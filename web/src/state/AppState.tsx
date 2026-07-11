@@ -7,6 +7,7 @@ import type { RosterState } from '../modules/roster/types'
 import { emptySchedulingState } from '../modules/scheduling/session-lifecycle'
 import type { SchedulingState } from '../modules/scheduling/types'
 import {
+  ensureClerkWorkspace,
   isSupabaseConfigured,
   loadWorkspaceFromSupabase,
   normalizeIdsForDb,
@@ -15,7 +16,14 @@ import {
 import { AppStateContext, type BackendStatus } from './app-state-context'
 import { clearPersistedAppState, loadPersistedAppState, savePersistedAppState } from './persist'
 import { loadActiveLearnerId, saveActiveLearnerId } from './active-learner'
+import {
+  loadActiveClassId,
+  loadActiveLearnerClassId,
+  saveActiveClassId,
+  saveActiveLearnerClassId,
+} from './workspace-prefs'
 import { loadLiveLedger } from '../lib/live-assessment'
+import { useStaffSession } from '../auth/useStaffSession'
 
 function ledgerFromCapture(
   capture: CaptureSessionState,
@@ -66,6 +74,18 @@ function rosterWeight(r: RosterState, s: SchedulingState): number {
   )
 }
 
+function rebaseRosterOrganization(
+  r: RosterState,
+  organizationId: string,
+  name: string,
+): RosterState {
+  return {
+    ...r,
+    organization: { id: organizationId, name },
+    courses: r.courses.map((course) => ({ ...course, organizationId })),
+  }
+}
+
 function ensureStableOrg(r: RosterState): RosterState {
   if (r.organization.id === 'org-local' || r.organization.id.startsWith('org-local')) {
     return {
@@ -82,17 +102,22 @@ function ensureStableOrg(r: RosterState): RosterState {
 }
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
-  const local = loadPersistedAppState()
+  const staffSession = useStaffSession()
+  const persistedRef = useRef(loadPersistedAppState())
   const [roster, setRoster] = useState<RosterState>(() =>
-    ensureStableOrg(local?.roster ?? createEmptyRoster()),
+    staffSession.clerkEnabled
+      ? createEmptyRoster()
+      : ensureStableOrg(persistedRef.current?.roster ?? createEmptyRoster()),
   )
-  const [scheduling, setScheduling] = useState<SchedulingState>(
-    () => local?.scheduling ?? emptySchedulingState(),
+  const [scheduling, setScheduling] = useState<SchedulingState>(() =>
+    staffSession.clerkEnabled
+      ? emptySchedulingState()
+      : (persistedRef.current?.scheduling ?? emptySchedulingState()),
   )
   const [capture, setCapture] = useState<CaptureSessionState | null>(null)
   const [ledger, setLedger] = useState<ResultRecord[]>([])
   const [metricSettings, setMetricSettings] = useState<MetricSettingsState>(
-    () => local?.metricSettings ?? createDefaultMetricSettings(),
+    () => persistedRef.current?.metricSettings ?? createDefaultMetricSettings(),
   )
   const [backendStatus, setBackendStatus] = useState<BackendStatus>('booting')
   const [backendError, setBackendError] = useState<string | null>(null)
@@ -100,10 +125,24 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [activeLearnerUserId, setActiveLearnerUserIdState] = useState<string | null>(() =>
     loadActiveLearnerId(),
   )
+  const [activeClassId, setActiveClassIdState] = useState<string | null>(() => loadActiveClassId())
+  const [activeLearnerClassId, setActiveLearnerClassIdState] = useState<string | null>(() =>
+    loadActiveLearnerClassId(),
+  )
 
   const setActiveLearnerUserId = useCallback((id: string | null) => {
     saveActiveLearnerId(id)
     setActiveLearnerUserIdState(id)
+  }, [])
+
+  const setActiveClassId = useCallback((id: string | null) => {
+    saveActiveClassId(id)
+    setActiveClassIdState(id)
+  }, [])
+
+  const setActiveLearnerClassId = useCallback((id: string | null) => {
+    saveActiveLearnerClassId(id)
+    setActiveLearnerClassIdState(id)
   }, [])
 
   const bootDone = useRef(false)
@@ -115,16 +154,44 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const liveRef = useRef({ roster, scheduling })
   liveRef.current = { roster, scheduling }
 
-  // Boot: merge Supabase + local without wiping richer side
+  // Boot: authenticated cloud is authoritative. Local data is used only once to
+  // bootstrap an empty Clerk-linked workspace, then cloud wins on every browser.
   useEffect(() => {
     let cancelled = false
     ;(async () => {
+      bootDone.current = false
+      if (staffSession.clerkEnabled && !staffSession.ready) return
+      if (staffSession.clerkEnabled && !staffSession.signedIn) {
+        setRoster(createEmptyRoster())
+        setScheduling(emptySchedulingState())
+        setCapture(null)
+        setLedger([])
+        setBackendStatus('offline')
+        return
+      }
       if (!isSupabaseConfigured()) {
         setBackendStatus('offline')
         bootDone.current = true
         return
       }
-      const loaded = await loadWorkspaceFromSupabase()
+
+      let organizationId: string | undefined
+      if (staffSession.userId) {
+        const provisioned = await ensureClerkWorkspace({
+          clerkUserId: staffSession.userId,
+          email: staffSession.email,
+          displayName: staffSession.displayName ?? staffSession.email ?? 'Chunks Staff',
+          roles: staffSession.staffRoles,
+        })
+        if (!provisioned.ok) {
+          setBackendStatus('error')
+          setBackendError(provisioned.error)
+          return
+        }
+        organizationId = provisioned.organizationId
+      }
+
+      const loaded = await loadWorkspaceFromSupabase({ organizationId })
       if (cancelled) return
       if (!loaded.ok) {
         setBackendStatus('error')
@@ -137,9 +204,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         roster: ensureStableOrg(loaded.data.roster),
         scheduling: loaded.data.scheduling,
       }
+      const localRoster = ensureStableOrg(
+        persistedRef.current?.roster ?? liveRef.current.roster,
+      )
       const live = {
-        roster: ensureStableOrg(liveRef.current.roster),
-        scheduling: liveRef.current.scheduling,
+        roster: organizationId
+          ? rebaseRosterOrganization(localRoster, organizationId, remote.roster.organization.name)
+          : localRoster,
+        scheduling: persistedRef.current?.scheduling ?? liveRef.current.scheduling,
       }
       const wRemote = rosterWeight(remote.roster, remote.scheduling)
       const wLive = rosterWeight(live.roster, live.scheduling)
@@ -147,18 +219,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       skipNextSync.current = true
 
       let authoritativeRoster = remote.roster
-      if (wRemote > 0 && wRemote >= wLive) {
-        // Cloud is source of truth when it has data
+      if (wRemote > 0) {
+        // Once cloud has data, it is always authoritative across browsers.
         setRoster(remote.roster)
         setScheduling(remote.scheduling)
-      } else if (wLive > 0 && wRemote === 0) {
-        // Cloud empty, browser has setup → keep live and push up
-        authoritativeRoster = live.roster
-        setRoster(live.roster)
-        setScheduling(live.scheduling)
-        skipNextSync.current = false
-      } else if (wLive > wRemote) {
-        // Prefer richer local (boot race: user typed before load finished)
+      } else if (wLive > 0) {
+        // One-time migration from this browser into the empty Clerk workspace.
         authoritativeRoster = live.roster
         setRoster(live.roster)
         setScheduling(live.scheduling)
@@ -179,7 +245,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [staffSession])
 
   // Local cache always
   useEffect(() => {
@@ -273,9 +339,22 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, [roster, scheduling])
 
   const reloadFromSupabase = useCallback(async () => {
-    if (!isSupabaseConfigured()) return
+    if (!isSupabaseConfigured() || !staffSession.userId) return
     setBackendStatus('syncing')
-    const loaded = await loadWorkspaceFromSupabase()
+    const provisioned = await ensureClerkWorkspace({
+      clerkUserId: staffSession.userId,
+      email: staffSession.email,
+      displayName: staffSession.displayName ?? staffSession.email ?? 'Chunks Staff',
+      roles: staffSession.staffRoles,
+    })
+    if (!provisioned.ok) {
+      setBackendStatus('error')
+      setBackendError(provisioned.error)
+      return
+    }
+    const loaded = await loadWorkspaceFromSupabase({
+      organizationId: provisioned.organizationId,
+    })
     if (!loaded.ok) {
       setBackendStatus('error')
       setBackendError(loaded.error)
@@ -291,7 +370,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setBackendStatus('online')
     setBackendError(null)
     setLastSyncedAt(new Date().toISOString())
-  }, [])
+  }, [staffSession])
 
   const appendFinalizedFromCapture = useCallback(
     (nextCapture: CaptureSessionState) => {
@@ -322,6 +401,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       supabaseEnabled: isSupabaseConfigured(),
       activeLearnerUserId,
       setActiveLearnerUserId,
+      activeClassId,
+      setActiveClassId,
+      activeLearnerClassId,
+      setActiveLearnerClassId,
     }),
     [
       roster,
@@ -338,6 +421,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       reloadFromSupabase,
       activeLearnerUserId,
       setActiveLearnerUserId,
+      activeClassId,
+      setActiveClassId,
+      activeLearnerClassId,
+      setActiveLearnerClassId,
     ],
   )
 

@@ -20,9 +20,89 @@ export type WorkspaceSnapshot = {
   scheduling: SchedulingState
 }
 
-export type SyncResult =
-  | { ok: true; source: 'supabase' | 'empty' }
-  | { ok: false; error: string }
+export type SyncResult = { ok: true; source: 'supabase' | 'empty' } | { ok: false; error: string }
+
+export type ClerkWorkspaceIdentity = {
+  clerkUserId: string
+  email: string | null
+  displayName: string
+  roles: Array<'admin' | 'teacher'>
+}
+
+export async function ensureClerkWorkspace(
+  identity: ClerkWorkspaceIdentity,
+): Promise<{ ok: true; organizationId: string } | { ok: false; error: string }> {
+  const sb = db()
+  if (!sb) return { ok: false, error: 'Supabase not configured' }
+
+  const existingUser = await sb
+    .from('users')
+    .select('id')
+    .eq('clerk_user_id', identity.clerkUserId)
+    .maybeSingle()
+  if (existingUser.error) return { ok: false, error: existingUser.error.message }
+
+  let userId = existingUser.data?.id as string | undefined
+  if (!userId) {
+    const inserted = await sb
+      .from('users')
+      .insert({
+        clerk_user_id: identity.clerkUserId,
+        display_name: identity.displayName,
+        email: identity.email,
+      })
+      .select('id')
+      .single()
+    if (inserted.error) return { ok: false, error: inserted.error.message }
+    userId = inserted.data.id as string
+  } else {
+    const updated = await sb
+      .from('users')
+      .update({ display_name: identity.displayName, email: identity.email })
+      .eq('id', userId)
+    if (updated.error) return { ok: false, error: updated.error.message }
+  }
+
+  const memberships = await sb
+    .from('organization_memberships')
+    .select('organization_id')
+    .eq('user_id', userId)
+  if (memberships.error) return { ok: false, error: memberships.error.message }
+
+  let organizationId = memberships.data?.[0]?.organization_id as string | undefined
+  if (!organizationId) {
+    const clerkOrgId = `personal:${identity.clerkUserId}`
+    const existingOrg = await sb
+      .from('organizations')
+      .select('id')
+      .eq('clerk_org_id', clerkOrgId)
+      .maybeSingle()
+    if (existingOrg.error) return { ok: false, error: existingOrg.error.message }
+    organizationId = existingOrg.data?.id as string | undefined
+    if (!organizationId) {
+      const insertedOrg = await sb
+        .from('organizations')
+        .insert({ name: `${identity.displayName} Workspace`, clerk_org_id: clerkOrgId })
+        .select('id')
+        .single()
+      if (insertedOrg.error) return { ok: false, error: insertedOrg.error.message }
+      organizationId = insertedOrg.data.id as string
+    }
+  }
+
+  const roles = identity.roles.length > 0 ? identity.roles : ['teacher' as const]
+  const membershipRows = roles.map((role) => ({
+    organization_id: organizationId!,
+    user_id: userId!,
+    role,
+  }))
+  const membershipUpsert = await sb
+    .from('organization_memberships')
+    .upsert(membershipRows, { onConflict: 'organization_id,user_id,role' })
+  if (membershipUpsert.error) return { ok: false, error: membershipUpsert.error.message }
+
+  return { ok: true, organizationId }
+}
 
 function asSchedule(raw: unknown): CourseSchedule | null {
   if (!raw || typeof raw !== 'object') return null
@@ -96,18 +176,17 @@ export function normalizeIdsForDb(snapshot: WorkspaceSnapshot): WorkspaceSnapsho
   return { roster, scheduling }
 }
 
-export async function loadWorkspaceFromSupabase(): Promise<
-  { ok: true; data: WorkspaceSnapshot } | { ok: false; error: string }
-> {
+export async function loadWorkspaceFromSupabase(options?: {
+  organizationId?: string
+}): Promise<{ ok: true; data: WorkspaceSnapshot } | { ok: false; error: string }> {
   const sb = db()
   if (!sb) return { ok: false, error: 'Supabase not configured' }
 
   try {
-    // Prefer stable local org id; else the org that has the most courses (richest workspace)
-    const { data: orgs, error: orgErr } = await sb
-      .from('organizations')
-      .select('*')
-      .order('created_at', { ascending: true })
+    // Authenticated staff must load only their provisioned organization.
+    let orgQuery = sb.from('organizations').select('*').order('created_at', { ascending: true })
+    if (options?.organizationId) orgQuery = orgQuery.eq('id', options.organizationId)
+    const { data: orgs, error: orgErr } = await orgQuery
 
     if (orgErr) return { ok: false, error: orgErr.message }
     if (!orgs?.length) {
@@ -117,9 +196,12 @@ export async function loadWorkspaceFromSupabase(): Promise<
       }
     }
 
-    let org = orgs.find((o) => o.id === LOCAL_ORG_ID) ?? orgs[0]!
-    // If multiple orgs exist, prefer the one with courses
-    if (orgs.length > 1) {
+    let org =
+      orgs.find((o) => o.id === options?.organizationId) ??
+      orgs.find((o) => o.id === LOCAL_ORG_ID) ??
+      orgs[0]!
+    // Legacy anonymous mode only: prefer the richest workspace.
+    if (!options?.organizationId && orgs.length > 1) {
       const counts = await Promise.all(
         orgs.map(async (o) => {
           const { count } = await sb
@@ -171,9 +253,7 @@ export async function loadWorkspaceFromSupabase(): Promise<
       if (r.error) return { ok: false, error: r.error.message }
     }
 
-    const memberUserIds = new Set(
-      (membersRes.data ?? []).map((m) => m.user_id as string),
-    )
+    const memberUserIds = new Set((membersRes.data ?? []).map((m) => m.user_id as string))
     const rolesByUser = new Map<string, DomainUser['roles']>()
     for (const m of membersRes.data ?? []) {
       const uid = m.user_id as string
@@ -335,8 +415,7 @@ export async function saveWorkspaceToSupabase(
       if ((courseCount ?? 0) > 0 || (userMemCount ?? 0) > 0) {
         return {
           ok: false,
-          error:
-            'Refused empty save — cloud has data. Use Clear data to wipe intentionally.',
+          error: 'Refused empty save — cloud has data. Use Clear data to wipe intentionally.',
         }
       }
     }
@@ -427,9 +506,7 @@ export async function saveWorkspaceToSupabase(
           .select('id, course_id')
           .in('course_id', courseIds)
         const keep = new Set(roster.classes.map((c) => c.id))
-        const toDelete = (existing ?? [])
-          .map((c) => c.id as string)
-          .filter((id) => !keep.has(id))
+        const toDelete = (existing ?? []).map((c) => c.id as string).filter((id) => !keep.has(id))
         if (toDelete.length > 0) {
           await sb.from('classes').delete().in('id', toDelete)
         }
@@ -460,9 +537,7 @@ export async function saveWorkspaceToSupabase(
           .select('id')
           .in('class_id', classIds)
         const keep = new Set(roster.enrollments.map((e) => e.id))
-        const toDelete = (existing ?? [])
-          .map((e) => e.id as string)
-          .filter((id) => !keep.has(id))
+        const toDelete = (existing ?? []).map((e) => e.id as string).filter((id) => !keep.has(id))
         if (toDelete.length > 0) {
           await sb.from('enrollments').delete().in('id', toDelete)
         }
@@ -493,9 +568,7 @@ export async function saveWorkspaceToSupabase(
           .select('id')
           .in('class_id', classIds)
         const keep = new Set(scheduling.scheduledSessions.map((s) => s.id))
-        const toDelete = (existing ?? [])
-          .map((s) => s.id as string)
-          .filter((id) => !keep.has(id))
+        const toDelete = (existing ?? []).map((s) => s.id as string).filter((id) => !keep.has(id))
         if (toDelete.length > 0) {
           await sb.from('scheduled_sessions').delete().in('id', toDelete)
         }
@@ -542,9 +615,7 @@ export async function saveWorkspaceToSupabase(
           .select('id')
           .in('class_id', classIds)
         const keep = new Set(scheduling.learningSessions.map((s) => s.id))
-        const toDelete = (existing ?? [])
-          .map((s) => s.id as string)
-          .filter((id) => !keep.has(id))
+        const toDelete = (existing ?? []).map((s) => s.id as string).filter((id) => !keep.has(id))
         if (toDelete.length > 0) {
           await sb.from('learning_sessions').delete().in('id', toDelete)
         }
@@ -593,9 +664,7 @@ export async function saveWorkspaceToSupabase(
           .select('id')
           .in('learning_session_id', lsIds)
         const keep = new Set(scheduling.attendance.map((a) => a.id))
-        const toDelete = (existing ?? [])
-          .map((a) => a.id as string)
-          .filter((id) => !keep.has(id))
+        const toDelete = (existing ?? []).map((a) => a.id as string).filter((id) => !keep.has(id))
         if (toDelete.length > 0) {
           await sb.from('attendance_records').delete().in('id', toDelete)
         }

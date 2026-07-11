@@ -1,11 +1,7 @@
 import { useAuth, useUser } from '@clerk/react'
-import {
-  createContext,
-  useContext,
-  useMemo,
-  type ReactNode,
-} from 'react'
+import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react'
 import { env } from '../env'
+import { setSupabaseAccessToken, setSupabaseAccessTokenProvider } from '../lib/supabase'
 import {
   canAccessStaffRole,
   resolveStaffRoles,
@@ -56,8 +52,21 @@ export function BypassStaffSessionProvider({ children }: { children: ReactNode }
 
 /** Production path: Clerk session → staff roles (metadata / allowlist / bootstrap). */
 export function ClerkStaffSessionProvider({ children }: { children: ReactNode }) {
-  const { isLoaded, isSignedIn, userId } = useAuth()
+  const { isLoaded, isSignedIn, userId, getToken } = useAuth()
   const { user, isLoaded: userLoaded } = useUser()
+
+  useEffect(() => {
+    if (!isLoaded) return
+    if (!isSignedIn) {
+      setSupabaseAccessTokenProvider(null)
+      void setSupabaseAccessToken(null)
+      return
+    }
+    const provider = async () => getToken()
+    setSupabaseAccessTokenProvider(provider)
+    void provider().then((token) => setSupabaseAccessToken(token))
+    return () => setSupabaseAccessTokenProvider(null)
+  }, [isLoaded, isSignedIn, getToken])
 
   const value = useMemo(() => {
     if (env.authBypass) {
@@ -80,7 +89,7 @@ export function ClerkStaffSessionProvider({ children }: { children: ReactNode })
     )
     const staffRoles = resolveStaffRoles(
       {
-        userId: isSignedIn ? userId ?? null : null,
+        userId: isSignedIn ? (userId ?? null) : null,
         email,
         metadataRoles,
       },
@@ -96,16 +105,14 @@ export function ClerkStaffSessionProvider({ children }: { children: ReactNode })
       signedIn: Boolean(isSignedIn),
       authBypass: false,
       clerkEnabled: true,
-      userId: isSignedIn ? userId ?? null : null,
+      userId: isSignedIn ? (userId ?? null) : null,
       email,
       displayName: user?.fullName ?? user?.username ?? email,
       staffRoles,
     })
   }, [isLoaded, isSignedIn, userId, user, userLoaded])
 
-  return (
-    <StaffSessionContext.Provider value={value}>{children}</StaffSessionContext.Provider>
-  )
+  return <StaffSessionContext.Provider value={value}>{children}</StaffSessionContext.Provider>
 }
 
 export function useStaffSession(): StaffSession {

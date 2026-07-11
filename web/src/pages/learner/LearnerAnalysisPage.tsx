@@ -29,8 +29,8 @@ export function LearnerAnalysisPage() {
   return (
     <>
       <PageHeader
-        title="Analysis"
-        subtitle={`${course.code}${classRow ? ` · ${classRow.name}` : ''}`}
+        title="Your progress"
+        subtitle={`${course.code}${classRow ? ` · ${classRow.name}` : ''} · how focus changes day by day`}
       />
       <ProgressAnalysisView
         mode="learner"
@@ -40,6 +40,7 @@ export function LearnerAnalysisPage() {
         courseEnd={course.endsOn}
         classId={classRow?.id}
         className={classRow?.name}
+        totalDays={course.schedule?.sessionCount ?? null}
         ledger={ledger}
         users={roster.users}
         learnerUserId={learner.id}
@@ -49,6 +50,7 @@ export function LearnerAnalysisPage() {
             id: s.id,
             startedAt: s.startedAt,
             completedAt: s.completedAt,
+            sessionNumber: s.sessionNumber,
           }))}
         emptyHint="After your teacher finishes sessions, progress appears here."
         metricSettings={metricSettings}

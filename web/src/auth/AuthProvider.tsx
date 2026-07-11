@@ -1,6 +1,5 @@
 import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/react'
 import type { ReactNode } from 'react'
-import { env } from '../env'
 
 type Props = { children?: ReactNode }
 
@@ -15,14 +14,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 /** Sign-in / sign-up / user menu controls for the top bar. */
 export function AuthChrome({ children }: Props) {
-  if (!env.clerkPublishableKey || env.authBypass) {
-    return (
-      <div className="auth-chrome bypass">
-        <span className="badge">Demo mode</span>
-        {children}
-      </div>
-    )
-  }
 
   return (
     <div className="auth-chrome">

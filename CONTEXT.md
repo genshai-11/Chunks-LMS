@@ -99,3 +99,15 @@ _Avoid_: Failure score
 **RAC**:
 The share of finalized Assessment Attempts ending Green or Purple in a Report Window.
 _Avoid_: Success score
+
+---
+
+## Related project docs (not domain language)
+
+| Doc | Purpose |
+|-----|---------|
+| [`docs/ops/ci-cd.md`](docs/ops/ci-cd.md) | GitHub Actions CI/CD, Vercel secrets, migration promote |
+| [`docs/ops/vercel-deploy.md`](docs/ops/vercel-deploy.md) | Manual / first-time Vercel deploy |
+| [`docs/adr/`](docs/adr/) | Architecture decisions |
+
+CI/CD workflows: `.github/workflows/ci.yml`, `.github/workflows/cd.yml`. Domain terms above are the source of truth for product language; ops docs do not redefine them.

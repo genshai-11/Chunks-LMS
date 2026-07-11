@@ -6,10 +6,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  ListOrdered,
   Play,
   Radio,
   Ban,
   Timer,
+  Trash2,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Flash } from '../../components/Flash'
@@ -22,8 +24,16 @@ import {
   applyCourseScheduleToClass,
   cancelScheduledSession,
   createScheduledSession,
+  deleteScheduledSession,
   startLearningSession,
 } from '../../modules/scheduling/session-lifecycle'
+import {
+  formatSessionClock,
+  formatSessionDateLabel,
+  formatSessionTimeRange,
+  isSameWallClockDay,
+  wallClockIsoFromLocal,
+} from '../../modules/scheduling/session-time'
 import type { ScheduledSession } from '../../modules/scheduling/types'
 import { useAppState } from '../../state/useAppState'
 
@@ -50,10 +60,6 @@ function sameDay(a: Date, b: Date): boolean {
     a.getMonth() === b.getMonth() &&
     a.getDate() === b.getDate()
   )
-}
-
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
 function formatDayHeader(d: Date): string {
@@ -113,6 +119,8 @@ export function TeacherCalendarPage() {
   const openSession = scheduling.learningSessions.find(
     (s) => s.classId === classRow?.id && s.status === 'open',
   )
+  const [listFilter, setListFilter] = useState<'active' | 'all'>('active')
+
   const sessions = useMemo(
     () =>
       scheduling.scheduledSessions
@@ -121,6 +129,11 @@ export function TeacherCalendarPage() {
         .sort((a, b) => a.plannedStart.localeCompare(b.plannedStart)),
     [scheduling.scheduledSessions, classRow?.id],
   )
+
+  const listSessions = useMemo(() => {
+    if (listFilter === 'all') return sessions
+    return sessions.filter((s) => s.status === 'scheduled' || s.status === 'completed')
+  }, [sessions, listFilter])
 
   const weekDays = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDays(weekAnchor, i)),
@@ -133,27 +146,19 @@ export function TeacherCalendarPage() {
       map.set(day.toDateString(), [])
     }
     for (const s of sessions) {
-      const d = new Date(s.plannedStart)
-      const key = new Date(d.getFullYear(), d.getMonth(), d.getDate()).toDateString()
-      const list = map.get(key)
-      if (list) list.push(s)
+      for (const day of weekDays) {
+        if (isSameWallClockDay(s.plannedStart, day)) {
+          map.get(day.toDateString())?.push(s)
+          break
+        }
+      }
     }
     return map
   }, [sessions, weekDays])
 
   const selectedSessions = useMemo(() => {
-    const key = new Date(
-      selectedDay.getFullYear(),
-      selectedDay.getMonth(),
-      selectedDay.getDate(),
-    ).toDateString()
     return sessions
-      .filter((s) => {
-        const d = new Date(s.plannedStart)
-        return (
-          new Date(d.getFullYear(), d.getMonth(), d.getDate()).toDateString() === key
-        )
-      })
+      .filter((s) => isSameWallClockDay(s.plannedStart, selectedDay))
       .sort((a, b) => a.plannedStart.localeCompare(b.plannedStart))
   }, [sessions, selectedDay])
 
@@ -199,17 +204,37 @@ export function TeacherCalendarPage() {
   }
 
   function scheduleAt(day: Date, hour: number, minutes = 0) {
-    const start = new Date(day)
-    start.setHours(hour, minutes, 0, 0)
+    const plannedStart = wallClockIsoFromLocal(day, hour, minutes)
     const r = createScheduledSession(scheduling, {
       classId: classRow!.id,
-      plannedStart: start.toISOString(),
+      plannedStart,
       durationMinutes: duration,
     })
     if (!r.ok) return err(r.error)
     setScheduling(r.state)
     setSelectedDay(day)
-    ok(`Scheduled ${formatTime(r.value.plannedStart)} · ${duration}m`)
+    ok(`Scheduled ${formatSessionClock(r.value.plannedStart)} · ${duration}m`)
+  }
+
+  function removeSession(s: ScheduledSession) {
+    if (
+      !window.confirm(
+        `Delete ${s.sessionNumber != null ? `Day ${s.sessionNumber}` : 'this session'} (${formatSessionDateLabel(s.plannedStart)} ${formatSessionClock(s.plannedStart)})?`,
+      )
+    ) {
+      return
+    }
+    const r = deleteScheduledSession(scheduling, s.id)
+    if (!r.ok) return err(r.error)
+    setScheduling(r.state)
+    ok('Session removed from list')
+  }
+
+  function cancelSession(s: ScheduledSession) {
+    const r = cancelScheduledSession(scheduling, s.id)
+    if (!r.ok) return err(r.error)
+    setScheduling(r.state)
+    ok('Session cancelled')
   }
 
   function goThisWeek() {
@@ -343,7 +368,10 @@ export function TeacherCalendarPage() {
                   ) : (
                     daySessions.map((s) => (
                       <div key={s.id} className={statusClass(s.status)}>
-                        <span className="sched-card-time">{formatTime(s.plannedStart)}</span>
+                        <span className="sched-card-time">
+                          {s.sessionNumber != null ? `D${s.sessionNumber} · ` : ''}
+                          {formatSessionClock(s.plannedStart)}
+                        </span>
                         <span className="sched-card-meta">{s.durationMinutes}m</span>
                       </div>
                     ))
@@ -389,62 +417,65 @@ export function TeacherCalendarPage() {
             />
           ) : (
             <ul className="sched-agenda">
-              {selectedSessions.map((s) => {
-                const end = new Date(s.plannedStart)
-                end.setMinutes(end.getMinutes() + s.durationMinutes)
-                return (
-                  <li key={s.id} className={`sched-agenda-item ${statusClass(s.status)}`}>
-                    <div className="sched-agenda-time">
-                      <Clock3 className="h-3.5 w-3.5" aria-hidden />
-                      <span>
-                        {formatTime(s.plannedStart)} – {formatTime(end.toISOString())}
-                      </span>
-                    </div>
-                    <div className="sched-agenda-body">
-                      <strong>{classRow.name}</strong>
-                      <span className="badge">{s.status}</span>
-                      <span className="meta mt-0">
-                        <Timer className="inline h-3 w-3" aria-hidden /> {s.durationMinutes} min
-                      </span>
-                    </div>
-                    <div className="sched-agenda-actions">
-                      {s.status === 'scheduled' && (
-                        <>
-                          {openSession ? (
-                            <button type="button" className="primary" onClick={resumeLive}>
-                              <Radio className="h-3.5 w-3.5" aria-hidden />
-                              <span>Resume live</span>
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              className="primary"
-                              onClick={() => startSession(s.id)}
-                            >
-                              <Play className="h-3.5 w-3.5" aria-hidden />
-                              <span>Start session</span>
-                            </button>
-                          )}
+              {selectedSessions.map((s) => (
+                <li key={s.id} className={`sched-agenda-item ${statusClass(s.status)}`}>
+                  <div className="sched-agenda-time">
+                    <Clock3 className="h-3.5 w-3.5" aria-hidden />
+                    <span>
+                      {s.sessionNumber != null ? `Day ${s.sessionNumber} · ` : ''}
+                      {formatSessionTimeRange(s.plannedStart, s.durationMinutes)}
+                    </span>
+                  </div>
+                  <div className="sched-agenda-body">
+                    <strong>{classRow.name}</strong>
+                    <span className="badge">{s.status}</span>
+                    <span className="meta mt-0">
+                      <Timer className="inline h-3 w-3" aria-hidden /> {s.durationMinutes} min
+                    </span>
+                  </div>
+                  <div className="sched-agenda-actions">
+                    {s.status === 'scheduled' && (
+                      <>
+                        {openSession ? (
+                          <button type="button" className="primary" onClick={resumeLive}>
+                            <Radio className="h-3.5 w-3.5" aria-hidden />
+                            <span>Resume live</span>
+                          </button>
+                        ) : (
                           <button
                             type="button"
-                            className="ghost danger"
-                            disabled={Boolean(openSession)}
-                            onClick={() => {
-                              const r = cancelScheduledSession(scheduling, s.id)
-                              if (!r.ok) return err(r.error)
-                              setScheduling(r.state)
-                              ok('Session cancelled')
-                            }}
+                            className="primary"
+                            onClick={() => startSession(s.id)}
                           >
-                            <Ban className="h-3.5 w-3.5" aria-hidden />
-                            <span>Cancel</span>
+                            <Play className="h-3.5 w-3.5" aria-hidden />
+                            <span>Start</span>
                           </button>
-                        </>
-                      )}
-                    </div>
-                  </li>
-                )
-              })}
+                        )}
+                        <button
+                          type="button"
+                          className="ghost danger"
+                          disabled={Boolean(openSession)}
+                          onClick={() => cancelSession(s)}
+                        >
+                          <Ban className="h-3.5 w-3.5" aria-hidden />
+                          <span>Cancel</span>
+                        </button>
+                      </>
+                    )}
+                    {s.status !== 'completed' ? (
+                      <button
+                        type="button"
+                        className="ghost danger"
+                        title="Remove from list"
+                        onClick={() => removeSession(s)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                        <span>Delete</span>
+                      </button>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
             </ul>
           )}
         </Panel>
@@ -537,6 +568,107 @@ export function TeacherCalendarPage() {
           </div>
         </Panel>
       </div>
+
+      {/* Full session list — manage / delete */}
+      <Panel
+        icon={ListOrdered}
+        title="All sessions"
+        description={`${listSessions.length} in list · Day numbers reindex after delete`}
+        defaultOpen
+        actions={
+          <div className="btn-row my-0">
+            <button
+              type="button"
+              className={listFilter === 'active' ? 'active' : 'ghost'}
+              onClick={() => setListFilter('active')}
+            >
+              Active
+            </button>
+            <button
+              type="button"
+              className={listFilter === 'all' ? 'active' : 'ghost'}
+              onClick={() => setListFilter('all')}
+            >
+              All
+            </button>
+          </div>
+        }
+      >
+        {listSessions.length === 0 ? (
+          <EmptyState
+            icon={ListOrdered}
+            title="No sessions yet"
+            description="Apply the course plan or add slots on the calendar."
+          />
+        ) : (
+          <div className="table-wrap">
+            <table aria-label="Class session list">
+              <thead>
+                <tr>
+                  <th scope="col">Day</th>
+                  <th scope="col">When</th>
+                  <th scope="col">Time</th>
+                  <th scope="col">Dur</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {listSessions.map((s) => (
+                  <tr key={s.id}>
+                    <td className="font-mono text-xs font-bold">
+                      {s.sessionNumber != null ? `Day ${s.sessionNumber}` : '—'}
+                    </td>
+                    <td className="text-sm">{formatSessionDateLabel(s.plannedStart)}</td>
+                    <td className="font-mono text-xs">
+                      {formatSessionTimeRange(s.plannedStart, s.durationMinutes)}
+                    </td>
+                    <td className="font-mono text-xs">{s.durationMinutes}m</td>
+                    <td>
+                      <span className="badge">{s.status}</span>
+                    </td>
+                    <td>
+                      <div className="btn-row my-0">
+                        {s.status === 'scheduled' && !openSession ? (
+                          <button
+                            type="button"
+                            className="ghost"
+                            onClick={() => startSession(s.id)}
+                          >
+                            <Play className="h-3.5 w-3.5" aria-hidden />
+                            Start
+                          </button>
+                        ) : null}
+                        {s.status === 'scheduled' ? (
+                          <button
+                            type="button"
+                            className="ghost danger"
+                            disabled={Boolean(openSession)}
+                            onClick={() => cancelSession(s)}
+                          >
+                            <Ban className="h-3.5 w-3.5" aria-hidden />
+                            Cancel
+                          </button>
+                        ) : null}
+                        {s.status !== 'completed' ? (
+                          <button
+                            type="button"
+                            className="ghost danger"
+                            onClick={() => removeSession(s)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                            Delete
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Panel>
     </>
   )
 }

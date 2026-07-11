@@ -28,7 +28,7 @@ export function TeacherAnalysisPage() {
     <>
       <PageHeader
         title="Analysis"
-        subtitle={`${course.code} · ${classRow.name}`}
+        subtitle={`${course.code} · ${classRow.name} · focus on RFC/RAC by day & learner`}
         actions={
           <Link to="/teacher/session" className="btn ghost">
             Session
@@ -43,6 +43,7 @@ export function TeacherAnalysisPage() {
         courseEnd={course.endsOn}
         classId={classRow.id}
         className={classRow.name}
+        totalDays={course.schedule?.sessionCount ?? null}
         ledger={ledger}
         users={[
           ...learners.filter((u): u is NonNullable<typeof u> => Boolean(u)),
@@ -54,6 +55,7 @@ export function TeacherAnalysisPage() {
             id: s.id,
             startedAt: s.startedAt,
             completedAt: s.completedAt,
+            sessionNumber: s.sessionNumber,
           }))}
         emptyHint="Start a live session and finalize Focus / Awareness colors to populate this report."
         metricSettings={metricSettings}

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { buildSessionMetricSeries, sessionLabel } from './session-series'
+import {
+  buildSessionMetricSeries,
+  resolveSessionDayNumber,
+  sessionDayBadge,
+  sessionDayHash,
+  sessionLabel,
+} from './session-series'
 import type { ResultRecord } from './progress'
 import type { LearningSession } from '../scheduling/types'
 
@@ -46,8 +52,26 @@ function rec(
 }
 
 describe('session metric series', () => {
-  it('labels buổi numbers', () => {
-    expect(sessionLabel(3)).toBe('Buổi 3')
+  it('labels day numbers and URL hash', () => {
+    expect(sessionLabel(3)).toBe('Day 3')
+    expect(sessionLabel(3, undefined, 15)).toBe('Day 3 / 15')
+    expect(sessionDayBadge(3, 15)).toBe('#Day 3/15')
+    expect(sessionDayHash(3)).toBe('#day-3')
+  })
+
+  it('resolves day number from sessionNumber or schedule order', () => {
+    expect(
+      resolveSessionDayNumber(
+        {
+          id: 'ls-1',
+          classId: 'c1',
+          sessionNumber: 4,
+          scheduledSessionId: null,
+          startedAt: '2026-07-01T09:00:00.000Z',
+        },
+        { scheduledSessions: [], learningSessions: [] },
+      ),
+    ).toBe(4)
   })
 
   it('builds one point per session with metrics', () => {
@@ -63,7 +87,7 @@ describe('session metric series', () => {
     })
     expect(points).toHaveLength(2)
     expect(points[0]!.sessionNumber).toBe(1)
-    expect(points[0]!.label).toBe('Buổi 1')
+    expect(points[0]!.label).toBe('Day 1')
     expect(points[0]!.metrics.rac).toBe(1)
     expect(points[1]!.sessionNumber).toBe(2)
     expect(points[1]!.metrics.rfc).toBe(1)

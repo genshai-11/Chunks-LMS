@@ -2,7 +2,6 @@ import {
   Cloud,
   CloudOff,
   GraduationCap,
-  LayoutDashboard,
   Loader2,
   RefreshCw,
   Shield,
@@ -99,11 +98,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="shell">
       <header className="topbar">
-        <NavLink to="/" className="topbar-brand" end>
-          <span className="topbar-mark" aria-hidden>
-            <LayoutDashboard className="h-3.5 w-3.5" strokeWidth={2.25} />
-          </span>
-          <span>Chunks LMS</span>
+        <NavLink to="/" className="topbar-brand" end aria-label="Chunks LMS home">
+          <img
+            src="/logo.png"
+            alt=""
+            className="topbar-logo"
+            width={120}
+            height={36}
+            decoding="async"
+          />
+          <span className="topbar-brand-text">Chunks LMS</span>
         </NavLink>
 
         <nav className="topbar-roles" aria-label="Switch role">

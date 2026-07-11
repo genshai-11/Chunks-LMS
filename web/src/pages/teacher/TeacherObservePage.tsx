@@ -1,40 +1,66 @@
-import { useCallback, useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, Keyboard, PanelLeft, Plus, X } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
+import {
+  Activity,
+  Check,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  GripVertical,
+  Keyboard,
+  LayoutGrid,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Plus,
+  Sparkles,
+  X,
+  Zap,
+} from 'lucide-react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import {
   addSessionQuestion,
   advancePosition,
   currentAttempt,
   jumpToQuestion,
+  markSessionCompleted,
   recordColorForCurrent,
   resolveProbeForCurrent,
   retreatPosition,
+  sessionColorSummary,
   type CaptureSessionState,
 } from '../../modules/assessment/session-capture'
 import { ObserveHeatmap } from '../../components/ObserveHeatmap'
 import { UserAvatar } from '../../components/UserAvatar'
 import type { ResultColor } from '../../modules/result-lifecycle/types'
+import {
+  resolveSessionDayNumber,
+  sessionDayBadge,
+  sessionDayHash,
+  sessionLabel,
+} from '../../modules/reporting/session-series'
+import {
+  completeLearningSession,
+  recordAttendance,
+} from '../../modules/scheduling/session-lifecycle'
 import { useAppState } from '../../state/useAppState'
 
 const COLORS: { key: ResultColor; label: string; shortcut: string }[] = [
-  { key: 'red', label: 'Red', shortcut: '1' },
-  { key: 'yellow', label: 'Yellow', shortcut: '2' },
-  { key: 'green', label: 'Green', shortcut: '3' },
-  { key: 'purple', label: 'Purple', shortcut: '4' },
+  { key: 'red', label: 'Red', shortcut: '0' },
+  { key: 'yellow', label: 'Yellow', shortcut: '1' },
+  { key: 'green', label: 'Green', shortcut: '2' },
+  { key: 'purple', label: 'Purple', shortcut: '3' },
 ]
 
-type Reaction = 'happy' | 'fight' | null
+type ReactionKind = 'happy' | 'fight'
+type Reaction = { kind: ReactionKind; id: number } | null
 
-function reactionFor(color: ResultColor | 'fail' | 'done'): Reaction {
+function reactionFor(color: ResultColor | 'fail' | 'done'): ReactionKind {
   if (color === 'green' || color === 'purple' || color === 'done') return 'happy'
-  if (color === 'red' || color === 'yellow' || color === 'fail') return 'fight'
-  return null
+  return 'fight'
 }
 
 function autoNextQuestion(state: CaptureSessionState): CaptureSessionState {
   const atLast =
-    state.questions.length === 0 ||
-    state.position.questionIndex >= state.questions.length - 1
+    state.questions.length === 0 || state.position.questionIndex >= state.questions.length - 1
   if (atLast) {
     const r = addSessionQuestion(state)
     if (r.ok) return r.state
@@ -42,30 +68,140 @@ function autoNextQuestion(state: CaptureSessionState): CaptureSessionState {
   return advancePosition(state)
 }
 
+const RAIL_W_KEY = 'chunks-lms:observe-rail-w'
+const RAIL_MIN = 152
+const RAIL_MAX = 440
+const RAIL_DEFAULT = 224
+const RAIL_COLLAPSED = 48
+
+function readSavedRailWidth(): number {
+  try {
+    const n = Number(window.localStorage.getItem(RAIL_W_KEY))
+    if (Number.isFinite(n)) return Math.min(RAIL_MAX, Math.max(RAIL_MIN, n))
+  } catch {
+    /* ignore */
+  }
+  return RAIL_DEFAULT
+}
+
 /**
  * Observe: left rail (avatar + collapsible map), big name, large bottom color dock,
- * happy/fight reaction flash. Phone-friendly.
+ * happy/fight reaction flash. Phone-friendly. Rail is drag-resizable when open.
  */
 export function TeacherObservePage() {
   const navigate = useNavigate()
-  const { roster, capture, setCapture, appendFinalizedFromCapture, scheduling } =
-    useAppState()
+  const {
+    roster,
+    capture,
+    setCapture,
+    appendFinalizedFromCapture,
+    scheduling,
+    setScheduling,
+    syncNow,
+  } = useAppState()
   const [toast, setToast] = useState<string | null>(null)
   const [showKeys, setShowKeys] = useState(false)
-  const [mapOpen, setMapOpen] = useState(true)
+  const [finishing, setFinishing] = useState(false)
+  const [showConfirmFinish, setShowConfirmFinish] = useState(false)
+  /** Desktop: open by default. Phone: closed so stage + colors stay primary. */
+  const [mapOpen, setMapOpen] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 640px)').matches : true,
+  )
   const [reaction, setReaction] = useState<Reaction>(null)
+  const [railWidth, setRailWidth] = useState(RAIL_DEFAULT)
+  const [resizing, setResizing] = useState(false)
+  const [isPhone, setIsPhone] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 639px)').matches : false,
+  )
+  const railWidthRef = useRef(railWidth)
+
+  useEffect(() => {
+    setRailWidth(readSavedRailWidth())
+    const mq = window.matchMedia('(max-width: 639px)')
+    const onChange = () => {
+      setIsPhone(mq.matches)
+      // When switching to phone, collapse map so dock stays visible
+      if (mq.matches) setMapOpen(false)
+    }
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+
+  useEffect(() => {
+    railWidthRef.current = railWidth
+  }, [railWidth])
+
+  const startRailResize = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!mapOpen) return
+    e.preventDefault()
+    e.stopPropagation()
+    const startX = e.clientX
+    const startW = railWidthRef.current
+    setResizing(true)
+
+    const onMove = (ev: PointerEvent) => {
+      const next = Math.min(RAIL_MAX, Math.max(RAIL_MIN, startW + (ev.clientX - startX)))
+      railWidthRef.current = next
+      setRailWidth(next)
+    }
+    const onUp = () => {
+      setResizing(false)
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      try {
+        window.localStorage.setItem(RAIL_W_KEY, String(railWidthRef.current))
+      } catch {
+        /* ignore */
+      }
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }, [mapOpen])
+
+  const railSizeClass =
+    !mapOpen ? 'is-narrow' : railWidth < 190 ? 'is-compact' : railWidth > 300 ? 'is-wide' : 'is-mid'
+
+  const avatarSize = !mapOpen ? 'sm' : railWidth > 300 ? 'xl' : railWidth > 200 ? 'lg' : 'md'
 
   const teacher = roster.users.find((u) => u.roles.includes('teacher'))
-  const classRow =
-    roster.classes.find((c) => c.teacherUserId === teacher?.id) ?? roster.classes[0]
+  const classRow = roster.classes.find((c) => c.teacherUserId === teacher?.id) ?? roster.classes[0]
+  const course = roster.courses.find((c) => c.id === classRow?.courseId)
   const openSession = scheduling.learningSessions.find(
     (s) => s.classId === classRow?.id && s.status === 'open',
   )
 
   const attempt = capture ? currentAttempt(capture) : null
-  const learner = attempt
-    ? roster.users.find((u) => u.id === attempt.learnerUserId)
+  const learner = attempt ? roster.users.find((u) => u.id === attempt.learnerUserId) : null
+
+  const plannedCount = scheduling.scheduledSessions.filter(
+    (s) =>
+      s.classId === classRow?.id && s.status !== 'cancelled' && s.status !== 'rescheduled',
+  ).length
+  const totalDays =
+    course?.schedule?.sessionCount && course.schedule.sessionCount > 0
+      ? course.schedule.sessionCount
+      : plannedCount > 0
+        ? plannedCount
+        : null
+
+  const dayNumber = openSession
+    ? resolveSessionDayNumber(openSession, {
+        scheduledSessions: scheduling.scheduledSessions,
+        learningSessions: scheduling.learningSessions,
+      })
     : null
+  const dayLabel = sessionLabel(dayNumber, openSession?.startedAt, totalDays)
+  const dayBadge = sessionDayBadge(dayNumber, totalDays)
+
+  // Keep browser URL in sync: /teacher/observe#day-3
+  useEffect(() => {
+    if (dayNumber == null) return
+    const hash = sessionDayHash(dayNumber)
+    if (window.location.hash !== hash) {
+      window.history.replaceState(null, '', `${window.location.pathname}${hash}`)
+    }
+    document.title = `${dayBadge} · Observe · Chunks LMS`
+  }, [dayNumber, dayBadge])
 
   const qNum = capture ? capture.position.questionIndex + 1 : 0
   const qTotal = capture?.questions.length ?? 0
@@ -73,8 +209,11 @@ export function TeacherObservePage() {
   const isFinalized =
     attempt?.snapshot.status === 'finalized' || attempt?.snapshot.status === 'corrected'
   const probeOpen =
-    attempt?.snapshot.status === 'probe_open' ||
-    attempt?.snapshot.status === 'resolution_required'
+    attempt?.snapshot.status === 'probe_open' || attempt?.snapshot.status === 'resolution_required'
+  const summary = capture ? sessionColorSummary(capture) : null
+  const ry = summary ? summary.byColor.red + summary.byColor.yellow : 0
+  const done = summary ? summary.done : 0
+  const rfcPct = done > 0 ? Math.round((ry / done) * 100) : 0
 
   const learnerName = useCallback(
     (id: string) => roster.users.find((u) => u.id === id)?.displayName ?? id.slice(0, 6),
@@ -86,10 +225,10 @@ export function TeacherObservePage() {
     window.setTimeout(() => setToast(null), 900)
   }, [])
 
-  const playReaction = useCallback((kind: Reaction) => {
-    if (!kind) return
-    setReaction(kind)
-    window.setTimeout(() => setReaction(null), 700)
+  const playReaction = useCallback((kind: ReactionKind) => {
+    const id = Date.now()
+    setReaction({ kind, id })
+    window.setTimeout(() => setReaction((current) => (current?.id === id ? null : current)), 850)
   }, [])
 
   const apply = useCallback(
@@ -110,10 +249,7 @@ export function TeacherObservePage() {
         return
       }
       apply(r.state)
-      if (
-        r.value.snapshot.status === 'finalized' ||
-        r.value.snapshot.status === 'corrected'
-      ) {
+      if (r.value.snapshot.status === 'finalized' || r.value.snapshot.status === 'corrected') {
         playReaction(reactionFor(color))
         if (wasFinal) {
           flash(color)
@@ -137,10 +273,7 @@ export function TeacherObservePage() {
         return
       }
       apply(r.state)
-      if (
-        r.value.snapshot.status === 'finalized' ||
-        r.value.snapshot.status === 'corrected'
-      ) {
+      if (r.value.snapshot.status === 'finalized' || r.value.snapshot.status === 'corrected') {
         playReaction(reactionFor(outcome === 'fail' ? 'fail' : 'done'))
         const next = autoNextQuestion(r.state)
         setCapture(next)
@@ -168,6 +301,13 @@ export function TeacherObservePage() {
     setCapture(retreatPosition(capture))
   }, [capture, setCapture])
 
+  const nextCell = useCallback(() => {
+    if (!capture || capture.questions.length === 0) return
+    if (capture.position.questionIndex < capture.questions.length - 1) {
+      setCapture(advancePosition(capture))
+    }
+  }, [capture, setCapture])
+
   const selectQuestion = useCallback(
     (questionIndex: number) => {
       if (!capture) return
@@ -175,6 +315,77 @@ export function TeacherObservePage() {
     },
     [capture, setCapture],
   )
+
+  /**
+   * Finish live session + persist:
+   * - marks missing attendance as present (required by completeLearningSession)
+   * - sets learning session completedAt
+   * - freezes capture (sessionStatus completed)
+   * - ledger already has finalized results via appendFinalizedFromCapture
+   */
+  const handleConfirmFinish = useCallback(async () => {
+    if (!capture || !openSession || finishing) return
+    setShowConfirmFinish(false)
+    setFinishing(true)
+    try {
+      const learnerIds = capture.learnerIds
+      let sched = scheduling
+      // Ensure every rostered learner has attendance so complete can succeed
+      for (const learnerId of learnerIds) {
+        const has = sched.attendance.some(
+          (a) => a.learningSessionId === openSession.id && a.learnerUserId === learnerId,
+        )
+        if (!has) {
+          const att = recordAttendance(sched, {
+            learningSessionId: openSession.id,
+            learnerUserId: learnerId,
+            status: 'present',
+          })
+          if (!att.ok) {
+            flash(att.error)
+            return
+          }
+          sched = att.state
+        }
+      }
+
+      const done = completeLearningSession(sched, openSession.id, learnerIds)
+      if (!done.ok) {
+        flash(done.error)
+        return
+      }
+
+      const completedCapture = markSessionCompleted(capture)
+      setScheduling(done.state)
+      setCapture(completedCapture)
+      appendFinalizedFromCapture(completedCapture)
+      try {
+        await syncNow()
+      } catch {
+        /* local persist still holds; backend may be offline */
+      }
+      flash('Session saved')
+      navigate('/teacher/session')
+    } finally {
+      setFinishing(false)
+    }
+  }, [
+    capture,
+    openSession,
+    finishing,
+    scheduling,
+    setScheduling,
+    setCapture,
+    appendFinalizedFromCapture,
+    syncNow,
+    navigate,
+    flash,
+  ])
+
+  const finishSessionAndSave = useCallback(() => {
+    if (!capture || !openSession || finishing) return
+    setShowConfirmFinish(true)
+  }, [capture, openSession, finishing])
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -202,27 +413,32 @@ export function TeacherObservePage() {
         prevCell()
         return
       }
+      if (k === 'arrowright') {
+        e.preventDefault()
+        nextCell()
+        return
+      }
       if (k === 'n' && capture?.questions.length === 0) {
         e.preventDefault()
         startFirst()
         return
       }
-      if (k === '1') {
+      if (k === '0') {
         e.preventDefault()
         recordColor('red')
         return
       }
-      if (k === '2') {
+      if (k === '1') {
         e.preventDefault()
         recordColor('yellow')
         return
       }
-      if (k === '3') {
+      if (k === '2') {
         e.preventDefault()
         recordColor('green')
         return
       }
-      if (k === '4') {
+      if (k === '3') {
         e.preventDefault()
         recordColor('purple')
         return
@@ -242,7 +458,10 @@ export function TeacherObservePage() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [navigate, prevCell, recordColor, resolveProbe, probeOpen, capture, startFirst])
+  }, [navigate, prevCell, nextCell, recordColor, resolveProbe, probeOpen, capture, startFirst])
+
+  const openProbes = summary ? summary.byColor.open : 0
+  const drafts = summary ? summary.byColor.draft : 0
 
   if (!openSession || !capture || capture.sessionStatus !== 'open') {
     return <Navigate to="/teacher/session" replace />
@@ -250,18 +469,20 @@ export function TeacherObservePage() {
 
   return (
     <div
-      className={`observe-root${reaction === 'happy' ? ' is-react-happy' : ''}${
-        reaction === 'fight' ? ' is-react-fight' : ''
-      }`}
+      className={`observe-root${reaction?.kind === 'happy' ? ' is-react-happy' : ''}${
+        reaction?.kind === 'fight' ? ' is-react-fight' : ''
+      }${isPhone ? ' is-phone' : ''}${mapOpen ? ' is-map-open' : ''}`}
       role="application"
-      aria-label="Focus and Awareness observation"
+      aria-label={`${dayLabel} · Focus and Awareness observation`}
     >
       <header className="observe-bar observe-bar-slim">
-        <Link to="/teacher/session" className="observe-exit" aria-label="Exit">
-          <X className="h-4 w-4" strokeWidth={2} />
+        <Link to="/teacher/session" className="observe-nav-exit" aria-label="Exit observe">
+          <X aria-hidden strokeWidth={2.5} />
         </Link>
         <div className="observe-bar-center">
-          <span className="observe-class">{classRow?.name ?? 'Class'}</span>
+          <span className="observe-day-badge" title={dayLabel}>
+            {dayNumber ? `Day ${dayNumber}` : 'Day —'}
+          </span>
           {qTotal > 0 ? (
             <>
               <span className="observe-sep">·</span>
@@ -271,206 +492,494 @@ export function TeacherObservePage() {
               </span>
             </>
           ) : null}
+          <span className="observe-sep observe-hide-phone">·</span>
+          <span className="observe-class observe-hide-phone">{classRow?.name ?? 'Class'}</span>
         </div>
-        <div className="observe-bar-actions">
+        <div className="observe-nav-group" role="toolbar" aria-label="Observe tools">
           {capture.questions.length > 0 ? (
             <button
               type="button"
-              className="observe-keys-btn icon-only"
+              className={`observe-nav-btn${mapOpen ? ' is-active' : ''}`}
               onClick={() => setMapOpen((v) => !v)}
               aria-pressed={mapOpen}
-              aria-label={mapOpen ? 'Hide map' : 'Show map'}
+              aria-label={mapOpen ? 'Hide question map' : 'Show question map'}
               title="Map (H)"
             >
-              <PanelLeft className="h-4 w-4" aria-hidden />
+              {/* Grid = question map (clearer than panel icons on phone) */}
+              <LayoutGrid aria-hidden strokeWidth={2.25} />
             </button>
           ) : null}
           <button
             type="button"
-            className="observe-keys-btn icon-only"
+            className={`observe-nav-btn observe-hide-phone${showKeys ? ' is-active' : ''}`}
             onClick={() => setShowKeys((v) => !v)}
-            aria-label="Shortcuts"
+            aria-pressed={showKeys}
+            aria-label="Keyboard shortcuts"
+            title="Keys (?)"
           >
-            <Keyboard className="h-4 w-4" aria-hidden />
+            <Keyboard aria-hidden strokeWidth={2.25} />
+          </button>
+          <button
+            type="button"
+            className="observe-nav-finish"
+            onClick={() => void finishSessionAndSave()}
+            disabled={finishing}
+            aria-label="Finish session and save"
+            title="Finish & save"
+          >
+            <CheckCircle2 aria-hidden strokeWidth={2.25} />
+            <span className="observe-nav-finish-label">
+              {finishing ? 'Saving…' : 'Finish'}
+            </span>
           </button>
         </div>
       </header>
 
-      <div className="observe-body">
-        {/* Left rail: avatar + collapsible heatmap (same area) */}
-        {capture.questions.length > 0 ? (
-          <aside
-            className={`observe-rail${mapOpen ? ' is-open' : ' is-closed'}`}
-            aria-label="Learner and progress map"
-          >
-            <div className="observe-rail-person">
-              <UserAvatar
-                name={learner?.displayName ?? 'Learner'}
-                avatarUrl={learner?.avatarUrl}
-                size="lg"
-                className="observe-rail-avatar"
+      {/* Desktop left rail (resizable). Phone uses bottom map sheet instead. */}
+      {capture.questions.length > 0 && !isPhone ? (
+        <aside
+          className={`observe-rail ${mapOpen ? 'is-open' : 'is-closed'} ${railSizeClass}${
+            resizing ? ' is-resizing' : ''
+          }`}
+          style={
+            {
+              ['--observe-rail-w']: mapOpen ? `${railWidth}px` : `${RAIL_COLLAPSED}px`,
+            } as CSSProperties
+          }
+          aria-label="Learner and progress map"
+        >
+          <div className="observe-rail-person">
+            <UserAvatar
+              name={learner?.displayName ?? 'Learner'}
+              avatarUrl={learner?.avatarUrl}
+              size={avatarSize}
+              className="observe-rail-avatar"
+            />
+            {mapOpen ? (
+              <>
+                <p className="observe-rail-name">{learner?.displayName ?? 'Learner'}</p>
+                {probeOpen ? <p className="observe-rail-n">n={probeDepth}</p> : null}
+              </>
+            ) : null}
+          </div>
+
+          {mapOpen ? (
+            <div className="observe-rail-map">
+              <ObserveHeatmap
+                capture={capture}
+                currentQuestionIndex={capture.position.questionIndex}
+                learnerName={learnerName}
+                onSelectQuestion={selectQuestion}
+                layout="column"
               />
-              <p className="observe-rail-name">{learner?.displayName ?? 'Learner'}</p>
-              {probeOpen ? (
-                <p className="observe-rail-n">n={probeDepth}</p>
-              ) : null}
             </div>
+          ) : (
+            <button
+              type="button"
+              className="observe-rail-peek"
+              onClick={() => setMapOpen(true)}
+              aria-label="Expand sidebar"
+              title="Expand"
+            >
+              <PanelLeftOpen className="h-4 w-4" aria-hidden strokeWidth={1.75} />
+            </button>
+          )}
 
-            {mapOpen ? (
-              <div className="observe-rail-map">
-                <ObserveHeatmap
-                  capture={capture}
-                  currentQuestionIndex={capture.position.questionIndex}
-                  learnerName={learnerName}
-                  onSelectQuestion={selectQuestion}
-                  layout="column"
-                />
-              </div>
-            ) : (
-              <button
-                type="button"
-                className="observe-rail-peek"
-                onClick={() => setMapOpen(true)}
-                aria-label="Open map"
-              >
-                <ChevronRight className="h-4 w-4" aria-hidden />
-              </button>
-            )}
-
-            {mapOpen ? (
+          {mapOpen ? (
+            <div className="observe-rail-footer">
               <button
                 type="button"
                 className="observe-rail-collapse"
                 onClick={() => setMapOpen(false)}
-                aria-label="Hide map"
+                aria-label="Collapse sidebar"
+                title="Collapse"
               >
-                <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
-              </button>
-            ) : null}
-          </aside>
-        ) : null}
-
-        {/* Center: big name only */}
-        <main className="observe-stage observe-stage-tight">
-          {capture.questions.length === 0 ? (
-            <div className="observe-empty">
-              <p className="observe-empty-title">Observe</p>
-              <button type="button" className="observe-cta" onClick={startFirst}>
-                <Plus className="h-5 w-5" aria-hidden />
-                Start
-                <kbd>N</kbd>
+                <PanelLeftClose className="h-4 w-4" aria-hidden strokeWidth={1.75} />
               </button>
             </div>
-          ) : (
-            <>
+          ) : null}
+
+          {mapOpen ? (
+            <div
+              className="observe-rail-resize"
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize sidebar"
+              aria-valuemin={RAIL_MIN}
+              aria-valuemax={RAIL_MAX}
+              aria-valuenow={Math.round(railWidth)}
+              tabIndex={0}
+              onPointerDown={startRailResize}
+              onDoubleClick={() => {
+                setRailWidth(RAIL_DEFAULT)
+                try {
+                  window.localStorage.setItem(RAIL_W_KEY, String(RAIL_DEFAULT))
+                } catch {
+                  /* ignore */
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowLeft') {
+                  e.preventDefault()
+                  setRailWidth((w) => {
+                    const next = Math.max(RAIL_MIN, w - 16)
+                    try {
+                      window.localStorage.setItem(RAIL_W_KEY, String(next))
+                    } catch {
+                      /* ignore */
+                    }
+                    return next
+                  })
+                }
+                if (e.key === 'ArrowRight') {
+                  e.preventDefault()
+                  setRailWidth((w) => {
+                    const next = Math.min(RAIL_MAX, w + 16)
+                    try {
+                      window.localStorage.setItem(RAIL_W_KEY, String(next))
+                    } catch {
+                      /* ignore */
+                    }
+                    return next
+                  })
+                }
+              }}
+            >
+              <GripVertical className="observe-rail-resize-grip" aria-hidden strokeWidth={1.5} />
+            </div>
+          ) : null}
+        </aside>
+      ) : null}
+
+      {/* Center: name + fixed color dock (phone-first stack) */}
+      <main className="observe-stage observe-stage-tight">
+        {capture.questions.length === 0 ? (
+          <div className="observe-empty">
+            <p className="observe-day-empty">{dayLabel}</p>
+            <p className="observe-empty-title">Observe</p>
+            <button type="button" className="observe-cta" onClick={startFirst}>
+              <Plus className="h-5 w-5" aria-hidden />
+              Start
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="observe-stage-hero">
+              <div className="observe-phone-avatar" aria-hidden={false}>
+                <UserAvatar
+                  name={learner?.displayName ?? 'Learner'}
+                  avatarUrl={learner?.avatarUrl}
+                  size="md"
+                />
+              </div>
+              <p className="observe-day-line observe-hide-phone">{dayLabel}</p>
               <h1 className="observe-learner observe-learner-solo">
                 {learner?.displayName ?? 'Learner'}
               </h1>
+              <div className="observe-meta-row">
+                {done > 0 ? (
+                  <span
+                    className="observe-learner-rfc"
+                    title={`Focus Coefficient: ${rfcPct}% Red/Yellow`}
+                  >
+                    <Activity className="h-3.5 w-3.5" aria-hidden />
+                    RFC {rfcPct}%
+                  </span>
+                ) : (
+                  <span className="observe-meta-muted observe-phone-only observe-hint-phone">
+                    Tap a color
+                  </span>
+                )}
+                {/* Counts live in map on phone — keep pills on tablet/desktop only */}
+                <div
+                  className="observe-heat-counts observe-color-pills observe-hide-phone"
+                  aria-label="Color counts"
+                >
+                  {COLORS.map((c) => (
+                    <span
+                      key={c.key}
+                      className={`observe-heat-count is-${c.key}`}
+                      title={`${c.label}: ${summary ? summary.byColor[c.key] : 0}`}
+                    >
+                      <i aria-hidden />
+                      {summary ? summary.byColor[c.key] : 0}
+                    </span>
+                  ))}
+                </div>
+              </div>
               {probeOpen ? (
                 <p className="observe-depth-inline">
-                  n=<strong>{probeDepth}</strong>
-                  <span className="observe-meta-muted"> · F / C / D</span>
+                  Probe n=<strong>{probeDepth}</strong>
                 </p>
               ) : null}
-
-              {/* Reaction burst */}
-              {reaction === 'happy' ? (
-                <div className="observe-react observe-react-happy" aria-hidden>
-                  <span>😊</span>
-                  <span className="observe-react-burst" />
-                </div>
-              ) : null}
-              {reaction === 'fight' ? (
-                <div className="observe-react observe-react-fight" aria-hidden>
-                  <span>💪</span>
-                  <span className="observe-react-burst" />
-                </div>
-              ) : null}
-            </>
-          )}
-        </main>
-      </div>
-
-      {/* Big bottom color dock — numbers only */}
-      {capture.questions.length > 0 ? (
-        <div className="observe-dock observe-dock-lg">
-          {probeOpen ? (
-            <div className="observe-dock-probe" role="group" aria-label="Resolve green">
-              <button
-                type="button"
-                className="observe-dock-probe-btn fail"
-                onClick={() => resolveProbe('fail')}
-              >
-                Fail
-                <kbd>F</kbd>
-              </button>
-              <button
-                type="button"
-                className="observe-dock-probe-btn cont"
-                onClick={() => resolveProbe('continue')}
-              >
-                Cont
-                <kbd>C</kbd>
-              </button>
-              <button
-                type="button"
-                className="observe-dock-probe-btn done"
-                onClick={() => resolveProbe('done')}
-              >
-                Done
-                <kbd>D</kbd>
-              </button>
             </div>
-          ) : (
-            <div className="observe-dock-colors" role="group" aria-label="Result color">
-              {COLORS.map((c) => (
+
+            {reaction ? (
+              <div
+                key={reaction.id}
+                className={`observe-react observe-react-${reaction.kind}`}
+                aria-hidden
+              >
+                <span className="observe-react-symbol">
+                  {reaction.kind === 'happy' ? <Check aria-hidden /> : <Zap aria-hidden />}
+                </span>
+                <span className="observe-react-label">
+                  {reaction.kind === 'happy' ? 'Great focus' : 'Keep fighting'}
+                </span>
+                {reaction.kind === 'happy' ? (
+                  <Sparkles className="observe-react-sparkles" aria-hidden />
+                ) : null}
+                <span className="observe-react-burst" />
+              </div>
+            ) : null}
+
+            <div className="observe-dock observe-dock-lg">
+              {probeOpen ? (
+                <div className="observe-dock-probe" role="group" aria-label="Resolve green">
+                  <button
+                    type="button"
+                    className="observe-dock-probe-btn fail"
+                    onClick={() => resolveProbe('fail')}
+                  >
+                    Fail
+                  </button>
+                  <button
+                    type="button"
+                    className="observe-dock-probe-btn cont"
+                    onClick={() => resolveProbe('continue')}
+                  >
+                    Cont
+                  </button>
+                  <button
+                    type="button"
+                    className="observe-dock-probe-btn done"
+                    onClick={() => resolveProbe('done')}
+                  >
+                    Done
+                  </button>
+                </div>
+              ) : (
+                <div className="observe-dock-colors" role="group" aria-label="Result color">
+                  {COLORS.map((c) => (
+                    <button
+                      key={c.key}
+                      type="button"
+                      className={`observe-dock-color is-${c.key}${
+                        isFinalized && attempt?.snapshot.effectiveColor === c.key
+                          ? ' is-selected'
+                          : ''
+                      }`}
+                      onClick={() => recordColor(c.key)}
+                      disabled={!attempt}
+                      aria-label={c.label}
+                    >
+                      <span className="observe-dock-num observe-hide-phone">{c.shortcut}</span>
+                      <span className="observe-dock-label">{c.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="observe-dock-tools">
                 <button
-                  key={c.key}
                   type="button"
-                  className={`observe-dock-color is-${c.key}${
-                    isFinalized && attempt?.snapshot.effectiveColor === c.key
-                      ? ' is-selected'
-                      : ''
-                  }`}
-                  onClick={() => recordColor(c.key)}
-                  disabled={!attempt}
-                  aria-label={c.label}
+                  className="observe-tool"
+                  onClick={prevCell}
+                  disabled={capture.position.questionIndex <= 0}
+                  aria-label="Previous question"
                 >
-                  <span className="observe-dock-num">{c.shortcut}</span>
+                  <ChevronLeft className="h-5 w-5" aria-hidden />
+                  <span className="observe-tool-text">Prev</span>
                 </button>
-              ))}
+                <span className="observe-dock-q" aria-live="polite">
+                  Q{qNum}/{qTotal}
+                </span>
+                <button
+                  type="button"
+                  className="observe-tool"
+                  onClick={nextCell}
+                  disabled={capture.position.questionIndex >= capture.questions.length - 1}
+                  aria-label="Next question"
+                >
+                  <span className="observe-tool-text">Next</span>
+                  <ChevronRight className="h-5 w-5" aria-hidden />
+                </button>
+              </div>
             </div>
-          )}
+          </>
+        )}
+      </main>
 
-          <div className="observe-dock-tools">
-            <button
-              type="button"
-              className="observe-tool"
-              onClick={prevCell}
-              disabled={capture.position.questionIndex <= 0}
-              aria-label="Previous question"
-            >
-              <ChevronLeft className="h-4 w-4" aria-hidden />
-            </button>
-            <Link to="/teacher/session" className="observe-tool">
-              Exit
-            </Link>
+      {/* Phone: question map as bottom sheet (not a side rail) */}
+      {isPhone && mapOpen && capture.questions.length > 0 ? (
+        <>
+          <button
+            type="button"
+            className="observe-sheet-backdrop"
+            aria-label="Close map"
+            onClick={() => setMapOpen(false)}
+          />
+          <div className="observe-map-sheet" role="dialog" aria-label="Question map">
+            <div className="observe-map-sheet-handle" aria-hidden />
+            <div className="observe-map-sheet-head">
+              <span className="observe-map-sheet-title">Questions</span>
+              <button
+                type="button"
+                className="observe-nav-btn"
+                onClick={() => setMapOpen(false)}
+                aria-label="Close map"
+              >
+                <X aria-hidden strokeWidth={2.5} />
+              </button>
+            </div>
+            <ObserveHeatmap
+              capture={capture}
+              currentQuestionIndex={capture.position.questionIndex}
+              learnerName={learnerName}
+              onSelectQuestion={(i) => {
+                selectQuestion(i)
+                setMapOpen(false)
+              }}
+              layout="column"
+            />
           </div>
-        </div>
+        </>
       ) : null}
 
-      {showKeys && (
+      {showKeys && !isPhone && (
         <div className="observe-keys-panel" role="dialog" aria-label="Keyboard shortcuts">
-          <p>
-            <kbd>1</kbd>–<kbd>4</kbd> · auto next · <kbd>F</kbd>/<kbd>C</kbd>/<kbd>D</kbd> ·{' '}
-            <kbd>H</kbd> map · <kbd>←</kbd> prev · <kbd>Esc</kbd>
-          </p>
+          <div className="observe-keys-header">
+            <h3 className="observe-keys-title">Keyboard Commands</h3>
+            <button
+              type="button"
+              className="observe-keys-close"
+              onClick={() => setShowKeys(false)}
+              aria-label="Close shortcuts"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="observe-keys-grid">
+            <div className="observe-keys-group">
+              <span className="observe-keys-group-title">Assessment</span>
+              <div className="observe-key-row">
+                <span>
+                  <kbd>0</kbd>–<kbd>3</kbd> Assess Color
+                </span>
+              </div>
+              <div className="observe-key-row">
+                <span>
+                  <kbd>F</kbd>/<kbd>C</kbd>/<kbd>D</kbd> Probe Action
+                </span>
+              </div>
+            </div>
+            <div className="observe-keys-group">
+              <span className="observe-keys-group-title">Navigation</span>
+              <div className="observe-key-row">
+                <span>
+                  <kbd>←</kbd> / <kbd>→</kbd> Prev / Next
+                </span>
+              </div>
+              <div className="observe-key-row">
+                <span>
+                  <kbd>H</kbd> / <kbd>M</kbd> Toggle Map
+                </span>
+              </div>
+              <div className="observe-key-row">
+                <span>
+                  <kbd>Esc</kbd> Exit Observe
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
       {toast && (
         <div className="observe-toast" role="status">
           {toast}
+        </div>
+      )}
+
+      {showConfirmFinish && (
+        <div className="observe-modal-container">
+          <div
+            className="observe-modal-backdrop"
+            onClick={() => setShowConfirmFinish(false)}
+            aria-hidden="true"
+          />
+          <div
+            className="observe-modal-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-finish-title"
+          >
+            <div className="observe-modal-icon">
+              <CheckCircle2 className="h-8 w-8 text-green-400" />
+            </div>
+            <h2 id="modal-finish-title" className="observe-modal-title">
+              Finish Session?
+            </h2>
+            <p className="observe-modal-desc">
+              Save and freeze the observation data for {dayBadge}. Once closed, this session cannot be modified.
+            </p>
+            <div className="observe-modal-summary-box">
+              <div className="summary-row">
+                <span className="summary-label">Total Sentences</span>
+                <span className="summary-val font-mono">{qTotal}</span>
+              </div>
+              <div className="summary-divider" />
+              <div className="summary-row">
+                <span className="summary-label">Focus Coefficient (RFC)</span>
+                <span className="summary-val text-amber-300 font-mono font-bold">{done > 0 ? `${rfcPct}%` : '—'}</span>
+              </div>
+              <div className="summary-divider" />
+              <div className="summary-colors-grid">
+                <div className="color-item">
+                  <span className="dot bg-red-500" />
+                  <span className="count">{summary ? summary.byColor.red : 0} Red</span>
+                </div>
+                <div className="color-item">
+                  <span className="dot bg-yellow-400" />
+                  <span className="count">{summary ? summary.byColor.yellow : 0} Yellow</span>
+                </div>
+                <div className="color-item">
+                  <span className="dot bg-green-500" />
+                  <span className="count">{summary ? summary.byColor.green : 0} Green</span>
+                </div>
+                <div className="color-item">
+                  <span className="dot bg-purple-500" />
+                  <span className="count">{summary ? summary.byColor.purple : 0} Purple</span>
+                </div>
+              </div>
+              <div className="summary-row footer-row">
+                <div className="footer-col">
+                  <span className="label">Open Probes</span>
+                  <span className={`val ${openProbes > 0 ? 'text-yellow-400 font-bold' : 'text-slate-400'}`}>{openProbes}</span>
+                </div>
+                <div className="footer-col">
+                  <span className="label">Drafts</span>
+                  <span className={`val ${drafts > 0 ? 'text-slate-200 font-bold' : 'text-slate-500'}`}>{drafts}</span>
+                </div>
+              </div>
+            </div>
+            <div className="observe-modal-actions">
+              <button
+                type="button"
+                className="observe-modal-btn observe-modal-cancel"
+                onClick={() => setShowConfirmFinish(false)}
+              >
+                Go Back
+              </button>
+              <button
+                type="button"
+                className="observe-modal-btn observe-modal-confirm"
+                onClick={() => void handleConfirmFinish()}
+              >
+                Confirm & Save
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

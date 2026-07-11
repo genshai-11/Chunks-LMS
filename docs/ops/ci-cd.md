@@ -1,93 +1,134 @@
 # CI/CD for Chunks-LMS
 
+> **Domain language** (Course, Learning Session, Assessment Attempt, metrics) lives in root [`CONTEXT.md`](../../CONTEXT.md).  
+> This file is **ops only**: GitHub Actions, Vercel, secrets, and migration promote. CI/CD is **not** defined in `CONTEXT.md`.
+
 ## Pipeline overview
 
 ```text
-PR opened / push
+PR opened / synchronize
     │
     ├─► CI (always)
-    │     install → lint → typecheck → unit tests → build → openspec validate
+    │     npm ci (web/) → openspec validate → lint → typecheck → tests → build
     │
-    ├─► CD preview (PRs, when Vercel secrets present)
-    │     build with env secrets → vercel deploy --preview
+    └─► CD preview (if VERCEL_* secrets set)
+          build with VITE_* secrets → vercel deploy (preview)
+
+push to main or master
     │
-    └─► CD production (main/master after CI green)
-          build → vercel deploy --prod
-          (DB migrations: manual promote — never auto-destructive)
+    ├─► CI (same quality gate)
+    │
+    └─► CD production (if VERCEL_* secrets set)
+          build with VITE_* secrets → vercel deploy --prod
+          (Supabase migrations: NEVER auto-applied — manual supabase db push)
 ```
 
-## GitHub Actions workflows
+## Workflows
 
-| File | Purpose |
-|------|---------|
-| `.github/workflows/ci.yml` | Quality gate on every PR and push to main |
-| `.github/workflows/cd.yml` | Preview + production deploys; reuses CI as a job dependency |
+| File | Triggers | Purpose |
+|------|----------|---------|
+| [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) | PR + push `main`/`master` | Quality gate |
+| [`.github/workflows/cd.yml`](../../.github/workflows/cd.yml) | PR → preview; push `main`/`master` → production; `workflow_dispatch` | Vercel deploy |
 
-## Required secrets
+**App root for deploy:** `web/` (Vite). Vercel project should use **Root Directory = `web`** (or CD runs with `working-directory: web`).
 
-Configure in **GitHub → Settings → Secrets and variables → Actions**.
+**Current project link (local):** `.vercel/project.json` → project `chunks-lms`  
+Typical URL: `https://chunks-lms.vercel.app` (see [vercel-deploy.md](./vercel-deploy.md)).
+
+## Required GitHub secrets
+
+**Repo → Settings → Secrets and variables → Actions**
 
 | Secret | Used by | Notes |
 |--------|---------|--------|
-| `VITE_CLERK_PUBLISHABLE_KEY` | CD build | Clerk publishable key for the target env |
-| `VITE_SUPABASE_URL` | CD build | Supabase project URL |
-| `VITE_SUPABASE_ANON_KEY` | CD build | Supabase anon key |
-| `VERCEL_TOKEN` | CD deploy | Vercel personal/org token |
-| `VERCEL_ORG_ID` | CD deploy | From `.vercel/project.json` after `vercel link` |
-| `VERCEL_PROJECT_ID` | CD deploy | From `.vercel/project.json` |
+| `VITE_CLERK_PUBLISHABLE_KEY` | CD build | Clerk publishable key; leave empty only if using auth bypass |
+| `VITE_SUPABASE_URL` | CD build | e.g. `https://<ref>.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | CD build | Anon/public key (client-safe) |
+| `VERCEL_TOKEN` | CD deploy | Vercel token; **if missing, deploy is skipped** (job still green) |
+| `VERCEL_ORG_ID` | CD deploy | From `vercel link` / `.vercel/project.json` → `orgId` |
+| `VERCEL_PROJECT_ID` | CD deploy | From `.vercel/project.json` → `projectId` |
 
-Optional later:
+Also set the same `VITE_*` values in **Vercel project → Settings → Environment Variables** for Production (and Preview if needed), so dashboard redeploys work without GitHub.
+
+Optional:
 
 | Secret | Purpose |
 |--------|---------|
-| `CLERK_SECRET_KEY` | Server webhook sync (when Edge Functions exist) |
-| `CLERK_WEBHOOK_SECRET` | Verify Clerk webhooks |
-| `SUPABASE_ACCESS_TOKEN` | CLI linked deploys / type generation in CI |
-| `SUPABASE_DB_PASSWORD` | Migration promote against hosted DB |
+| `CLERK_SECRET_KEY` | Server / webhooks (not in Vite client) |
+| `CLERK_WEBHOOK_SECRET` | Webhook verification |
+| `SUPABASE_ACCESS_TOKEN` | CLI in CI (typegen, etc.) |
+| `SUPABASE_DB_PASSWORD` | Hosted DB promote |
 
-## Environments
+## Environments (optional)
 
-Create GitHub Environments:
+GitHub Environments used by CD:
 
-1. **preview** — PR deploys; optional protection rules
-2. **production** — require reviewer for first production cut
+1. **preview** — PR deploys  
+2. **production** — production deploys (can require reviewers)
 
-## Supabase migration promotion
+## What CI validates (product constraints)
 
-1. Author SQL under `supabase/migrations/`.
-2. Review in PR (migrations are part of CI-reviewed code).
-3. Local: `supabase start` then `supabase db reset` (applies migrations + `seed.sql`).
-4. Staging: `supabase link` + `supabase db push`.
-5. Production: same after staging verification.
-6. **Never** drop assessment event history without an ADR.
+CI does **not** load `CONTEXT.md`, but unit tests enforce domain rules described there, including:
 
-## Clerk + Supabase third-party auth (hosted)
+- Immutable assessment lifecycle / corrections  
+- One Assessment Attempt per Session Question (round-robin learners)  
+- Only finalized results feed metrics  
+- Course auto-schedule / session numbering (buổi) in scheduling modules  
 
-1. Enable Clerk third-party auth in Supabase dashboard (not JWT template).
-2. Point Clerk to the Supabase project.
-3. Client passes Clerk session JWT to Supabase (`Authorization: Bearer <token>`).
-4. RLS uses `auth.jwt() ->> 'sub'` mapped to `users.clerk_user_id`.
+Build uses `VITE_AUTH_BYPASS=true` so CI can build without real Clerk keys.
 
-See ADR `docs/adr/0002-clerk-with-supabase-third-party-auth.md`.
+## Supabase and deploys
+
+| Concern | Behavior |
+|---------|----------|
+| App data sync | Client loads/saves roster + scheduling via Supabase (anon key + demo RLS for foundation) |
+| Schema migrations | **Manual only** — never auto-applied in CD |
+| Migration path | Author under `supabase/migrations/` → PR review → `supabase db push --linked` after merge |
+
+Promote steps:
+
+1. Author SQL under `supabase/migrations/`.  
+2. Include in PR (reviewed with app code).  
+3. Local (optional): `supabase start` + `supabase db reset`.  
+4. Hosted: `supabase link` + `supabase db push`.  
+5. **Never** drop assessment event history without an ADR.
+
+## Clerk + Supabase (production auth)
+
+1. Enable Clerk third-party auth in Supabase (not JWT template only).  
+2. Wire Clerk app to the Supabase project.  
+3. Client passes Clerk session JWT to Supabase.  
+4. Tighten RLS; remove foundation demo “allow all” policies before real multi-tenant production.
+
+See `docs/adr/0002-clerk-with-supabase-third-party-auth.md`.
 
 ## Local developer flow
 
 ```bash
 # App
-cd web && cp .env.example .env && npm install && npm run dev
+cd web && cp .env.example .env   # fill VITE_SUPABASE_* (+ Clerk if needed)
+npm install
+npm run dev
 
-# DB (requires Supabase CLI)
-supabase start
-supabase db reset
+# Hosted DB migrations (CLI logged in)
+supabase link --project-ref <ref>
+supabase db push
 
 # Quality (same as CI)
 npm run ci   # from repo root
 ```
 
-## Deploy prerequisites checklist
+## Why Vercel looked “stuck on old version”
 
-- [ ] Vercel project linked to `web/`
-- [ ] GitHub secrets set for Clerk + Supabase + Vercel
-- [ ] Supabase project created; migrations pushed
-- [ ] Clerk application + organization configured
-- [ ] Production environment protection enabled
+1. Code only deploys when it is **committed and pushed** to `main`/`master` (or deployed via CLI).  
+2. If `VERCEL_TOKEN` is missing, CD **skips** deploy and exits 0.  
+3. After a successful deploy, hard-refresh the site (or open the deployment URL from the Actions log).
+
+## Deploy checklist
+
+- [ ] Vercel project linked; root directory `web/`  
+- [ ] GitHub secrets: Vercel + `VITE_SUPABASE_*` (+ Clerk as needed)  
+- [ ] Same `VITE_*` on Vercel env for Production  
+- [ ] Supabase project exists; migrations pushed manually  
+- [ ] After push to `master`, Actions → CD production is green  
+- [ ] Clerk configured when leaving auth bypass  

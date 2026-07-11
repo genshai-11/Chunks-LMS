@@ -29,6 +29,12 @@ import {
   startLearningSession,
 } from '../../modules/scheduling/session-lifecycle'
 import type { AttendanceStatus } from '../../modules/scheduling/types'
+import {
+  resolveSessionDayNumber,
+  sessionDayBadge,
+  sessionDayHash,
+  sessionLabel,
+} from '../../modules/reporting/session-series'
 import { useAppState } from '../../state/useAppState'
 
 const ATTENDANCE: AttendanceStatus[] = ['present', 'late', 'absent', 'excused']
@@ -55,6 +61,23 @@ export function TeacherSessionPage() {
   const openSession = scheduling.learningSessions.find(
     (s) => s.classId === classRow?.id && s.status === 'open',
   )
+  const course = roster.courses.find((c) => c.id === classRow?.courseId)
+  const totalDays =
+    course?.schedule?.sessionCount ??
+    scheduling.scheduledSessions.filter(
+      (s) =>
+        s.classId === classRow?.id && s.status !== 'cancelled' && s.status !== 'rescheduled',
+    ).length ??
+    null
+  const dayNumber = openSession
+    ? resolveSessionDayNumber(openSession, {
+        scheduledSessions: scheduling.scheduledSessions,
+        learningSessions: scheduling.learningSessions,
+      })
+    : null
+  const dayBadge = sessionDayBadge(dayNumber, totalDays || null)
+  const dayLabel = sessionLabel(dayNumber, openSession?.startedAt, totalDays || null)
+  const observeTo = dayNumber != null ? `/teacher/observe${sessionDayHash(dayNumber)}` : '/teacher/observe'
 
   const teacherActor = useMemo<PolicyActor | null>(
     () =>
@@ -156,7 +179,7 @@ export function TeacherSessionPage() {
           icon={Radio}
           kicker="Teacher"
           title="Live session"
-          subtitle="Start now or resume from Schedule."
+          subtitle="Start a day (Day 1…15) or resume from Schedule."
         />
         <EmptyState
           icon={Radio}
@@ -187,14 +210,16 @@ export function TeacherSessionPage() {
     <>
       <PageHeader
         icon={Radio}
-        kicker="Live session"
+        kicker={dayBadge}
         title="Classroom"
-        subtitle={`${classRow.name} · session open · resume anytime from Schedule or Live`}
+        subtitle={`${classRow.name} · ${dayLabel} · open for observation`}
         actions={
           <div className="page-actions">
-            <Link to="/teacher/observe" className="btn primary">
+            <Link to={observeTo} className="btn primary">
               <Eye className="h-4 w-4" aria-hidden />
-              <span>{finalizedCount > 0 ? 'Resume observation' : 'Enter observation'}</span>
+              <span>
+                {finalizedCount > 0 ? `Resume ${dayBadge}` : `Observe ${dayBadge}`}
+              </span>
             </Link>
             <button
               type="button"
@@ -292,9 +317,11 @@ export function TeacherSessionPage() {
             to continue. Observation is full-screen.
           </p>
           <div className="btn-row">
-            <Link to="/teacher/observe" className="btn primary observe-entry-cta">
+            <Link to={observeTo} className="btn primary observe-entry-cta">
               <Eye className="h-4 w-4" aria-hidden />
-              <span>{finalizedCount > 0 ? 'Resume observation' : 'Enter observation'}</span>
+              <span>
+                {finalizedCount > 0 ? `Resume ${dayBadge}` : `Enter ${dayBadge}`}
+              </span>
             </Link>
             <button
               type="button"

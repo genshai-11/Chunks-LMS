@@ -35,15 +35,84 @@ function toFinalized(r: ResultRecord) {
   }
 }
 
-export function sessionLabel(sessionNumber: number | null | undefined, startedAt?: string): string {
-  if (sessionNumber != null) return `Buổi ${sessionNumber}`
+/**
+ * Human label for a class meeting: "Day 1" … "Day 15" (sessionNumber is 1-based).
+ * Optional totalDays → "Day 3 / 15".
+ */
+export function sessionLabel(
+  sessionNumber: number | null | undefined,
+  startedAt?: string,
+  totalDays?: number | null,
+): string {
+  if (sessionNumber != null) {
+    if (totalDays != null && totalDays > 0) return `Day ${sessionNumber} / ${totalDays}`
+    return `Day ${sessionNumber}`
+  }
   if (startedAt) {
     return new Date(startedAt).toLocaleDateString([], {
       month: 'short',
       day: 'numeric',
     })
   }
-  return 'Session'
+  return 'Day —'
+}
+
+/** Compact badge form: "#Day 1" */
+export function sessionDayBadge(
+  sessionNumber: number | null | undefined,
+  totalDays?: number | null,
+): string {
+  if (sessionNumber == null) return '#Day —'
+  if (totalDays != null && totalDays > 0) return `#Day ${sessionNumber}/${totalDays}`
+  return `#Day ${sessionNumber}`
+}
+
+/** URL hash for observe, e.g. "#day-3" */
+export function sessionDayHash(sessionNumber: number | null | undefined): string {
+  if (sessionNumber == null || sessionNumber < 1) return '#day'
+  return `#day-${sessionNumber}`
+}
+
+/**
+ * Resolve 1-based day index for a live Learning Session
+ * (sessionNumber → linked schedule → order among class sessions).
+ */
+export function resolveSessionDayNumber(
+  openSession: {
+    id: string
+    classId: string
+    sessionNumber: number | null
+    scheduledSessionId: string | null
+    startedAt: string
+  },
+  ctx: {
+    scheduledSessions: Array<{
+      id: string
+      classId: string
+      sessionNumber: number | null
+      status: string
+    }>
+    learningSessions: Array<{
+      id: string
+      classId: string
+      sessionNumber: number | null
+      startedAt: string
+    }>
+  },
+): number {
+  if (openSession.sessionNumber != null && openSession.sessionNumber > 0) {
+    return openSession.sessionNumber
+  }
+  if (openSession.scheduledSessionId) {
+    const sched = ctx.scheduledSessions.find((s) => s.id === openSession.scheduledSessionId)
+    if (sched?.sessionNumber != null && sched.sessionNumber > 0) return sched.sessionNumber
+  }
+  const ordered = ctx.learningSessions
+    .filter((s) => s.classId === openSession.classId)
+    .slice()
+    .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
+  const idx = ordered.findIndex((s) => s.id === openSession.id)
+  return idx >= 0 ? idx + 1 : 1
 }
 
 /**

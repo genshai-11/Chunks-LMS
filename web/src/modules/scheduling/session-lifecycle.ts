@@ -158,6 +158,42 @@ export function cancelScheduledSession(
 }
 
 /**
+ * Hard-delete a planned slot from the class list.
+ * Blocks if a learning session already ran (or is open) against this schedule id.
+ * Cancelled / rescheduled / pure scheduled slots without live history can be removed.
+ */
+export function deleteScheduledSession(
+  state: SchedulingState,
+  scheduledSessionId: string,
+): SchedulingResult<{ deletedId: string }> {
+  const session = state.scheduledSessions.find((s) => s.id === scheduledSessionId)
+  if (!session) return { ok: false, error: 'Scheduled session not found' }
+
+  const linked = state.learningSessions.find((ls) => ls.scheduledSessionId === scheduledSessionId)
+  if (linked) {
+    return {
+      ok: false,
+      error:
+        linked.status === 'open'
+          ? 'Finish or abandon the live session before deleting this slot'
+          : 'Cannot delete — a completed live session is linked (cancel is not enough; keep history)',
+    }
+  }
+
+  if (session.status === 'completed') {
+    return { ok: false, error: 'Cannot delete a completed schedule row' }
+  }
+
+  const classId = session.classId
+  const removed: SchedulingState = {
+    ...state,
+    scheduledSessions: state.scheduledSessions.filter((s) => s.id !== scheduledSessionId),
+  }
+  const reindexed = reindexSessionNumbers(removed, classId)
+  return { ok: true, value: { deletedId: scheduledSessionId }, state: reindexed }
+}
+
+/**
  * Reschedule: mark original as rescheduled; create replacement linked back.
  * Original planned start is never rewritten.
  */

@@ -70,11 +70,24 @@
   }
 
   .topbar-brand {
-    @apply inline-flex shrink-0 items-center gap-2.5 font-display text-sm font-semibold tracking-tight text-slate-900;
+    @apply inline-flex shrink-0 items-center gap-2 font-display text-sm font-semibold tracking-tight text-slate-900;
+  }
+
+  .topbar-logo {
+    @apply h-8 w-auto max-w-[7.5rem] rounded-md object-contain object-left shadow-sm ring-1 ring-black/5 sm:h-9 sm:max-w-[8.5rem];
+  }
+
+  .topbar-brand-text {
+    /* Logo already says CHUNKS — keep short product label on wider screens */
+    @apply hidden text-slate-900 sm:inline;
   }
 
   .topbar-mark {
     @apply grid h-7 w-7 place-items-center rounded-lg bg-red-700 font-display text-xs font-bold text-white;
+  }
+
+  .home-logo {
+    @apply mx-auto mb-3 h-14 w-auto max-w-[min(100%,14rem)] rounded-lg object-contain shadow-md ring-1 ring-black/10 sm:h-16;
   }
 
   .topbar-roles {
@@ -844,32 +857,127 @@
     @apply mt-2 text-xs text-slate-500;
   }
 
-  .learner-days-list {
-    @apply flex flex-col gap-3;
+  .learner-tz-note {
+    @apply mt-2 text-[11px] text-slate-500;
   }
 
-  .learner-day-card {
-    @apply rounded-xl border border-slate-100 bg-slate-50/50 p-4;
+  .learner-cal-toolbar {
+    @apply flex flex-wrap items-center justify-end gap-2;
   }
 
-  .learner-day-card-head {
-    @apply mb-2 flex flex-wrap items-start justify-between gap-2;
+  /* Shared session chips (week + month) */
+  .learner-cal-chip {
+    @apply rounded-md border border-slate-100 bg-slate-50 px-1.5 py-1;
   }
 
-  .learner-day-card-head h3 {
-    @apply m-0 text-sm font-semibold text-slate-900;
+  .learner-cal-chip.is-scheduled {
+    @apply border-indigo-100 bg-indigo-50/60;
   }
 
-  .learner-day-pattern {
-    @apply m-0 flex items-center gap-1.5 text-sm font-medium text-slate-700;
+  .learner-cal-chip.is-completed {
+    @apply border-green-100 bg-green-50/50;
   }
 
-  .learner-upcoming {
-    @apply mt-2 m-0 list-none space-y-1 p-0;
+  .learner-cal-chip.is-compact {
+    @apply px-1 py-0.5;
   }
 
-  .learner-upcoming li {
-    @apply flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-100 bg-white px-3 py-1.5 text-xs;
+  .learner-cal-chip-time {
+    @apply block font-mono text-[11px] font-bold leading-tight text-slate-800;
+  }
+
+  .learner-cal-chip.is-compact .learner-cal-chip-time {
+    @apply text-[10px];
+  }
+
+  .learner-cal-chip-meta {
+    @apply block truncate text-[10px] text-slate-500;
+  }
+
+  /* Learner week calendar */
+  .learner-week {
+    @apply grid gap-1.5 [grid-template-columns:repeat(7,minmax(0,1fr))];
+  }
+
+  @media (max-width: 720px) {
+    .learner-week {
+      @apply grid-cols-2 sm:grid-cols-3;
+    }
+  }
+
+  .learner-week-day {
+    @apply min-h-[5.5rem] rounded-xl border border-slate-200 bg-white p-1.5 text-left;
+  }
+
+  .learner-week-day.is-today {
+    @apply border-red-200 bg-red-50/40 ring-1 ring-red-100;
+  }
+
+  .learner-week-day-head {
+    @apply mb-1 flex items-baseline justify-between gap-1 px-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-400;
+  }
+
+  .learner-week-day-head strong {
+    @apply text-xs font-semibold normal-case tracking-normal text-slate-700;
+  }
+
+  .learner-week-day-body {
+    @apply flex flex-col gap-1;
+  }
+
+  .learner-week-empty {
+    @apply block py-2 text-center text-xs text-slate-300;
+  }
+
+  /* Learner month calendar */
+  .learner-month {
+    @apply flex flex-col gap-1;
+  }
+
+  .learner-month-head {
+    @apply grid grid-cols-7 gap-1 text-center text-[10px] font-bold uppercase tracking-wide text-slate-400;
+  }
+
+  .learner-month-grid {
+    @apply grid grid-cols-7 gap-1;
+  }
+
+  .learner-month-day {
+    @apply min-h-[4.75rem] rounded-lg border border-slate-100 bg-white p-1 sm:min-h-[5.5rem];
+  }
+
+  .learner-month-day.is-today {
+    @apply border-red-200 bg-red-50/40 ring-1 ring-red-100;
+  }
+
+  .learner-month-day.is-outside {
+    @apply bg-slate-50/80 opacity-55;
+  }
+
+  .learner-month-date {
+    @apply mb-0.5 block px-0.5 text-[11px] font-semibold text-slate-600;
+  }
+
+  .learner-month-day.is-today .learner-month-date {
+    @apply text-red-700;
+  }
+
+  .learner-month-day-body {
+    @apply flex flex-col gap-0.5;
+  }
+
+  .learner-month-more {
+    @apply px-0.5 text-[10px] font-semibold text-slate-400;
+  }
+
+  @media (max-width: 640px) {
+    .learner-month-day {
+      @apply min-h-[3.5rem];
+    }
+
+    .learner-cal-chip-meta {
+      @apply hidden;
+    }
   }
 
   .access-page {
@@ -983,7 +1091,29 @@
   }
 
   .observe-root {
-    @apply relative flex min-h-[100dvh] flex-col overflow-hidden bg-slate-950 text-slate-100;
+    @apply fixed inset-0 z-50 flex h-[100dvh] max-h-[100dvh] w-screen flex-col overflow-hidden bg-slate-950 text-slate-100;
+  }
+
+  @media (min-width: 640px) {
+    .observe-root {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      grid-template-rows: auto 1fr;
+      grid-template-areas:
+        "rail bar"
+        "rail stage";
+    }
+    .observe-bar {
+      grid-area: bar;
+    }
+    .observe-rail {
+      grid-area: rail;
+      height: 100vh;
+    }
+    .observe-stage {
+      grid-area: stage;
+      height: 100%;
+    }
   }
 
   .observe-bar {
@@ -999,11 +1129,73 @@
   }
 
   .observe-exit {
-    @apply inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/10 hover:text-white;
+    @apply border-0 bg-transparent! shadow-none min-h-0 inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-200! transition hover:bg-white/15! hover:text-white!;
+  }
+
+  .observe-exit svg {
+    @apply stroke-current text-slate-200;
+  }
+
+  .observe-nav-group {
+    @apply flex items-center gap-1.5 rounded-2xl border border-white/10 bg-slate-900/60 p-1 shadow-xl backdrop-blur-md transition-all duration-300;
+  }
+
+  .observe-nav-btn {
+    @apply border-0 bg-transparent! shadow-none min-h-0 inline-flex h-11 w-11 items-center justify-center rounded-xl text-slate-400! transition-all duration-200 active:scale-95 hover:bg-white/10 hover:text-white! focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white;
+  }
+
+  /* Size + weight controlled here so Lucide always renders large enough */
+  .observe-nav-btn svg {
+    @apply h-6 w-6 shrink-0 stroke-current text-slate-400 transition-colors duration-200;
+  }
+
+  .observe-nav-btn:hover svg {
+    @apply text-white;
+  }
+
+  .observe-nav-btn.is-active {
+    @apply bg-gradient-to-r from-indigo-600 to-violet-600 text-white! shadow-lg shadow-indigo-500/20 ring-1 ring-white/10;
+  }
+
+  .observe-nav-btn.is-active svg {
+    @apply text-white stroke-white;
+  }
+
+  .observe-nav-exit {
+    @apply min-h-0 border-0 shadow-none inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5! text-slate-400! shadow-sm transition-all duration-200 hover:bg-white/10! hover:text-white!;
+  }
+
+  .observe-nav-exit svg {
+    @apply h-6 w-6 text-slate-400 transition-colors duration-200;
+  }
+
+  .observe-nav-exit:hover svg {
+    @apply text-white;
+  }
+
+  /* Finish & save — primary action in observe toolbar */
+  .observe-nav-finish {
+    @apply min-h-0 border-0 inline-flex h-11 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600! px-3 py-2 text-white! font-semibold shadow-lg shadow-green-500/10 hover:from-green-500 hover:to-emerald-500 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .observe-nav-finish svg {
+    @apply h-6 w-6 text-white;
+  }
+
+  .observe-nav-finish-label {
+    @apply hidden font-display text-xs font-bold uppercase tracking-wide sm:inline;
+  }
+
+  .observe-nav-finish:disabled {
+    @apply cursor-wait opacity-60;
   }
 
   .observe-bar-center {
     @apply flex min-w-0 flex-1 items-center justify-center gap-1.5 text-xs font-medium text-slate-400 sm:text-sm;
+  }
+
+  .observe-day-badge {
+    @apply shrink-0 rounded-md border border-indigo-400/40 bg-indigo-500/20 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide text-indigo-200;
   }
 
   .observe-class {
@@ -1018,27 +1210,40 @@
     @apply text-slate-600;
   }
 
+  .observe-day-line {
+    @apply m-0 mb-1 font-mono text-xs font-bold uppercase tracking-wider text-indigo-300;
+  }
+
+  .observe-day-empty {
+    @apply m-0 mb-2 font-mono text-sm font-bold uppercase tracking-wider text-indigo-300;
+  }
+
   .observe-keys-btn {
-    @apply inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-white/10;
+    @apply border border-white/10 bg-white/5! shadow-none min-h-0 text-slate-300 hover:bg-white/10!;
   }
 
   .observe-keys-btn.icon-only {
-    @apply h-9 w-9 justify-center px-0;
-  }
-
-  /* Body: left rail + stage */
-  .observe-body {
-    @apply flex min-h-0 flex-1;
+    @apply h-9 w-9 min-h-0 justify-center px-0;
   }
 
   .observe-rail {
-    @apply relative flex shrink-0 flex-col border-r border-white/10 bg-black/30 transition-[width] duration-200;
+    --observe-rail-w: 14rem;
+    width: var(--observe-rail-w);
+    container-type: inline-size;
+    @apply relative flex shrink-0 flex-col border-r border-white/10 bg-black/30 transition-[width] duration-200 ease-out;
   }
+
+  .observe-rail.is-resizing {
+    transition: none;
+    user-select: none;
+  }
+
   .observe-rail.is-open {
-    @apply w-[4.75rem] sm:w-[5.5rem];
+    /* width from --observe-rail-w */
   }
+
   .observe-rail.is-closed {
-    @apply w-11;
+    --observe-rail-w: 3rem;
   }
 
   .observe-rail-person {
@@ -1046,21 +1251,41 @@
   }
 
   .observe-rail-avatar {
-    @apply h-9 w-9 ring-1 ring-white/20 sm:h-11 sm:w-11;
+    @apply ring-1 ring-white/20;
   }
 
   .observe-rail.is-closed .observe-rail-avatar {
     @apply h-8 w-8;
   }
 
+  .observe-rail.is-compact .observe-rail-avatar {
+    @apply h-10 w-10 ring-2 ring-white/20;
+  }
+
+  .observe-rail.is-mid .observe-rail-avatar {
+    @apply h-12 w-12 ring-2 ring-white/25;
+  }
+
+  .observe-rail.is-wide .observe-rail-avatar {
+    @apply h-16 w-16 ring-2 ring-white/30;
+  }
+
   .observe-rail-name {
-    @apply m-0 max-w-full truncate px-0.5 text-center text-[9px] font-semibold leading-tight text-slate-300;
+    @apply m-0 max-w-full truncate px-1 text-center text-[10px] font-semibold leading-tight text-slate-300;
+  }
+
+  .observe-rail.is-open .observe-rail-name {
+    @apply text-[11px] font-bold text-white sm:text-xs;
+  }
+
+  .observe-rail.is-wide .observe-rail-name {
+    @apply text-sm;
   }
 
   .observe-rail.is-closed .observe-rail-name,
   .observe-rail.is-closed .observe-rail-n,
   .observe-rail.is-closed .observe-rail-map,
-  .observe-rail.is-closed .observe-rail-collapse {
+  .observe-rail.is-closed .observe-rail-footer {
     @apply hidden;
   }
 
@@ -1068,13 +1293,91 @@
     @apply m-0 font-mono text-[10px] font-bold text-amber-300;
   }
 
+  .observe-rail.is-open .observe-rail-n {
+    @apply mt-0.5 text-xs text-amber-400;
+  }
+
   .observe-rail-map {
-    @apply flex min-h-0 flex-1 flex-col overflow-y-auto px-1 py-1.5;
+    @apply flex min-h-0 flex-1 flex-col overflow-y-auto px-1.5 py-1.5;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .observe-rail-map::-webkit-scrollbar {
+    display: none;
+  }
+
+  .observe-rail.is-open .observe-rail-map {
+    @apply px-2.5 py-2.5;
+  }
+
+  .observe-rail.is-wide .observe-rail-map {
+    @apply px-3 py-3;
+  }
+
+  .observe-rail-footer {
+    @apply flex shrink-0 items-center justify-center border-t border-white/5 py-1;
   }
 
   .observe-rail-peek,
   .observe-rail-collapse {
-    @apply mx-auto my-1 flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-white/10 hover:text-slate-200;
+    @apply border-0 bg-transparent shadow-none mx-auto my-1 flex min-h-10 min-w-10 items-center justify-center rounded-lg text-slate-200! transition hover:bg-white/15 hover:text-white! focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white;
+  }
+
+  .observe-rail-peek svg,
+  .observe-rail-collapse svg {
+    @apply stroke-current text-slate-100;
+  }
+
+  /* Drag handle on open rail edge */
+  .observe-rail-resize {
+    @apply absolute top-0 right-0 z-20 flex h-full w-3.5 cursor-col-resize items-center justify-center border-0 bg-transparent;
+  }
+
+  .observe-rail-resize:hover,
+  .observe-rail.is-resizing .observe-rail-resize {
+    @apply bg-indigo-400/30;
+  }
+
+  .observe-rail-resize-grip {
+    @apply h-6 w-3.5 text-slate-200 opacity-40 transition-opacity;
+  }
+
+  .observe-rail-resize:hover .observe-rail-resize-grip,
+  .observe-rail.is-resizing .observe-rail-resize-grip,
+  .observe-rail-resize:focus-visible .observe-rail-resize-grip {
+    @apply opacity-100 text-white;
+  }
+
+  .observe-rail.is-open .observe-heat {
+    @apply flex min-h-0 flex-1 flex-col;
+  }
+
+  .observe-rail.is-open .observe-heat.layout-column .observe-heat-summary {
+    @apply mb-2 flex flex-col gap-1 rounded-xl border border-white/5 bg-white/5 p-2 text-[10px] sm:text-xs;
+  }
+
+  .observe-rail.is-open .observe-heat.layout-column .observe-heat-summary .observe-heat-metric {
+    @apply flex items-center justify-between;
+  }
+
+  .observe-rail.is-open .observe-heat.layout-column .observe-heat-summary .observe-heat-counts {
+    @apply mt-0.5 flex items-center justify-around border-t border-white/5 pt-1.5;
+  }
+
+  .observe-rail.is-open .observe-heat.layout-column .observe-heat-grid {
+    @apply mt-2 grid min-h-0 flex-1 grid-cols-4 justify-items-center gap-1.5 overflow-y-auto;
+  }
+
+  .observe-rail.is-mid .observe-heat.layout-column .observe-heat-grid {
+    @apply grid-cols-5 gap-2;
+  }
+
+  .observe-rail.is-wide .observe-heat.layout-column .observe-heat-grid {
+    @apply grid-cols-6 gap-2;
+  }
+
+  .observe-rail.is-compact .observe-heat.layout-column .observe-heat-grid {
+    @apply grid-cols-3 gap-1;
   }
 
   /* Heatmap column */
@@ -1091,7 +1394,8 @@
   }
 
   .observe-heat.layout-column .observe-heat-grid {
-    @apply mt-1 max-h-[40dvh] flex-col flex-wrap content-start gap-1 overflow-y-auto sm:max-h-none;
+    @apply mt-1 max-h-[40dvh] grid-cols-3 gap-1 overflow-y-auto sm:max-h-none;
+    display: grid;
   }
 
   .observe-heat-summary {
@@ -1140,32 +1444,37 @@
 
   .observe-heat-grid {
     @apply flex flex-wrap gap-1;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .observe-heat-grid::-webkit-scrollbar {
+    display: none;
   }
 
   .observe-heat-dot-btn {
-    @apply h-2 w-2 shrink-0 rounded-full bg-white/15 transition hover:scale-125;
+    @apply flex h-7 w-7 min-h-0 min-w-0 shrink-0 items-center justify-center justify-self-center rounded-full border-0 bg-white/10 p-0 text-[10px] font-bold text-slate-300 shadow-none transition hover:scale-115 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white;
   }
   .observe-heat-dot-btn.is-current {
-    @apply h-2.5 w-2.5 ring-1 ring-white ring-offset-1 ring-offset-slate-950;
+    @apply ring-2 ring-white ring-offset-2 ring-offset-slate-950 scale-105;
   }
   .observe-heat-dot-btn.is-red {
-    @apply bg-red-500;
+    @apply bg-red-500 text-white;
   }
   .observe-heat-dot-btn.is-yellow {
-    @apply bg-yellow-400;
+    @apply bg-yellow-400 text-yellow-950;
   }
   .observe-heat-dot-btn.is-green {
-    @apply bg-green-500;
+    @apply bg-green-500 text-white;
   }
   .observe-heat-dot-btn.is-purple {
-    @apply bg-purple-500;
+    @apply bg-purple-500 text-white;
   }
   .observe-heat-dot-btn.is-open {
-    @apply bg-amber-400 animate-pulse;
+    @apply bg-amber-400 text-amber-950 animate-pulse;
   }
   .observe-heat-dot-btn.is-draft,
   .observe-heat-dot-btn.is-empty {
-    @apply bg-white/10;
+    @apply bg-white/10 text-slate-400;
   }
 
   .observe-stage {
@@ -1176,45 +1485,135 @@
     @apply py-2;
   }
 
+  .observe-stage-hero {
+    @apply flex w-full max-w-xl flex-col items-center gap-1.5 px-2;
+  }
+
+  .observe-phone-avatar {
+    @apply hidden;
+  }
+
+  .observe-phone-only {
+    @apply hidden;
+  }
+
+  .observe-hide-phone {
+    /* shown by default; hidden under phone media */
+  }
+
+  .observe-meta-row {
+    @apply mt-1 flex flex-wrap items-center justify-center gap-2;
+  }
+
+  .observe-color-pills {
+    @apply m-0;
+  }
+
   .observe-learner-solo {
     @apply m-0 max-w-[92vw] font-display text-[clamp(1.75rem,8vw,3.5rem)] font-bold leading-tight tracking-tight text-white;
   }
 
+  .observe-learner-rfc {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] sm:text-xs font-mono font-bold tracking-tight rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20 align-middle;
+  }
+
+  .observe-learner-rfc svg {
+    @apply h-3.5 w-3.5 text-amber-400;
+  }
+
   .observe-depth-inline {
-    @apply m-0 mt-2 font-mono text-sm text-amber-200/90;
+    @apply m-0 mt-1 font-mono text-sm text-amber-200/90;
   }
 
   .observe-depth-inline strong {
     @apply text-amber-100;
   }
 
-  /* Reaction overlays */
-  .observe-react {
-    @apply pointer-events-none absolute inset-0 flex items-center justify-center;
+  .observe-dock-q {
+    @apply font-mono text-xs font-bold tabular-nums text-slate-400;
   }
 
-  .observe-react > span:first-child {
-    @apply z-10 text-6xl sm:text-7xl;
+  .observe-tool-text {
+    @apply hidden sm:inline;
+  }
+
+  /* Phone map bottom sheet */
+  .observe-sheet-backdrop {
+    @apply fixed inset-0 z-40 border-0 bg-black/55 p-0;
+  }
+
+  .observe-map-sheet {
+    @apply fixed inset-x-0 bottom-0 z-50 flex max-h-[min(70dvh,28rem)] flex-col rounded-t-2xl border border-white/10 bg-slate-900 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-2xl;
+  }
+
+  .observe-map-sheet-handle {
+    @apply mx-auto mb-2 h-1 w-10 shrink-0 rounded-full bg-white/20;
+  }
+
+  .observe-map-sheet-head {
+    @apply mb-2 flex shrink-0 items-center justify-between gap-2;
+  }
+
+  .observe-map-sheet-title {
+    @apply font-display text-sm font-bold text-white;
+  }
+
+  .observe-map-sheet .observe-heat {
+    @apply min-h-0 flex-1 overflow-y-auto;
+  }
+
+  .observe-map-sheet .observe-heat.layout-column .observe-heat-grid {
+    @apply max-h-none grid-cols-6 gap-1.5 sm:grid-cols-8;
+  }
+
+  /* Reaction overlays */
+  .observe-react {
+    @apply pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2;
+  }
+
+  .observe-react-symbol {
+    @apply z-10 flex h-20 w-20 items-center justify-center rounded-full border-2 border-white/70 text-white shadow-2xl sm:h-24 sm:w-24;
+  }
+
+  .observe-react-symbol svg {
+    @apply h-10 w-10 sm:h-12 sm:w-12;
+  }
+
+  .observe-react-label {
+    @apply z-10 rounded-full border border-white/15 bg-slate-950/80 px-4 py-1.5 text-sm font-black uppercase tracking-[0.16em] text-white shadow-xl;
+  }
+
+  .observe-react-sparkles {
+    @apply absolute z-10 h-36 w-36 text-emerald-200 sm:h-44 sm:w-44;
+    animation: observe-sparkle 0.75s ease-out both;
   }
 
   .observe-react-burst {
-    @apply absolute h-32 w-32 rounded-full sm:h-40 sm:w-40;
+    @apply absolute h-36 w-36 rounded-full sm:h-44 sm:w-44;
   }
 
-  .observe-react-happy > span:first-child {
-    animation: observe-pop-happy 0.65s ease-out both;
+  .observe-react-happy .observe-react-symbol {
+    @apply bg-emerald-500;
+    animation: observe-pop-happy 0.75s ease-out both;
+  }
+  .observe-react-happy .observe-react-label {
+    animation: observe-label-in 0.75s ease-out both;
   }
   .observe-react-happy .observe-react-burst {
-    @apply bg-green-400/25;
-    animation: observe-ring-happy 0.65s ease-out both;
+    @apply bg-emerald-400/25;
+    animation: observe-ring-happy 0.75s ease-out both;
   }
 
-  .observe-react-fight > span:first-child {
-    animation: observe-shake-fight 0.55s ease-out both;
+  .observe-react-fight .observe-react-symbol {
+    @apply bg-orange-500;
+    animation: observe-shake-fight 0.7s ease-out both;
+  }
+  .observe-react-fight .observe-react-label {
+    animation: observe-label-in 0.7s ease-out both;
   }
   .observe-react-fight .observe-react-burst {
-    @apply bg-red-500/20;
-    animation: observe-ring-fight 0.55s ease-out both;
+    @apply bg-orange-400/25;
+    animation: observe-ring-fight 0.7s ease-out both;
   }
 
   .observe-root.is-react-happy .observe-learner-solo {
@@ -1289,6 +1688,35 @@
     }
   }
 
+  @keyframes observe-label-in {
+    0% {
+      transform: translateY(10px);
+      opacity: 0;
+    }
+    35%,
+    75% {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+
+  @keyframes observe-sparkle {
+    0% {
+      transform: rotate(-15deg) scale(0.5);
+      opacity: 0;
+    }
+    35% {
+      opacity: 0.9;
+    }
+    100% {
+      transform: rotate(20deg) scale(1.25);
+      opacity: 0;
+    }
+  }
+
   @keyframes observe-glow-good {
     0%,
     100% {
@@ -1309,10 +1737,9 @@
     }
   }
 
-  /* Bottom dock — big numbers only */
+  /* Bottom dock — inline control panel inside stage */
   .observe-dock {
-    @apply shrink-0 border-t border-white/10 bg-slate-950/95 px-2 pt-2 backdrop-blur;
-    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+    @apply mt-6 w-full max-w-xl shrink-0 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-xl mx-auto;
   }
 
   .observe-dock-lg .observe-dock-colors {
@@ -1320,11 +1747,11 @@
   }
 
   .observe-dock-colors {
-    @apply grid grid-cols-4 gap-1.5;
+    @apply grid grid-cols-2 gap-1.5;
   }
 
   .observe-dock-color {
-    @apply flex min-h-[5.25rem] items-center justify-center rounded-2xl text-white transition active:scale-97 disabled:opacity-40 sm:min-h-[5.75rem];
+    @apply flex min-h-[5rem] flex-col items-center justify-center gap-1 rounded-2xl border-0 p-2 text-white shadow-lg transition hover:-translate-y-0.5 active:translate-y-0 active:scale-97 disabled:opacity-40 sm:min-h-[6rem] focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-white;
   }
   .observe-dock-color.is-red {
     @apply bg-red-600 hover:bg-red-500;
@@ -1342,8 +1769,12 @@
     @apply ring-2 ring-white ring-offset-2 ring-offset-slate-950;
   }
 
+  .observe-dock-label {
+    @apply font-display text-xs font-black uppercase tracking-[0.14em] opacity-90 sm:text-sm;
+  }
+
   .observe-dock-num {
-    @apply font-display text-3xl font-bold tabular-nums tracking-tight sm:text-4xl;
+    @apply font-display text-4xl font-black leading-none tabular-nums tracking-tight sm:text-5xl;
   }
 
   .observe-dock-probe {
@@ -1367,57 +1798,215 @@
   }
 
   .observe-dock-tools {
-    @apply mt-1 flex items-center justify-between px-1;
+    @apply mt-3 flex items-center justify-between border-t border-white/5 px-1 pt-3;
   }
 
   .observe-tool {
-    @apply inline-flex h-8 items-center gap-1 rounded-md px-2 text-[11px] font-semibold text-slate-500 hover:bg-white/5 hover:text-slate-300 disabled:opacity-30;
+    @apply border-0 bg-transparent! shadow-none min-h-0 inline-flex h-9 min-w-11 items-center justify-center gap-1 rounded-lg px-2 text-[11px] font-semibold text-slate-400 hover:bg-white/5 hover:text-slate-200 disabled:opacity-30;
   }
 
-  /* Phone: map opens as bottom sheet strip under header instead of eating width */
+  /*
+   * Phone observe (≤639px / .is-phone):
+   * - column stack: slim bar → hero → bottom dock
+   * - no side rail (map is bottom sheet)
+   * - fewer labels so stage isn't overcrowded
+   */
   @media (max-width: 639px) {
-    .observe-body {
-      @apply flex-col;
+    .observe-hide-phone {
+      display: none !important;
     }
 
-    .observe-rail.is-open {
-      @apply w-full flex-row items-stretch border-b border-r-0;
+    .observe-phone-only {
+      display: inline !important;
     }
 
-    .observe-rail.is-open .observe-rail-person {
-      @apply w-16 shrink-0 border-b-0 border-r border-white/5 py-1.5;
+    .observe-root,
+    .observe-root.is-phone {
+      display: flex;
+      flex-direction: column;
     }
 
-    .observe-rail.is-open .observe-rail-map {
-      @apply flex-1 overflow-x-auto overflow-y-hidden px-2 py-1;
+    .observe-bar {
+      @apply px-1.5 py-1;
     }
 
-    .observe-rail.is-open .observe-heat.layout-column .observe-heat-summary {
-      @apply flex-row flex-wrap items-center gap-1.5;
+    .observe-bar-slim {
+      @apply py-1;
     }
 
-    .observe-rail.is-open .observe-heat.layout-column .observe-heat-grid {
-      @apply max-h-none flex-row flex-wrap content-center;
+    .observe-bar-center {
+      @apply gap-1 text-[11px];
     }
 
-    .observe-rail.is-closed {
-      @apply w-full flex-row items-center border-b border-r-0 px-1;
+    .observe-day-badge {
+      @apply px-1.5 py-0.5 text-[9px];
     }
 
-    .observe-rail.is-closed .observe-rail-person {
-      @apply flex-row gap-2 border-0 py-1;
+    .observe-nav-btn {
+      @apply h-12 w-12;
     }
 
-    .observe-rail.is-closed .observe-rail-name {
-      @apply block max-w-[40vw] text-left text-[11px];
+    .observe-nav-btn svg,
+    .observe-nav-exit svg {
+      @apply h-7 w-7;
+    }
+
+    .observe-nav-finish {
+      @apply h-12 w-auto min-w-12 gap-1 px-2.5;
+    }
+
+    .observe-nav-finish svg {
+      @apply h-6 w-6;
+    }
+
+    /* Always show short Finish label on phone — icon alone was too easy to miss */
+    .observe-nav-finish-label {
+      @apply inline text-[11px];
+    }
+
+    .observe-nav-group {
+      @apply gap-1 p-1;
+    }
+
+    .observe-stage,
+    .observe-stage-tight {
+      @apply flex min-h-0 flex-1 flex-col items-stretch justify-between gap-2 px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))];
+    }
+
+    .observe-stage-hero {
+      @apply min-h-0 flex-1 justify-center gap-1 py-1;
+    }
+
+    .observe-phone-avatar {
+      @apply mb-1 flex shrink-0;
+    }
+
+    .observe-phone-avatar .user-avatar {
+      @apply !h-12 !w-12 !text-sm;
+    }
+
+    .observe-hint-phone {
+      @apply text-[11px] text-slate-500;
+    }
+
+    .observe-learner-solo {
+      @apply text-[clamp(1.35rem,7vw,1.85rem)] leading-snug;
+    }
+
+    .observe-learner-rfc {
+      @apply ml-0 text-[10px];
+    }
+
+    .observe-depth-inline {
+      @apply text-xs;
+    }
+
+    .observe-dock,
+    .observe-dock-lg {
+      @apply mt-0 w-full max-w-none rounded-2xl border-white/15 bg-slate-900/95 p-2.5 shadow-2xl backdrop-blur-md;
+    }
+
+    .observe-dock-colors {
+      @apply gap-2;
     }
 
     .observe-dock-color {
-      @apply min-h-[4.75rem] rounded-xl;
+      @apply min-h-[4.25rem] gap-0.5 rounded-xl p-1.5 active:scale-95;
     }
 
-    .observe-dock-num {
-      @apply text-2xl;
+    .observe-dock-label {
+      @apply text-[11px] tracking-[0.12em];
+    }
+
+    .observe-dock-probe-btn {
+      @apply min-h-[4rem] rounded-xl text-xs;
+    }
+
+    .observe-dock-tools {
+      @apply mt-2 pt-2;
+    }
+
+    .observe-tool {
+      @apply h-10 min-w-12;
+    }
+
+    .observe-tool-text {
+      @apply inline text-[11px];
+    }
+
+    .observe-dock-q {
+      @apply text-sm text-slate-300;
+    }
+
+    .observe-empty {
+      @apply flex flex-1 flex-col items-center justify-center gap-3 px-4;
+    }
+
+    .observe-empty-title {
+      @apply text-xl;
+    }
+
+    .observe-cta {
+      @apply mt-4 min-h-12 px-6 text-sm;
+    }
+
+    .observe-toast {
+      @apply top-12 text-xs;
+    }
+
+    .observe-react-symbol {
+      @apply h-16 w-16;
+    }
+
+    .observe-react-symbol svg {
+      @apply h-8 w-8;
+    }
+
+    .observe-react-label {
+      @apply text-sm;
+    }
+  }
+
+  /* Short landscape phones: keep dock usable, shrink hero */
+  @media (max-height: 500px) and (orientation: landscape) {
+    .observe-stage-hero {
+      @apply flex-row flex-wrap items-center justify-center gap-2 py-0;
+    }
+
+    .observe-phone-avatar {
+      @apply mb-0;
+    }
+
+    .observe-learner-solo {
+      @apply text-lg;
+    }
+
+    .observe-dock-color {
+      @apply min-h-12;
+    }
+
+    .observe-dock-probe-btn {
+      @apply min-h-12;
+    }
+
+    .observe-map-sheet {
+      @apply max-h-[85dvh];
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .observe-react-symbol,
+    .observe-react-label,
+    .observe-react-sparkles,
+    .observe-react-burst,
+    .observe-root.is-react-happy .observe-learner-solo,
+    .observe-root.is-react-fight .observe-learner-solo {
+      animation: none;
+    }
+
+    .observe-react-label,
+    .observe-react-symbol {
+      opacity: 1;
     }
   }
 
@@ -1571,11 +2160,43 @@
   }
 
   .observe-keys-panel {
-    @apply fixed bottom-20 left-1/2 z-20 w-[min(92vw,28rem)] -translate-x-1/2 rounded-xl border border-white/10 bg-slate-900/95 px-4 py-3 text-center text-xs text-slate-300 shadow-2xl backdrop-blur;
+    @apply fixed bottom-20 left-1/2 z-20 w-[min(92vw,28rem)] -translate-x-1/2 rounded-2xl border border-white/10 bg-slate-900/95 p-4 shadow-2xl backdrop-blur transition-all duration-300;
+  }
+
+  .observe-keys-header {
+    @apply flex items-center justify-between border-b border-white/5 pb-2 mb-3;
+  }
+
+  .observe-keys-title {
+    @apply m-0 text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono;
+  }
+
+  .observe-keys-close {
+    @apply border-0 bg-transparent! p-0 min-h-0 text-slate-500 hover:text-white transition-colors duration-200;
+  }
+
+  .observe-keys-grid {
+    @apply grid grid-cols-2 gap-4 text-left;
+  }
+
+  .observe-keys-group {
+    @apply flex flex-col gap-1.5;
+  }
+
+  .observe-keys-group-title {
+    @apply text-[9px] font-bold uppercase tracking-tight text-slate-500 font-mono mb-0.5;
+  }
+
+  .observe-key-row {
+    @apply flex items-center gap-1.5 text-[11px] text-slate-300;
+  }
+
+  .observe-key-row span {
+    @apply truncate;
   }
 
   .observe-keys-panel kbd {
-    @apply mx-0.5 rounded border border-white/20 bg-black/30 px-1.5 py-0.5 font-mono text-[10px];
+    @apply mx-0.5 rounded border border-white/20 bg-slate-950 px-1.5 py-0.5 font-mono text-[10px] font-bold text-white shadow-sm;
   }
 
   .observe-toast {
@@ -1945,12 +2566,201 @@
     @apply flex flex-col gap-3;
   }
 
+  .analysis-filter-card {
+    @apply mb-3 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-3xs sm:p-4;
+  }
+
+  .analysis-filter-row {
+    @apply flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-4;
+  }
+
+  .analysis-filter-block {
+    @apply flex min-w-0 flex-col gap-1.5;
+  }
+
+  .analysis-filter-grow {
+    @apply flex-1;
+  }
+
+  .analysis-filter-label {
+    @apply inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400;
+  }
+
+  .analysis-chip-row {
+    @apply flex flex-wrap gap-1.5;
+  }
+
+  .analysis-chip {
+    @apply rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-white;
+  }
+
+  .analysis-chip.is-active {
+    @apply border-red-200 bg-red-50 text-red-800 shadow-sm;
+  }
+
+  .analysis-select-wrap {
+    @apply flex min-w-0 flex-col gap-1;
+  }
+
+  .analysis-select {
+    @apply min-h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800;
+  }
+
+  .analysis-dates {
+    @apply mt-2;
+  }
+
+  .analysis-filter-meta {
+    @apply mt-2.5 mb-0 text-xs text-slate-500;
+  }
+
+  .analysis-filter-meta strong {
+    @apply font-mono text-slate-700;
+  }
+
+  .analysis-person-strip {
+    @apply mb-3 flex items-center gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/50 px-3 py-2.5;
+  }
+
+  .analysis-person-copy {
+    @apply min-w-0 flex-1;
+  }
+
+  .analysis-person-name {
+    @apply m-0 font-display text-base font-bold text-slate-900;
+  }
+
+  .analysis-person-clear {
+    @apply shrink-0;
+  }
+
+  .analysis-plain-hint {
+    @apply m-0 mb-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600;
+  }
+
   .analysis-kpis .kpi-highlight {
     @apply border-red-200 bg-gradient-to-b from-red-50 to-white;
   }
 
+  .analysis-kpi-rfc.is-good {
+    @apply border-green-200 bg-gradient-to-b from-green-50/80 to-white;
+  }
+
+  .analysis-kpi-rfc.is-warn {
+    @apply border-amber-200 bg-gradient-to-b from-amber-50/80 to-white;
+  }
+
+  .analysis-kpi-rac.is-good {
+    @apply border-green-200 bg-gradient-to-b from-green-50/80 to-white;
+  }
+
+  .analysis-kpi-rac.is-warn {
+    @apply border-amber-200 bg-gradient-to-b from-amber-50/80 to-white;
+  }
+
+  .analysis-delta {
+    @apply m-0 inline-flex items-center gap-1 text-xs font-semibold text-slate-500;
+  }
+
+  .analysis-delta.is-up {
+    @apply text-green-700;
+  }
+
+  .analysis-delta.is-down {
+    @apply text-amber-700;
+  }
+
+  .analysis-delta.is-flat {
+    @apply text-slate-500;
+  }
+
+  .analysis-delta-note {
+    @apply font-normal text-slate-400;
+  }
+
+  .analysis-session-mini {
+    @apply m-0 flex list-none flex-col gap-1 p-0;
+  }
+
+  .analysis-session-mini-row {
+    @apply flex w-full items-center gap-2 rounded-lg border-0 bg-transparent px-1 py-1.5 text-left text-sm hover:bg-slate-50;
+  }
+
+  .analysis-session-mini-day {
+    @apply min-w-0 flex-1 font-semibold text-slate-800;
+  }
+
+  .analysis-session-mini-rfc {
+    @apply font-mono text-xs text-slate-600;
+  }
+
+  .analysis-link-btn {
+    @apply mt-2 text-xs font-semibold text-red-700;
+  }
+
+  .analysis-link-row {
+    @apply mt-1 flex flex-wrap gap-2;
+  }
+
+  .analysis-link-row .analysis-link-btn {
+    @apply mt-0;
+  }
+
+  .analysis-day-cell {
+    @apply flex flex-col gap-0.5;
+  }
+
+  .analysis-day-cell small {
+    @apply font-normal text-slate-400;
+  }
+
   .analysis-grid {
     @apply grid grid-cols-1 gap-4 lg:grid-cols-2;
+  }
+
+  /* Analysis multi-chart board */
+  .analysis-charts {
+    @apply flex flex-col gap-3;
+  }
+
+  .analysis-charts-toolbar {
+    @apply flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-4 sm:p-4;
+  }
+
+  .analysis-charts-days {
+    @apply flex flex-col gap-1.5;
+  }
+
+  .analysis-chip.is-muted-on {
+    @apply border-slate-200 bg-white text-slate-700;
+  }
+
+  .analysis-charts-grid {
+    @apply grid grid-cols-1 gap-3 md:grid-cols-2;
+  }
+
+  .analysis-chart-card {
+    @apply overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-3 shadow-3xs sm:p-4;
+  }
+
+  .analysis-chart-card-wide {
+    @apply md:col-span-2;
+  }
+
+  .analysis-chart-card-head {
+    @apply mb-2 flex flex-wrap items-baseline justify-between gap-2;
+  }
+
+  .analysis-chart-card-head h3 {
+    @apply m-0 font-display text-sm font-bold text-slate-900;
+  }
+
+  .analysis-chart-body {
+    @apply min-h-[12rem] w-full;
+  }
+
+  .analysis-charts-single {
+    @apply flex flex-col gap-3;
   }
 
   .dist-bars {
@@ -2016,5 +2826,209 @@
 
   .metric-toggle input {
     @apply h-4 w-4 accent-red-700;
+  }
+
+  /* ——— Custom Confirmation Modal ——— */
+  .observe-modal-container {
+    @apply fixed inset-0 z-50 flex items-center justify-center p-4;
+  }
+
+  .observe-modal-backdrop {
+    @apply absolute inset-0 z-40 bg-slate-950/75 backdrop-blur-sm transition-opacity duration-300;
+  }
+
+  @keyframes modal-scale-in {
+    0% {
+      transform: scale(0.96);
+      opacity: 0;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  .observe-modal-card {
+    @apply relative z-50 w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl backdrop-blur-md flex flex-col items-center gap-4 text-center;
+    animation: modal-scale-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .observe-modal-icon {
+    @apply flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10 border border-green-500/20 text-green-400 shadow-[0_0_20px_rgba(34,197,94,0.1)];
+  }
+
+  .observe-modal-title {
+    @apply m-0 text-xl font-bold tracking-tight text-white font-display;
+  }
+
+  .observe-modal-desc {
+    @apply m-0 text-xs leading-relaxed text-slate-400 px-2;
+  }
+
+  /* ——— Modal Summary Box ——— */
+  .observe-modal-summary-box {
+    @apply w-full bg-slate-950/50 border border-white/5 rounded-2xl p-4 my-1 flex flex-col gap-3 text-left;
+  }
+
+  .observe-modal-summary-box .summary-row {
+    @apply flex items-center justify-between;
+  }
+
+  .observe-modal-summary-box .summary-label {
+    @apply text-xs font-semibold text-slate-400;
+  }
+
+  .observe-modal-summary-box .summary-val {
+    @apply text-sm font-bold;
+  }
+
+  .observe-modal-summary-box .summary-divider {
+    @apply h-[1px] bg-white/5 w-full;
+  }
+
+  .observe-modal-summary-box .summary-colors-grid {
+    @apply grid grid-cols-2 gap-2;
+  }
+
+  .observe-modal-summary-box .color-item {
+    @apply flex items-center gap-2 text-xs text-slate-300 font-mono;
+  }
+
+  .observe-modal-summary-box .color-item .dot {
+    @apply h-2 w-2 rounded-full shrink-0;
+  }
+
+  .observe-modal-summary-box .footer-row {
+    @apply grid grid-cols-2 gap-4 border-t border-white/5 pt-3 mt-1;
+  }
+
+  .observe-modal-summary-box .footer-col {
+    @apply flex flex-col gap-0.5 items-center justify-center text-center;
+  }
+
+  .observe-modal-summary-box .footer-col .label {
+    @apply text-[9px] font-bold uppercase tracking-wider text-slate-500 font-mono;
+  }
+
+  .observe-modal-summary-box .footer-col .val {
+    @apply text-sm font-bold font-mono tracking-tight;
+  }
+
+  .observe-modal-actions {
+    @apply flex items-center gap-3 w-full mt-2;
+  }
+
+  .observe-modal-btn {
+    @apply flex-1 flex h-11 items-center justify-center rounded-xl text-xs font-bold transition-all duration-200 active:scale-97;
+  }
+
+  .observe-modal-cancel {
+    @apply border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white;
+  }
+
+  .observe-modal-confirm {
+    @apply border-0 bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg shadow-green-500/10 hover:from-green-500 hover:to-emerald-500;
+  }
+
+  /* ——— Learner Attendance Page Grid View & Class info ——— */
+  .learner-attendance-layout {
+    @apply grid grid-cols-1 md:grid-cols-12 gap-6 w-full items-start mt-6;
+  }
+
+  .learner-sidebar-panel {
+    @apply md:col-span-5 flex flex-col gap-6;
+  }
+
+  .learner-main-panel {
+    @apply md:col-span-7;
+  }
+
+  .attendance-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 gap-4;
+  }
+
+  .attendance-card {
+    @apply rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm flex flex-col gap-4 transition-all duration-200 hover:border-slate-300/80 hover:scale-[1.01] text-left;
+  }
+
+  .attendance-card.status-present {
+    @apply border-green-200 bg-green-50/40 shadow-[0_0_12px_rgba(34,197,94,0.01)];
+  }
+
+  .attendance-card.status-late {
+    @apply border-amber-200 bg-amber-50/40 shadow-[0_0_12px_rgba(245,158,11,0.01)];
+  }
+
+  .attendance-card.status-absent {
+    @apply border-red-200 bg-red-50/40 shadow-[0_0_12px_rgba(239,68,68,0.01)];
+  }
+
+  .attendance-card.status-excused {
+    @apply border-purple-200 bg-purple-50/40 shadow-[0_0_12px_rgba(168,85,247,0.01)];
+  }
+
+  .attendance-card .card-header {
+    @apply flex items-center justify-between;
+  }
+
+  .attendance-card .session-tag {
+    @apply px-2 py-0.5 rounded text-[10px] font-bold font-mono tracking-tight bg-slate-100 text-slate-600;
+  }
+
+  .attendance-card .status-badge {
+    @apply text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full;
+  }
+
+  .attendance-card .status-badge.present {
+    @apply bg-green-50 text-green-700 border border-green-200/60;
+  }
+
+  .attendance-card .status-badge.late {
+    @apply bg-amber-50 text-amber-700 border border-amber-200/60;
+  }
+
+  .attendance-card .status-badge.absent {
+    @apply bg-red-50 text-red-700 border border-red-200/60;
+  }
+
+  .attendance-card .status-badge.excused {
+    @apply bg-purple-50 text-purple-700 border border-purple-200/60;
+  }
+
+  .attendance-card .card-body {
+    @apply flex flex-col gap-0.5 text-left;
+  }
+
+  .attendance-card .card-date {
+    @apply m-0 text-sm font-bold text-slate-800;
+  }
+
+  .attendance-card .card-time {
+    @apply m-0 text-[10px] text-slate-500 font-mono;
+  }
+
+  /* My classes styling */
+  .class-card {
+    @apply rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm flex flex-col gap-4 text-left;
+  }
+
+  .class-card-header {
+    @apply flex flex-col gap-0.5 border-b border-slate-100 pb-3;
+  }
+
+  .class-card-title {
+    @apply m-0 text-lg font-bold text-slate-800 font-display;
+  }
+
+  .class-card-subtitle {
+    @apply text-xs text-slate-500;
+  }
+
+  .upcoming-box {
+    @apply flex flex-col gap-2;
+  }
+
+  .upcoming-box-title {
+    @apply text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono mb-1;
   }
 }

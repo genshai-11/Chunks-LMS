@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   cancelScheduledSession,
+  deleteScheduledSession,
   completeLearningSession,
   createScheduledSession,
   emptySchedulingState,
@@ -131,5 +132,29 @@ describe('session lifecycle and attendance', () => {
     expect(cancel.ok).toBe(true)
     if (!cancel.ok) return
     expect(cancel.state.scheduledSessions.find((s) => s.id === created.value.id)).toBeTruthy()
+  })
+
+  it('deletes a scheduled slot and reindexes day numbers', () => {
+    let state = emptySchedulingState()
+    const a = createScheduledSession(state, {
+      classId,
+      plannedStart: '2026-07-20T09:00:00.000Z',
+      durationMinutes: 60,
+    })
+    if (!a.ok) throw new Error(a.error)
+    state = a.state
+    const b = createScheduledSession(state, {
+      classId,
+      plannedStart: '2026-07-22T09:00:00.000Z',
+      durationMinutes: 60,
+    })
+    if (!b.ok) throw new Error(b.error)
+    state = b.state
+
+    const del = deleteScheduledSession(state, a.value.id)
+    expect(del.ok).toBe(true)
+    if (!del.ok) return
+    expect(del.state.scheduledSessions).toHaveLength(1)
+    expect(del.state.scheduledSessions[0]?.sessionNumber).toBe(1)
   })
 })

@@ -9,12 +9,19 @@ const app = <App />
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {env.clerkPublishableKey && !env.authBypass ? (
+    {env.clerkPublishableKey ? (
       <ClerkProvider publishableKey={env.clerkPublishableKey} afterSignOutUrl="/">
         {app}
       </ClerkProvider>
     ) : (
-      app
+      <div className="flex items-center justify-center min-h-screen bg-slate-950 text-white p-4 text-center">
+        <div className="max-w-md p-6 bg-slate-900 rounded-2xl border border-white/10 shadow-xl">
+          <h2 className="text-xl font-bold mb-2 font-display">Clerk publishable key missing</h2>
+          <p className="text-sm text-slate-400">
+            Please configure VITE_CLERK_PUBLISHABLE_KEY in your environment to load the application.
+          </p>
+        </div>
+      </div>
     )}
   </StrictMode>,
 )

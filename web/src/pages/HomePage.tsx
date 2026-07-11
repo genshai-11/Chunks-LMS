@@ -23,7 +23,15 @@ export function HomePage() {
   return (
     <div className="home-compact">
       <header className="home-compact-head">
-        <h1>Chunks LMS</h1>
+        <img
+          src="/logo.png"
+          alt="Chunks"
+          className="home-logo"
+          width={220}
+          height={66}
+          decoding="async"
+        />
+        <h1 className="sr-only">Chunks LMS</h1>
         <p>Focus &amp; Awareness observation for small classes.</p>
         <div className="home-tools">
           <Link to="/access" className="btn ghost">

@@ -1,30 +1,26 @@
-import { CalendarDays, ChartColumn, Radio } from 'lucide-react'
-import { Navigate, useLocation } from 'react-router-dom'
+import { Archive, CalendarDays, ChartColumn, Home, Radio } from 'lucide-react'
+import { ClassContextSelect } from '../../components/ClassContextSelect'
 import { RoleWorkspace } from '../../components/RoleWorkspace'
-import { activeEnrollmentsForClass } from '../../modules/roster/service'
+import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import { useAppState } from '../../state/useAppState'
 
 const ITEMS = [
+  { to: '/teacher', label: 'Home', icon: Home, end: true },
   { to: '/teacher/calendar', label: 'Schedule', icon: CalendarDays },
   { to: '/teacher/session', label: 'Live session', icon: Radio },
+  { to: '/teacher/archive', label: 'Archive', icon: Archive },
   { to: '/teacher/analysis', label: 'Analysis', icon: ChartColumn },
 ]
 
 export function TeacherLayout() {
-  const { roster, scheduling, capture } = useAppState()
-  const { pathname } = useLocation()
-  const teacher = roster.users.find((u) => u.roles.includes('teacher'))
-  const classRow = roster.classes.find((c) => c.teacherUserId === teacher?.id) ?? roster.classes[0]
-  const seats = classRow ? activeEnrollmentsForClass(roster, classRow.id).length : 0
+  const { scheduling, capture } = useAppState()
+  const { options, classRow, seats, activeClassId, setActiveClassId } = useTeacherClassContext()
+
   const liveOpen = Boolean(
     classRow &&
       scheduling.learningSessions.some((s) => s.classId === classRow.id && s.status === 'open') &&
       capture?.sessionStatus === 'open',
   )
-
-  if (pathname === '/teacher' || pathname === '/teacher/') {
-    return <Navigate to={liveOpen ? '/teacher/session' : '/teacher/calendar'} replace />
-  }
 
   const items = ITEMS.map((item) =>
     item.to === '/teacher/session' && liveOpen
@@ -37,8 +33,17 @@ export function TeacherLayout() {
       title="Teaching"
       subtitle={
         classRow
-          ? `${classRow.name} · ${seats}/${classRow.capacity}${liveOpen ? ' · LIVE' : ''}`
-          : 'No class'
+          ? `${seats}/${classRow.capacity} seats${liveOpen ? ' · LIVE' : ''}`
+          : 'No class assigned'
+      }
+      contextSlot={
+        <ClassContextSelect
+          variant="teacher"
+          options={options}
+          value={activeClassId}
+          onChange={(id) => setActiveClassId(id)}
+          compact
+        />
       }
       navLabel="Teacher menu"
       items={items}

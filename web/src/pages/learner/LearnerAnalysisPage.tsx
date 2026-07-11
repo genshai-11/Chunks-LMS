@@ -1,21 +1,11 @@
-import { useMemo } from 'react'
 import { PageHeader } from '../../components/PageHeader'
 import { ProgressAnalysisView } from '../../components/ProgressAnalysisView'
-import { useActiveLearner } from '../../hooks/useActiveLearner'
+import { useLearnerClassContext } from '../../hooks/useLearnerClassContext'
 import { useAppState } from '../../state/useAppState'
 
 export function LearnerAnalysisPage() {
   const { roster, scheduling, ledger, metricSettings } = useAppState()
-  const learner = useActiveLearner()
-  const myEnrollments = useMemo(
-    () =>
-      roster.enrollments.filter(
-        (e) => e.learnerUserId === learner?.id && e.status === 'active',
-      ),
-    [roster.enrollments, learner?.id],
-  )
-  const classRow = roster.classes.find((c) => c.id === myEnrollments[0]?.classId)
-  const course = roster.courses.find((c) => c.id === classRow?.courseId) ?? roster.courses[0]
+  const { learner, classRow, course } = useLearnerClassContext()
 
   if (!learner || !course) {
     return (

@@ -11,23 +11,38 @@ import { Link } from 'react-router-dom'
 import { PageHeader } from '../../components/PageHeader'
 import { UserAvatar } from '../../components/UserAvatar'
 import { EmptyState, NavTile, Panel, StatCard } from '../../components/ui'
+import { useLearnerClassContext } from '../../hooks/useLearnerClassContext'
 import { useAppState } from '../../state/useAppState'
 
 export function LearnerOverviewPage() {
-  const { roster, scheduling, capture, ledger } = useAppState()
-  const learner = roster.users.find((u) => u.roles.includes('learner'))
-  const myEnrollments = useMemo(
-    () => roster.enrollments.filter((e) => e.learnerUserId === learner?.id && e.status === 'active'),
-    [roster.enrollments, learner?.id],
-  )
-  const myAttendance = useMemo(
-    () => scheduling.attendance.filter((a) => a.learnerUserId === learner?.id),
-    [scheduling.attendance, learner?.id],
-  )
+  const { scheduling, ledger } = useAppState()
+  const { learner, options, classRow, course, hasMultiple } = useLearnerClassContext()
+
+  const myAttendance = useMemo(() => {
+    if (!learner) return []
+    const rows = scheduling.attendance.filter((a) => a.learnerUserId === learner.id)
+    if (!classRow) return rows
+    const sessionIds = new Set(
+      scheduling.learningSessions.filter((s) => s.classId === classRow.id).map((s) => s.id),
+    )
+    return rows.filter((a) => sessionIds.has(a.learningSessionId))
+  }, [scheduling.attendance, scheduling.learningSessions, learner, classRow])
+
   const myResults = useMemo(() => {
-    if (!capture || !learner) return []
-    return capture.attempts.filter((a) => a.learnerUserId === learner.id)
-  }, [capture, learner])
+    if (!learner) return []
+    return ledger.filter(
+      (r) =>
+        r.learnerUserId === learner.id && (!classRow || r.classId === classRow.id),
+    )
+  }, [ledger, learner, classRow])
+
+  const nextSession = useMemo(() => {
+    if (!classRow) return null
+    return scheduling.scheduledSessions
+      .filter((s) => s.classId === classRow.id && s.status === 'scheduled')
+      .slice()
+      .sort((a, b) => a.plannedStart.localeCompare(b.plannedStart))[0]
+  }, [scheduling.scheduledSessions, classRow])
 
   if (!learner) {
     return (
@@ -35,8 +50,13 @@ export function LearnerOverviewPage() {
         <PageHeader icon={GraduationCap} kicker="Learner" title="No profile" />
         <EmptyState
           icon={GraduationCap}
-          title="No learner profile"
-          description="Add a learner in Admin → People (you can upload a photo there)."
+          title="Open your portal"
+          description="Use the invite link from your teacher or enter your registered email."
+          action={
+            <Link to="/access" className="btn primary">
+              Open portal
+            </Link>
+          }
         />
       </>
     )
@@ -55,53 +75,67 @@ export function LearnerOverviewPage() {
           icon={Home}
           kicker="Learner"
           title={`Hi, ${learner.displayName.split(' ')[0]}`}
-          subtitle="Your classes, attendance, and progress — read only."
+          subtitle={
+            classRow
+              ? `${classRow.name}${course?.code ? ` · ${course.code}` : ''}${
+                  hasMultiple ? ` · ${options.length} classes` : ''
+                }`
+              : 'Your classes, attendance, and progress — read only.'
+          }
         />
       </div>
 
       <div className="stat-grid">
-        <StatCard icon={BookMarked} label="My classes" value={myEnrollments.length} />
+        <StatCard icon={BookMarked} label="My classes" value={options.length} />
         <StatCard icon={ClipboardCheck} label="Attendance" value={myAttendance.length} />
-        <StatCard icon={ListChecks} label="Session results" value={myResults.length} />
+        <StatCard icon={ListChecks} label="Results" value={myResults.length} hint="Finalized" />
         <StatCard
           icon={ChartColumn}
-          label="History"
-          value={ledger.filter((r) => r.learnerUserId === learner.id).length}
+          label="Next session"
+          value={
+            nextSession
+              ? new Date(nextSession.plannedStart).toLocaleDateString()
+              : '—'
+          }
+          hint={
+            nextSession
+              ? new Date(nextSession.plannedStart).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              : 'None scheduled'
+          }
         />
       </div>
 
       <Panel
         icon={BookMarked}
         title="Your classes"
-        description="Active enrollments."
+        description={hasMultiple ? 'Switch class in the sidebar.' : 'Active enrollments.'}
         actions={
           <Link to="/learner/enrollments" className="btn ghost">
             View all
           </Link>
         }
       >
-        {myEnrollments.length === 0 ? (
+        {options.length === 0 ? (
           <EmptyState
             icon={BookMarked}
             title="Not enrolled yet"
-            description="When admin seats you in a class, it will show up here."
+            description="When staff seats you in a class, it will show up here."
           />
         ) : (
           <div className="list-cards">
-            {myEnrollments.map((e) => {
-              const cl = roster.classes.find((c) => c.id === e.classId)
-              const course = roster.courses.find((c) => c.id === cl?.courseId)
-              return (
-                <NavTile
-                  key={e.id}
-                  to="/learner/progress"
-                  title={cl?.name ?? 'Class'}
-                  description={course?.name ?? course?.code ?? 'Course'}
-                  icon={BookMarked}
-                  cta="Progress"
-                />
-              )
-            })}
+            {options.map((o) => (
+              <NavTile
+                key={o.enrollment.id}
+                to="/learner/analysis"
+                title={o.classRow.name}
+                description={o.course?.name ?? o.course?.code ?? 'Course'}
+                icon={BookMarked}
+                cta="Progress"
+              />
+            ))}
           </div>
         )}
       </Panel>
@@ -116,17 +150,17 @@ export function LearnerOverviewPage() {
             cta="Open"
           />
           <NavTile
-            to="/learner/results"
-            title="Results"
-            description="Observation outcomes from sessions."
-            icon={ListChecks}
+            to="/learner/analysis"
+            title="Analysis"
+            description="Your operational metrics for the selected class."
+            icon={ChartColumn}
             cta="Open"
           />
           <NavTile
-            to="/learner/progress"
-            title="Progress"
-            description="Your operational metrics over a window."
-            icon={ChartColumn}
+            to="/learner/enrollments"
+            title="My classes"
+            description="Enrollment details."
+            icon={BookMarked}
             cta="Open"
           />
         </div>

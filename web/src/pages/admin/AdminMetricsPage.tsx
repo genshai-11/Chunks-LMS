@@ -33,7 +33,7 @@ export function AdminMetricsPage() {
       <PageHeader
         icon={Gauge}
         title="Metrics"
-        subtitle="Show/hide on Analysis · min sample · operational vs experimental"
+        subtitle="Show/hide on Analysis · min sample · operational vs experimental · saved locally and to org_settings when Supabase is connected"
         actions={
           <label className="field field-inline" style={{ margin: 0 }}>
             Max probes

@@ -2,37 +2,31 @@ import { useMemo } from 'react'
 import { BookOpen, ClipboardCheck } from 'lucide-react'
 import { PageHeader } from '../../components/PageHeader'
 import { EmptyState, Panel } from '../../components/ui'
-import { useActiveLearner } from '../../hooks/useActiveLearner'
+import { useLearnerClassContext } from '../../hooks/useLearnerClassContext'
 import { useAppState } from '../../state/useAppState'
 
 export function LearnerAttendancePage() {
-  const { scheduling, roster } = useAppState()
-  const learner = useActiveLearner()
+  const { scheduling } = useAppState()
+  const { learner, options, classRow } = useLearnerClassContext()
 
-  const myAttendance = useMemo(
-    () => scheduling.attendance.filter((a) => a.learnerUserId === learner?.id),
-    [scheduling.attendance, learner?.id],
-  )
-
-  const myEnrollments = useMemo(
-    () => roster.enrollments.filter((e) => e.learnerUserId === learner?.id),
-    [roster.enrollments, learner?.id],
-  )
+  const myAttendance = useMemo(() => {
+    if (!learner) return []
+    const rows = scheduling.attendance.filter((a) => a.learnerUserId === learner.id)
+    if (!classRow) return rows
+    const sessionIds = new Set(
+      scheduling.learningSessions.filter((s) => s.classId === classRow.id).map((s) => s.id),
+    )
+    return rows.filter((a) => sessionIds.has(a.learningSessionId))
+  }, [scheduling.attendance, scheduling.learningSessions, learner, classRow])
 
   const myClasses = useMemo(() => {
-    return myEnrollments
-      .map((e) => {
-        const klass = roster.classes.find((c) => c.id === e.classId)
-        const course = klass ? roster.courses.find((co) => co.id === klass.courseId) : null
-        const upcoming = klass
-          ? scheduling.scheduledSessions
-              .filter((s) => s.classId === klass.id && s.status === 'scheduled')
-              .sort((a, b) => new Date(a.plannedStart).getTime() - new Date(b.plannedStart).getTime())
-          : []
-        return { klass, course, upcoming }
-      })
-      .filter((item) => item.klass != null)
-  }, [myEnrollments, roster.classes, roster.courses, scheduling.scheduledSessions])
+    return options.map((o) => {
+      const upcoming = scheduling.scheduledSessions
+        .filter((s) => s.classId === o.classRow.id && s.status === 'scheduled')
+        .sort((a, b) => new Date(a.plannedStart).getTime() - new Date(b.plannedStart).getTime())
+      return { klass: o.classRow, course: o.course, upcoming }
+    })
+  }, [options, scheduling.scheduledSessions])
 
   return (
     <>

@@ -81,11 +81,23 @@ Build uses `VITE_AUTH_BYPASS=true` so CI can build without real Clerk keys.
 
 | Concern | Behavior |
 |---------|----------|
-| App data sync | Client loads/saves roster + scheduling via Supabase (anon key + demo RLS for foundation) |
+| App data sync | **Phase D:** entity **upsert** for roster/schedule; prune only on intentional Clear data. Open learning sessions never deleted. Assessment attempts only via live capture RPCs. |
 | Schema migrations | **Manual only** — never auto-applied in CD |
 | Migration path | Author under `supabase/migrations/` → PR review → `supabase db push --linked` after merge |
+| Integrity | Admin → **Integrity**: rebuild ledger from snapshots; event vs snapshot reconciliation |
 
-Promote steps:
+### Migration promote checklist (hosted)
+
+Use after every migration lands on `main`:
+
+1. [ ] SQL reviewed (no destructive drop of `assessment_events` / snapshots without ADR).  
+2. [ ] Local: `supabase db reset` (or `migration up`) green.  
+3. [ ] Hosted: `supabase link --project-ref <ref>` then `supabase db push`.  
+4. [ ] Confirm new columns/tables exist (e.g. `org_settings`, `learning_sessions.owner_user_id`).  
+5. [ ] Smoke: staff sign-in → Admin reload workspace → Teacher start session (lock set) → Observe once → Admin Integrity check OK.  
+6. [ ] **Never** run unreviewed SQL against production.
+
+Promote steps (authoring):
 
 1. Author SQL under `supabase/migrations/`.  
 2. Include in PR (reviewed with app code).  

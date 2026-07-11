@@ -197,9 +197,11 @@ Align product language with `CONTEXT.md`:
 
 ---
 
-### Phase B — Role dashboards & class context — **P0**
+### Phase B — Role dashboards & class context — **P0** ✅ implemented
 
 **Outcome:** Each role has a home that answers “what should I do next?” and correct scope.
+
+**Shipped:** `/admin`, `/teacher`, `/learner` overview homes; `useTeacherClassContext` / `useLearnerClassContext` + sidebar class switcher; Admin `/admin/analysis` with class picker; invite coverage KPI; teacher home invite copy.
 
 1. Route overview pages:
    - Admin → `/admin` overview (courses, seats, open sessions, recent results count, **invite coverage** % with email).
@@ -213,9 +215,11 @@ Align product language with `CONTEXT.md`:
 
 ---
 
-### Phase C — Operational tracking boards — **P1**
+### Phase C — Operational tracking boards — **P1** ✅ implemented
 
 **Outcome:** Admin/Teacher can manage and audit the measurement pipeline without diving into raw tables.
+
+**Shipped:** `/admin/ops`, `/admin/attendance`, `/admin/audit` (post-session correction + audit log), `/teacher/archive`, ops domain helpers, `org_settings` migration + metric settings sync, local auditLog persistence.
 
 1. **Admin Ops board**
    - Today’s sessions (scheduled / open / completed).
@@ -231,9 +235,11 @@ Align product language with `CONTEXT.md`:
 
 ---
 
-### Phase D — Data integrity & multi-user sync — **P1**
+### Phase D — Data integrity & multi-user sync — **P1** ✅ implemented
 
 **Outcome:** Concurrent use does not lose assessments or roster edits.
+
+**Shipped:** upsert-first `saveWorkspaceToSupabase` (no prune by default; never delete open/protected sessions); `mergeScheduling` on boot/reload; soft locks (`owner_user_id` / `lock_expires_at`); ledger rebuild from snapshots; Admin `/admin/integrity` reconciliation; migration promote checklist in `docs/ops/ci-cd.md`.
 
 1. Stop full-workspace replace as default; prefer:
    - transactional writes per entity for roster/schedule;
@@ -247,15 +253,19 @@ Align product language with `CONTEXT.md`:
 
 ---
 
-### Phase E — Production ship — **P0/P1**
+### Phase E — Production ship — **P0/P1** ✅ implemented (engineering)
 
 **Outcome:** First hosted class can run a real course.
 
-1. Hosted preview (Vercel) with Clerk + Supabase env secrets.
-2. Seed or import one real org (non-demo) without wiping production.
-3. Run one full live session on hosted stack; verify Analysis numbers.
-4. Archive OpenSpec `establish-lms-foundation` when Phase A–B exit criteria pass.
-5. Document runbook: create staff in Clerk → enroll learners with email → **share invite links** → start Day 1.
+**Shipped:**
+
+1. Runbook: [`docs/ops/production-runbook.md`](../ops/production-runbook.md)  
+2. Hosted smoke checklist: [`docs/ops/hosted-e2e-checklist.md`](../ops/hosted-e2e-checklist.md)  
+3. Env matrix: [`docs/ops/env-production.md`](../ops/env-production.md)  
+4. Idempotent starter seed (no wipe): [`supabase/seeds/production-starter.sql`](../../supabase/seeds/production-starter.sql)  
+5. OpenSpec `establish-lms-foundation` **archived** → `openspec/changes/archive/2026-07-11-establish-lms-foundation/`; main specs under `openspec/specs/`  
+
+**Human gate (operator):** execute hosted checklist on production URL with real Clerk + Supabase (no auth bypass).
 
 **Exit criteria:** Real teacher completes one Learning Session on production URL; learner opens share link and sees only own progress.
 

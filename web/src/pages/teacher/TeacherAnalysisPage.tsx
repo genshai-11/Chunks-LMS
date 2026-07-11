@@ -1,25 +1,25 @@
 import { Link } from 'react-router-dom'
 import { PageHeader } from '../../components/PageHeader'
 import { ProgressAnalysisView } from '../../components/ProgressAnalysisView'
+import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import { activeEnrollmentsForClass } from '../../modules/roster/service'
 import { useAppState } from '../../state/useAppState'
 
 export function TeacherAnalysisPage() {
   const { roster, scheduling, ledger, metricSettings } = useAppState()
-  const teacher = roster.users.find((u) => u.roles.includes('teacher'))
-  const classRow = roster.classes.find((c) => c.teacherUserId === teacher?.id) ?? roster.classes[0]
-  const course = roster.courses.find((c) => c.id === classRow?.courseId) ?? roster.courses[0]
+  const { classRow, course } = useTeacherClassContext()
+
   const learners = classRow
     ? activeEnrollmentsForClass(roster, classRow.id)
         .map((e) => roster.users.find((u) => u.id === e.learnerUserId))
         .filter(Boolean)
-    : roster.users.filter((u) => u.roles.includes('learner'))
+    : []
 
   if (!course || !classRow) {
     return (
       <>
         <PageHeader kicker="Teacher" title="Analysis & progress" />
-        <div className="empty-state">Assign a class and course first (Admin).</div>
+        <div className="empty-state">Assign a class and course first (Admin). Use the class switcher when you teach more than one.</div>
       </>
     )
   }

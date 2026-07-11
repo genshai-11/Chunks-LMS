@@ -20,6 +20,8 @@ const sessions: LearningSession[] = [
     completedAt: '2026-07-01T10:00:00.000Z',
     maxProbeCount: 2,
     sessionNumber: 1,
+    ownerUserId: null,
+    lockExpiresAt: null,
   },
   {
     id: 'ls-2',
@@ -31,6 +33,8 @@ const sessions: LearningSession[] = [
     completedAt: '2026-07-02T10:00:00.000Z',
     maxProbeCount: 2,
     sessionNumber: 2,
+    ownerUserId: null,
+    lockExpiresAt: null,
   },
 ]
 

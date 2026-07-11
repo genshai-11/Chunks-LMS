@@ -251,6 +251,9 @@ export function startLearningSession(
     at?: string
     maxProbeCount?: number
     plannedQuestionCount?: number | null
+    /** Soft lock owner (teacher user id) */
+    ownerUserId?: string | null
+    lockTtlMs?: number
   },
 ): SchedulingResult<LearningSession> {
   const at = input.at ?? new Date().toISOString()
@@ -292,6 +295,8 @@ export function startLearningSession(
     sessionNumber = maxN > 0 ? maxN + adHocCount + 1 : adHocCount + 1
   }
 
+  const ownerUserId = input.ownerUserId ?? null
+  const ttl = input.lockTtlMs ?? 5 * 60 * 1000
   const session: LearningSession = {
     id: newId('ls'),
     classId: input.classId,
@@ -302,6 +307,10 @@ export function startLearningSession(
     completedAt: null,
     maxProbeCount: input.maxProbeCount ?? 2,
     sessionNumber,
+    ownerUserId,
+    lockExpiresAt: ownerUserId
+      ? new Date(new Date(at).getTime() + ttl).toISOString()
+      : null,
   }
 
   return {
@@ -310,6 +319,40 @@ export function startLearningSession(
     state: {
       ...state,
       learningSessions: [...state.learningSessions, session],
+    },
+  }
+}
+
+/** Refresh soft lock for the teacher currently capturing. */
+export function touchLearningSessionLock(
+  state: SchedulingState,
+  learningSessionId: string,
+  ownerUserId: string,
+  at = new Date().toISOString(),
+  ttlMs = 5 * 60 * 1000,
+): SchedulingResult<LearningSession> {
+  const session = state.learningSessions.find((s) => s.id === learningSessionId)
+  if (!session) return { ok: false, error: 'Learning Session not found' }
+  if (session.status !== 'open') return { ok: false, error: 'Session is not open' }
+  if (
+    session.ownerUserId &&
+    session.ownerUserId !== ownerUserId &&
+    session.lockExpiresAt &&
+    new Date(session.lockExpiresAt) > new Date(at)
+  ) {
+    return { ok: false, error: 'Session locked by another teacher' }
+  }
+  const next: LearningSession = {
+    ...session,
+    ownerUserId,
+    lockExpiresAt: new Date(new Date(at).getTime() + ttlMs).toISOString(),
+  }
+  return {
+    ok: true,
+    value: next,
+    state: {
+      ...state,
+      learningSessions: state.learningSessions.map((s) => (s.id === learningSessionId ? next : s)),
     },
   }
 }
@@ -374,6 +417,8 @@ export function completeLearningSession(
 
   const completed: LearningSession = {
     ...session,
+    ownerUserId: null,
+    lockExpiresAt: null,
     status: 'completed',
     completedAt: at,
   }

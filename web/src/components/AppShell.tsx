@@ -30,7 +30,10 @@ function BackendBadge() {
 
   if (!supabaseEnabled) {
     return (
-      <span className="backend-badge is-offline" title="Supabase env not set">
+      <span
+        className="backend-badge is-offline"
+        title="Set VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY in web/.env (anon key, not service_role)"
+      >
         <CloudOff className="h-3.5 w-3.5" aria-hidden />
         Local only
       </span>

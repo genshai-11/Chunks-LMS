@@ -13,6 +13,8 @@ import {
   normalizeIdsForDb,
   saveWorkspaceToSupabase,
 } from '../lib/supabase-sync'
+import { mergeScheduling } from '../modules/sync/entity-sync'
+import { rebuildLedgerFromCloud } from '../lib/reconciliation-fetch'
 import { AppStateContext, type BackendStatus } from './app-state-context'
 import { clearPersistedAppState, loadPersistedAppState, savePersistedAppState } from './persist'
 import { loadActiveLearnerId, saveActiveLearnerId } from './active-learner'
@@ -24,6 +26,16 @@ import {
 } from './workspace-prefs'
 import { loadLiveLedger } from '../lib/live-assessment'
 import { useStaffSession } from '../auth/useStaffSession'
+import {
+  auditFromNewResults,
+  correctFinalizedResult,
+  type CorrectResultInput,
+} from '../modules/ops/audit'
+import type { OpsAuditEvent } from '../modules/ops/types'
+import {
+  loadOrgMetricSettings,
+  saveOrgMetricSettings,
+} from '../lib/org-settings-sync'
 
 function ledgerFromCapture(
   capture: CaptureSessionState,
@@ -115,8 +127,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       : (persistedRef.current?.scheduling ?? emptySchedulingState()),
   )
   const [capture, setCapture] = useState<CaptureSessionState | null>(null)
-  const [ledger, setLedger] = useState<ResultRecord[]>([])
-  const [metricSettings, setMetricSettings] = useState<MetricSettingsState>(
+  const [ledger, setLedger] = useState<ResultRecord[]>(() => persistedRef.current?.ledger ?? [])
+  const [auditLog, setAuditLog] = useState<OpsAuditEvent[]>(
+    () => persistedRef.current?.auditLog ?? [],
+  )
+  const [metricSettings, setMetricSettingsState] = useState<MetricSettingsState>(
     () => persistedRef.current?.metricSettings ?? createDefaultMetricSettings(),
   )
   const [backendStatus, setBackendStatus] = useState<BackendStatus>('booting')
@@ -161,16 +176,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     ;(async () => {
       bootDone.current = false
       if (staffSession.clerkEnabled && !staffSession.ready) return
-      if (staffSession.clerkEnabled && !staffSession.signedIn) {
-        setRoster(createEmptyRoster())
-        setScheduling(emptySchedulingState())
-        setCapture(null)
-        setLedger([])
-        setBackendStatus('offline')
+      // Signed-out staff: keep local cache, do not wipe, skip cloud until sign-in
+      if (staffSession.clerkEnabled && !staffSession.signedIn && !staffSession.authBypass) {
+        setBackendStatus(isSupabaseConfigured() ? 'offline' : 'offline')
+        setBackendError('Sign in to load and sync Supabase workspace')
+        bootDone.current = true
         return
       }
       if (!isSupabaseConfigured()) {
         setBackendStatus('offline')
+        setBackendError(null)
         bootDone.current = true
         return
       }
@@ -220,9 +235,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
       let authoritativeRoster = remote.roster
       if (wRemote > 0) {
-        // Once cloud has data, it is always authoritative across browsers.
+        // Cloud roster authoritative; merge scheduling so open remote sessions survive.
         setRoster(remote.roster)
-        setScheduling(remote.scheduling)
+        setScheduling(mergeScheduling(live.scheduling, remote.scheduling))
       } else if (wLive > 0) {
         // One-time migration from this browser into the empty Clerk workspace.
         authoritativeRoster = live.roster
@@ -234,8 +249,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setScheduling(remote.scheduling)
       }
 
-      const liveLedger = await loadLiveLedger(authoritativeRoster)
+      // Prefer snapshot projection for ledger (not capture-only append).
+      const liveLedger = await rebuildLedgerFromCloud(authoritativeRoster)
       if (!cancelled && liveLedger.ok) setLedger(liveLedger.data)
+      else if (!cancelled) {
+        const fallback = await loadLiveLedger(authoritativeRoster)
+        if (fallback.ok) setLedger(fallback.data)
+      }
 
       setBackendStatus('online')
       setBackendError(null)
@@ -253,10 +273,22 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       roster,
       scheduling,
       capture: null,
-      ledger: [],
+      ledger,
       metricSettings,
+      auditLog,
     })
-  }, [roster, scheduling, metricSettings])
+  }, [roster, scheduling, metricSettings, ledger, auditLog])
+
+  // Persist metric settings to Supabase org_settings when available
+  useEffect(() => {
+    if (!bootDone.current) return
+    if (!isSupabaseConfigured()) return
+    const orgId = ensureStableOrg(roster).organization.id
+    const t = setTimeout(() => {
+      void saveOrgMetricSettings(orgId, metricSettings)
+    }, 800)
+    return () => clearTimeout(t)
+  }, [metricSettings, roster.organization.id])
 
   // Debounced Supabase save
   useEffect(() => {
@@ -314,7 +346,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setScheduling(emptySchedulingState())
     setCapture(null)
     setLedger([])
-    setMetricSettings(createDefaultMetricSettings())
+    setAuditLog([])
+    setMetricSettingsState(createDefaultMetricSettings())
   }, [])
 
   const syncNow = useCallback(async () => {
@@ -363,21 +396,63 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     skipNextSync.current = true
     const remoteRoster = ensureStableOrg(loaded.data.roster)
     setRoster(remoteRoster)
-    setScheduling(loaded.data.scheduling)
+    setScheduling(mergeScheduling(liveRef.current.scheduling, loaded.data.scheduling))
     setCapture(null)
-    const liveLedger = await loadLiveLedger(remoteRoster)
+    const liveLedger = await rebuildLedgerFromCloud(remoteRoster)
     if (liveLedger.ok) setLedger(liveLedger.data)
+    else {
+      const fallback = await loadLiveLedger(remoteRoster)
+      if (fallback.ok) setLedger(fallback.data)
+    }
     setBackendStatus('online')
     setBackendError(null)
     setLastSyncedAt(new Date().toISOString())
   }, [staffSession])
 
+  const setMetricSettings = useCallback((next: MetricSettingsState) => {
+    setMetricSettingsState(next)
+  }, [])
+
   const appendFinalizedFromCapture = useCallback(
     (nextCapture: CaptureSessionState) => {
-      setLedger((prev) => ledgerFromCapture(nextCapture, roster, prev))
+      setLedger((prev) => {
+        const next = ledgerFromCapture(nextCapture, roster, prev)
+        const events = auditFromNewResults(
+          roster.organization.id,
+          prev,
+          next,
+          nextCapture.teacherUserId,
+        )
+        if (events.length > 0) {
+          setAuditLog((a) => [...a, ...events])
+        }
+        return next
+      })
     },
     [roster],
   )
+
+  const correctResult = useCallback(
+    (input: CorrectResultInput) => {
+      const result = correctFinalizedResult(ledger, auditLog, input)
+      if (!result.ok) return { ok: false as const, error: result.error }
+      setLedger(result.ledger)
+      setAuditLog(result.audit)
+      return { ok: true as const }
+    },
+    [ledger, auditLog],
+  )
+
+  // Load org metric settings once when online
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return
+    const orgId = ensureStableOrg(roster).organization.id
+    void loadOrgMetricSettings(orgId).then((loaded) => {
+      if (loaded.ok && loaded.data) setMetricSettingsState(loaded.data)
+    })
+    // only on org change / boot
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roster.organization.id])
 
   const value = useMemo(
     () => ({
@@ -391,7 +466,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setLedger,
       metricSettings,
       setMetricSettings,
+      auditLog,
       appendFinalizedFromCapture,
+      correctResult,
       resetAll,
       backendStatus,
       backendError,
@@ -412,7 +489,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       capture,
       ledger,
       metricSettings,
+      setMetricSettings,
+      auditLog,
       appendFinalizedFromCapture,
+      correctResult,
       resetAll,
       backendStatus,
       backendError,

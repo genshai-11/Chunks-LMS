@@ -13,6 +13,7 @@
     "format": "npm --prefix web run format",
     "format:check": "npm --prefix web run format:check",
     "openspec:validate": "npx openspec validate --all",
+    "supabase:verify": "node scripts/verify-supabase.mjs",
     "ci": "npm run openspec:validate && npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "engines": {

@@ -36,6 +36,7 @@ import {
   sessionDayHash,
   sessionLabel,
 } from '../../modules/reporting/session-series'
+import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import { useAppState } from '../../state/useAppState'
 
 const ATTENDANCE: AttendanceStatus[] = ['present', 'late', 'absent', 'excused']
@@ -51,9 +52,8 @@ export function TeacherSessionPage() {
     metricSettings,
   } = useAppState()
   const { message, error, ok, err } = useFlash()
+  const { classRow, course, teacher } = useTeacherClassContext()
 
-  const teacher = roster.users.find((u) => u.roles.includes('teacher'))
-  const classRow = roster.classes.find((c) => c.teacherUserId === teacher?.id) ?? roster.classes[0]
   const activeLearners = useMemo(
     () =>
       classRow ? activeEnrollmentsForClass(roster, classRow.id).map((e) => e.learnerUserId) : [],
@@ -62,7 +62,6 @@ export function TeacherSessionPage() {
   const openSession = scheduling.learningSessions.find(
     (s) => s.classId === classRow?.id && s.status === 'open',
   )
-  const course = roster.courses.find((c) => c.id === classRow?.courseId)
   const totalDays =
     course?.schedule?.sessionCount ??
     scheduling.scheduledSessions.filter(
@@ -149,6 +148,7 @@ export function TeacherSessionPage() {
     const r = startLearningSession(scheduling, {
       classId: classRow.id,
       maxProbeCount: maxProbe,
+      ownerUserId: teacher.id,
     })
     if (!r.ok) return err(r.error)
     setScheduling(r.state)

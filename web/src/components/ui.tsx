@@ -155,11 +155,13 @@ export function PersonRow({
   meta,
   avatarUrl,
   icon: Icon,
+  actions,
 }: {
   name: string
   meta?: string
   avatarUrl?: string | null
   icon?: LucideIcon
+  actions?: ReactNode
 }) {
   return (
     <li className="person-row">
@@ -174,6 +176,7 @@ export function PersonRow({
         <strong>{name}</strong>
         {meta ? <span>{meta}</span> : null}
       </div>
+      {actions ? <div className="row-actions">{actions}</div> : null}
     </li>
   )
 }

@@ -1,6 +1,7 @@
 /**
  * Supabase backend sync for Chunks-LMS workspace (roster + scheduling).
- * Loads on boot; full replace-style save keeps DB aligned with UI state.
+ * Phase D: upsert-first; prune only when allowEmptyWipe / pruneMissing.
+ * Never deletes open or lock-protected learning sessions.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { normalizeCourseSchedule } from '../modules/roster/schedule'
@@ -8,6 +9,10 @@ import type { CourseSchedule, DomainUser, RosterState } from '../modules/roster/
 import { createEmptyRoster, isUuid, LOCAL_ORG_ID, newId } from '../modules/roster/seed'
 import type { SchedulingState } from '../modules/scheduling/types'
 import { emptySchedulingState } from '../modules/scheduling/session-lifecycle'
+import {
+  protectedLearningSessionIds,
+  prunableIds,
+} from '../modules/sync/entity-sync'
 import { getSupabase } from './supabase'
 
 /** Loose client — foundation DB types are partial; cast for sync ops. */
@@ -164,6 +169,8 @@ export function normalizeIdsForDb(snapshot: WorkspaceSnapshot): WorkspaceSnapsho
       classId: mapId(s.classId),
       scheduledSessionId: s.scheduledSessionId ? mapId(s.scheduledSessionId) : null,
       sessionNumber: s.sessionNumber ?? null,
+      ownerUserId: s.ownerUserId ? mapId(s.ownerUserId) : null,
+      lockExpiresAt: s.lockExpiresAt ?? null,
     })),
     attendance: snapshot.scheduling.attendance.map((a) => ({
       ...a,
@@ -324,20 +331,26 @@ export async function loadWorkspaceFromSupabase(options?: {
 
     const learningSessions = (learningRes.data ?? [])
       .filter((s) => classIds.has(s.class_id as string))
-      .map((s) => ({
-        id: s.id as string,
-        classId: s.class_id as string,
-        scheduledSessionId: (s.scheduled_session_id as string | null) ?? null,
-        status: s.status as 'open' | 'completed',
-        plannedQuestionCount: (s.planned_question_count as number | null) ?? null,
-        startedAt: s.started_at as string,
-        completedAt: (s.completed_at as string | null) ?? null,
-        maxProbeCount: (s.max_probe_count as number) ?? 2,
-        sessionNumber:
-          typeof (s as { session_number?: number | null }).session_number === 'number'
-            ? ((s as { session_number?: number }).session_number as number)
-            : null,
-      }))
+      .map((s) => {
+        const row = s as {
+          session_number?: number | null
+          owner_user_id?: string | null
+          lock_expires_at?: string | null
+        }
+        return {
+          id: s.id as string,
+          classId: s.class_id as string,
+          scheduledSessionId: (s.scheduled_session_id as string | null) ?? null,
+          status: s.status as 'open' | 'completed',
+          plannedQuestionCount: (s.planned_question_count as number | null) ?? null,
+          startedAt: s.started_at as string,
+          completedAt: (s.completed_at as string | null) ?? null,
+          maxProbeCount: (s.max_probe_count as number) ?? 2,
+          sessionNumber: typeof row.session_number === 'number' ? row.session_number : null,
+          ownerUserId: (row.owner_user_id as string | null) ?? null,
+          lockExpiresAt: (row.lock_expires_at as string | null) ?? null,
+        }
+      })
 
     const lsIds = new Set(learningSessions.map((s) => s.id))
     const attendance = (attendanceRes.data ?? [])
@@ -378,6 +391,11 @@ export type SaveWorkspaceOptions = {
    * Default false — refuses to wipe non-empty cloud with empty UI (boot race).
    */
   allowEmptyWipe?: boolean
+  /**
+   * When true, delete cloud rows missing from local (dangerous for multi-user).
+   * Default false — upsert only. allowEmptyWipe implies prune.
+   */
+  pruneMissing?: boolean
 }
 
 function workspaceIsEmpty(s: WorkspaceSnapshot): boolean {
@@ -400,6 +418,7 @@ export async function saveWorkspaceToSupabase(
 
   const { roster, scheduling } = normalizeIdsForDb(raw)
   const orgId = roster.organization.id
+  const prune = Boolean(options.allowEmptyWipe || options.pruneMissing)
 
   try {
     // Guard: never let an empty boot/race wipe existing cloud data
@@ -432,7 +451,7 @@ export async function saveWorkspaceToSupabase(
       if (error) return { ok: false, error: `org: ${error.message}` }
     }
 
-    // 2) Users
+    // 2) Users — upsert only (never delete users; other browser may still reference)
     if (roster.users.length > 0) {
       const { error } = await sb.from('users').upsert(
         roster.users.map((u) => ({
@@ -448,9 +467,8 @@ export async function saveWorkspaceToSupabase(
       if (error) return { ok: false, error: `users: ${error.message}` }
     }
 
-    // 3) Memberships — replace for this org
+    // 3) Memberships — upsert roles; only full replace when pruning wipe
     {
-      await sb.from('organization_memberships').delete().eq('organization_id', orgId)
       const rows = roster.users.flatMap((u) =>
         u.roles.map((role) => ({
           organization_id: orgId,
@@ -458,25 +476,30 @@ export async function saveWorkspaceToSupabase(
           role,
         })),
       )
+      if (options.allowEmptyWipe) {
+        await sb.from('organization_memberships').delete().eq('organization_id', orgId)
+      }
       if (rows.length > 0) {
-        const { error } = await sb.from('organization_memberships').insert(rows)
+        const { error } = await sb
+          .from('organization_memberships')
+          .upsert(rows, { onConflict: 'organization_id,user_id,role' })
         if (error) return { ok: false, error: `memberships: ${error.message}` }
       }
     }
 
-    // 4) Courses
+    // 4) Courses — upsert; optional prune
     {
-      // Delete courses no longer present
-      const { data: existingCourses } = await sb
-        .from('courses')
-        .select('id')
-        .eq('organization_id', orgId)
-      const keep = new Set(roster.courses.map((c) => c.id))
-      const toDelete = (existingCourses ?? [])
-        .map((c) => c.id as string)
-        .filter((id) => !keep.has(id))
-      if (toDelete.length > 0) {
-        await sb.from('courses').delete().in('id', toDelete)
+      if (prune) {
+        const { data: existingCourses } = await sb
+          .from('courses')
+          .select('id')
+          .eq('organization_id', orgId)
+        const toDelete = prunableIds(
+          roster.courses.map((c) => c.id),
+          (existingCourses ?? []).map((c) => c.id as string),
+          new Set(),
+        )
+        if (toDelete.length > 0) await sb.from('courses').delete().in('id', toDelete)
       }
 
       if (roster.courses.length > 0) {
@@ -497,19 +520,20 @@ export async function saveWorkspaceToSupabase(
       }
     }
 
-    // 5) Classes
+    // 5) Classes — upsert; optional prune
     {
       const courseIds = roster.courses.map((c) => c.id)
-      if (courseIds.length > 0) {
+      if (prune && courseIds.length > 0) {
         const { data: existing } = await sb
           .from('classes')
           .select('id, course_id')
           .in('course_id', courseIds)
-        const keep = new Set(roster.classes.map((c) => c.id))
-        const toDelete = (existing ?? []).map((c) => c.id as string).filter((id) => !keep.has(id))
-        if (toDelete.length > 0) {
-          await sb.from('classes').delete().in('id', toDelete)
-        }
+        const toDelete = prunableIds(
+          roster.classes.map((c) => c.id),
+          (existing ?? []).map((c) => c.id as string),
+          new Set(),
+        )
+        if (toDelete.length > 0) await sb.from('classes').delete().in('id', toDelete)
       }
 
       if (roster.classes.length > 0) {
@@ -528,19 +552,20 @@ export async function saveWorkspaceToSupabase(
       }
     }
 
-    // 6) Enrollments
+    // 6) Enrollments — upsert; optional prune
     {
       const classIds = roster.classes.map((c) => c.id)
-      if (classIds.length > 0) {
+      if (prune && classIds.length > 0) {
         const { data: existing } = await sb
           .from('enrollments')
           .select('id')
           .in('class_id', classIds)
-        const keep = new Set(roster.enrollments.map((e) => e.id))
-        const toDelete = (existing ?? []).map((e) => e.id as string).filter((id) => !keep.has(id))
-        if (toDelete.length > 0) {
-          await sb.from('enrollments').delete().in('id', toDelete)
-        }
+        const toDelete = prunableIds(
+          roster.enrollments.map((e) => e.id),
+          (existing ?? []).map((e) => e.id as string),
+          new Set(),
+        )
+        if (toDelete.length > 0) await sb.from('enrollments').delete().in('id', toDelete)
       }
 
       if (roster.enrollments.length > 0) {
@@ -559,19 +584,20 @@ export async function saveWorkspaceToSupabase(
       }
     }
 
-    // 7) Scheduled sessions
+    // 7) Scheduled sessions — upsert; optional prune
     {
       const classIds = roster.classes.map((c) => c.id)
-      if (classIds.length > 0) {
+      if (prune && classIds.length > 0) {
         const { data: existing } = await sb
           .from('scheduled_sessions')
           .select('id')
           .in('class_id', classIds)
-        const keep = new Set(scheduling.scheduledSessions.map((s) => s.id))
-        const toDelete = (existing ?? []).map((s) => s.id as string).filter((id) => !keep.has(id))
-        if (toDelete.length > 0) {
-          await sb.from('scheduled_sessions').delete().in('id', toDelete)
-        }
+        const toDelete = prunableIds(
+          scheduling.scheduledSessions.map((s) => s.id),
+          (existing ?? []).map((s) => s.id as string),
+          new Set(),
+        )
+        if (toDelete.length > 0) await sb.from('scheduled_sessions').delete().in('id', toDelete)
       }
 
       if (scheduling.scheduledSessions.length > 0) {
@@ -583,13 +609,11 @@ export async function saveWorkspaceToSupabase(
             duration_minutes: s.durationMinutes,
             status: s.status,
             rescheduled_from_id: s.rescheduledFromId,
-            // session_number column optional until migration lands; ignored if missing
             session_number: s.sessionNumber,
           })),
           { onConflict: 'id' },
         )
         if (error) {
-          // Retry without session_number if column not present
           const { error: e2 } = await sb.from('scheduled_sessions').upsert(
             scheduling.scheduledSessions.map((s) => ({
               id: s.id,
@@ -606,37 +630,57 @@ export async function saveWorkspaceToSupabase(
       }
     }
 
-    // 8) Learning sessions
+    // 8) Learning sessions — upsert; NEVER delete open/protected; prune only completed orphans when allowed
     {
       const classIds = roster.classes.map((c) => c.id)
+      let remoteOpenIds: string[] = []
       if (classIds.length > 0) {
         const { data: existing } = await sb
           .from('learning_sessions')
-          .select('id')
+          .select('id, status')
           .in('class_id', classIds)
-        const keep = new Set(scheduling.learningSessions.map((s) => s.id))
-        const toDelete = (existing ?? []).map((s) => s.id as string).filter((id) => !keep.has(id))
-        if (toDelete.length > 0) {
-          await sb.from('learning_sessions').delete().in('id', toDelete)
+        remoteOpenIds = (existing ?? [])
+          .filter((s) => s.status === 'open')
+          .map((s) => s.id as string)
+        if (prune) {
+          const protectedIds = protectedLearningSessionIds(scheduling, remoteOpenIds)
+          const toDelete = prunableIds(
+            scheduling.learningSessions.map((s) => s.id),
+            (existing ?? []).map((s) => s.id as string),
+            protectedIds,
+          )
+          if (toDelete.length > 0) {
+            // Extra guard: never delete if assessment attempts exist
+            const { data: withAttempts } = await sb
+              .from('assessment_attempts')
+              .select('learning_session_id')
+              .in('learning_session_id', toDelete)
+            const blocked = new Set(
+              (withAttempts ?? []).map((r) => r.learning_session_id as string),
+            )
+            const safe = toDelete.filter((id) => !blocked.has(id))
+            if (safe.length > 0) await sb.from('learning_sessions').delete().in('id', safe)
+          }
         }
       }
 
       if (scheduling.learningSessions.length > 0) {
-        const { error } = await sb.from('learning_sessions').upsert(
-          scheduling.learningSessions.map((s) => ({
-            id: s.id,
-            class_id: s.classId,
-            scheduled_session_id: s.scheduledSessionId,
-            status: s.status,
-            planned_question_count: s.plannedQuestionCount,
-            started_at: s.startedAt,
-            completed_at: s.completedAt,
-            max_probe_count: s.maxProbeCount,
-            session_number: s.sessionNumber,
-          })),
-          { onConflict: 'id' },
-        )
+        const baseRows = scheduling.learningSessions.map((s) => ({
+          id: s.id,
+          class_id: s.classId,
+          scheduled_session_id: s.scheduledSessionId,
+          status: s.status,
+          planned_question_count: s.plannedQuestionCount,
+          started_at: s.startedAt,
+          completed_at: s.completedAt,
+          max_probe_count: s.maxProbeCount,
+          session_number: s.sessionNumber,
+          owner_user_id: s.ownerUserId,
+          lock_expires_at: s.lockExpiresAt,
+        }))
+        const { error } = await sb.from('learning_sessions').upsert(baseRows, { onConflict: 'id' })
         if (error) {
+          // Retry without optional lock columns if migration not applied
           const { error: e2 } = await sb.from('learning_sessions').upsert(
             scheduling.learningSessions.map((s) => ({
               id: s.id,
@@ -655,19 +699,20 @@ export async function saveWorkspaceToSupabase(
       }
     }
 
-    // 9) Attendance
+    // 9) Attendance — upsert; optional prune only non-protected sessions
     {
       const lsIds = scheduling.learningSessions.map((s) => s.id)
-      if (lsIds.length > 0) {
+      if (prune && lsIds.length > 0) {
         const { data: existing } = await sb
           .from('attendance_records')
           .select('id')
           .in('learning_session_id', lsIds)
-        const keep = new Set(scheduling.attendance.map((a) => a.id))
-        const toDelete = (existing ?? []).map((a) => a.id as string).filter((id) => !keep.has(id))
-        if (toDelete.length > 0) {
-          await sb.from('attendance_records').delete().in('id', toDelete)
-        }
+        const toDelete = prunableIds(
+          scheduling.attendance.map((a) => a.id),
+          (existing ?? []).map((a) => a.id as string),
+          new Set(),
+        )
+        if (toDelete.length > 0) await sb.from('attendance_records').delete().in('id', toDelete)
       }
 
       if (scheduling.attendance.length > 0) {

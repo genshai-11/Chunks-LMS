@@ -106,6 +106,8 @@ _Avoid_: Success score
 
 | Doc | Purpose |
 |-----|---------|
+| [`docs/ops/production-runbook.md`](docs/ops/production-runbook.md) | First hosted class: env, seed, Day 1, smoke |
+| [`docs/ops/hosted-e2e-checklist.md`](docs/ops/hosted-e2e-checklist.md) | Production pass/fail checklist |
 | [`docs/ops/ci-cd.md`](docs/ops/ci-cd.md) | GitHub Actions CI/CD, Vercel secrets, migration promote |
 | [`docs/ops/vercel-deploy.md`](docs/ops/vercel-deploy.md) | Manual / first-time Vercel deploy |
 | [`docs/adr/`](docs/adr/) | Architecture decisions |

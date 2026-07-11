@@ -35,6 +35,7 @@ import {
   wallClockIsoFromLocal,
 } from '../../modules/scheduling/session-time'
 import type { ScheduledSession } from '../../modules/scheduling/types'
+import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import { useAppState } from '../../state/useAppState'
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -108,9 +109,7 @@ export function TeacherCalendarPage() {
   const [duration, setDuration] = useState(60)
   const [slotHour, setSlotHour] = useState(9)
 
-  const teacher = roster.users.find((u) => u.roles.includes('teacher'))
-  const classRow = roster.classes.find((c) => c.teacherUserId === teacher?.id) ?? roster.classes[0]
-  const course = roster.courses.find((c) => c.id === classRow?.courseId)
+  const { classRow, course, teacher } = useTeacherClassContext()
   const activeLearners = useMemo(
     () =>
       classRow ? activeEnrollmentsForClass(roster, classRow.id).map((e) => e.learnerUserId) : [],
@@ -183,6 +182,7 @@ export function TeacherCalendarPage() {
       classId: classRow!.id,
       scheduledSessionId,
       maxProbeCount: maxProbe,
+      ownerUserId: teacher!.id,
     })
     if (!r.ok) return err(r.error)
     setScheduling(r.state)

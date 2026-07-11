@@ -27,6 +27,13 @@ export type LearningSession = {
   maxProbeCount: number
   /** Inherited from scheduled session or assigned when started */
   sessionNumber: number | null
+  /**
+   * Soft lock: teacher currently authorized to capture for an open session.
+   * Null when unlocked / expired (see lockExpiresAt).
+   */
+  ownerUserId: string | null
+  /** ISO expiry for ownerUserId lock; null means no active lock. */
+  lockExpiresAt: string | null
 }
 
 export type AttendanceRecord = {

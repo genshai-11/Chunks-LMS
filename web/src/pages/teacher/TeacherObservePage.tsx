@@ -47,6 +47,7 @@ import {
   completeLearningSession,
   recordAttendance,
 } from '../../modules/scheduling/session-lifecycle'
+import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import { useAppState } from '../../state/useAppState'
 import {
   createLiveQuestion,
@@ -178,9 +179,7 @@ export function TeacherObservePage() {
 
   const avatarSize = !mapOpen ? 'sm' : railWidth > 300 ? 'xl' : railWidth > 200 ? 'lg' : 'md'
 
-  const teacher = roster.users.find((u) => u.roles.includes('teacher'))
-  const classRow = roster.classes.find((c) => c.teacherUserId === teacher?.id) ?? roster.classes[0]
-  const course = roster.courses.find((c) => c.id === classRow?.courseId)
+  const { classRow, course, teacher } = useTeacherClassContext()
   const openSession = scheduling.learningSessions.find(
     (s) => s.classId === classRow?.id && s.status === 'open',
   )

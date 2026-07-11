@@ -9,12 +9,22 @@ type Props = {
   subtitle?: string
   /** Optional avatar or badge shown above the sidebar title */
   leading?: ReactNode
+  /** Class switcher or other context control under subtitle */
+  contextSlot?: ReactNode
   navLabel: string
   items: SectionTab[]
   footer?: string
 }
 
-export function RoleWorkspace({ title, subtitle, leading, navLabel, items, footer }: Props) {
+export function RoleWorkspace({
+  title,
+  subtitle,
+  leading,
+  contextSlot,
+  navLabel,
+  items,
+  footer,
+}: Props) {
   const location = useLocation()
 
   return (
@@ -23,6 +33,7 @@ export function RoleWorkspace({ title, subtitle, leading, navLabel, items, foote
         {leading ? <div className="sidebar-leading">{leading}</div> : null}
         <div className="sidebar-label">{title}</div>
         {subtitle ? <p className="sidebar-subtitle">{subtitle}</p> : null}
+        {contextSlot ? <div className="sidebar-context">{contextSlot}</div> : null}
         {items.map((item) => {
           const Icon = item.icon ?? Circle
           return (

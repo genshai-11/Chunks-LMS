@@ -4,15 +4,15 @@ Measurement-focused LMS for learner **Focus** and **Awareness** via teacher-obse
 
 ## Status
 
-Foundation change `establish-lms-foundation` is **implemented** (OpenSpec tasks complete):
+Foundation OpenSpec change is **archived**; main specs under `openspec/specs/`. Phases **A–E** engineering complete for first hosted class.
 
 - React + TypeScript app under `web/` (Admin, Teacher, Learner)
-- Domain modules + unit tests (lifecycle, metrics, roster, scheduling, report windows, e2e flow)
-- Supabase migrations + seed
-- GitHub Actions **CI** + **CD** (Vercel preview/production)
-- Progress reporting with session/week/month/custom windows
+- Domain modules + unit tests (lifecycle, metrics, roster, scheduling, ops, sync, e2e)
+- Supabase migrations + local `seed.sql` + idempotent `supabase/seeds/production-starter.sql`
+- GitHub Actions **CI** + **CD** (Vercel)
+- **Ship docs:** [production runbook](docs/ops/production-runbook.md) · [hosted e2e checklist](docs/ops/hosted-e2e-checklist.md)
 
-**Production readiness (role tracking/management):** ~55–60%. V1 identity: **Clerk = Admin + Teacher only**; **learners = email profile + share link** (no membership). Next: staff Clerk gates, invite UX, multi-class, ops boards — see the completion plan.
+**V1 identity:** Clerk = Admin + Teacher; learners = email profile + share link (no membership).
 
 ## Start here
 
@@ -20,7 +20,8 @@ Foundation change `establish-lms-foundation` is **implemented** (OpenSpec tasks 
 |-----|---------|
 | [CONTEXT.md](CONTEXT.md) | Domain glossary |
 | [AGENTS.md](AGENTS.md) | Agent rules + skills + maturity summary |
-| [docs/plans/lms-completion-by-role.md](docs/plans/lms-completion-by-role.md) | **Roadmap to 100% V1 by role** |
+| [docs/ops/production-runbook.md](docs/ops/production-runbook.md) | **First real class — Day 1** |
+| [docs/plans/lms-completion-by-role.md](docs/plans/lms-completion-by-role.md) | Roadmap A–F |
 | [docs/architecture/chunks-lms-architecture-review.md](docs/architecture/chunks-lms-architecture-review.md) | Architecture |
 | [docs/ops/ci-cd.md](docs/ops/ci-cd.md) | CI/CD secrets & deploy |
 | [docs/adr/](docs/adr/) | Architecture decisions |
@@ -38,15 +39,24 @@ npm run dev
 npm run ci
 ```
 
-### Supabase (optional local DB)
+### Supabase (hosted or local)
 
 ```bash
-# Requires Supabase CLI
+# Hosted (already linked project chunks-lms / ekubetkxfcuxlyahesrl)
+# web/.env:
+#   VITE_SUPABASE_URL=https://ekubetkxfcuxlyahesrl.supabase.co
+#   VITE_SUPABASE_ANON_KEY=<anon public key — never service_role>
+supabase db push
+npm run supabase:verify
+# optional starter rows (idempotent):
+supabase db query --linked --file supabase/seeds/production-starter.sql
+
+# Local CLI DB instead
 supabase start
 supabase db reset   # migrations + seed.sql
 ```
 
-Seed creates one Organization, course `ERE-Level-B`, one Teacher, one Class (capacity 3), three Learners.
+See [docs/ops/supabase-connect.md](docs/ops/supabase-connect.md).
 
 ## Scripts
 
@@ -56,7 +66,8 @@ Seed creates one Organization, course `ERE-Level-B`, one Teacher, one Class (cap
 | `npm run test` | root | Unit tests (Vitest) |
 | `npm run build` | root | Production build |
 | `npm run ci` | root | OpenSpec + lint + typecheck + test + build |
-| `npm run openspec:validate` | root | Validate OpenSpec change |
+| `npm run openspec:validate` | root | Validate OpenSpec specs |
+| `npm run supabase:verify` | root | Ping hosted Supabase with anon key from `web/.env` |
 
 ## CI/CD & hosting
 

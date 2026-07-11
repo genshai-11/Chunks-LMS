@@ -3,6 +3,7 @@ import {
   createDefaultMetricSettings,
   type MetricSettingsState,
 } from '../modules/metrics/settings'
+import type { OpsAuditEvent } from '../modules/ops/types'
 import type { ResultRecord } from '../modules/reporting/progress'
 import { createEmptyRoster, LOCAL_ORG_ID } from '../modules/roster/seed'
 import { normalizeCourseSchedule } from '../modules/roster/schedule'
@@ -19,6 +20,7 @@ export type PersistedAppState = {
   capture: CaptureSessionState | null
   ledger: ResultRecord[]
   metricSettings: MetricSettingsState
+  auditLog?: OpsAuditEvent[]
   savedAt: string
 }
 
@@ -73,6 +75,7 @@ export function loadPersistedAppState(): PersistedAppState | null {
       capture: data.capture ?? null,
       ledger: data.ledger ?? [],
       metricSettings: data.metricSettings ?? createDefaultMetricSettings(),
+      auditLog: Array.isArray(data.auditLog) ? data.auditLog : [],
       savedAt: data.savedAt ?? new Date().toISOString(),
     }
   } catch {
@@ -86,6 +89,7 @@ export function savePersistedAppState(state: {
   capture: CaptureSessionState | null
   ledger: ResultRecord[]
   metricSettings: MetricSettingsState
+  auditLog?: OpsAuditEvent[]
 }): void {
   if (typeof window === 'undefined') return
   try {
@@ -96,6 +100,7 @@ export function savePersistedAppState(state: {
       capture: state.capture,
       ledger: state.ledger,
       metricSettings: state.metricSettings,
+      auditLog: state.auditLog ?? [],
       savedAt: new Date().toISOString(),
     }
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
@@ -122,6 +127,7 @@ export function initialAppState(): Omit<PersistedAppState, 'version' | 'savedAt'
       capture: saved.capture,
       ledger: saved.ledger,
       metricSettings: saved.metricSettings,
+      auditLog: saved.auditLog ?? [],
     }
   }
   return {
@@ -130,5 +136,6 @@ export function initialAppState(): Omit<PersistedAppState, 'version' | 'savedAt'
     capture: null,
     ledger: [],
     metricSettings: createDefaultMetricSettings(),
+    auditLog: [],
   }
 }

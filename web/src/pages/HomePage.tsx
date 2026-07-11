@@ -20,17 +20,17 @@ export function HomePage() {
 
   if (session.canAccess('admin')) {
     chips.push({
-      to: '/admin/courses',
+      to: '/admin',
       title: 'Admin',
-      description: 'Courses, classes, people, metrics',
+      description: 'Dashboard, classes, invites, analysis',
       icon: Shield,
     })
   }
   if (session.canAccess('teacher')) {
     chips.push({
-      to: '/teacher/session',
+      to: '/teacher',
       title: 'Teacher',
-      description: 'Schedule, live observe, analysis',
+      description: 'Home, schedule, live observe, analysis',
       icon: Users,
     })
   }

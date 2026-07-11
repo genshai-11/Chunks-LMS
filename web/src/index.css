@@ -828,6 +828,124 @@
     @apply hidden sm:inline text-[10px] uppercase tracking-wide font-bold text-slate-500;
   }
 
+  .sidebar-context {
+    @apply px-3 pb-3;
+  }
+
+  .class-context-select {
+    @apply flex items-center gap-2 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 shadow-3xs;
+  }
+
+  .class-context-select select {
+    @apply min-w-0 flex-1 border-0 bg-transparent p-0 text-xs font-semibold text-slate-800 outline-none cursor-pointer;
+  }
+
+  .class-context-select.is-compact {
+    @apply py-1.5;
+  }
+
+  .class-context-single,
+  .class-context-empty {
+    @apply flex items-center gap-2 text-xs font-semibold text-slate-600 px-0.5;
+  }
+
+  .class-context-empty {
+    @apply text-slate-400;
+  }
+
+  .mobile-class-context {
+    @apply px-3 pt-2 sm:hidden;
+  }
+
+  .attendance-matrix-wrap {
+    @apply overflow-x-auto;
+  }
+
+  .attendance-matrix th,
+  .attendance-matrix td {
+    @apply text-center text-xs px-2 py-1.5;
+  }
+
+  .attendance-matrix th:first-child,
+  .attendance-matrix td:first-child,
+  .attendance-matrix tbody th {
+    @apply text-left sticky left-0 bg-white z-[1];
+  }
+
+  .att-cell.is-present {
+    @apply bg-green-50 text-green-800 font-bold;
+  }
+  .att-cell.is-late {
+    @apply bg-amber-50 text-amber-800 font-bold;
+  }
+  .att-cell.is-absent {
+    @apply bg-red-50 text-red-800 font-bold;
+  }
+  .att-cell.is-excused {
+    @apply bg-slate-100 text-slate-600 font-bold;
+  }
+  .att-cell.is-missing {
+    @apply text-slate-300;
+  }
+
+  .color-pill {
+    @apply inline-block font-mono text-[10px] font-bold uppercase px-1.5 py-0.5 rounded;
+  }
+  .color-pill.is-red {
+    @apply bg-red-50 text-red-700;
+  }
+  .color-pill.is-yellow {
+    @apply bg-yellow-50 text-yellow-800;
+  }
+  .color-pill.is-green {
+    @apply bg-green-50 text-green-700;
+  }
+  .color-pill.is-purple {
+    @apply bg-purple-50 text-purple-700;
+  }
+
+  .archive-layout {
+    @apply grid gap-4 lg:grid-cols-[minmax(0,16rem)_1fr];
+  }
+
+  .archive-day-btn {
+    @apply w-full text-left rounded-xl border border-slate-200 bg-white px-3 py-2.5 mb-2
+      hover:border-slate-300 transition-colors cursor-pointer flex flex-col gap-0.5;
+  }
+  .archive-day-btn.is-active {
+    @apply border-slate-900 ring-1 ring-slate-900/10;
+  }
+
+  .archive-heat {
+    @apply grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2;
+  }
+
+  .archive-heat-cell {
+    @apply rounded-xl border border-slate-200 p-3 flex flex-col gap-1 text-xs;
+  }
+  .archive-heat-cell.is-red {
+    @apply bg-red-50 border-red-100;
+  }
+  .archive-heat-cell.is-yellow {
+    @apply bg-yellow-50 border-yellow-100;
+  }
+  .archive-heat-cell.is-green {
+    @apply bg-green-50 border-green-100;
+  }
+  .archive-heat-cell.is-purple {
+    @apply bg-purple-50 border-purple-100;
+  }
+
+  .archive-heat-q {
+    @apply font-mono text-[10px] font-bold text-slate-400 uppercase;
+  }
+  .archive-heat-name {
+    @apply font-semibold text-slate-800;
+  }
+  .archive-heat-color {
+    @apply font-mono text-[11px] uppercase font-bold text-slate-600;
+  }
+
   .class-students-full {
     @apply mt-2 text-amber-700;
   }

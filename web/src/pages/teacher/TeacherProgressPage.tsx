@@ -5,13 +5,12 @@ import { PageHeader } from '../../components/PageHeader'
 import { ProgressReportPanel } from '../../components/ProgressReportPanel'
 import { EmptyState, Panel, StatCard } from '../../components/ui'
 import { sessionLabel } from '../../modules/reporting/session-series'
+import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import { useAppState } from '../../state/useAppState'
 
 export function TeacherProgressPage() {
   const { roster, scheduling, ledger, metricSettings } = useAppState()
-  const teacher = roster.users.find((u) => u.roles.includes('teacher'))
-  const classRow = roster.classes.find((c) => c.teacherUserId === teacher?.id) ?? roster.classes[0]
-  const course = roster.courses.find((c) => c.id === classRow?.courseId) ?? roster.courses[0]
+  const { classRow, course } = useTeacherClassContext()
 
   const classSessions = useMemo(() => {
     if (!classRow) return []

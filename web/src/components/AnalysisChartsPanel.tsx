@@ -84,6 +84,8 @@ function toSessions(list: SessionOpt[], classId?: string) {
     completedAt: s.completedAt,
     maxProbeCount: 2,
     sessionNumber: s.sessionNumber ?? null,
+    ownerUserId: null,
+    lockExpiresAt: null,
   }))
 }
 

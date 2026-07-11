@@ -268,6 +268,8 @@ export function ProgressAnalysisView({
         completedAt: s.completedAt,
         maxProbeCount: 2,
         sessionNumber: s.sessionNumber ?? null,
+        ownerUserId: null,
+        lockExpiresAt: null,
       })),
       courseId,
       classId,

@@ -1,0 +1,21 @@
+{
+  "name": "chunks-lms",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Chunks-LMS — Focus and Awareness measurement platform",
+  "scripts": {
+    "dev": "npm --prefix web run dev",
+    "build": "npm --prefix web run build",
+    "lint": "npm --prefix web run lint",
+    "typecheck": "npm --prefix web run typecheck",
+    "test": "npm --prefix web run test",
+    "test:watch": "npm --prefix web run test:watch",
+    "format": "npm --prefix web run format",
+    "format:check": "npm --prefix web run format:check",
+    "openspec:validate": "npx openspec validate --all",
+    "ci": "npm run openspec:validate && npm run lint && npm run typecheck && npm run test && npm run build"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

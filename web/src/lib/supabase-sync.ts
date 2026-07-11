@@ -1,0 +1,531 @@
+/**
+ * Supabase backend sync for Chunks-LMS workspace (roster + scheduling).
+ * Loads on boot; full replace-style save keeps DB aligned with UI state.
+ */
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { CourseSchedule, DomainUser, RosterState } from '../modules/roster/types'
+import { createEmptyRoster, isUuid, newId } from '../modules/roster/seed'
+import type { SchedulingState } from '../modules/scheduling/types'
+import { emptySchedulingState } from '../modules/scheduling/session-lifecycle'
+import { getSupabase } from './supabase'
+
+/** Loose client — foundation DB types are partial; cast for sync ops. */
+function db(): SupabaseClient | null {
+  return getSupabase() as unknown as SupabaseClient | null
+}
+
+export type WorkspaceSnapshot = {
+  roster: RosterState
+  scheduling: SchedulingState
+}
+
+export type SyncResult =
+  | { ok: true; source: 'supabase' | 'empty' }
+  | { ok: false; error: string }
+
+function asSchedule(raw: unknown): CourseSchedule | null {
+  if (!raw || typeof raw !== 'object') return null
+  const s = raw as Record<string, unknown>
+  if (!Array.isArray(s.weekdays)) return null
+  return {
+    weekdays: s.weekdays as number[],
+    startTime: typeof s.startTime === 'string' ? s.startTime : '09:00',
+    durationMinutes: typeof s.durationMinutes === 'number' ? s.durationMinutes : 60,
+    sessionCount: typeof s.sessionCount === 'number' ? s.sessionCount : 15,
+    timeZone: typeof s.timeZone === 'string' ? s.timeZone : 'Asia/Ho_Chi_Minh',
+  }
+}
+
+/** Ensure all domain IDs are UUIDs so Postgres accepts them. */
+export function normalizeIdsForDb(snapshot: WorkspaceSnapshot): WorkspaceSnapshot {
+  const idMap = new Map<string, string>()
+  const mapId = (id: string) => {
+    if (isUuid(id)) return id
+    if (!idMap.has(id)) idMap.set(id, newId())
+    return idMap.get(id)!
+  }
+
+  const roster: RosterState = {
+    organization: {
+      ...snapshot.roster.organization,
+      id: mapId(snapshot.roster.organization.id),
+    },
+    users: snapshot.roster.users.map((u) => ({
+      ...u,
+      id: mapId(u.id),
+    })),
+    courses: snapshot.roster.courses.map((c) => ({
+      ...c,
+      id: mapId(c.id),
+      organizationId: mapId(c.organizationId),
+    })),
+    classes: snapshot.roster.classes.map((c) => ({
+      ...c,
+      id: mapId(c.id),
+      courseId: mapId(c.courseId),
+      teacherUserId: mapId(c.teacherUserId),
+    })),
+    enrollments: snapshot.roster.enrollments.map((e) => ({
+      ...e,
+      id: mapId(e.id),
+      classId: mapId(e.classId),
+      learnerUserId: mapId(e.learnerUserId),
+    })),
+  }
+
+  const scheduling: SchedulingState = {
+    scheduledSessions: snapshot.scheduling.scheduledSessions.map((s) => ({
+      ...s,
+      id: mapId(s.id),
+      classId: mapId(s.classId),
+      rescheduledFromId: s.rescheduledFromId ? mapId(s.rescheduledFromId) : null,
+    })),
+    learningSessions: snapshot.scheduling.learningSessions.map((s) => ({
+      ...s,
+      id: mapId(s.id),
+      classId: mapId(s.classId),
+      scheduledSessionId: s.scheduledSessionId ? mapId(s.scheduledSessionId) : null,
+    })),
+    attendance: snapshot.scheduling.attendance.map((a) => ({
+      ...a,
+      id: mapId(a.id),
+      learningSessionId: mapId(a.learningSessionId),
+      learnerUserId: mapId(a.learnerUserId),
+    })),
+  }
+
+  return { roster, scheduling }
+}
+
+export async function loadWorkspaceFromSupabase(): Promise<
+  { ok: true; data: WorkspaceSnapshot } | { ok: false; error: string }
+> {
+  const sb = db()
+  if (!sb) return { ok: false, error: 'Supabase not configured' }
+
+  try {
+    const { data: orgs, error: orgErr } = await sb
+      .from('organizations')
+      .select('*')
+      .order('created_at', { ascending: true })
+      .limit(1)
+
+    if (orgErr) return { ok: false, error: orgErr.message }
+    if (!orgs?.length) {
+      return {
+        ok: true,
+        data: { roster: createEmptyRoster(), scheduling: emptySchedulingState() },
+      }
+    }
+
+    const org = orgs[0]!
+    const orgId = org.id as string
+
+    const [
+      membersRes,
+      usersRes,
+      coursesRes,
+      classesRes,
+      enrollmentsRes,
+      scheduledRes,
+      learningRes,
+      attendanceRes,
+    ] = await Promise.all([
+      sb.from('organization_memberships').select('*').eq('organization_id', orgId),
+      sb.from('users').select('*'),
+      sb.from('courses').select('*').eq('organization_id', orgId),
+      sb.from('classes').select('*'),
+      sb.from('enrollments').select('*'),
+      sb.from('scheduled_sessions').select('*'),
+      sb.from('learning_sessions').select('*'),
+      sb.from('attendance_records').select('*'),
+    ])
+
+    for (const r of [
+      membersRes,
+      usersRes,
+      coursesRes,
+      classesRes,
+      enrollmentsRes,
+      scheduledRes,
+      learningRes,
+      attendanceRes,
+    ]) {
+      if (r.error) return { ok: false, error: r.error.message }
+    }
+
+    const memberUserIds = new Set(
+      (membersRes.data ?? []).map((m) => m.user_id as string),
+    )
+    const rolesByUser = new Map<string, DomainUser['roles']>()
+    for (const m of membersRes.data ?? []) {
+      const uid = m.user_id as string
+      const role = m.role as DomainUser['roles'][number]
+      const prev = rolesByUser.get(uid) ?? []
+      if (!prev.includes(role)) rolesByUser.set(uid, [...prev, role])
+    }
+
+    const users: DomainUser[] = (usersRes.data ?? [])
+      .filter((u) => memberUserIds.has(u.id as string))
+      .map((u) => ({
+        id: u.id as string,
+        displayName: u.display_name as string,
+        email: (u.email as string | null) ?? null,
+        avatarUrl: ((u as { avatar_url?: string | null }).avatar_url ?? null) as string | null,
+        roles: rolesByUser.get(u.id as string) ?? ['learner'],
+      }))
+
+    const courseIds = new Set((coursesRes.data ?? []).map((c) => c.id as string))
+    const courses = (coursesRes.data ?? []).map((c) => ({
+      id: c.id as string,
+      organizationId: c.organization_id as string,
+      code: c.code as string,
+      name: c.name as string,
+      status: c.status as 'active' | 'archived',
+      startsOn: (c.starts_on as string | null) ?? null,
+      endsOn: (c.ends_on as string | null) ?? null,
+      schedule: asSchedule((c as { schedule?: unknown }).schedule),
+    }))
+
+    const classes = (classesRes.data ?? [])
+      .filter((cl) => courseIds.has(cl.course_id as string))
+      .map((cl) => ({
+        id: cl.id as string,
+        courseId: cl.course_id as string,
+        name: cl.name as string,
+        capacity: cl.capacity as number,
+        teacherUserId: cl.teacher_user_id as string,
+        status: cl.status as 'active' | 'ended',
+      }))
+
+    const classIds = new Set(classes.map((c) => c.id))
+    const enrollments = (enrollmentsRes.data ?? [])
+      .filter((e) => classIds.has(e.class_id as string))
+      .map((e) => ({
+        id: e.id as string,
+        classId: e.class_id as string,
+        learnerUserId: e.learner_user_id as string,
+        status: e.status as 'active' | 'ended',
+        startedAt: e.started_at as string,
+        endedAt: (e.ended_at as string | null) ?? null,
+      }))
+
+    const scheduledSessions = (scheduledRes.data ?? [])
+      .filter((s) => classIds.has(s.class_id as string))
+      .map((s) => ({
+        id: s.id as string,
+        classId: s.class_id as string,
+        plannedStart: s.planned_start as string,
+        durationMinutes: s.duration_minutes as number,
+        status: s.status as 'scheduled' | 'completed' | 'cancelled' | 'rescheduled',
+        rescheduledFromId: (s.rescheduled_from_id as string | null) ?? null,
+      }))
+
+    const learningSessions = (learningRes.data ?? [])
+      .filter((s) => classIds.has(s.class_id as string))
+      .map((s) => ({
+        id: s.id as string,
+        classId: s.class_id as string,
+        scheduledSessionId: (s.scheduled_session_id as string | null) ?? null,
+        status: s.status as 'open' | 'completed',
+        plannedQuestionCount: (s.planned_question_count as number | null) ?? null,
+        startedAt: s.started_at as string,
+        completedAt: (s.completed_at as string | null) ?? null,
+        maxProbeCount: (s.max_probe_count as number) ?? 2,
+      }))
+
+    const lsIds = new Set(learningSessions.map((s) => s.id))
+    const attendance = (attendanceRes.data ?? [])
+      .filter((a) => lsIds.has(a.learning_session_id as string))
+      .map((a) => ({
+        id: a.id as string,
+        learningSessionId: a.learning_session_id as string,
+        learnerUserId: a.learner_user_id as string,
+        status: a.status as 'present' | 'late' | 'absent' | 'excused',
+        recordedAt: a.recorded_at as string,
+      }))
+
+    return {
+      ok: true,
+      data: {
+        roster: {
+          organization: { id: orgId, name: org.name as string },
+          users,
+          courses,
+          classes,
+          enrollments,
+        },
+        scheduling: {
+          scheduledSessions,
+          learningSessions,
+          attendance,
+        },
+      },
+    }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Load failed' }
+  }
+}
+
+export async function saveWorkspaceToSupabase(
+  raw: WorkspaceSnapshot,
+): Promise<SyncResult> {
+  const sb = db()
+  if (!sb) return { ok: false, error: 'Supabase not configured' }
+
+  const { roster, scheduling } = normalizeIdsForDb(raw)
+  const orgId = roster.organization.id
+
+  try {
+    // 1) Org
+    {
+      const { error } = await sb.from('organizations').upsert(
+        {
+          id: orgId,
+          name: roster.organization.name,
+        },
+        { onConflict: 'id' },
+      )
+      if (error) return { ok: false, error: `org: ${error.message}` }
+    }
+
+    // 2) Users
+    if (roster.users.length > 0) {
+      const { error } = await sb.from('users').upsert(
+        roster.users.map((u) => ({
+          id: u.id,
+          clerk_user_id: `local_${u.id}`,
+          display_name: u.displayName,
+          email: u.email,
+          avatar_url: u.avatarUrl,
+          updated_at: new Date().toISOString(),
+        })),
+        { onConflict: 'id' },
+      )
+      if (error) return { ok: false, error: `users: ${error.message}` }
+    }
+
+    // 3) Memberships — replace for this org
+    {
+      await sb.from('organization_memberships').delete().eq('organization_id', orgId)
+      const rows = roster.users.flatMap((u) =>
+        u.roles.map((role) => ({
+          organization_id: orgId,
+          user_id: u.id,
+          role,
+        })),
+      )
+      if (rows.length > 0) {
+        const { error } = await sb.from('organization_memberships').insert(rows)
+        if (error) return { ok: false, error: `memberships: ${error.message}` }
+      }
+    }
+
+    // 4) Courses
+    {
+      // Delete courses no longer present
+      const { data: existingCourses } = await sb
+        .from('courses')
+        .select('id')
+        .eq('organization_id', orgId)
+      const keep = new Set(roster.courses.map((c) => c.id))
+      const toDelete = (existingCourses ?? [])
+        .map((c) => c.id as string)
+        .filter((id) => !keep.has(id))
+      if (toDelete.length > 0) {
+        await sb.from('courses').delete().in('id', toDelete)
+      }
+
+      if (roster.courses.length > 0) {
+        const { error } = await sb.from('courses').upsert(
+          roster.courses.map((c) => ({
+            id: c.id,
+            organization_id: orgId,
+            code: c.code,
+            name: c.name,
+            status: c.status,
+            starts_on: c.startsOn,
+            ends_on: c.endsOn,
+            schedule: c.schedule,
+          })),
+          { onConflict: 'id' },
+        )
+        if (error) return { ok: false, error: `courses: ${error.message}` }
+      }
+    }
+
+    // 5) Classes
+    {
+      const courseIds = roster.courses.map((c) => c.id)
+      if (courseIds.length > 0) {
+        const { data: existing } = await sb
+          .from('classes')
+          .select('id, course_id')
+          .in('course_id', courseIds)
+        const keep = new Set(roster.classes.map((c) => c.id))
+        const toDelete = (existing ?? [])
+          .map((c) => c.id as string)
+          .filter((id) => !keep.has(id))
+        if (toDelete.length > 0) {
+          await sb.from('classes').delete().in('id', toDelete)
+        }
+      }
+
+      if (roster.classes.length > 0) {
+        const { error } = await sb.from('classes').upsert(
+          roster.classes.map((c) => ({
+            id: c.id,
+            course_id: c.courseId,
+            name: c.name,
+            capacity: c.capacity,
+            teacher_user_id: c.teacherUserId,
+            status: c.status,
+          })),
+          { onConflict: 'id' },
+        )
+        if (error) return { ok: false, error: `classes: ${error.message}` }
+      }
+    }
+
+    // 6) Enrollments
+    {
+      const classIds = roster.classes.map((c) => c.id)
+      if (classIds.length > 0) {
+        const { data: existing } = await sb
+          .from('enrollments')
+          .select('id')
+          .in('class_id', classIds)
+        const keep = new Set(roster.enrollments.map((e) => e.id))
+        const toDelete = (existing ?? [])
+          .map((e) => e.id as string)
+          .filter((id) => !keep.has(id))
+        if (toDelete.length > 0) {
+          await sb.from('enrollments').delete().in('id', toDelete)
+        }
+      }
+
+      if (roster.enrollments.length > 0) {
+        const { error } = await sb.from('enrollments').upsert(
+          roster.enrollments.map((e) => ({
+            id: e.id,
+            class_id: e.classId,
+            learner_user_id: e.learnerUserId,
+            status: e.status,
+            started_at: e.startedAt,
+            ended_at: e.endedAt,
+          })),
+          { onConflict: 'id' },
+        )
+        if (error) return { ok: false, error: `enrollments: ${error.message}` }
+      }
+    }
+
+    // 7) Scheduled sessions
+    {
+      const classIds = roster.classes.map((c) => c.id)
+      if (classIds.length > 0) {
+        const { data: existing } = await sb
+          .from('scheduled_sessions')
+          .select('id')
+          .in('class_id', classIds)
+        const keep = new Set(scheduling.scheduledSessions.map((s) => s.id))
+        const toDelete = (existing ?? [])
+          .map((s) => s.id as string)
+          .filter((id) => !keep.has(id))
+        if (toDelete.length > 0) {
+          await sb.from('scheduled_sessions').delete().in('id', toDelete)
+        }
+      }
+
+      if (scheduling.scheduledSessions.length > 0) {
+        const { error } = await sb.from('scheduled_sessions').upsert(
+          scheduling.scheduledSessions.map((s) => ({
+            id: s.id,
+            class_id: s.classId,
+            planned_start: s.plannedStart,
+            duration_minutes: s.durationMinutes,
+            status: s.status,
+            rescheduled_from_id: s.rescheduledFromId,
+          })),
+          { onConflict: 'id' },
+        )
+        if (error) return { ok: false, error: `scheduled: ${error.message}` }
+      }
+    }
+
+    // 8) Learning sessions
+    {
+      const classIds = roster.classes.map((c) => c.id)
+      if (classIds.length > 0) {
+        const { data: existing } = await sb
+          .from('learning_sessions')
+          .select('id')
+          .in('class_id', classIds)
+        const keep = new Set(scheduling.learningSessions.map((s) => s.id))
+        const toDelete = (existing ?? [])
+          .map((s) => s.id as string)
+          .filter((id) => !keep.has(id))
+        if (toDelete.length > 0) {
+          await sb.from('learning_sessions').delete().in('id', toDelete)
+        }
+      }
+
+      if (scheduling.learningSessions.length > 0) {
+        const { error } = await sb.from('learning_sessions').upsert(
+          scheduling.learningSessions.map((s) => ({
+            id: s.id,
+            class_id: s.classId,
+            scheduled_session_id: s.scheduledSessionId,
+            status: s.status,
+            planned_question_count: s.plannedQuestionCount,
+            started_at: s.startedAt,
+            completed_at: s.completedAt,
+            max_probe_count: s.maxProbeCount,
+          })),
+          { onConflict: 'id' },
+        )
+        if (error) return { ok: false, error: `learning: ${error.message}` }
+      }
+    }
+
+    // 9) Attendance
+    {
+      const lsIds = scheduling.learningSessions.map((s) => s.id)
+      if (lsIds.length > 0) {
+        const { data: existing } = await sb
+          .from('attendance_records')
+          .select('id')
+          .in('learning_session_id', lsIds)
+        const keep = new Set(scheduling.attendance.map((a) => a.id))
+        const toDelete = (existing ?? [])
+          .map((a) => a.id as string)
+          .filter((id) => !keep.has(id))
+        if (toDelete.length > 0) {
+          await sb.from('attendance_records').delete().in('id', toDelete)
+        }
+      }
+
+      if (scheduling.attendance.length > 0) {
+        const { error } = await sb.from('attendance_records').upsert(
+          scheduling.attendance.map((a) => ({
+            id: a.id,
+            learning_session_id: a.learningSessionId,
+            learner_user_id: a.learnerUserId,
+            status: a.status,
+            recorded_at: a.recordedAt,
+          })),
+          { onConflict: 'id' },
+        )
+        if (error) return { ok: false, error: `attendance: ${error.message}` }
+      }
+    }
+
+    return { ok: true, source: 'supabase' }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Save failed' }
+  }
+}
+
+export function isSupabaseConfigured(): boolean {
+  return getSupabase() !== null
+}

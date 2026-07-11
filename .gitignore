@@ -1,0 +1,93 @@
+
+# Windows accidental device-name file
+/nul
+nul
+
+# Dependencies and build
+node_modules/
+web/node_modules/
+web/dist/
+dist/
+build/
+.next/
+.turbo/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+web/.env
+
+# Local tooling / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
+
+# Vercel
+.vercel/
+web/.vercel/
+
+# Agent skill dumps for non-primary agents
+# Canonical project skills live under .agents/; .grok is a local Grok mirror
+.grok/
+.claude/
+.cursor/
+.windsurf/
+.codex/
+.continue/
+.roo/
+.goose/
+.factory/
+.kiro/
+.kilocode/
+.augment/
+.tabnine/
+.trae/
+.qoder/
+.qwen/
+.pi/
+.bob/
+.crush/
+.hermes/
+.vibe/
+.junie/
+.iflow/
+.lingma/
+.zencoder/
+.zcode/
+.neovate/
+.pochi/
+.adal/
+.aider-desk/
+.autohand/
+.commandcode/
+.codebuddy/
+.codemaker/
+.codestudio/
+.codeartsdoer/
+.cortex/
+.devin/
+.forge/
+.inferencesh/
+.jazz/
+.kode/
+.mcpjam/
+.moxby/
+.mux/
+.ona/
+.openhands/
+.reasonix/
+.rovodev/
+.terramind/
+.tinycloud/
+agent/
+data/
+# root-level skills dump only (canonical skills are under .agents/skills/)
+/skills/
+.vercel
+.env*

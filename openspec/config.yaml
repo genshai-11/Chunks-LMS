@@ -1,0 +1,40 @@
+schema: spec-driven
+
+context: |
+  Product: Chunks-LMS measures learner Focus and Awareness via teacher-observed
+  assessments. Not a content-authoring or resource-library platform.
+
+  Stack (V1 foundation): React + TypeScript app, Clerk auth, Supabase/Postgres
+  with RLS, hybrid immutable assessment events + current-state snapshots.
+
+  Domain glossary: root CONTEXT.md. ADRs: docs/adr/. Architecture:
+  docs/architecture/chunks-lms-architecture-review.md. Agent law: AGENTS.md.
+
+  Engineering skills config: docs/agents/ (GitHub issue tracker genshai-11/Chunks-LMS,
+  triage labels, single-context domain docs).
+
+  Constraints:
+  - Preserve immutable assessment/probe/finalization/correction history
+  - Scoring rules only in domain/DB layer, never duplicated in UI callers
+  - Only finalized results feed progress metrics
+  - Question sequence numbers are presentation, not identity
+  - Learner-first and question-first are UI modes over the same model
+  - AuthZ in Supabase RLS, not only UI
+  - V1 metrics are operational indicators, not psychometric instruments
+  - Resource content and CCI/CVR stay outside V1 core
+
+rules:
+  proposal:
+    - "Include Non-goals and product-boundary check against CONTEXT.md"
+    - "Name capabilities in kebab-case matching module seams"
+  design:
+    - "Align with accepted ADRs; surface conflicts before inventing new decisions"
+    - "Prefer deep module interfaces over table-by-table repositories"
+    - "Include CI/CD path for PR validation and production deploy"
+  specs:
+    - "Use CONTEXT.md glossary terms only (no silent synonyms)"
+    - "Every requirement needs at least one WHEN/THEN scenario"
+  tasks:
+    - "Order by vertical slices: foundation → identity → roster → sessions → assessment → metrics → reports → CI/CD"
+    - "Keep tasks implementable with TDD where domain rules exist"
+    - "Include install, lint, typecheck, test, build, OpenSpec validate, and deploy gates"

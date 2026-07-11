@@ -1,0 +1,120 @@
+import type { CaptureSessionState } from '../modules/assessment/session-capture'
+import {
+  createDefaultMetricSettings,
+  type MetricSettingsState,
+} from '../modules/metrics/settings'
+import type { ResultRecord } from '../modules/reporting/progress'
+import { createEmptyRoster } from '../modules/roster/seed'
+import type { Course, DomainUser, RosterState } from '../modules/roster/types'
+import { emptySchedulingState } from '../modules/scheduling/session-lifecycle'
+import type { SchedulingState } from '../modules/scheduling/types'
+
+const STORAGE_KEY = 'chunks-lms:app-state:v1'
+
+export type PersistedAppState = {
+  version: 1
+  roster: RosterState
+  scheduling: SchedulingState
+  capture: CaptureSessionState | null
+  ledger: ResultRecord[]
+  metricSettings: MetricSettingsState
+  savedAt: string
+}
+
+function normalizeUser(u: DomainUser): DomainUser {
+  return {
+    ...u,
+    avatarUrl: u.avatarUrl ?? null,
+  }
+}
+
+function normalizeCourse(c: Course): Course {
+  return {
+    ...c,
+    schedule: c.schedule ?? null,
+  }
+}
+
+/** Load last local workspace. Returns null if none / invalid. */
+export function loadPersistedAppState(): PersistedAppState | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const data = JSON.parse(raw) as Partial<PersistedAppState>
+    if (!data || data.version !== 1 || !data.roster) return null
+
+    const roster: RosterState = {
+      organization: data.roster.organization ?? createEmptyRoster().organization,
+      users: (data.roster.users ?? []).map(normalizeUser),
+      courses: (data.roster.courses ?? []).map(normalizeCourse),
+      classes: data.roster.classes ?? [],
+      enrollments: data.roster.enrollments ?? [],
+    }
+
+    return {
+      version: 1,
+      roster,
+      scheduling: data.scheduling ?? emptySchedulingState(),
+      capture: data.capture ?? null,
+      ledger: data.ledger ?? [],
+      metricSettings: data.metricSettings ?? createDefaultMetricSettings(),
+      savedAt: data.savedAt ?? new Date().toISOString(),
+    }
+  } catch {
+    return null
+  }
+}
+
+export function savePersistedAppState(state: {
+  roster: RosterState
+  scheduling: SchedulingState
+  capture: CaptureSessionState | null
+  ledger: ResultRecord[]
+  metricSettings: MetricSettingsState
+}): void {
+  if (typeof window === 'undefined') return
+  try {
+    const payload: PersistedAppState = {
+      version: 1,
+      roster: state.roster,
+      scheduling: state.scheduling,
+      capture: state.capture,
+      ledger: state.ledger,
+      metricSettings: state.metricSettings,
+      savedAt: new Date().toISOString(),
+    }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
+  } catch {
+    // Quota / private mode — ignore
+  }
+}
+
+export function clearPersistedAppState(): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.removeItem(STORAGE_KEY)
+  } catch {
+    // ignore
+  }
+}
+
+export function initialAppState(): Omit<PersistedAppState, 'version' | 'savedAt'> {
+  const saved = loadPersistedAppState()
+  if (saved) {
+    return {
+      roster: saved.roster,
+      scheduling: saved.scheduling,
+      capture: saved.capture,
+      ledger: saved.ledger,
+      metricSettings: saved.metricSettings,
+    }
+  }
+  return {
+    roster: createEmptyRoster(),
+    scheduling: emptySchedulingState(),
+    capture: null,
+    ledger: [],
+    metricSettings: createDefaultMetricSettings(),
+  }
+}

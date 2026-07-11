@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 import {
   Activity,
   Check,
@@ -12,18 +20,16 @@ import {
   PanelLeftOpen,
   Plus,
   Sparkles,
+  Trophy,
   X,
   Zap,
 } from 'lucide-react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import {
-  addSessionQuestion,
   advancePosition,
   currentAttempt,
   jumpToQuestion,
   markSessionCompleted,
-  recordColorForCurrent,
-  resolveProbeForCurrent,
   retreatPosition,
   sessionColorSummary,
   type CaptureSessionState,
@@ -42,6 +48,14 @@ import {
   recordAttendance,
 } from '../../modules/scheduling/session-lifecycle'
 import { useAppState } from '../../state/useAppState'
+import {
+  createLiveQuestion,
+  loadLiveCapture,
+  recordLiveColor,
+  replaceLiveAttempt,
+  resolveLiveProbe,
+} from '../../lib/live-assessment'
+import { getSupabase } from '../../lib/supabase'
 
 const COLORS: { key: ResultColor; label: string; shortcut: string }[] = [
   { key: 'red', label: 'Red', shortcut: '0' },
@@ -50,22 +64,13 @@ const COLORS: { key: ResultColor; label: string; shortcut: string }[] = [
   { key: 'purple', label: 'Purple', shortcut: '3' },
 ]
 
-type ReactionKind = 'happy' | 'fight'
-type Reaction = { kind: ReactionKind; id: number } | null
+type ReactionKind = 'celebrate' | 'happy' | 'fight'
+type Reaction = { kind: ReactionKind; color: ResultColor; id: number } | null
 
-function reactionFor(color: ResultColor | 'fail' | 'done'): ReactionKind {
-  if (color === 'green' || color === 'purple' || color === 'done') return 'happy'
+function reactionFor(color: ResultColor): ReactionKind {
+  if (color === 'purple') return 'celebrate'
+  if (color === 'green') return 'happy'
   return 'fight'
-}
-
-function autoNextQuestion(state: CaptureSessionState): CaptureSessionState {
-  const atLast =
-    state.questions.length === 0 || state.position.questionIndex >= state.questions.length - 1
-  if (atLast) {
-    const r = addSessionQuestion(state)
-    if (r.ok) return r.state
-  }
-  return advancePosition(state)
 }
 
 const RAIL_W_KEY = 'chunks-lms:observe-rail-w'
@@ -102,6 +107,8 @@ export function TeacherObservePage() {
   const [toast, setToast] = useState<string | null>(null)
   const [showKeys, setShowKeys] = useState(false)
   const [finishing, setFinishing] = useState(false)
+  const [liveLoading, setLiveLoading] = useState(true)
+  const [liveSaving, setLiveSaving] = useState(false)
   const [showConfirmFinish, setShowConfirmFinish] = useState(false)
   /** Desktop: open by default. Phone: closed so stage + colors stay primary. */
   const [mapOpen, setMapOpen] = useState(() =>
@@ -131,35 +138,43 @@ export function TeacherObservePage() {
     railWidthRef.current = railWidth
   }, [railWidth])
 
-  const startRailResize = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!mapOpen) return
-    e.preventDefault()
-    e.stopPropagation()
-    const startX = e.clientX
-    const startW = railWidthRef.current
-    setResizing(true)
+  const startRailResize = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (!mapOpen) return
+      e.preventDefault()
+      e.stopPropagation()
+      const startX = e.clientX
+      const startW = railWidthRef.current
+      setResizing(true)
 
-    const onMove = (ev: PointerEvent) => {
-      const next = Math.min(RAIL_MAX, Math.max(RAIL_MIN, startW + (ev.clientX - startX)))
-      railWidthRef.current = next
-      setRailWidth(next)
-    }
-    const onUp = () => {
-      setResizing(false)
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-      try {
-        window.localStorage.setItem(RAIL_W_KEY, String(railWidthRef.current))
-      } catch {
-        /* ignore */
+      const onMove = (ev: PointerEvent) => {
+        const next = Math.min(RAIL_MAX, Math.max(RAIL_MIN, startW + (ev.clientX - startX)))
+        railWidthRef.current = next
+        setRailWidth(next)
       }
-    }
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-  }, [mapOpen])
+      const onUp = () => {
+        setResizing(false)
+        window.removeEventListener('pointermove', onMove)
+        window.removeEventListener('pointerup', onUp)
+        try {
+          window.localStorage.setItem(RAIL_W_KEY, String(railWidthRef.current))
+        } catch {
+          /* ignore */
+        }
+      }
+      window.addEventListener('pointermove', onMove)
+      window.addEventListener('pointerup', onUp)
+    },
+    [mapOpen],
+  )
 
-  const railSizeClass =
-    !mapOpen ? 'is-narrow' : railWidth < 190 ? 'is-compact' : railWidth > 300 ? 'is-wide' : 'is-mid'
+  const railSizeClass = !mapOpen
+    ? 'is-narrow'
+    : railWidth < 190
+      ? 'is-compact'
+      : railWidth > 300
+        ? 'is-wide'
+        : 'is-mid'
 
   const avatarSize = !mapOpen ? 'sm' : railWidth > 300 ? 'xl' : railWidth > 200 ? 'lg' : 'md'
 
@@ -169,13 +184,64 @@ export function TeacherObservePage() {
   const openSession = scheduling.learningSessions.find(
     (s) => s.classId === classRow?.id && s.status === 'open',
   )
+  const activeLearnerIds = useMemo(
+    () =>
+      classRow
+        ? roster.enrollments
+            .filter(
+              (enrollment) => enrollment.classId === classRow.id && enrollment.status === 'active',
+            )
+            .map((enrollment) => enrollment.learnerUserId)
+        : [],
+    [classRow, roster.enrollments],
+  )
+
+  const refreshLiveCapture = useCallback(async () => {
+    if (!openSession || !teacher) {
+      setLiveLoading(false)
+      return
+    }
+    const result = await loadLiveCapture({
+      learningSessionId: openSession.id,
+      teacherUserId: teacher.id,
+      learnerIds: activeLearnerIds,
+      sessionStatus: openSession.status,
+      maxProbeCount: openSession.maxProbeCount,
+    })
+    if (result.ok) {
+      setCapture(result.data)
+    } else {
+      setToast(result.error)
+      window.setTimeout(() => setToast(null), 1800)
+    }
+    setLiveLoading(false)
+  }, [openSession, teacher, activeLearnerIds, setCapture])
+
+  useEffect(() => {
+    void refreshLiveCapture()
+  }, [refreshLiveCapture])
+
+  useEffect(() => {
+    const supabase = getSupabase()
+    if (!supabase || !openSession) return
+    const channel = supabase
+      .channel(`observe-session:${openSession.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'assessment_attempt_snapshots' },
+        () => void refreshLiveCapture(),
+      )
+      .subscribe()
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [openSession, refreshLiveCapture])
 
   const attempt = capture ? currentAttempt(capture) : null
   const learner = attempt ? roster.users.find((u) => u.id === attempt.learnerUserId) : null
 
   const plannedCount = scheduling.scheduledSessions.filter(
-    (s) =>
-      s.classId === classRow?.id && s.status !== 'cancelled' && s.status !== 'rescheduled',
+    (s) => s.classId === classRow?.id && s.status !== 'cancelled' && s.status !== 'rescheduled',
   ).length
   const totalDays =
     course?.schedule?.sessionCount && course.schedule.sessionCount > 0
@@ -225,76 +291,126 @@ export function TeacherObservePage() {
     window.setTimeout(() => setToast(null), 900)
   }, [])
 
-  const playReaction = useCallback((kind: ReactionKind) => {
+  const playReaction = useCallback((color: ResultColor) => {
     const id = Date.now()
-    setReaction({ kind, id })
-    window.setTimeout(() => setReaction((current) => (current?.id === id ? null : current)), 850)
+    setReaction({ kind: reactionFor(color), color, id })
+    window.setTimeout(() => setReaction((current) => (current?.id === id ? null : current)), 1200)
   }, [])
 
-  const apply = useCallback(
-    (next: CaptureSessionState) => {
-      setCapture(next)
-      appendFinalizedFromCapture(next)
+  const advanceAfterFinal = useCallback(
+    async (state: CaptureSessionState): Promise<CaptureSessionState> => {
+      if (state.position.questionIndex < state.questions.length - 1) {
+        return advancePosition(state)
+      }
+      const created = await createLiveQuestion({ capture: state })
+      if (!created.ok) {
+        flash(created.error)
+        return state
+      }
+      return created.data
     },
-    [setCapture, appendFinalizedFromCapture],
+    [flash],
   )
 
   const recordColor = useCallback(
-    (color: ResultColor) => {
-      if (!capture) return
+    async (color: ResultColor) => {
+      if (!capture || !attempt || liveSaving) return
       const wasFinal = isFinalized
-      const r = recordColorForCurrent(capture, color)
-      if (!r.ok) {
-        flash(r.error)
-        return
-      }
-      apply(r.state)
-      if (r.value.snapshot.status === 'finalized' || r.value.snapshot.status === 'corrected') {
-        playReaction(reactionFor(color))
-        if (wasFinal) {
-          flash(color)
-        } else {
-          const next = autoNextQuestion(r.state)
-          setCapture(next)
-          appendFinalizedFromCapture(next)
+      setLiveSaving(true)
+      try {
+        const result = await recordLiveColor(attempt, color)
+        if (!result.ok) {
+          flash(result.error)
+          return
+        }
+        let next = replaceLiveAttempt(capture, result.data)
+        setCapture(next)
+        appendFinalizedFromCapture(next)
+        if (
+          result.data.snapshot.status === 'finalized' ||
+          result.data.snapshot.status === 'corrected'
+        ) {
+          playReaction(color)
+          if (!wasFinal) {
+            next = await advanceAfterFinal(next)
+            setCapture(next)
+            appendFinalizedFromCapture(next)
+          }
           flash(color)
         }
+      } finally {
+        setLiveSaving(false)
       }
     },
-    [capture, apply, flash, setCapture, isFinalized, appendFinalizedFromCapture, playReaction],
+    [
+      capture,
+      attempt,
+      liveSaving,
+      isFinalized,
+      setCapture,
+      appendFinalizedFromCapture,
+      playReaction,
+      advanceAfterFinal,
+      flash,
+    ],
   )
 
   const resolveProbe = useCallback(
-    (outcome: 'fail' | 'continue' | 'done') => {
-      if (!capture) return
-      const r = resolveProbeForCurrent(capture, outcome)
-      if (!r.ok) {
-        flash(r.error)
-        return
-      }
-      apply(r.state)
-      if (r.value.snapshot.status === 'finalized' || r.value.snapshot.status === 'corrected') {
-        playReaction(reactionFor(outcome === 'fail' ? 'fail' : 'done'))
-        const next = autoNextQuestion(r.state)
+    async (outcome: 'fail' | 'continue' | 'done') => {
+      if (!capture || !attempt || liveSaving) return
+      setLiveSaving(true)
+      try {
+        const result = await resolveLiveProbe(attempt, outcome)
+        if (!result.ok) {
+          flash(result.error)
+          return
+        }
+        let next = replaceLiveAttempt(capture, result.data)
         setCapture(next)
         appendFinalizedFromCapture(next)
-        flash(outcome === 'fail' ? 'yellow' : 'green')
-      } else if (outcome === 'continue') {
-        flash(`n=${r.value.snapshot.probeCount}`)
+        if (
+          result.data.snapshot.status === 'finalized' ||
+          result.data.snapshot.status === 'corrected'
+        ) {
+          const color: ResultColor = outcome === 'fail' ? 'yellow' : 'green'
+          playReaction(color)
+          next = await advanceAfterFinal(next)
+          setCapture(next)
+          appendFinalizedFromCapture(next)
+          flash(color)
+        } else if (outcome === 'continue') {
+          flash(`n=${result.data.snapshot.probeCount}`)
+        }
+      } finally {
+        setLiveSaving(false)
       }
     },
-    [capture, apply, flash, setCapture, appendFinalizedFromCapture, playReaction],
+    [
+      capture,
+      attempt,
+      liveSaving,
+      setCapture,
+      appendFinalizedFromCapture,
+      playReaction,
+      advanceAfterFinal,
+      flash,
+    ],
   )
 
-  const startFirst = useCallback(() => {
-    if (!capture) return
-    const r = addSessionQuestion(capture)
-    if (!r.ok) {
-      flash(r.error)
-      return
+  const startFirst = useCallback(async () => {
+    if (!capture || liveSaving) return
+    setLiveSaving(true)
+    try {
+      const result = await createLiveQuestion({ capture })
+      if (!result.ok) {
+        flash(result.error)
+        return
+      }
+      setCapture(result.data)
+    } finally {
+      setLiveSaving(false)
     }
-    setCapture(r.state)
-  }, [capture, setCapture, flash])
+  }, [capture, liveSaving, setCapture, flash])
 
   const prevCell = useCallback(() => {
     if (!capture || capture.questions.length === 0) return
@@ -463,15 +579,27 @@ export function TeacherObservePage() {
   const openProbes = summary ? summary.byColor.open : 0
   const drafts = summary ? summary.byColor.draft : 0
 
-  if (!openSession || !capture || capture.sessionStatus !== 'open') {
+  if (!openSession) {
+    return <Navigate to="/teacher/session" replace />
+  }
+
+  if (liveLoading || !capture || capture.learningSessionId !== openSession.id) {
+    return (
+      <div className="observe-root flex items-center justify-center" role="status">
+        <p className="text-sm font-semibold text-slate-300">Loading live session…</p>
+      </div>
+    )
+  }
+
+  if (capture.sessionStatus !== 'open') {
     return <Navigate to="/teacher/session" replace />
   }
 
   return (
     <div
-      className={`observe-root${reaction?.kind === 'happy' ? ' is-react-happy' : ''}${
-        reaction?.kind === 'fight' ? ' is-react-fight' : ''
-      }${isPhone ? ' is-phone' : ''}${mapOpen ? ' is-map-open' : ''}`}
+      className={`observe-root${reaction ? ` is-react-${reaction.kind} is-react-${reaction.color}` : ''}${
+        isPhone ? ' is-phone' : ''
+      }${mapOpen ? ' is-map-open' : ''}`}
       role="application"
       aria-label={`${dayLabel} · Focus and Awareness observation`}
     >
@@ -528,9 +656,7 @@ export function TeacherObservePage() {
             title="Finish & save"
           >
             <CheckCircle2 aria-hidden strokeWidth={2.25} />
-            <span className="observe-nav-finish-label">
-              {finishing ? 'Saving…' : 'Finish'}
-            </span>
+            <span className="observe-nav-finish-label">{finishing ? 'Saving…' : 'Finish'}</span>
           </button>
         </div>
       </header>
@@ -721,25 +847,45 @@ export function TeacherObservePage() {
                 aria-hidden
               >
                 <span className="observe-react-symbol">
-                  {reaction.kind === 'happy' ? <Check aria-hidden /> : <Zap aria-hidden />}
+                  {reaction.kind === 'celebrate' ? (
+                    <Trophy aria-hidden />
+                  ) : reaction.kind === 'happy' ? (
+                    <Check aria-hidden />
+                  ) : (
+                    <Zap aria-hidden />
+                  )}
                 </span>
                 <span className="observe-react-label">
-                  {reaction.kind === 'happy' ? 'Great focus' : 'Keep fighting'}
+                  {reaction.kind === 'celebrate'
+                    ? 'Xuất sắc!'
+                    : reaction.kind === 'happy'
+                      ? 'Tập trung tốt!'
+                      : 'Tiếp tục cố gắng!'}
                 </span>
-                {reaction.kind === 'happy' ? (
+                {reaction.kind !== 'fight' ? (
                   <Sparkles className="observe-react-sparkles" aria-hidden />
+                ) : null}
+                {reaction.kind === 'celebrate' ? (
+                  <span className="observe-react-confetti" aria-hidden>
+                    {Array.from({ length: 10 }, (_, i) => (
+                      <i key={i} />
+                    ))}
+                  </span>
                 ) : null}
                 <span className="observe-react-burst" />
               </div>
             ) : null}
 
-            <div className="observe-dock observe-dock-lg">
+            <div
+              className={`observe-dock observe-dock-lg${reaction ? ` is-glowing is-${reaction.color}` : ''}`}
+            >
               {probeOpen ? (
                 <div className="observe-dock-probe" role="group" aria-label="Resolve green">
                   <button
                     type="button"
                     className="observe-dock-probe-btn fail"
                     onClick={() => resolveProbe('fail')}
+                    disabled={liveSaving}
                   >
                     Fail
                   </button>
@@ -747,6 +893,7 @@ export function TeacherObservePage() {
                     type="button"
                     className="observe-dock-probe-btn cont"
                     onClick={() => resolveProbe('continue')}
+                    disabled={liveSaving}
                   >
                     Cont
                   </button>
@@ -754,6 +901,7 @@ export function TeacherObservePage() {
                     type="button"
                     className="observe-dock-probe-btn done"
                     onClick={() => resolveProbe('done')}
+                    disabled={liveSaving}
                   >
                     Done
                   </button>
@@ -770,10 +918,10 @@ export function TeacherObservePage() {
                           : ''
                       }`}
                       onClick={() => recordColor(c.key)}
-                      disabled={!attempt}
+                      disabled={!attempt || liveSaving}
                       aria-label={c.label}
                     >
-                      <span className="observe-dock-num observe-hide-phone">{c.shortcut}</span>
+                      <span className="observe-dock-num">{c.shortcut}</span>
                       <span className="observe-dock-label">{c.label}</span>
                     </button>
                   ))}
@@ -921,7 +1069,8 @@ export function TeacherObservePage() {
               Finish Session?
             </h2>
             <p className="observe-modal-desc">
-              Save and freeze the observation data for {dayBadge}. Once closed, this session cannot be modified.
+              Save and freeze the observation data for {dayBadge}. Once closed, this session cannot
+              be modified.
             </p>
             <div className="observe-modal-summary-box">
               <div className="summary-row">
@@ -931,7 +1080,9 @@ export function TeacherObservePage() {
               <div className="summary-divider" />
               <div className="summary-row">
                 <span className="summary-label">Focus Coefficient (RFC)</span>
-                <span className="summary-val text-amber-300 font-mono font-bold">{done > 0 ? `${rfcPct}%` : '—'}</span>
+                <span className="summary-val text-amber-300 font-mono font-bold">
+                  {done > 0 ? `${rfcPct}%` : '—'}
+                </span>
               </div>
               <div className="summary-divider" />
               <div className="summary-colors-grid">
@@ -955,11 +1106,19 @@ export function TeacherObservePage() {
               <div className="summary-row footer-row">
                 <div className="footer-col">
                   <span className="label">Open Probes</span>
-                  <span className={`val ${openProbes > 0 ? 'text-yellow-400 font-bold' : 'text-slate-400'}`}>{openProbes}</span>
+                  <span
+                    className={`val ${openProbes > 0 ? 'text-yellow-400 font-bold' : 'text-slate-400'}`}
+                  >
+                    {openProbes}
+                  </span>
                 </div>
                 <div className="footer-col">
                   <span className="label">Drafts</span>
-                  <span className={`val ${drafts > 0 ? 'text-slate-200 font-bold' : 'text-slate-500'}`}>{drafts}</span>
+                  <span
+                    className={`val ${drafts > 0 ? 'text-slate-200 font-bold' : 'text-slate-500'}`}
+                  >
+                    {drafts}
+                  </span>
                 </div>
               </div>
             </div>

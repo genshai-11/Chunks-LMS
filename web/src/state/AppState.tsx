@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { CaptureSessionState } from '../modules/assessment/session-capture'
-import {
-  createDefaultMetricSettings,
-  type MetricSettingsState,
-} from '../modules/metrics/settings'
+import { createDefaultMetricSettings, type MetricSettingsState } from '../modules/metrics/settings'
 import { appendResult, type ResultRecord } from '../modules/reporting/progress'
 import { createEmptyRoster, LOCAL_ORG_ID } from '../modules/roster/seed'
 import type { RosterState } from '../modules/roster/types'
@@ -16,12 +13,9 @@ import {
   saveWorkspaceToSupabase,
 } from '../lib/supabase-sync'
 import { AppStateContext, type BackendStatus } from './app-state-context'
-import {
-  clearPersistedAppState,
-  loadPersistedAppState,
-  savePersistedAppState,
-} from './persist'
+import { clearPersistedAppState, loadPersistedAppState, savePersistedAppState } from './persist'
 import { loadActiveLearnerId, saveActiveLearnerId } from './active-learner'
+import { loadLiveLedger } from '../lib/live-assessment'
 
 function ledgerFromCapture(
   capture: CaptureSessionState,
@@ -29,8 +23,7 @@ function ledgerFromCapture(
   existing: ResultRecord[],
 ): ResultRecord[] {
   const klass =
-    roster.classes.find((c) => c.teacherUserId === capture.teacherUserId) ??
-    roster.classes[0]
+    roster.classes.find((c) => c.teacherUserId === capture.teacherUserId) ?? roster.classes[0]
   const course = roster.courses.find((c) => c.id === klass?.courseId) ?? roster.courses[0]
   if (!klass || !course) return existing
 
@@ -96,10 +89,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [scheduling, setScheduling] = useState<SchedulingState>(
     () => local?.scheduling ?? emptySchedulingState(),
   )
-  const [capture, setCapture] = useState<CaptureSessionState | null>(
-    () => local?.capture ?? null,
-  )
-  const [ledger, setLedger] = useState<ResultRecord[]>(() => local?.ledger ?? [])
+  const [capture, setCapture] = useState<CaptureSessionState | null>(null)
+  const [ledger, setLedger] = useState<ResultRecord[]>([])
   const [metricSettings, setMetricSettings] = useState<MetricSettingsState>(
     () => local?.metricSettings ?? createDefaultMetricSettings(),
   )
@@ -155,17 +146,20 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
       skipNextSync.current = true
 
+      let authoritativeRoster = remote.roster
       if (wRemote > 0 && wRemote >= wLive) {
         // Cloud is source of truth when it has data
         setRoster(remote.roster)
         setScheduling(remote.scheduling)
       } else if (wLive > 0 && wRemote === 0) {
         // Cloud empty, browser has setup → keep live and push up
+        authoritativeRoster = live.roster
         setRoster(live.roster)
         setScheduling(live.scheduling)
         skipNextSync.current = false
       } else if (wLive > wRemote) {
         // Prefer richer local (boot race: user typed before load finished)
+        authoritativeRoster = live.roster
         setRoster(live.roster)
         setScheduling(live.scheduling)
         skipNextSync.current = false
@@ -173,6 +167,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setRoster(remote.roster)
         setScheduling(remote.scheduling)
       }
+
+      const liveLedger = await loadLiveLedger(authoritativeRoster)
+      if (!cancelled && liveLedger.ok) setLedger(liveLedger.data)
 
       setBackendStatus('online')
       setBackendError(null)
@@ -189,11 +186,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     savePersistedAppState({
       roster,
       scheduling,
-      capture,
-      ledger,
+      capture: null,
+      ledger: [],
       metricSettings,
     })
-  }, [roster, scheduling, capture, ledger, metricSettings])
+  }, [roster, scheduling, metricSettings])
 
   // Debounced Supabase save
   useEffect(() => {
@@ -285,8 +282,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       return
     }
     skipNextSync.current = true
-    setRoster(ensureStableOrg(loaded.data.roster))
+    const remoteRoster = ensureStableOrg(loaded.data.roster)
+    setRoster(remoteRoster)
     setScheduling(loaded.data.scheduling)
+    setCapture(null)
+    const liveLedger = await loadLiveLedger(remoteRoster)
+    if (liveLedger.ok) setLedger(liveLedger.data)
     setBackendStatus('online')
     setBackendError(null)
     setLastSyncedAt(new Date().toISOString())

@@ -12,12 +12,15 @@ Foundation change `establish-lms-foundation` is **implemented** (OpenSpec tasks 
 - GitHub Actions **CI** + **CD** (Vercel preview/production)
 - Progress reporting with session/week/month/custom windows
 
+**Production readiness (role tracking/management):** ~55–60%. Next work is access spine, multi-class context, Admin ops boards, and hosted e2e — see the completion plan below.
+
 ## Start here
 
 | Doc | Purpose |
 |-----|---------|
 | [CONTEXT.md](CONTEXT.md) | Domain glossary |
-| [AGENTS.md](AGENTS.md) | Agent rules + skills |
+| [AGENTS.md](AGENTS.md) | Agent rules + skills + maturity summary |
+| [docs/plans/lms-completion-by-role.md](docs/plans/lms-completion-by-role.md) | **Roadmap to 100% V1 by role** |
 | [docs/architecture/chunks-lms-architecture-review.md](docs/architecture/chunks-lms-architecture-review.md) | Architecture |
 | [docs/ops/ci-cd.md](docs/ops/ci-cd.md) | CI/CD secrets & deploy |
 | [docs/adr/](docs/adr/) | Architecture decisions |

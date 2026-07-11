@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Eye,
+  Info,
   Play,
   Plus,
   Radio,
@@ -312,10 +313,13 @@ export function TeacherSessionPage() {
         description="Full-screen focus mode — large learner name, big color pads, keyboard shortcuts."
       >
         <div className="observe-entry">
-          <p className="observe-entry-copy">
-            Leave this page anytime — use <strong>Resume live</strong> on Schedule or Live session
-            to continue. Observation is full-screen.
-          </p>
+          <div className="observe-entry-info">
+            <Info className="observe-entry-icon" aria-hidden />
+            <p className="observe-entry-copy">
+              Leave this page anytime — use <strong>Resume live</strong> on Schedule or Live session
+              to continue. Observation is full-screen.
+            </p>
+          </div>
           <div className="btn-row">
             <Link to={observeTo} className="btn primary observe-entry-cta">
               <Eye className="h-4 w-4" aria-hidden />

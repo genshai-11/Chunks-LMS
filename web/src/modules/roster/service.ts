@@ -1,8 +1,6 @@
-import {
-  computeCourseEndDate,
-  materializeSessionCount,
-} from '../scheduling/recurrence'
+import { materializeCourseSchedule } from '../scheduling/recurrence'
 import { canEnroll, DEFAULT_CLASS_CAPACITY } from './capacity'
+import { normalizeCourseSchedule } from './schedule'
 import { newId } from './seed'
 import type {
   Class,
@@ -14,6 +12,13 @@ import type {
   RosterState,
 } from './types'
 
+export { defaultCourseSchedule } from './schedule'
+export {
+  formatScheduleLabel,
+  formatWeekdaysLabel,
+  normalizeCourseSchedule,
+} from './schedule'
+
 export function listTeachers(state: RosterState): DomainUser[] {
   return state.users.filter((u) => u.roles.includes('teacher'))
 }
@@ -22,20 +27,21 @@ export function listLearners(state: RosterState): DomainUser[] {
   return state.users.filter((u) => u.roles.includes('learner'))
 }
 
-export function activeEnrollmentsForClass(state: RosterState, classId: string): Enrollment[] {
-  return state.enrollments.filter((e) => e.classId === classId && e.status === 'active')
+export function findLearnerByEmail(
+  state: RosterState,
+  email: string,
+): DomainUser | null {
+  const needle = email.trim().toLowerCase()
+  if (!needle) return null
+  return (
+    state.users.find(
+      (u) => u.roles.includes('learner') && (u.email ?? '').toLowerCase() === needle,
+    ) ?? null
+  )
 }
 
-export function defaultCourseSchedule(
-  partial?: Partial<CourseSchedule>,
-): CourseSchedule {
-  return {
-    weekdays: partial?.weekdays ?? [2, 3], // Tue, Wed
-    startTime: partial?.startTime ?? '09:00',
-    durationMinutes: partial?.durationMinutes ?? 60,
-    sessionCount: partial?.sessionCount ?? 15,
-    timeZone: partial?.timeZone ?? 'Asia/Ho_Chi_Minh',
-  }
+export function activeEnrollmentsForClass(state: RosterState, classId: string): Enrollment[] {
+  return state.enrollments.filter((e) => e.classId === classId && e.status === 'active')
 }
 
 function resolveCourseDates(input: {
@@ -43,20 +49,16 @@ function resolveCourseDates(input: {
   endsOn?: string | null
   schedule?: CourseSchedule | null
 }): { startsOn: string | null; endsOn: string | null; schedule: CourseSchedule | null } {
-  const schedule = input.schedule === undefined ? null : input.schedule
+  const schedule = normalizeCourseSchedule(input.schedule ?? null)
   const startsOn = input.startsOn ?? null
 
-  if (schedule && startsOn && schedule.weekdays.length > 0 && schedule.sessionCount > 0) {
-    const endsOn =
-      computeCourseEndDate({
-        startDate: startsOn,
-        weekdays: schedule.weekdays,
-        sessionCount: schedule.sessionCount,
-        startTime: schedule.startTime,
-        timeZone: schedule.timeZone,
-        durationMinutes: schedule.durationMinutes,
-      }) ?? input.endsOn ?? null
-    return { startsOn, endsOn, schedule }
+  if (schedule && startsOn && schedule.slots.length > 0 && schedule.sessionCount > 0) {
+    const plan = materializeCourseSchedule(startsOn, schedule)
+    return {
+      startsOn,
+      endsOn: plan.endsOn ?? input.endsOn ?? null,
+      schedule,
+    }
   }
 
   return {
@@ -83,17 +85,18 @@ export function createCourse(
     return { ok: false, error: `Course code ${code} already exists` }
   }
 
-  if (input.schedule && input.schedule.weekdays.length === 0) {
-    return { ok: false, error: 'Select at least one weekday for auto-schedule' }
+  const normalizedSchedule = normalizeCourseSchedule(input.schedule ?? null)
+  if (input.schedule && (!normalizedSchedule || normalizedSchedule.slots.length === 0)) {
+    return { ok: false, error: 'Add at least one day and time for auto-schedule' }
   }
-  if (input.schedule && input.schedule.sessionCount < 1) {
+  if (normalizedSchedule && normalizedSchedule.sessionCount < 1) {
     return { ok: false, error: 'Session count must be at least 1' }
   }
 
   const dates = resolveCourseDates({
     startsOn: input.startsOn ?? null,
     endsOn: input.endsOn ?? null,
-    schedule: input.schedule ?? null,
+    schedule: normalizedSchedule,
   })
 
   const course: Course = {
@@ -142,9 +145,11 @@ export function updateCourse(
   }
 
   const nextSchedule =
-    input.schedule !== undefined ? input.schedule : course.schedule
-  if (nextSchedule && nextSchedule.weekdays.length === 0) {
-    return { ok: false, error: 'Select at least one weekday for auto-schedule' }
+    input.schedule !== undefined
+      ? normalizeCourseSchedule(input.schedule)
+      : normalizeCourseSchedule(course.schedule)
+  if (input.schedule !== undefined && input.schedule && (!nextSchedule || nextSchedule.slots.length === 0)) {
+    return { ok: false, error: 'Add at least one day and time for auto-schedule' }
   }
 
   const dates = resolveCourseDates({
@@ -176,16 +181,21 @@ export function updateCourse(
 /** Preview auto end date + occurrence list for a course schedule. */
 export function previewCourseSchedule(course: Pick<Course, 'startsOn' | 'schedule'>) {
   if (!course.startsOn || !course.schedule) {
-    return { endsOn: course.startsOn ? null : null, occurrences: [], sessionCount: 0 }
+    return { endsOn: null, occurrences: [], sessionCount: 0 }
   }
-  return materializeSessionCount({
-    startDate: course.startsOn,
-    weekdays: course.schedule.weekdays,
-    sessionCount: course.schedule.sessionCount,
-    startTime: course.schedule.startTime,
-    timeZone: course.schedule.timeZone,
-    durationMinutes: course.schedule.durationMinutes,
-  })
+  const schedule = normalizeCourseSchedule(course.schedule)
+  if (!schedule) return { endsOn: null, occurrences: [], sessionCount: 0 }
+  return materializeCourseSchedule(course.startsOn, schedule)
+}
+
+/** Invite URL so a learner can open their portal by email. */
+export function learnerInviteUrl(
+  learner: DomainUser,
+  origin = typeof window !== 'undefined' ? window.location.origin : '',
+): string | null {
+  if (!learner.email?.trim()) return null
+  const base = origin || ''
+  return `${base}/access?email=${encodeURIComponent(learner.email.trim())}`
 }
 
 export function archiveCourse(state: RosterState, courseId: string): RosterResult<Course> {

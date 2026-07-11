@@ -58,31 +58,18 @@ describe('result lifecycle state machine', () => {
     expect(r.snapshot.effectiveColor).toBe('green')
   })
 
-  it('Continue below max keeps probe open; at max requires Fail or Done', () => {
+  it('Continue is unlimited; probeCount tracks depth n without blocking', () => {
     let snap = createDraftSnapshot(2)
     let r = applyLifecycleCommand(snap, { type: 'record_provisional', color: 'green', at })
     if (!r.ok) throw new Error(r.error)
 
-    r = applyLifecycleCommand(r.snapshot, { type: 'resolve_probe', outcome: 'continue', at })
-    expect(r.ok).toBe(true)
-    if (!r.ok) return
-    // first continue: probeCount 1 < max 2 → still open OR at boundary
-    // with max=2: first continue → count=1, still open; second → count=2, resolution_required
-    expect(r.snapshot.probeCount).toBe(1)
-    expect(r.snapshot.status).toBe('probe_open')
-
-    r = applyLifecycleCommand(r.snapshot, { type: 'resolve_probe', outcome: 'continue', at })
-    expect(r.ok).toBe(true)
-    if (!r.ok) return
-    expect(r.snapshot.status).toBe('resolution_required')
-    expect(r.snapshot.probeCount).toBe(2)
-
-    const cont = applyLifecycleCommand(r.snapshot, {
-      type: 'resolve_probe',
-      outcome: 'continue',
-      at,
-    })
-    expect(cont.ok).toBe(false)
+    for (let n = 1; n <= 5; n++) {
+      r = applyLifecycleCommand(r.snapshot, { type: 'resolve_probe', outcome: 'continue', at })
+      expect(r.ok).toBe(true)
+      if (!r.ok) return
+      expect(r.snapshot.probeCount).toBe(n)
+      expect(r.snapshot.status).toBe('probe_open')
+    }
 
     const done = applyLifecycleCommand(r.snapshot, {
       type: 'resolve_probe',
@@ -92,6 +79,7 @@ describe('result lifecycle state machine', () => {
     expect(done.ok).toBe(true)
     if (!done.ok) return
     expect(done.snapshot.effectiveColor).toBe('green')
+    expect(done.snapshot.probeCount).toBe(6)
   })
 
   it('corrections require reason and preserve finalization path', () => {

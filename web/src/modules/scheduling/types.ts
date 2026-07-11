@@ -9,6 +9,11 @@ export type ScheduledSession = {
   durationMinutes: number
   status: ScheduleStatus
   rescheduledFromId: string | null
+  /**
+   * 1-based buổi index within the class course plan (e.g. 1..15).
+   * Null for ad-hoc slots until reindexed.
+   */
+  sessionNumber: number | null
 }
 
 export type LearningSession = {
@@ -20,6 +25,8 @@ export type LearningSession = {
   startedAt: string
   completedAt: string | null
   maxProbeCount: number
+  /** Inherited from scheduled session or assigned when started */
+  sessionNumber: number | null
 }
 
 export type AttendanceRecord = {

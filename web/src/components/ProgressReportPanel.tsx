@@ -24,7 +24,12 @@ type Props = {
   ledger: ResultRecord[]
   users: DomainUser[]
   learnerUserId?: string
-  learningSessions?: Array<{ id: string; startedAt: string; completedAt: string | null }>
+  learningSessions?: Array<{
+    id: string
+    startedAt: string
+    completedAt: string | null
+    sessionNumber?: number | null
+  }>
 }
 
 function tryResolveWindow(input: {
@@ -197,7 +202,9 @@ export function ProgressReportPanel({
             >
               {learningSessions.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.id.slice(0, 12)}… · {new Date(s.startedAt).toLocaleString()}
+                  {s.sessionNumber != null ? `Buổi ${s.sessionNumber}` : s.id.slice(0, 8)}
+                  {' · '}
+                  {new Date(s.startedAt).toLocaleString()}
                 </option>
               ))}
             </select>

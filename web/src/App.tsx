@@ -17,6 +17,7 @@ import { LearnerLayout } from './pages/learner/LearnerLayout'
 import { LearnerEnrollmentsPage } from './pages/learner/LearnerEnrollmentsPage'
 import { LearnerAttendancePage } from './pages/learner/LearnerAttendancePage'
 import { LearnerAnalysisPage } from './pages/learner/LearnerAnalysisPage'
+import { LearnerAccessPage } from './pages/LearnerAccessPage'
 import { AppStateProvider } from './state/AppState'
 
 export default function App() {
@@ -27,6 +28,7 @@ export default function App() {
           <AppShell>
             <Routes>
               <Route path="/" element={<HomePage />} />
+              <Route path="/access" element={<LearnerAccessPage />} />
 
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<Navigate to="courses" replace />} />

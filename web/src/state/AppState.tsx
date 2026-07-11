@@ -5,7 +5,7 @@ import {
   type MetricSettingsState,
 } from '../modules/metrics/settings'
 import { appendResult, type ResultRecord } from '../modules/reporting/progress'
-import { createEmptyRoster } from '../modules/roster/seed'
+import { createEmptyRoster, LOCAL_ORG_ID } from '../modules/roster/seed'
 import type { RosterState } from '../modules/roster/types'
 import { emptySchedulingState } from '../modules/scheduling/session-lifecycle'
 import type { SchedulingState } from '../modules/scheduling/types'
@@ -21,6 +21,7 @@ import {
   loadPersistedAppState,
   savePersistedAppState,
 } from './persist'
+import { loadActiveLearnerId, saveActiveLearnerId } from './active-learner'
 
 function ledgerFromCapture(
   capture: CaptureSessionState,
@@ -61,10 +62,36 @@ function ledgerFromCapture(
   return next
 }
 
+function rosterWeight(r: RosterState, s: SchedulingState): number {
+  return (
+    r.users.length * 4 +
+    r.courses.length * 3 +
+    r.classes.length * 3 +
+    r.enrollments.length * 2 +
+    s.scheduledSessions.length +
+    s.learningSessions.length
+  )
+}
+
+function ensureStableOrg(r: RosterState): RosterState {
+  if (r.organization.id === 'org-local' || r.organization.id.startsWith('org-local')) {
+    return {
+      ...r,
+      organization: { ...r.organization, id: LOCAL_ORG_ID },
+      courses: r.courses.map((c) =>
+        c.organizationId === r.organization.id || c.organizationId === 'org-local'
+          ? { ...c, organizationId: LOCAL_ORG_ID }
+          : c,
+      ),
+    }
+  }
+  return r
+}
+
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const local = loadPersistedAppState()
-  const [roster, setRoster] = useState<RosterState>(
-    () => local?.roster ?? createEmptyRoster(),
+  const [roster, setRoster] = useState<RosterState>(() =>
+    ensureStableOrg(local?.roster ?? createEmptyRoster()),
   )
   const [scheduling, setScheduling] = useState<SchedulingState>(
     () => local?.scheduling ?? emptySchedulingState(),
@@ -79,12 +106,25 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [backendStatus, setBackendStatus] = useState<BackendStatus>('booting')
   const [backendError, setBackendError] = useState<string | null>(null)
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null)
+  const [activeLearnerUserId, setActiveLearnerUserIdState] = useState<string | null>(() =>
+    loadActiveLearnerId(),
+  )
+
+  const setActiveLearnerUserId = useCallback((id: string | null) => {
+    saveActiveLearnerId(id)
+    setActiveLearnerUserIdState(id)
+  }, [])
 
   const bootDone = useRef(false)
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const skipNextSync = useRef(false)
+  /** After intentional Clear data, allow empty cloud wipe once */
+  const allowEmptyWipeOnce = useRef(false)
+  /** Latest in-memory workspace for boot merge (avoid clobbering mid-edit) */
+  const liveRef = useRef({ roster, scheduling })
+  liveRef.current = { roster, scheduling }
 
-  // Boot: prefer Supabase, fall back to localStorage
+  // Boot: merge Supabase + local without wiping richer side
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -102,26 +142,32 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      const remote = loaded.data
-      const hasRemote =
-        remote.roster.courses.length > 0 ||
-        remote.roster.users.length > 0 ||
-        remote.roster.classes.length > 0 ||
-        remote.scheduling.scheduledSessions.length > 0
-
-      const hasLocal =
-        (local?.roster.courses.length ?? 0) > 0 ||
-        (local?.roster.users.length ?? 0) > 0 ||
-        (local?.roster.classes.length ?? 0) > 0
+      const remote = {
+        roster: ensureStableOrg(loaded.data.roster),
+        scheduling: loaded.data.scheduling,
+      }
+      const live = {
+        roster: ensureStableOrg(liveRef.current.roster),
+        scheduling: liveRef.current.scheduling,
+      }
+      const wRemote = rosterWeight(remote.roster, remote.scheduling)
+      const wLive = rosterWeight(live.roster, live.scheduling)
 
       skipNextSync.current = true
-      if (hasRemote) {
+
+      if (wRemote > 0 && wRemote >= wLive) {
+        // Cloud is source of truth when it has data
         setRoster(remote.roster)
         setScheduling(remote.scheduling)
-      } else if (hasLocal && local) {
-        // First cloud push from browser workspace
-        setRoster(local.roster)
-        setScheduling(local.scheduling)
+      } else if (wLive > 0 && wRemote === 0) {
+        // Cloud empty, browser has setup → keep live and push up
+        setRoster(live.roster)
+        setScheduling(live.scheduling)
+        skipNextSync.current = false
+      } else if (wLive > wRemote) {
+        // Prefer richer local (boot race: user typed before load finished)
+        setRoster(live.roster)
+        setScheduling(live.scheduling)
         skipNextSync.current = false
       } else {
         setRoster(remote.roster)
@@ -136,7 +182,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- boot once
   }, [])
 
   // Local cache always
@@ -162,17 +207,25 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     if (syncTimer.current) clearTimeout(syncTimer.current)
     syncTimer.current = setTimeout(async () => {
       setBackendStatus('syncing')
-      const normalized = normalizeIdsForDb({ roster, scheduling })
-      // If IDs were remapped, update UI once so future saves match DB
+      const stable = {
+        roster: ensureStableOrg(roster),
+        scheduling,
+      }
+      const normalized = normalizeIdsForDb(stable)
       if (
         normalized.roster.organization.id !== roster.organization.id ||
-        normalized.roster.users.some((u, i) => u.id !== roster.users[i]?.id)
+        normalized.roster.users.some((u, i) => u.id !== roster.users[i]?.id) ||
+        normalized.roster.courses.some((c, i) => c.id !== roster.courses[i]?.id)
       ) {
         skipNextSync.current = true
         setRoster(normalized.roster)
         setScheduling(normalized.scheduling)
       }
-      const result = await saveWorkspaceToSupabase(normalized)
+      const wipe = allowEmptyWipeOnce.current
+      allowEmptyWipeOnce.current = false
+      const result = await saveWorkspaceToSupabase(normalized, {
+        allowEmptyWipe: wipe,
+      })
       if (result.ok) {
         setBackendStatus('online')
         setBackendError(null)
@@ -190,6 +243,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const resetAll = useCallback(() => {
     clearPersistedAppState()
+    saveActiveLearnerId(null)
+    setActiveLearnerUserIdState(null)
+    allowEmptyWipeOnce.current = true
+    skipNextSync.current = false
     setRoster(createEmptyRoster())
     setScheduling(emptySchedulingState())
     setCapture(null)
@@ -203,7 +260,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       return
     }
     setBackendStatus('syncing')
-    const result = await saveWorkspaceToSupabase({ roster, scheduling })
+    const result = await saveWorkspaceToSupabase(
+      { roster: ensureStableOrg(roster), scheduling },
+      { allowEmptyWipe: allowEmptyWipeOnce.current },
+    )
+    allowEmptyWipeOnce.current = false
     if (result.ok) {
       setBackendStatus('online')
       setBackendError(null)
@@ -224,7 +285,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       return
     }
     skipNextSync.current = true
-    setRoster(loaded.data.roster)
+    setRoster(ensureStableOrg(loaded.data.roster))
     setScheduling(loaded.data.scheduling)
     setBackendStatus('online')
     setBackendError(null)
@@ -258,6 +319,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       syncNow,
       reloadFromSupabase,
       supabaseEnabled: isSupabaseConfigured(),
+      activeLearnerUserId,
+      setActiveLearnerUserId,
     }),
     [
       roster,
@@ -272,6 +335,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       lastSyncedAt,
       syncNow,
       reloadFromSupabase,
+      activeLearnerUserId,
+      setActiveLearnerUserId,
     ],
   )
 

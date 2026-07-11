@@ -3,8 +3,9 @@
  * Loads on boot; full replace-style save keeps DB aligned with UI state.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { normalizeCourseSchedule } from '../modules/roster/schedule'
 import type { CourseSchedule, DomainUser, RosterState } from '../modules/roster/types'
-import { createEmptyRoster, isUuid, newId } from '../modules/roster/seed'
+import { createEmptyRoster, isUuid, LOCAL_ORG_ID, newId } from '../modules/roster/seed'
 import type { SchedulingState } from '../modules/scheduling/types'
 import { emptySchedulingState } from '../modules/scheduling/session-lifecycle'
 import { getSupabase } from './supabase'
@@ -25,15 +26,7 @@ export type SyncResult =
 
 function asSchedule(raw: unknown): CourseSchedule | null {
   if (!raw || typeof raw !== 'object') return null
-  const s = raw as Record<string, unknown>
-  if (!Array.isArray(s.weekdays)) return null
-  return {
-    weekdays: s.weekdays as number[],
-    startTime: typeof s.startTime === 'string' ? s.startTime : '09:00',
-    durationMinutes: typeof s.durationMinutes === 'number' ? s.durationMinutes : 60,
-    sessionCount: typeof s.sessionCount === 'number' ? s.sessionCount : 15,
-    timeZone: typeof s.timeZone === 'string' ? s.timeZone : 'Asia/Ho_Chi_Minh',
-  }
+  return normalizeCourseSchedule(raw as Partial<CourseSchedule>)
 }
 
 /** Ensure all domain IDs are UUIDs so Postgres accepts them. */
@@ -41,6 +34,10 @@ export function normalizeIdsForDb(snapshot: WorkspaceSnapshot): WorkspaceSnapsho
   const idMap = new Map<string, string>()
   const mapId = (id: string) => {
     if (isUuid(id)) return id
+    // Legacy non-uuid org keys always map to the stable local org id
+    if (id === 'org-local' || id === 'org-local-empty' || id.startsWith('org-')) {
+      return LOCAL_ORG_ID
+    }
     if (!idMap.has(id)) idMap.set(id, newId())
     return idMap.get(id)!
   }
@@ -79,12 +76,14 @@ export function normalizeIdsForDb(snapshot: WorkspaceSnapshot): WorkspaceSnapsho
       id: mapId(s.id),
       classId: mapId(s.classId),
       rescheduledFromId: s.rescheduledFromId ? mapId(s.rescheduledFromId) : null,
+      sessionNumber: s.sessionNumber ?? null,
     })),
     learningSessions: snapshot.scheduling.learningSessions.map((s) => ({
       ...s,
       id: mapId(s.id),
       classId: mapId(s.classId),
       scheduledSessionId: s.scheduledSessionId ? mapId(s.scheduledSessionId) : null,
+      sessionNumber: s.sessionNumber ?? null,
     })),
     attendance: snapshot.scheduling.attendance.map((a) => ({
       ...a,
@@ -104,11 +103,11 @@ export async function loadWorkspaceFromSupabase(): Promise<
   if (!sb) return { ok: false, error: 'Supabase not configured' }
 
   try {
+    // Prefer stable local org id; else the org that has the most courses (richest workspace)
     const { data: orgs, error: orgErr } = await sb
       .from('organizations')
       .select('*')
       .order('created_at', { ascending: true })
-      .limit(1)
 
     if (orgErr) return { ok: false, error: orgErr.message }
     if (!orgs?.length) {
@@ -118,7 +117,25 @@ export async function loadWorkspaceFromSupabase(): Promise<
       }
     }
 
-    const org = orgs[0]!
+    let org = orgs.find((o) => o.id === LOCAL_ORG_ID) ?? orgs[0]!
+    // If multiple orgs exist, prefer the one with courses
+    if (orgs.length > 1) {
+      const counts = await Promise.all(
+        orgs.map(async (o) => {
+          const { count } = await sb
+            .from('courses')
+            .select('id', { count: 'exact', head: true })
+            .eq('organization_id', o.id as string)
+          return { org: o, count: count ?? 0 }
+        }),
+      )
+      counts.sort((a, b) => b.count - a.count)
+      const best = counts[0]
+      if (best && best.count > 0) org = best.org
+      else if (orgs.find((o) => o.id === LOCAL_ORG_ID)) {
+        org = orgs.find((o) => o.id === LOCAL_ORG_ID)!
+      }
+    }
     const orgId = org.id as string
 
     const [
@@ -219,6 +236,10 @@ export async function loadWorkspaceFromSupabase(): Promise<
         durationMinutes: s.duration_minutes as number,
         status: s.status as 'scheduled' | 'completed' | 'cancelled' | 'rescheduled',
         rescheduledFromId: (s.rescheduled_from_id as string | null) ?? null,
+        sessionNumber:
+          typeof (s as { session_number?: number | null }).session_number === 'number'
+            ? ((s as { session_number?: number }).session_number as number)
+            : null,
       }))
 
     const learningSessions = (learningRes.data ?? [])
@@ -232,6 +253,10 @@ export async function loadWorkspaceFromSupabase(): Promise<
         startedAt: s.started_at as string,
         completedAt: (s.completed_at as string | null) ?? null,
         maxProbeCount: (s.max_probe_count as number) ?? 2,
+        sessionNumber:
+          typeof (s as { session_number?: number | null }).session_number === 'number'
+            ? ((s as { session_number?: number }).session_number as number)
+            : null,
       }))
 
     const lsIds = new Set(learningSessions.map((s) => s.id))
@@ -267,8 +292,28 @@ export async function loadWorkspaceFromSupabase(): Promise<
   }
 }
 
+export type SaveWorkspaceOptions = {
+  /**
+   * When true, empty local roster may delete cloud rows for this org.
+   * Default false — refuses to wipe non-empty cloud with empty UI (boot race).
+   */
+  allowEmptyWipe?: boolean
+}
+
+function workspaceIsEmpty(s: WorkspaceSnapshot): boolean {
+  return (
+    s.roster.users.length === 0 &&
+    s.roster.courses.length === 0 &&
+    s.roster.classes.length === 0 &&
+    s.roster.enrollments.length === 0 &&
+    s.scheduling.scheduledSessions.length === 0 &&
+    s.scheduling.learningSessions.length === 0
+  )
+}
+
 export async function saveWorkspaceToSupabase(
   raw: WorkspaceSnapshot,
+  options: SaveWorkspaceOptions = {},
 ): Promise<SyncResult> {
   const sb = db()
   if (!sb) return { ok: false, error: 'Supabase not configured' }
@@ -277,6 +322,25 @@ export async function saveWorkspaceToSupabase(
   const orgId = roster.organization.id
 
   try {
+    // Guard: never let an empty boot/race wipe existing cloud data
+    if (workspaceIsEmpty({ roster, scheduling }) && !options.allowEmptyWipe) {
+      const { count: courseCount } = await sb
+        .from('courses')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', orgId)
+      const { count: userMemCount } = await sb
+        .from('organization_memberships')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', orgId)
+      if ((courseCount ?? 0) > 0 || (userMemCount ?? 0) > 0) {
+        return {
+          ok: false,
+          error:
+            'Refused empty save — cloud has data. Use Clear data to wipe intentionally.',
+        }
+      }
+    }
+
     // 1) Org
     {
       const { error } = await sb.from('organizations').upsert(
@@ -446,10 +510,26 @@ export async function saveWorkspaceToSupabase(
             duration_minutes: s.durationMinutes,
             status: s.status,
             rescheduled_from_id: s.rescheduledFromId,
+            // session_number column optional until migration lands; ignored if missing
+            session_number: s.sessionNumber,
           })),
           { onConflict: 'id' },
         )
-        if (error) return { ok: false, error: `scheduled: ${error.message}` }
+        if (error) {
+          // Retry without session_number if column not present
+          const { error: e2 } = await sb.from('scheduled_sessions').upsert(
+            scheduling.scheduledSessions.map((s) => ({
+              id: s.id,
+              class_id: s.classId,
+              planned_start: s.plannedStart,
+              duration_minutes: s.durationMinutes,
+              status: s.status,
+              rescheduled_from_id: s.rescheduledFromId,
+            })),
+            { onConflict: 'id' },
+          )
+          if (e2) return { ok: false, error: `scheduled: ${e2.message}` }
+        }
       }
     }
 
@@ -481,10 +561,26 @@ export async function saveWorkspaceToSupabase(
             started_at: s.startedAt,
             completed_at: s.completedAt,
             max_probe_count: s.maxProbeCount,
+            session_number: s.sessionNumber,
           })),
           { onConflict: 'id' },
         )
-        if (error) return { ok: false, error: `learning: ${error.message}` }
+        if (error) {
+          const { error: e2 } = await sb.from('learning_sessions').upsert(
+            scheduling.learningSessions.map((s) => ({
+              id: s.id,
+              class_id: s.classId,
+              scheduled_session_id: s.scheduledSessionId,
+              status: s.status,
+              planned_question_count: s.plannedQuestionCount,
+              started_at: s.startedAt,
+              completed_at: s.completedAt,
+              max_probe_count: s.maxProbeCount,
+            })),
+            { onConflict: 'id' },
+          )
+          if (e2) return { ok: false, error: `learning: ${e2.message}` }
+        }
       }
     }
 

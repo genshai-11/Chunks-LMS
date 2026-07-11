@@ -27,6 +27,9 @@ export type AppStateValue = {
   syncNow: () => Promise<void>
   reloadFromSupabase: () => Promise<void>
   supabaseEnabled: boolean
+  /** Which learner portal is active (email / invite link) */
+  activeLearnerUserId: string | null
+  setActiveLearnerUserId: (id: string | null) => void
 }
 
 export const AppStateContext = createContext<AppStateValue | null>(null)

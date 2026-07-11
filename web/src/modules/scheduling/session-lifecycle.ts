@@ -1,6 +1,7 @@
 import { newId } from '../roster/seed'
+import { materializeCourseSchedule } from './recurrence'
 import type { Course } from '../roster/types'
-import { materializeSessionCount } from './recurrence'
+import { normalizeCourseSchedule } from '../roster/schedule'
 import type {
   AttendanceRecord,
   AttendanceStatus,
@@ -17,12 +18,45 @@ export function emptySchedulingState(): SchedulingState {
   return { scheduledSessions: [], learningSessions: [], attendance: [] }
 }
 
+/** Re-number scheduled sessions for a class by plannedStart (1..N). */
+export function reindexSessionNumbers(
+  state: SchedulingState,
+  classId: string,
+): SchedulingState {
+  const ordered = state.scheduledSessions
+    .filter((s) => s.classId === classId && s.status !== 'cancelled' && s.status !== 'rescheduled')
+    .slice()
+    .sort((a, b) => a.plannedStart.localeCompare(b.plannedStart))
+
+  const numberById = new Map<string, number>()
+  ordered.forEach((s, i) => numberById.set(s.id, i + 1))
+
+  return {
+    ...state,
+    scheduledSessions: state.scheduledSessions.map((s) => {
+      if (s.classId !== classId) return s
+      if (s.status === 'cancelled' || s.status === 'rescheduled') {
+        return { ...s, sessionNumber: s.sessionNumber }
+      }
+      return { ...s, sessionNumber: numberById.get(s.id) ?? s.sessionNumber }
+    }),
+    learningSessions: state.learningSessions.map((ls) => {
+      if (ls.classId !== classId) return ls
+      if (ls.scheduledSessionId && numberById.has(ls.scheduledSessionId)) {
+        return { ...ls, sessionNumber: numberById.get(ls.scheduledSessionId)! }
+      }
+      return ls
+    }),
+  }
+}
+
 export function createScheduledSession(
   state: SchedulingState,
   input: {
     classId: string
     plannedStart: string
     durationMinutes: number
+    sessionNumber?: number | null
   },
 ): SchedulingResult<ScheduledSession> {
   if (input.durationMinutes < 1) {
@@ -35,14 +69,18 @@ export function createScheduledSession(
     durationMinutes: input.durationMinutes,
     status: 'scheduled',
     rescheduledFromId: null,
+    sessionNumber: input.sessionNumber ?? null,
   }
+  const withRow = {
+    ...state,
+    scheduledSessions: [...state.scheduledSessions, session],
+  }
+  const reindexed = reindexSessionNumbers(withRow, input.classId)
+  const value = reindexed.scheduledSessions.find((s) => s.id === session.id) ?? session
   return {
     ok: true,
-    value: session,
-    state: {
-      ...state,
-      scheduledSessions: [...state.scheduledSessions, session],
-    },
+    value,
+    state: reindexed,
   }
 }
 
@@ -58,44 +96,42 @@ export function applyCourseScheduleToClass(
   },
 ): SchedulingResult<ScheduledSession[]> {
   const { classId, course } = input
-  if (!course.startsOn || !course.schedule) {
+  const schedule = normalizeCourseSchedule(course.schedule)
+  if (!course.startsOn || !schedule) {
     return { ok: false, error: 'Course needs a start date and auto-schedule pattern' }
   }
 
-  const plan = materializeSessionCount({
-    startDate: course.startsOn,
-    weekdays: course.schedule.weekdays,
-    sessionCount: course.schedule.sessionCount,
-    startTime: course.schedule.startTime,
-    timeZone: course.schedule.timeZone,
-    durationMinutes: course.schedule.durationMinutes,
-  })
+  const plan = materializeCourseSchedule(course.startsOn, schedule)
 
   if (plan.occurrences.length === 0) {
     return { ok: false, error: 'No sessions generated from course schedule' }
   }
 
-  const existingDates = new Set(
+  // Key by full plannedStart so multi-time same day is allowed
+  const existingStarts = new Set(
     state.scheduledSessions
       .filter((s) => s.classId === classId && s.status !== 'cancelled')
-      .map((s) => s.plannedStart.slice(0, 10)),
+      .map((s) => s.plannedStart),
   )
 
   const created: ScheduledSession[] = []
   let next = state
   for (const occ of plan.occurrences) {
-    if (existingDates.has(occ.plannedStartDate)) continue
+    if (existingStarts.has(occ.plannedStart)) continue
     const r = createScheduledSession(next, {
       classId,
       plannedStart: occ.plannedStart,
       durationMinutes: occ.durationMinutes,
+      sessionNumber: occ.sequence + 1,
     })
     if (!r.ok) return r
     next = r.state
-    created.push(r.value)
-    existingDates.add(occ.plannedStartDate)
+    const row = r.state.scheduledSessions.find((s) => s.plannedStart === occ.plannedStart)
+    if (row) created.push(row)
+    existingStarts.add(occ.plannedStart)
   }
 
+  next = reindexSessionNumbers(next, classId)
   return { ok: true, value: created, state: next }
 }
 
@@ -144,18 +180,26 @@ export function rescheduleSession(
     durationMinutes: original.durationMinutes,
     status: 'scheduled',
     rescheduledFromId: original.id,
+    sessionNumber: original.sessionNumber,
   }
 
-  return {
-    ok: true,
-    value: { original: marked, replacement },
-    state: {
+  const nextState = reindexSessionNumbers(
+    {
       ...state,
       scheduledSessions: [
         ...state.scheduledSessions.map((s) => (s.id === original.id ? marked : s)),
         replacement,
       ],
     },
+    original.classId,
+  )
+  const replacementFinal =
+    nextState.scheduledSessions.find((s) => s.id === replacement.id) ?? replacement
+
+  return {
+    ok: true,
+    value: { original: marked, replacement: replacementFinal },
+    state: nextState,
   }
 }
 
@@ -197,6 +241,21 @@ export function startLearningSession(
     return { ok: false, error: 'Class already has an open Learning Session' }
   }
 
+  let sessionNumber: number | null = null
+  if (scheduledSessionId) {
+    const scheduled = state.scheduledSessions.find((s) => s.id === scheduledSessionId)
+    sessionNumber = scheduled?.sessionNumber ?? null
+  }
+  if (sessionNumber == null) {
+    const maxN = state.scheduledSessions
+      .filter((s) => s.classId === input.classId && s.sessionNumber != null)
+      .reduce((m, s) => Math.max(m, s.sessionNumber ?? 0), 0)
+    const adHocCount = state.learningSessions.filter(
+      (ls) => ls.classId === input.classId && !ls.scheduledSessionId,
+    ).length
+    sessionNumber = maxN > 0 ? maxN + adHocCount + 1 : adHocCount + 1
+  }
+
   const session: LearningSession = {
     id: newId('ls'),
     classId: input.classId,
@@ -206,6 +265,7 @@ export function startLearningSession(
     startedAt: at,
     completedAt: null,
     maxProbeCount: input.maxProbeCount ?? 2,
+    sessionNumber,
   }
 
   return {

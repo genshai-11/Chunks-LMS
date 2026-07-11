@@ -16,14 +16,38 @@ export type DomainUser = {
   roles: Array<'admin' | 'teacher' | 'learner'>
 }
 
-/** Weekly meeting pattern for auto-scheduling (0=Sun … 6=Sat). */
-export type CourseSchedule = {
-  /** e.g. [2, 3] = Tuesday + Wednesday */
-  weekdays: number[]
+/**
+ * One meeting window on a weekday.
+ * Same weekday may appear more than once (multi-time per day).
+ * Different weekdays can have different start times.
+ */
+export type CourseDaySlot = {
+  /** 0=Sunday … 6=Saturday */
+  weekday: number
   /** Local start time HH:mm */
   startTime: string
+  /** Optional override; falls back to schedule.durationMinutes */
+  durationMinutes?: number
+}
+
+/**
+ * Weekly meeting pattern for auto-scheduling.
+ * Prefer `slots` for per-day / multi-time schedules.
+ * Legacy `weekdays` + single `startTime` still accepted and normalized.
+ */
+export type CourseSchedule = {
+  /** Dynamic day+time slots (source of truth when present) */
+  slots: CourseDaySlot[]
+  /**
+   * @deprecated Prefer slots — kept for backward compat / derived summary
+   */
+  weekdays: number[]
+  /**
+   * @deprecated Prefer per-slot startTime
+   */
+  startTime: string
   durationMinutes: number
-  /** Number of class meetings (default 15) */
+  /** Number of class meetings to generate (default 15) */
   sessionCount: number
   timeZone: string
 }

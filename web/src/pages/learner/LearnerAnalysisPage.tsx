@@ -1,11 +1,12 @@
 import { useMemo } from 'react'
 import { PageHeader } from '../../components/PageHeader'
 import { ProgressAnalysisView } from '../../components/ProgressAnalysisView'
+import { useActiveLearner } from '../../hooks/useActiveLearner'
 import { useAppState } from '../../state/useAppState'
 
 export function LearnerAnalysisPage() {
   const { roster, scheduling, ledger, metricSettings } = useAppState()
-  const learner = roster.users.find((u) => u.roles.includes('learner'))
+  const learner = useActiveLearner()
   const myEnrollments = useMemo(
     () =>
       roster.enrollments.filter(

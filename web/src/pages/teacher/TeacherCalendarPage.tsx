@@ -11,7 +11,7 @@ import {
   Ban,
   Timer,
 } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Flash } from '../../components/Flash'
 import { PageHeader } from '../../components/PageHeader'
 import { EmptyState, Panel } from '../../components/ui'
@@ -90,6 +90,7 @@ function statusClass(status: ScheduledSession['status']): string {
 export function TeacherCalendarPage() {
   const { roster, scheduling, setScheduling, setCapture, metricSettings } = useAppState()
   const { message, error, ok, err } = useFlash()
+  const navigate = useNavigate()
   const today = useMemo(() => {
     const t = new Date()
     t.setHours(0, 0, 0, 0)
@@ -169,6 +170,9 @@ export function TeacherCalendarPage() {
   }
 
   function startSession(scheduledSessionId?: string) {
+    if (activeLearners.length === 0) {
+      return err('Seat at least one learner before starting a live session')
+    }
     const maxProbe = metricSettings.defaultMaxProbeCount
     const r = startLearningSession(scheduling, {
       classId: classRow!.id,
@@ -185,7 +189,13 @@ export function TeacherCalendarPage() {
         maxProbeCount: maxProbe,
       }),
     )
-    ok('Learning Session started — continue on Live session')
+    ok('Live session started')
+    // Open live classroom immediately (attendance + observe)
+    navigate('/teacher/session')
+  }
+
+  function resumeLive() {
+    navigate('/teacher/session')
   }
 
   function scheduleAt(day: Date, hour: number, minutes = 0) {
@@ -245,14 +255,14 @@ export function TeacherCalendarPage() {
               </button>
             ) : null}
             {openSession ? (
-              <Link to="/teacher/session" className="btn primary">
+              <button type="button" className="primary" onClick={resumeLive}>
                 <Radio className="h-4 w-4" aria-hidden />
                 <span>Resume live</span>
-              </Link>
+              </button>
             ) : (
               <button type="button" className="primary" onClick={() => startSession()}>
                 <Play className="h-4 w-4" aria-hidden />
-                <span>Start ad-hoc</span>
+                <span>Start session</span>
               </button>
             )}
           </div>
@@ -400,18 +410,25 @@ export function TeacherCalendarPage() {
                     <div className="sched-agenda-actions">
                       {s.status === 'scheduled' && (
                         <>
-                          <button
-                            type="button"
-                            className="primary"
-                            disabled={Boolean(openSession)}
-                            onClick={() => startSession(s.id)}
-                          >
-                            <Play className="h-3.5 w-3.5" aria-hidden />
-                            <span>Start</span>
-                          </button>
+                          {openSession ? (
+                            <button type="button" className="primary" onClick={resumeLive}>
+                              <Radio className="h-3.5 w-3.5" aria-hidden />
+                              <span>Resume live</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="primary"
+                              onClick={() => startSession(s.id)}
+                            >
+                              <Play className="h-3.5 w-3.5" aria-hidden />
+                              <span>Start session</span>
+                            </button>
+                          )}
                           <button
                             type="button"
                             className="ghost danger"
+                            disabled={Boolean(openSession)}
                             onClick={() => {
                               const r = cancelScheduledSession(scheduling, s.id)
                               if (!r.ok) return err(r.error)

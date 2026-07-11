@@ -815,6 +815,75 @@
     @apply text-xs;
   }
 
+  /* Dynamic per-day course schedule */
+  .day-slot-list {
+    @apply mt-3 flex flex-col gap-2;
+  }
+
+  .day-slot-row {
+    @apply flex flex-wrap items-start gap-3 rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2.5;
+  }
+
+  .day-slot-row.is-on {
+    @apply border-slate-200 bg-white;
+  }
+
+  .day-slot-times {
+    @apply flex min-w-0 flex-1 flex-wrap items-center gap-2;
+  }
+
+  .day-slot-time {
+    @apply inline-flex items-center gap-1;
+  }
+
+  .day-slot-time input[type='time'] {
+    @apply min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm font-medium text-slate-700;
+  }
+
+  .course-form-hint-static {
+    @apply mt-2 text-xs text-slate-500;
+  }
+
+  .learner-days-list {
+    @apply flex flex-col gap-3;
+  }
+
+  .learner-day-card {
+    @apply rounded-xl border border-slate-100 bg-slate-50/50 p-4;
+  }
+
+  .learner-day-card-head {
+    @apply mb-2 flex flex-wrap items-start justify-between gap-2;
+  }
+
+  .learner-day-card-head h3 {
+    @apply m-0 text-sm font-semibold text-slate-900;
+  }
+
+  .learner-day-pattern {
+    @apply m-0 flex items-center gap-1.5 text-sm font-medium text-slate-700;
+  }
+
+  .learner-upcoming {
+    @apply mt-2 m-0 list-none space-y-1 p-0;
+  }
+
+  .learner-upcoming li {
+    @apply flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-100 bg-white px-3 py-1.5 text-xs;
+  }
+
+  .access-page {
+    @apply mx-auto max-w-lg space-y-4 px-4 py-6;
+  }
+
+  .access-current {
+    @apply flex flex-wrap items-center gap-3;
+  }
+
+  .access-help {
+    @apply text-center;
+  }
+
   /* ——— Home ——— */
   .home-hero {
     @apply mx-auto max-w-2xl px-6 pb-6 pt-12 text-center;
@@ -914,27 +983,35 @@
   }
 
   .observe-root {
-    @apply flex min-h-screen flex-col bg-slate-950 text-slate-100;
+    @apply relative flex min-h-[100dvh] flex-col overflow-hidden bg-slate-950 text-slate-100;
   }
 
   .observe-bar {
-    @apply flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3;
+    @apply flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-2 py-2 sm:px-3;
+  }
+
+  .observe-bar-slim {
+    @apply py-1.5;
+  }
+
+  .observe-bar-actions {
+    @apply flex items-center gap-1;
   }
 
   .observe-exit {
-    @apply inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white;
+    @apply inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/10 hover:text-white;
   }
 
   .observe-bar-center {
-    @apply flex min-w-0 items-center gap-2 text-sm font-medium text-slate-400;
+    @apply flex min-w-0 flex-1 items-center justify-center gap-1.5 text-xs font-medium text-slate-400 sm:text-sm;
   }
 
   .observe-class {
-    @apply truncate font-semibold text-white;
+    @apply max-w-[40vw] truncate font-semibold text-white sm:max-w-none;
   }
 
   .observe-mode {
-    @apply hidden text-slate-500 sm:inline;
+    @apply text-slate-400;
   }
 
   .observe-sep {
@@ -945,16 +1022,403 @@
     @apply inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-white/10;
   }
 
-  .observe-progress {
-    @apply h-1 w-full bg-white/5;
+  .observe-keys-btn.icon-only {
+    @apply h-9 w-9 justify-center px-0;
   }
 
-  .observe-progress-fill {
-    @apply h-full bg-red-600 transition-[width] duration-300;
+  /* Body: left rail + stage */
+  .observe-body {
+    @apply flex min-h-0 flex-1;
+  }
+
+  .observe-rail {
+    @apply relative flex shrink-0 flex-col border-r border-white/10 bg-black/30 transition-[width] duration-200;
+  }
+  .observe-rail.is-open {
+    @apply w-[4.75rem] sm:w-[5.5rem];
+  }
+  .observe-rail.is-closed {
+    @apply w-11;
+  }
+
+  .observe-rail-person {
+    @apply flex flex-col items-center gap-1 border-b border-white/5 px-1 py-2;
+  }
+
+  .observe-rail-avatar {
+    @apply h-9 w-9 ring-1 ring-white/20 sm:h-11 sm:w-11;
+  }
+
+  .observe-rail.is-closed .observe-rail-avatar {
+    @apply h-8 w-8;
+  }
+
+  .observe-rail-name {
+    @apply m-0 max-w-full truncate px-0.5 text-center text-[9px] font-semibold leading-tight text-slate-300;
+  }
+
+  .observe-rail.is-closed .observe-rail-name,
+  .observe-rail.is-closed .observe-rail-n,
+  .observe-rail.is-closed .observe-rail-map,
+  .observe-rail.is-closed .observe-rail-collapse {
+    @apply hidden;
+  }
+
+  .observe-rail-n {
+    @apply m-0 font-mono text-[10px] font-bold text-amber-300;
+  }
+
+  .observe-rail-map {
+    @apply flex min-h-0 flex-1 flex-col overflow-y-auto px-1 py-1.5;
+  }
+
+  .observe-rail-peek,
+  .observe-rail-collapse {
+    @apply mx-auto my-1 flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-white/10 hover:text-slate-200;
+  }
+
+  /* Heatmap column */
+  .observe-heat {
+    @apply flex flex-col gap-1.5;
+  }
+
+  .observe-heat.layout-column .observe-heat-summary {
+    @apply flex flex-col items-stretch gap-0.5 text-[9px];
+  }
+
+  .observe-heat.layout-column .observe-heat-counts {
+    @apply flex flex-wrap justify-center gap-1;
+  }
+
+  .observe-heat.layout-column .observe-heat-grid {
+    @apply mt-1 max-h-[40dvh] flex-col flex-wrap content-start gap-1 overflow-y-auto sm:max-h-none;
+  }
+
+  .observe-heat-summary {
+    @apply flex flex-wrap items-center gap-1 text-[10px] text-slate-400;
+  }
+
+  .observe-heat-metric strong {
+    @apply ml-0.5 font-mono font-bold text-white;
+  }
+
+  .observe-heat-metric.muted {
+    @apply text-slate-500;
+  }
+
+  .observe-heat-metric.muted strong {
+    @apply text-slate-300;
+  }
+
+  .observe-heat-metric.tabular {
+    @apply font-mono;
+  }
+
+  .observe-heat-counts {
+    @apply inline-flex items-center gap-1;
+  }
+
+  .observe-heat-count {
+    @apply inline-flex items-center gap-0.5 font-mono text-[9px] font-bold text-slate-300;
+  }
+
+  .observe-heat-count i {
+    @apply inline-block h-1.5 w-1.5 rounded-full;
+  }
+  .observe-heat-count.is-red i {
+    @apply bg-red-500;
+  }
+  .observe-heat-count.is-yellow i {
+    @apply bg-yellow-400;
+  }
+  .observe-heat-count.is-green i {
+    @apply bg-green-500;
+  }
+  .observe-heat-count.is-purple i {
+    @apply bg-purple-500;
+  }
+
+  .observe-heat-grid {
+    @apply flex flex-wrap gap-1;
+  }
+
+  .observe-heat-dot-btn {
+    @apply h-2 w-2 shrink-0 rounded-full bg-white/15 transition hover:scale-125;
+  }
+  .observe-heat-dot-btn.is-current {
+    @apply h-2.5 w-2.5 ring-1 ring-white ring-offset-1 ring-offset-slate-950;
+  }
+  .observe-heat-dot-btn.is-red {
+    @apply bg-red-500;
+  }
+  .observe-heat-dot-btn.is-yellow {
+    @apply bg-yellow-400;
+  }
+  .observe-heat-dot-btn.is-green {
+    @apply bg-green-500;
+  }
+  .observe-heat-dot-btn.is-purple {
+    @apply bg-purple-500;
+  }
+  .observe-heat-dot-btn.is-open {
+    @apply bg-amber-400 animate-pulse;
+  }
+  .observe-heat-dot-btn.is-draft,
+  .observe-heat-dot-btn.is-empty {
+    @apply bg-white/10;
   }
 
   .observe-stage {
-    @apply flex flex-1 flex-col items-center justify-center px-4 py-8 text-center;
+    @apply relative flex min-w-0 flex-1 flex-col items-center justify-center px-3 py-4 text-center;
+  }
+
+  .observe-stage-tight {
+    @apply py-2;
+  }
+
+  .observe-learner-solo {
+    @apply m-0 max-w-[92vw] font-display text-[clamp(1.75rem,8vw,3.5rem)] font-bold leading-tight tracking-tight text-white;
+  }
+
+  .observe-depth-inline {
+    @apply m-0 mt-2 font-mono text-sm text-amber-200/90;
+  }
+
+  .observe-depth-inline strong {
+    @apply text-amber-100;
+  }
+
+  /* Reaction overlays */
+  .observe-react {
+    @apply pointer-events-none absolute inset-0 flex items-center justify-center;
+  }
+
+  .observe-react > span:first-child {
+    @apply z-10 text-6xl sm:text-7xl;
+  }
+
+  .observe-react-burst {
+    @apply absolute h-32 w-32 rounded-full sm:h-40 sm:w-40;
+  }
+
+  .observe-react-happy > span:first-child {
+    animation: observe-pop-happy 0.65s ease-out both;
+  }
+  .observe-react-happy .observe-react-burst {
+    @apply bg-green-400/25;
+    animation: observe-ring-happy 0.65s ease-out both;
+  }
+
+  .observe-react-fight > span:first-child {
+    animation: observe-shake-fight 0.55s ease-out both;
+  }
+  .observe-react-fight .observe-react-burst {
+    @apply bg-red-500/20;
+    animation: observe-ring-fight 0.55s ease-out both;
+  }
+
+  .observe-root.is-react-happy .observe-learner-solo {
+    animation: observe-glow-good 0.65s ease-out both;
+  }
+  .observe-root.is-react-fight .observe-learner-solo {
+    animation: observe-glow-bad 0.55s ease-out both;
+  }
+
+  @keyframes observe-pop-happy {
+    0% {
+      transform: scale(0.3);
+      opacity: 0;
+    }
+    50% {
+      transform: scale(1.25);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 0;
+    }
+  }
+
+  @keyframes observe-shake-fight {
+    0%,
+    100% {
+      transform: translateX(0) scale(1);
+      opacity: 0;
+    }
+    15% {
+      transform: translateX(-10px) rotate(-8deg) scale(1.1);
+      opacity: 1;
+    }
+    30% {
+      transform: translateX(10px) rotate(8deg) scale(1.1);
+      opacity: 1;
+    }
+    45% {
+      transform: translateX(-8px) rotate(-5deg);
+      opacity: 1;
+    }
+    60% {
+      transform: translateX(8px) rotate(5deg);
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(0);
+      opacity: 0;
+    }
+  }
+
+  @keyframes observe-ring-happy {
+    0% {
+      transform: scale(0.4);
+      opacity: 0.7;
+    }
+    100% {
+      transform: scale(1.6);
+      opacity: 0;
+    }
+  }
+
+  @keyframes observe-ring-fight {
+    0% {
+      transform: scale(0.5);
+      opacity: 0.6;
+    }
+    100% {
+      transform: scale(1.4);
+      opacity: 0;
+    }
+  }
+
+  @keyframes observe-glow-good {
+    0%,
+    100% {
+      text-shadow: none;
+    }
+    40% {
+      text-shadow: 0 0 28px rgb(74 222 128 / 0.55);
+    }
+  }
+
+  @keyframes observe-glow-bad {
+    0%,
+    100% {
+      text-shadow: none;
+    }
+    40% {
+      text-shadow: 0 0 24px rgb(248 113 113 / 0.5);
+    }
+  }
+
+  /* Bottom dock — big numbers only */
+  .observe-dock {
+    @apply shrink-0 border-t border-white/10 bg-slate-950/95 px-2 pt-2 backdrop-blur;
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+
+  .observe-dock-lg .observe-dock-colors {
+    @apply max-w-none gap-2 sm:mx-auto sm:max-w-xl;
+  }
+
+  .observe-dock-colors {
+    @apply grid grid-cols-4 gap-1.5;
+  }
+
+  .observe-dock-color {
+    @apply flex min-h-[5.25rem] items-center justify-center rounded-2xl text-white transition active:scale-97 disabled:opacity-40 sm:min-h-[5.75rem];
+  }
+  .observe-dock-color.is-red {
+    @apply bg-red-600 hover:bg-red-500;
+  }
+  .observe-dock-color.is-yellow {
+    @apply bg-yellow-500 text-yellow-950 hover:bg-yellow-400;
+  }
+  .observe-dock-color.is-green {
+    @apply bg-green-600 hover:bg-green-500;
+  }
+  .observe-dock-color.is-purple {
+    @apply bg-purple-600 hover:bg-purple-500;
+  }
+  .observe-dock-color.is-selected {
+    @apply ring-2 ring-white ring-offset-2 ring-offset-slate-950;
+  }
+
+  .observe-dock-num {
+    @apply font-display text-3xl font-bold tabular-nums tracking-tight sm:text-4xl;
+  }
+
+  .observe-dock-probe {
+    @apply grid grid-cols-3 gap-1.5 sm:mx-auto sm:max-w-xl;
+  }
+
+  .observe-dock-probe-btn {
+    @apply flex min-h-[4.5rem] items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-white/10 text-sm font-bold text-white hover:bg-white/15 sm:min-h-[5rem];
+  }
+  .observe-dock-probe-btn.fail {
+    @apply border-yellow-500/30 bg-yellow-500/20 text-yellow-50;
+  }
+  .observe-dock-probe-btn.cont {
+    @apply border-amber-400/30 bg-amber-500/15 text-amber-50;
+  }
+  .observe-dock-probe-btn.done {
+    @apply border-green-500/40 bg-green-600 text-white hover:bg-green-500;
+  }
+  .observe-dock-probe-btn kbd {
+    @apply rounded border border-white/20 bg-black/20 px-1 font-mono text-[10px];
+  }
+
+  .observe-dock-tools {
+    @apply mt-1 flex items-center justify-between px-1;
+  }
+
+  .observe-tool {
+    @apply inline-flex h-8 items-center gap-1 rounded-md px-2 text-[11px] font-semibold text-slate-500 hover:bg-white/5 hover:text-slate-300 disabled:opacity-30;
+  }
+
+  /* Phone: map opens as bottom sheet strip under header instead of eating width */
+  @media (max-width: 639px) {
+    .observe-body {
+      @apply flex-col;
+    }
+
+    .observe-rail.is-open {
+      @apply w-full flex-row items-stretch border-b border-r-0;
+    }
+
+    .observe-rail.is-open .observe-rail-person {
+      @apply w-16 shrink-0 border-b-0 border-r border-white/5 py-1.5;
+    }
+
+    .observe-rail.is-open .observe-rail-map {
+      @apply flex-1 overflow-x-auto overflow-y-hidden px-2 py-1;
+    }
+
+    .observe-rail.is-open .observe-heat.layout-column .observe-heat-summary {
+      @apply flex-row flex-wrap items-center gap-1.5;
+    }
+
+    .observe-rail.is-open .observe-heat.layout-column .observe-heat-grid {
+      @apply max-h-none flex-row flex-wrap content-center;
+    }
+
+    .observe-rail.is-closed {
+      @apply w-full flex-row items-center border-b border-r-0 px-1;
+    }
+
+    .observe-rail.is-closed .observe-rail-person {
+      @apply flex-row gap-2 border-0 py-1;
+    }
+
+    .observe-rail.is-closed .observe-rail-name {
+      @apply block max-w-[40vw] text-left text-[11px];
+    }
+
+    .observe-dock-color {
+      @apply min-h-[4.75rem] rounded-xl;
+    }
+
+    .observe-dock-num {
+      @apply text-2xl;
+    }
   }
 
   .observe-empty-title {
@@ -1285,45 +1749,178 @@
     @apply mt-3 border-t border-slate-100 pt-3;
   }
 
-  /* ——— Course auto-schedule builder ——— */
-  .course-schedule {
-    @apply mt-3 space-y-3;
+  /* ——— Courses page (compact list + sheet form) ——— */
+  .course-list {
+    @apply flex flex-col gap-2;
   }
 
-  .course-schedule-toggle {
-    @apply flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-700;
+  .course-row {
+    @apply flex items-center gap-3 rounded-xl border border-slate-200/80 bg-white px-3 py-2.5 shadow-3xs transition-shadow hover:shadow-2xs;
   }
 
-  .course-schedule-toggle input {
-    @apply h-4 w-4 accent-indigo-700;
+  .course-row.is-active {
+    @apply border-slate-900 ring-1 ring-slate-900/10;
   }
 
-  .weekday-field {
-    @apply m-0 rounded-xl border border-slate-100 bg-slate-50 p-3;
+  .course-row-icon {
+    @apply grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-slate-200/80 bg-slate-50 text-slate-600;
   }
 
-  .weekday-field legend {
-    @apply px-1 font-display text-xs font-bold text-slate-500;
+  .course-row-body {
+    @apply min-w-0 flex-1;
+  }
+
+  .course-row-title {
+    @apply flex flex-wrap items-center gap-2;
+  }
+
+  .course-row-title strong {
+    @apply font-display text-sm font-bold text-slate-900;
+  }
+
+  .course-row-title > span:not(.badge) {
+    @apply truncate text-sm text-slate-600;
+  }
+
+  .course-row-meta {
+    @apply m-0 mt-0.5 flex flex-wrap items-center gap-x-1 text-[11px] text-slate-500;
+  }
+
+  .course-row-actions {
+    @apply flex shrink-0 flex-wrap items-center justify-end gap-0.5;
+  }
+
+  .course-row-actions button,
+  .course-row-actions .btn {
+    @apply min-h-8 px-2 py-1 text-[11px];
+  }
+
+  @media (max-width: 720px) {
+    .course-row-action-label {
+      @apply sr-only;
+    }
+  }
+
+  .course-sheet {
+    @apply mb-4 rounded-xl border border-slate-200/80 bg-white p-4 shadow-3xs;
+  }
+
+  .course-sheet-head {
+    @apply mb-3 flex items-center justify-between gap-2 border-b border-slate-100 pb-2;
+  }
+
+  .course-sheet-title {
+    @apply m-0 font-display text-sm font-bold text-slate-800;
+  }
+
+  .course-form {
+    @apply space-y-4;
+  }
+
+  .course-form-grid {
+    @apply grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(8.5rem,1fr))];
+  }
+
+  .course-form-grid label {
+    @apply flex flex-col gap-1 text-xs font-semibold text-slate-500;
+  }
+
+  .course-form-grid input,
+  .course-form-grid select {
+    @apply min-h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-3xs outline-none focus:border-indigo-500;
+  }
+
+  .course-form-span2 {
+    @apply sm:col-span-2;
+  }
+
+  .course-form-section {
+    @apply space-y-2.5 rounded-xl border border-slate-100 bg-slate-50/80 p-3;
+  }
+
+  .course-form-section-head {
+    @apply flex items-center justify-between gap-2;
+  }
+
+  .course-form-section-title {
+    @apply font-display text-xs font-bold text-slate-700;
+  }
+
+  .course-switch {
+    @apply inline-flex cursor-pointer items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wide text-slate-500;
+  }
+
+  .course-switch input {
+    @apply h-3.5 w-3.5 accent-indigo-700;
   }
 
   .weekday-pills {
-    @apply flex flex-wrap gap-1.5;
+    @apply flex flex-wrap gap-1;
   }
 
   .weekday-pill {
-    @apply min-h-8 min-w-11 rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-display text-[11px] font-semibold text-slate-600 shadow-3xs;
+    @apply min-h-8 min-w-10 rounded-lg border border-slate-200 bg-white px-2 py-1 font-display text-[11px] font-semibold text-slate-600 shadow-3xs;
   }
 
   .weekday-pill.is-on {
     @apply border-slate-900 bg-slate-900 text-white;
   }
 
-  .course-schedule-preview {
-    @apply flex items-start gap-2 rounded-lg border border-indigo-100 bg-indigo-50/50 px-3 py-2 text-xs text-slate-600;
+  .course-form-hint {
+    @apply m-0 flex items-center gap-1.5 font-mono text-[11px] text-slate-500;
   }
 
-  .course-edit-card {
+  .course-form-actions {
+    @apply flex justify-end gap-2;
+  }
+
+  /* ——— Session tracking + dynamic charts ——— */
+  .session-track-list {
+    @apply flex flex-col gap-1.5;
+  }
+
+  .session-track-row {
+    @apply flex flex-wrap items-center gap-2 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2;
+  }
+
+  .session-track-num {
+    @apply min-w-[4.5rem] font-display text-xs font-bold text-slate-800;
+  }
+
+  .session-track-meta {
+    @apply min-w-0 flex-1;
+  }
+
+  .session-track-id {
+    @apply shrink-0;
+  }
+
+  .chart-studio {
+    @apply space-y-4;
+  }
+
+  .chart-studio-controls {
     @apply space-y-3 rounded-xl border border-slate-100 bg-slate-50/80 p-3;
+  }
+
+  .chart-control-block {
+    @apply space-y-1.5;
+  }
+
+  .chart-control-label {
+    @apply block font-mono text-[10px] font-bold uppercase tracking-wide text-slate-400;
+  }
+
+  .chart-metric-pills {
+    @apply flex flex-wrap gap-1;
+  }
+
+  .chart-studio-canvas {
+    @apply rounded-xl border border-slate-100 bg-white p-2;
+  }
+
+  .chart-plot {
+    @apply h-[280px] w-full;
   }
 
   .sr-only {

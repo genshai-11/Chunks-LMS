@@ -2,7 +2,7 @@ import { BookMarked, ChartColumn, ClipboardCheck } from 'lucide-react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { RoleWorkspace } from '../../components/RoleWorkspace'
 import { UserAvatar } from '../../components/UserAvatar'
-import { useAppState } from '../../state/useAppState'
+import { useActiveLearner } from '../../hooks/useActiveLearner'
 
 const ITEMS = [
   { to: '/learner/enrollments', label: 'My classes', icon: BookMarked },
@@ -11,9 +11,8 @@ const ITEMS = [
 ]
 
 export function LearnerLayout() {
-  const { roster } = useAppState()
+  const learner = useActiveLearner()
   const { pathname } = useLocation()
-  const learner = roster.users.find((u) => u.roles.includes('learner'))
 
   if (pathname === '/learner' || pathname === '/learner/') {
     return <Navigate to="/learner/enrollments" replace />

@@ -4,21 +4,18 @@ import {
   BookOpen,
   CalendarRange,
   Check,
-  ChevronDown,
   Clock3,
   Pencil,
   Plus,
   RotateCcw,
   School,
   Trash2,
-  Users,
   X,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { ClassStudentsPanel } from '../../components/ClassStudentsPanel'
 import { Flash } from '../../components/Flash'
 import { PageHeader } from '../../components/PageHeader'
-import { EmptyState, Panel } from '../../components/ui'
+import { EmptyState } from '../../components/ui'
 import { useFlash } from '../../hooks/useFlash'
 import {
   activeEnrollmentsForClass,
@@ -26,23 +23,24 @@ import {
   createCourse,
   defaultCourseSchedule,
   deleteCourse,
+  formatScheduleLabel,
   previewCourseSchedule,
   restoreCourse,
   updateCourse,
 } from '../../modules/roster/service'
-import type { Course, CourseSchedule } from '../../modules/roster/types'
-import { formatWeekdaysLabel } from '../../modules/scheduling/recurrence'
+import { normalizeCourseSchedule } from '../../modules/roster/schedule'
+import type { Course, CourseDaySlot, CourseSchedule } from '../../modules/roster/types'
 import { useAppState } from '../../state/useAppState'
 
-const WEEKDAYS: { value: number; label: string; short: string }[] = [
-  { value: 1, label: 'Monday', short: 'Mon' },
-  { value: 2, label: 'Tuesday', short: 'Tue' },
-  { value: 3, label: 'Wednesday', short: 'Wed' },
-  { value: 4, label: 'Thursday', short: 'Thu' },
-  { value: 5, label: 'Friday', short: 'Fri' },
-  { value: 6, label: 'Saturday', short: 'Sat' },
-  { value: 0, label: 'Sunday', short: 'Sun' },
-]
+const WEEKDAYS = [
+  { value: 1, short: 'Mon' },
+  { value: 2, short: 'Tue' },
+  { value: 3, short: 'Wed' },
+  { value: 4, short: 'Thu' },
+  { value: 5, short: 'Fri' },
+  { value: 6, short: 'Sat' },
+  { value: 0, short: 'Sun' },
+] as const
 
 type Draft = {
   code: string
@@ -50,8 +48,8 @@ type Draft = {
   startsOn: string
   endsOn: string
   useAutoSchedule: boolean
-  weekdays: number[]
-  startTime: string
+  /** Dynamic per-day times (multi-time per day allowed) */
+  slots: CourseDaySlot[]
   durationMinutes: number
   sessionCount: number
 }
@@ -59,28 +57,26 @@ type Draft = {
 function emptyDraft(): Draft {
   const s = defaultCourseSchedule()
   return {
-    code: 'ERE-Level-A',
-    name: 'ERE Level A',
-    startsOn: '2026-07-01',
+    code: '',
+    name: '',
+    startsOn: new Date().toISOString().slice(0, 10),
     endsOn: '',
     useAutoSchedule: true,
-    weekdays: [...s.weekdays],
-    startTime: s.startTime,
+    slots: s.slots.map((x) => ({ ...x })),
     durationMinutes: s.durationMinutes,
     sessionCount: s.sessionCount,
   }
 }
 
 function courseToDraft(c: Course): Draft {
-  const s = c.schedule ?? defaultCourseSchedule()
+  const s = normalizeCourseSchedule(c.schedule) ?? defaultCourseSchedule()
   return {
     code: c.code,
     name: c.name,
     startsOn: c.startsOn ?? '',
     endsOn: c.endsOn ?? '',
     useAutoSchedule: Boolean(c.schedule),
-    weekdays: [...s.weekdays],
-    startTime: s.startTime,
+    slots: s.slots.map((x) => ({ ...x })),
     durationMinutes: s.durationMinutes,
     sessionCount: s.sessionCount,
   }
@@ -89,30 +85,50 @@ function courseToDraft(c: Course): Draft {
 function draftToSchedule(d: Draft): CourseSchedule | null {
   if (!d.useAutoSchedule) return null
   return defaultCourseSchedule({
-    weekdays: d.weekdays,
-    startTime: d.startTime,
+    slots: d.slots,
     durationMinutes: d.durationMinutes,
     sessionCount: d.sessionCount,
   })
 }
 
-function toggleDay(days: number[], day: number): number[] {
-  return days.includes(day) ? days.filter((d) => d !== day) : [...days, day].sort((a, b) => a - b)
+function dayEnabled(slots: CourseDaySlot[], day: number): boolean {
+  return slots.some((s) => s.weekday === day)
 }
 
-function ScheduleFields({
+function timesForDay(slots: CourseDaySlot[], day: number): string[] {
+  return slots.filter((s) => s.weekday === day).map((s) => s.startTime)
+}
+
+function toggleDay(slots: CourseDaySlot[], day: number): CourseDaySlot[] {
+  if (dayEnabled(slots, day)) {
+    return slots.filter((s) => s.weekday !== day)
+  }
+  return [...slots, { weekday: day, startTime: '09:00' }]
+}
+
+function setDayTimes(slots: CourseDaySlot[], day: number, times: string[]): CourseDaySlot[] {
+  const others = slots.filter((s) => s.weekday !== day)
+  const next = times
+    .filter(Boolean)
+    .map((startTime) => ({ weekday: day, startTime }))
+  return [...others, ...next]
+}
+
+function CourseForm({
   draft,
   setDraft,
-  idPrefix,
+  submitLabel,
+  onSubmit,
+  onCancel,
 }: {
   draft: Draft
   setDraft: (fn: (d: Draft) => Draft) => void
-  idPrefix: string
+  submitLabel: string
+  onSubmit: () => void
+  onCancel: () => void
 }) {
   const preview = useMemo(() => {
-    if (!draft.useAutoSchedule || !draft.startsOn || draft.weekdays.length === 0) {
-      return null
-    }
+    if (!draft.useAutoSchedule || !draft.startsOn || draft.slots.length === 0) return null
     return previewCourseSchedule({
       startsOn: draft.startsOn,
       schedule: draftToSchedule(draft),
@@ -120,154 +136,277 @@ function ScheduleFields({
   }, [draft])
 
   return (
-    <div className="course-schedule">
-      <label className="course-schedule-toggle">
-        <input
-          type="checkbox"
-          checked={draft.useAutoSchedule}
-          onChange={(e) =>
-            setDraft((d) => ({
-              ...d,
-              useAutoSchedule: e.target.checked,
-              endsOn: e.target.checked ? '' : d.endsOn,
-            }))
-          }
-        />
-        <span>Auto-schedule ({draft.sessionCount || 15} class days)</span>
-      </label>
+    <form
+      className="course-form"
+      onSubmit={(e) => {
+        e.preventDefault()
+        onSubmit()
+      }}
+    >
+      <div className="course-form-grid">
+        <label>
+          Code
+          <input
+            value={draft.code}
+            onChange={(e) => setDraft((d) => ({ ...d, code: e.target.value }))}
+            placeholder="ERE-Level-A"
+            required
+          />
+        </label>
+        <label className="course-form-span2">
+          Name
+          <input
+            value={draft.name}
+            onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+            placeholder="ERE Level A"
+            required
+          />
+        </label>
+      </div>
 
-      {draft.useAutoSchedule ? (
-        <>
-          <div className="form-grid">
+      <div className="course-form-section">
+        <div className="course-form-section-head">
+          <span className="course-form-section-title">Schedule</span>
+          <label className="course-switch">
+            <input
+              type="checkbox"
+              checked={draft.useAutoSchedule}
+              onChange={(e) =>
+                setDraft((d) => ({
+                  ...d,
+                  useAutoSchedule: e.target.checked,
+                  endsOn: e.target.checked ? '' : d.endsOn,
+                }))
+              }
+            />
+            <span>Auto</span>
+          </label>
+        </div>
+
+        {draft.useAutoSchedule ? (
+          <>
+            <div className="course-form-grid">
+              <label>
+                Start
+                <input
+                  type="date"
+                  value={draft.startsOn}
+                  onChange={(e) => setDraft((d) => ({ ...d, startsOn: e.target.value }))}
+                  required
+                />
+              </label>
+              <label>
+                Meetings
+                <input
+                  type="number"
+                  min={1}
+                  max={120}
+                  value={draft.sessionCount}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, sessionCount: Number(e.target.value) || 15 }))
+                  }
+                />
+              </label>
+              <label>
+                Default length
+                <select
+                  value={draft.durationMinutes}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, durationMinutes: Number(e.target.value) }))
+                  }
+                >
+                  {[30, 45, 60, 90, 120].map((m) => (
+                    <option key={m} value={m}>
+                      {m} min
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <p className="course-form-hint course-form-hint-static">
+              Turn on each day and set its own time(s). Same day can have multiple times.
+            </p>
+
+            <div className="day-slot-list" role="group" aria-label="Days and times">
+              {WEEKDAYS.map((wd) => {
+                const on = dayEnabled(draft.slots, wd.value)
+                const times = timesForDay(draft.slots, wd.value)
+                return (
+                  <div key={wd.value} className={`day-slot-row${on ? ' is-on' : ''}`}>
+                    <button
+                      type="button"
+                      className={on ? 'weekday-pill is-on' : 'weekday-pill'}
+                      aria-pressed={on}
+                      onClick={() =>
+                        setDraft((d) => ({
+                          ...d,
+                          slots: toggleDay(d.slots, wd.value),
+                        }))
+                      }
+                    >
+                      {wd.short}
+                    </button>
+                    {on ? (
+                      <div className="day-slot-times">
+                        {times.map((t, idx) => (
+                          <div key={`${wd.value}-${idx}`} className="day-slot-time">
+                            <input
+                              type="time"
+                              value={t}
+                              aria-label={`${wd.short} time ${idx + 1}`}
+                              onChange={(e) => {
+                                const next = [...times]
+                                next[idx] = e.target.value
+                                setDraft((d) => ({
+                                  ...d,
+                                  slots: setDayTimes(d.slots, wd.value, next),
+                                }))
+                              }}
+                            />
+                            {times.length > 1 ? (
+                              <button
+                                type="button"
+                                className="ghost danger"
+                                aria-label="Remove time"
+                                onClick={() => {
+                                  const next = times.filter((_, i) => i !== idx)
+                                  setDraft((d) => ({
+                                    ...d,
+                                    slots: setDayTimes(d.slots, wd.value, next),
+                                  }))
+                                }}
+                              >
+                                <X className="h-3.5 w-3.5" aria-hidden />
+                              </button>
+                            ) : null}
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          className="ghost"
+                          onClick={() =>
+                            setDraft((d) => ({
+                              ...d,
+                              slots: setDayTimes(d.slots, wd.value, [
+                                ...times,
+                                times[times.length - 1] ?? '14:00',
+                              ]),
+                            }))
+                          }
+                        >
+                          <Plus className="h-3.5 w-3.5" aria-hidden />
+                          <span>Add time</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="meta">Off</span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {preview?.sessionCount ? (
+              <p className="course-form-hint">
+                <Clock3 className="h-3.5 w-3.5" aria-hidden />
+                <span>
+                  {formatScheduleLabel(draftToSchedule(draft))} · {preview.sessionCount} meetings ·
+                  ends <strong className="font-mono">{preview.endsOn}</strong>
+                </span>
+              </p>
+            ) : null}
+          </>
+        ) : (
+          <div className="course-form-grid">
             <label>
-              Start day
+              Starts
               <input
                 type="date"
                 value={draft.startsOn}
                 onChange={(e) => setDraft((d) => ({ ...d, startsOn: e.target.value }))}
-                required
               />
             </label>
             <label>
-              Time
+              Ends
               <input
-                type="time"
-                value={draft.startTime}
-                onChange={(e) => setDraft((d) => ({ ...d, startTime: e.target.value }))}
-              />
-            </label>
-            <label>
-              Duration (min)
-              <select
-                value={draft.durationMinutes}
-                onChange={(e) =>
-                  setDraft((d) => ({ ...d, durationMinutes: Number(e.target.value) }))
-                }
-              >
-                {[30, 45, 60, 90, 120].map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Class days
-              <input
-                type="number"
-                min={1}
-                max={60}
-                value={draft.sessionCount}
-                onChange={(e) =>
-                  setDraft((d) => ({ ...d, sessionCount: Number(e.target.value) || 15 }))
-                }
+                type="date"
+                value={draft.endsOn}
+                onChange={(e) => setDraft((d) => ({ ...d, endsOn: e.target.value }))}
               />
             </label>
           </div>
+        )}
+      </div>
 
-          <fieldset className="weekday-field">
-            <legend>Meets on</legend>
-            <div className="weekday-pills" role="group" aria-label="Weekdays">
-              {WEEKDAYS.map((wd) => {
-                const on = draft.weekdays.includes(wd.value)
-                return (
-                  <button
-                    key={wd.value}
-                    type="button"
-                    className={on ? 'weekday-pill is-on' : 'weekday-pill'}
-                    aria-pressed={on}
-                    onClick={() =>
-                      setDraft((d) => ({
-                        ...d,
-                        weekdays: toggleDay(d.weekdays, wd.value),
-                      }))
-                    }
-                  >
-                    {wd.short}
-                  </button>
-                )
-              })}
-            </div>
-          </fieldset>
-
-          <div className="course-schedule-preview" aria-live="polite">
-            <Clock3 className="h-3.5 w-3.5 text-slate-400" aria-hidden />
-            <span>
-              {preview?.sessionCount ? (
-                <>
-                  <strong>{preview.sessionCount}</strong> sessions ·{' '}
-                  {formatWeekdaysLabel(draft.weekdays)} · {draft.startTime} · ends{' '}
-                  <strong className="font-mono">{preview.endsOn}</strong> (auto)
-                </>
-              ) : (
-                'Pick start day + weekdays to auto-detect end day'
-              )}
-            </span>
-          </div>
-        </>
-      ) : (
-        <div className="form-grid">
-          <label>
-            Starts
-            <input
-              id={`${idPrefix}-start`}
-              type="date"
-              value={draft.startsOn}
-              onChange={(e) => setDraft((d) => ({ ...d, startsOn: e.target.value }))}
-            />
-          </label>
-          <label>
-            Ends
-            <input
-              id={`${idPrefix}-end`}
-              type="date"
-              value={draft.endsOn}
-              onChange={(e) => setDraft((d) => ({ ...d, endsOn: e.target.value }))}
-            />
-          </label>
-        </div>
-      )}
-    </div>
+      <div className="course-form-actions">
+        <button type="button" className="ghost" onClick={onCancel}>
+          <X className="h-3.5 w-3.5" aria-hidden />
+          Cancel
+        </button>
+        <button type="submit" className="primary">
+          <Check className="h-3.5 w-3.5" aria-hidden />
+          {submitLabel}
+        </button>
+      </div>
+    </form>
   )
 }
 
 export function AdminCoursesPage() {
   const { roster, setRoster } = useAppState()
   const { message, error, ok, err } = useFlash()
-  const [createDraft, setCreateDraft] = useState<Draft>(emptyDraft)
+  const [mode, setMode] = useState<'list' | 'create' | 'edit'>('list')
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editDraft, setEditDraft] = useState<Draft>(emptyDraft)
-  const [studentsOpenClassId, setStudentsOpenClassId] = useState<string | null>(null)
+  const [draft, setDraft] = useState<Draft>(emptyDraft)
 
-  function startEdit(c: Course) {
-    setEditingId(c.id)
-    setStudentsOpenClassId(null)
-    setEditDraft(courseToDraft(c))
+  function openCreate() {
+    setDraft(emptyDraft())
+    setEditingId(null)
+    setMode('create')
   }
 
-  function cancelEdit() {
+  function openEdit(c: Course) {
+    setDraft(courseToDraft(c))
+    setEditingId(c.id)
+    setMode('edit')
+  }
+
+  function closeForm() {
+    setMode('list')
     setEditingId(null)
-    setEditDraft(emptyDraft())
+    setDraft(emptyDraft())
+  }
+
+  function saveCreate() {
+    const schedule = draftToSchedule(draft)
+    const r = createCourse(roster, {
+      code: draft.code,
+      name: draft.name,
+      startsOn: draft.startsOn || null,
+      endsOn: schedule ? null : draft.endsOn || null,
+      schedule,
+    })
+    if (!r.ok) return err(r.error)
+    setRoster(r.state)
+    ok(`Course ${r.value.code} created` + (r.value.endsOn ? ` · ends ${r.value.endsOn}` : ''))
+    closeForm()
+  }
+
+  function saveEdit() {
+    if (!editingId) return
+    const schedule = draftToSchedule(draft)
+    const r = updateCourse(roster, editingId, {
+      code: draft.code,
+      name: draft.name,
+      startsOn: draft.startsOn || null,
+      endsOn: schedule ? null : draft.endsOn || null,
+      schedule,
+    })
+    if (!r.ok) return err(r.error)
+    setRoster(r.state)
+    ok(`Course ${r.value.code} updated`)
+    closeForm()
   }
 
   return (
@@ -275,316 +414,149 @@ export function AdminCoursesPage() {
       <PageHeader
         icon={BookOpen}
         title="Courses"
-        subtitle="Program schedule first — then open a class under the course to add students."
+        subtitle="Programs and meeting patterns."
+        actions={
+          mode === 'list' ? (
+            <button type="button" className="primary" onClick={openCreate}>
+              <Plus className="h-4 w-4" aria-hidden />
+              New course
+            </button>
+          ) : null
+        }
       />
       <Flash message={message} error={error} />
 
-      <Panel
-        icon={BookOpen}
-        title="Course catalog"
-        description="Auto-schedule computes end date. Expand a class to seat students (new or directory)."
-      >
-        {roster.courses.length === 0 ? (
-          <EmptyState
-            icon={BookOpen}
-            title="No courses yet"
-            description="Create a course with Tue/Wed (or your days) and 15 sessions."
+      {mode !== 'list' ? (
+        <section className="course-sheet">
+          <header className="course-sheet-head">
+            <h2 className="course-sheet-title">
+              {mode === 'create' ? 'New course' : 'Edit course'}
+            </h2>
+            <button type="button" className="ghost" onClick={closeForm} aria-label="Close">
+              <X className="h-4 w-4" />
+            </button>
+          </header>
+          <CourseForm
+            draft={draft}
+            setDraft={setDraft}
+            submitLabel={mode === 'create' ? 'Create' : 'Save'}
+            onSubmit={mode === 'create' ? saveCreate : saveEdit}
+            onCancel={closeForm}
           />
-        ) : (
-          <div className="course-cards">
-            {roster.courses.map((c) => {
-              const classes = roster.classes.filter((cl) => cl.courseId === c.id)
-              const isEditing = editingId === c.id
+        </section>
+      ) : null}
 
-              if (isEditing) {
-                return (
-                  <article key={c.id} className="course-card">
-                    <div className="course-edit-card">
-                      <div className="form-grid">
-                        <label>
-                          Code
-                          <input
-                            className="row-input"
-                            value={editDraft.code}
-                            onChange={(e) =>
-                              setEditDraft((d) => ({ ...d, code: e.target.value }))
-                            }
-                          />
-                        </label>
-                        <label>
-                          Name
-                          <input
-                            className="row-input"
-                            value={editDraft.name}
-                            onChange={(e) =>
-                              setEditDraft((d) => ({ ...d, name: e.target.value }))
-                            }
-                          />
-                        </label>
-                      </div>
-                      <ScheduleFields
-                        draft={editDraft}
-                        setDraft={setEditDraft}
-                        idPrefix={`edit-${c.id}`}
-                      />
-                      <div className="row-actions mt-2">
-                        <button
-                          type="button"
-                          className="primary"
-                          onClick={() => {
-                            const schedule = draftToSchedule(editDraft)
-                            const r = updateCourse(roster, c.id, {
-                              code: editDraft.code,
-                              name: editDraft.name,
-                              startsOn: editDraft.startsOn || null,
-                              endsOn: schedule ? null : editDraft.endsOn || null,
-                              schedule,
-                            })
-                            if (!r.ok) return err(r.error)
-                            setRoster(r.state)
-                            ok(
-                              `Course ${r.value.code} updated` +
-                                (r.value.endsOn ? ` · ends ${r.value.endsOn}` : ''),
-                            )
-                            cancelEdit()
-                          }}
-                        >
-                          <Check className="h-3.5 w-3.5" aria-hidden />
-                          <span>Save</span>
-                        </button>
-                        <button type="button" className="ghost" onClick={cancelEdit}>
-                          <X className="h-3.5 w-3.5" aria-hidden />
-                          <span>Cancel</span>
-                        </button>
-                      </div>
-                    </div>
-                  </article>
-                )
-              }
+      {roster.courses.length === 0 && mode === 'list' ? (
+        <EmptyState
+          icon={BookOpen}
+          title="No courses yet"
+          description="Create a program with start day, weekdays, and session count."
+          action={
+            <button type="button" className="primary" onClick={openCreate}>
+              <Plus className="h-4 w-4" aria-hidden />
+              New course
+            </button>
+          }
+        />
+      ) : mode === 'list' || roster.courses.length > 0 ? (
+        <div className="course-list">
+          {roster.courses.map((c) => {
+            const classCount = roster.classes.filter((cl) => cl.courseId === c.id).length
+            const seats = roster.classes
+              .filter((cl) => cl.courseId === c.id)
+              .reduce((n, cl) => n + activeEnrollmentsForClass(roster, cl.id).length, 0)
 
-              return (
-                <article key={c.id} className="course-card">
-                  <div className="course-card-main">
-                    <div className="course-card-identity">
-                      <span className="class-card-icon" aria-hidden>
-                        <BookOpen className="h-4 w-4" strokeWidth={1.75} />
-                      </span>
-                      <div>
-                        <h3 className="class-card-name">
-                          {c.code}{' '}
-                          <span className="course-card-name-muted">{c.name}</span>
-                        </h3>
-                        <p className="class-card-meta">
-                          {c.schedule ? (
-                            <span className="font-mono">
-                              {formatWeekdaysLabel(c.schedule.weekdays)} · {c.schedule.startTime} ·{' '}
-                              {c.schedule.sessionCount}d
-                            </span>
-                          ) : (
-                            <span className="badge">manual</span>
-                          )}
-                          <span aria-hidden>·</span>
-                          <span className="inline-flex items-center gap-1 font-mono">
-                            <CalendarRange className="h-3 w-3" aria-hidden />
-                            {c.startsOn ?? '—'} → {c.endsOn ?? '—'}
-                          </span>
-                          <span aria-hidden>·</span>
-                          <span className={`badge${c.status === 'active' ? ' success' : ''}`}>
-                            {c.status}
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-                    <div className="row-actions">
-                      <button type="button" className="ghost" onClick={() => startEdit(c)}>
-                        <Pencil className="h-3.5 w-3.5" aria-hidden />
-                        <span>Edit</span>
-                      </button>
-                      {c.status === 'active' ? (
-                        <button
-                          type="button"
-                          className="ghost"
-                          onClick={() => {
-                            const r = archiveCourse(roster, c.id)
-                            if (!r.ok) return err(r.error)
-                            setRoster(r.state)
-                            ok(`Course ${c.code} archived`)
-                          }}
-                        >
-                          <Archive className="h-3.5 w-3.5" aria-hidden />
-                          <span>Archive</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className="ghost"
-                          onClick={() => {
-                            const r = restoreCourse(roster, c.id)
-                            if (!r.ok) return err(r.error)
-                            setRoster(r.state)
-                            ok(`Course ${c.code} restored`)
-                          }}
-                        >
-                          <RotateCcw className="h-3.5 w-3.5" aria-hidden />
-                          <span>Restore</span>
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="ghost danger"
-                        onClick={() => {
-                          if (
-                            !window.confirm(
-                              `Delete course ${c.code}? Only works if it has no classes.`,
-                            )
-                          ) {
-                            return
-                          }
-                          const r = deleteCourse(roster, c.id)
-                          if (!r.ok) return err(r.error)
-                          setRoster(r.state)
-                          ok(`Course ${c.code} deleted`)
-                        }}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                        <span>Delete</span>
-                      </button>
-                    </div>
+            return (
+              <article
+                key={c.id}
+                className={`course-row${editingId === c.id ? ' is-active' : ''}`}
+              >
+                <div className="course-row-icon" aria-hidden>
+                  <BookOpen className="h-4 w-4" strokeWidth={1.75} />
+                </div>
+
+                <div className="course-row-body">
+                  <div className="course-row-title">
+                    <strong>{c.code}</strong>
+                    <span>{c.name}</span>
+                    <span className={`badge${c.status === 'active' ? ' success' : ''}`}>
+                      {c.status}
+                    </span>
                   </div>
-
-                  <div className="course-classes">
-                    <div className="course-classes-head">
-                      <p className="panel-title">Classes &amp; students</p>
-                      <Link to="/admin/classes" className="btn ghost">
-                        <School className="h-3.5 w-3.5" aria-hidden />
-                        <span>Manage classes</span>
-                      </Link>
-                    </div>
-
-                    {classes.length === 0 ? (
-                      <EmptyState
-                        icon={School}
-                        title="No classes under this course"
-                        description="Create a class on Admin → Classes, then add students there or here."
-                        action={
-                          <Link to="/admin/classes" className="btn primary">
-                            <Plus className="h-4 w-4" aria-hidden />
-                            <span>Go to Classes</span>
-                          </Link>
-                        }
-                      />
+                  <p className="course-row-meta">
+                    {c.schedule ? (
+                      <>
+                        {formatScheduleLabel(c.schedule)} · {c.schedule.sessionCount} meetings
+                      </>
                     ) : (
-                      <div className="course-class-list">
-                        {classes.map((cl) => {
-                          const seats = activeEnrollmentsForClass(roster, cl.id).length
-                          const open = studentsOpenClassId === cl.id
-                          const teacher = roster.users.find((u) => u.id === cl.teacherUserId)
-                          return (
-                            <div key={cl.id} className="course-class-row">
-                              <div className="course-class-row-main">
-                                <div>
-                                  <strong>{cl.name}</strong>
-                                  <p className="meta">
-                                    {teacher?.displayName ?? 'No teacher'} · {seats}/
-                                    {cl.capacity} seats · {cl.status}
-                                  </p>
-                                </div>
-                                <button
-                                  type="button"
-                                  className={open ? 'primary' : 'ghost'}
-                                  aria-expanded={open}
-                                  onClick={() =>
-                                    setStudentsOpenClassId((id) =>
-                                      id === cl.id ? null : cl.id,
-                                    )
-                                  }
-                                >
-                                  <Users className="h-3.5 w-3.5" aria-hidden />
-                                  <span>Students</span>
-                                  <ChevronDown
-                                    className={`h-3.5 w-3.5 transition-transform${open ? ' rotate-180' : ''}`}
-                                    aria-hidden
-                                  />
-                                </button>
-                              </div>
-                              {open ? (
-                                <div className="class-card-students">
-                                  <ClassStudentsPanel
-                                    classId={cl.id}
-                                    compact
-                                    onMessage={ok}
-                                    onError={err}
-                                  />
-                                </div>
-                              ) : null}
-                            </div>
-                          )
-                        })}
-                      </div>
+                      'Manual dates'
                     )}
-                  </div>
-                </article>
-              )
-            })}
-          </div>
-        )}
+                    <span aria-hidden> · </span>
+                    <CalendarRange className="inline h-3 w-3" aria-hidden />{' '}
+                    {c.startsOn ?? '—'} → {c.endsOn ?? '—'}
+                    <span aria-hidden> · </span>
+                    {classCount} class{classCount === 1 ? '' : 'es'} · {seats} seats
+                  </p>
+                </div>
 
-        <div className="panel-footer-form">
-          <p className="panel-title mb-3">Create course</p>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              const schedule = draftToSchedule(createDraft)
-              const r = createCourse(roster, {
-                code: createDraft.code,
-                name: createDraft.name,
-                startsOn: createDraft.startsOn || null,
-                endsOn: schedule ? null : createDraft.endsOn || null,
-                schedule,
-              })
-              if (!r.ok) return err(r.error)
-              setRoster(r.state)
-              ok(
-                `Course ${r.value.code} created` +
-                  (r.value.endsOn
-                    ? ` · ${r.value.schedule?.sessionCount ?? ''} days · ends ${r.value.endsOn}`
-                    : ''),
-              )
-              setCreateDraft(emptyDraft())
-            }}
-          >
-            <div className="form-grid">
-              <label>
-                Code
-                <input
-                  value={createDraft.code}
-                  onChange={(e) => setCreateDraft((d) => ({ ...d, code: e.target.value }))}
-                  required
-                />
-              </label>
-              <label>
-                Name
-                <input
-                  value={createDraft.name}
-                  onChange={(e) => setCreateDraft((d) => ({ ...d, name: e.target.value }))}
-                  required
-                />
-              </label>
-            </div>
-            <ScheduleFields
-              draft={createDraft}
-              setDraft={setCreateDraft}
-              idPrefix="create"
-            />
-            <div className="btn-row">
-              <button type="submit" className="primary">
-                <Plus className="h-4 w-4" aria-hidden />
-                <span>Create course</span>
-              </button>
-            </div>
-          </form>
+                <div className="course-row-actions">
+                  <Link to="/admin/classes" className="btn ghost" title="Classes">
+                    <School className="h-3.5 w-3.5" aria-hidden />
+                    <span className="course-row-action-label">Classes</span>
+                  </Link>
+                  <button type="button" className="ghost" onClick={() => openEdit(c)}>
+                    <Pencil className="h-3.5 w-3.5" aria-hidden />
+                    <span className="course-row-action-label">Edit</span>
+                  </button>
+                  {c.status === 'active' ? (
+                    <button
+                      type="button"
+                      className="ghost"
+                      title="Archive"
+                      onClick={() => {
+                        const r = archiveCourse(roster, c.id)
+                        if (!r.ok) return err(r.error)
+                        setRoster(r.state)
+                        ok(`Archived ${c.code}`)
+                      }}
+                    >
+                      <Archive className="h-3.5 w-3.5" aria-hidden />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="ghost"
+                      title="Restore"
+                      onClick={() => {
+                        const r = restoreCourse(roster, c.id)
+                        if (!r.ok) return err(r.error)
+                        setRoster(r.state)
+                        ok(`Restored ${c.code}`)
+                      }}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="ghost danger"
+                    title="Delete"
+                    onClick={() => {
+                      if (!window.confirm(`Delete ${c.code}?`)) return
+                      const r = deleteCourse(roster, c.id)
+                      if (!r.ok) return err(r.error)
+                      setRoster(r.state)
+                      ok(`Deleted ${c.code}`)
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                </div>
+              </article>
+            )
+          })}
         </div>
-      </Panel>
+      ) : null}
     </>
   )
 }

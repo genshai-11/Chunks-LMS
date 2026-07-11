@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Eye,
+  Play,
   Plus,
   Radio,
 } from 'lucide-react'
@@ -15,6 +16,7 @@ import { EmptyState, Panel } from '../../components/ui'
 import { useFlash } from '../../hooks/useFlash'
 import {
   addSessionQuestion,
+  createCaptureSession,
   markSessionCompleted,
 } from '../../modules/assessment/session-capture'
 import type { PolicyActor } from '../../modules/identity/access-policy'
@@ -24,6 +26,7 @@ import { subscribeToClassSnapshots } from '../../modules/realtime/snapshot-chann
 import {
   completeLearningSession,
   recordAttendance,
+  startLearningSession,
 } from '../../modules/scheduling/session-lifecycle'
 import type { AttendanceStatus } from '../../modules/scheduling/types'
 import { useAppState } from '../../state/useAppState'
@@ -38,6 +41,7 @@ export function TeacherSessionPage() {
     capture,
     setCapture,
     appendFinalizedFromCapture,
+    metricSettings,
   } = useAppState()
   const { message, error, ok, err } = useFlash()
 
@@ -80,9 +84,59 @@ export function TeacherSessionPage() {
     return () => sub.unsubscribe()
   }, [classRow, teacherActor, roster.organization.id, activeLearners])
 
+  // Resume capture board if learning session is still open but capture was lost
+  useEffect(() => {
+    if (!openSession || !teacher) return
+    if (
+      capture &&
+      capture.sessionStatus === 'open' &&
+      capture.learningSessionId === openSession.id
+    ) {
+      return
+    }
+    setCapture(
+      createCaptureSession({
+        learningSessionId: openSession.id,
+        teacherUserId: teacher.id,
+        learnerIds: activeLearners,
+        maxProbeCount: openSession.maxProbeCount ?? metricSettings.defaultMaxProbeCount,
+      }),
+    )
+  }, [
+    openSession,
+    teacher,
+    capture,
+    activeLearners,
+    metricSettings.defaultMaxProbeCount,
+    setCapture,
+  ])
+
   function applyCapture(next: NonNullable<typeof capture>) {
     setCapture(next)
     appendFinalizedFromCapture(next)
+  }
+
+  function startLiveNow() {
+    if (!classRow || !teacher) return
+    if (activeLearners.length === 0) {
+      return err('Seat at least one learner before starting')
+    }
+    const maxProbe = metricSettings.defaultMaxProbeCount
+    const r = startLearningSession(scheduling, {
+      classId: classRow.id,
+      maxProbeCount: maxProbe,
+    })
+    if (!r.ok) return err(r.error)
+    setScheduling(r.state)
+    setCapture(
+      createCaptureSession({
+        learningSessionId: r.value.id,
+        teacherUserId: teacher.id,
+        learnerIds: activeLearners,
+        maxProbeCount: maxProbe,
+      }),
+    )
+    ok('Live session started')
   }
 
   if (!classRow || !teacher) {
@@ -102,22 +156,32 @@ export function TeacherSessionPage() {
           icon={Radio}
           kicker="Teacher"
           title="Live session"
-          subtitle="Start a session from Schedule first."
+          subtitle="Start now or resume from Schedule."
         />
         <EmptyState
-          icon={CalendarDays}
-          title="No active learning session"
-          description="Open Schedule to start an ad-hoc session or a planned slot."
+          icon={Radio}
+          title="No live session yet"
+          description="Start a live session here, or pick a planned slot on Schedule."
           action={
-            <Link to="/teacher/calendar" className="btn primary">
-              <CalendarDays className="h-4 w-4" aria-hidden />
-              <span>Open schedule</span>
-            </Link>
+            <div className="btn-row">
+              <button type="button" className="primary" onClick={startLiveNow}>
+                <Play className="h-4 w-4" aria-hidden />
+                <span>Start session</span>
+              </button>
+              <Link to="/teacher/calendar" className="btn ghost">
+                <CalendarDays className="h-4 w-4" aria-hidden />
+                <span>Schedule</span>
+              </Link>
+            </div>
           }
         />
       </>
     )
   }
+
+  const finalizedCount = capture.attempts.filter(
+    (a) => a.snapshot.status === 'finalized' || a.snapshot.status === 'corrected',
+  ).length
 
   return (
     <>
@@ -125,7 +189,29 @@ export function TeacherSessionPage() {
         icon={Radio}
         kicker="Live session"
         title="Classroom"
-        subtitle={`Attendance and observation capture · ${openSession.id.slice(0, 10)}…`}
+        subtitle={`${classRow.name} · session open · resume anytime from Schedule or Live`}
+        actions={
+          <div className="page-actions">
+            <Link to="/teacher/observe" className="btn primary">
+              <Eye className="h-4 w-4" aria-hidden />
+              <span>{finalizedCount > 0 ? 'Resume observation' : 'Enter observation'}</span>
+            </Link>
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => {
+                const r = completeLearningSession(scheduling, openSession.id, activeLearners)
+                if (!r.ok) return err(r.error)
+                setScheduling(r.state)
+                applyCapture(markSessionCompleted(capture))
+                ok('Session completed')
+              }}
+            >
+              <CheckCircle2 className="h-4 w-4" aria-hidden />
+              <span>Complete</span>
+            </button>
+          </div>
+        }
       />
       <Flash message={message} error={error} />
 
@@ -133,22 +219,6 @@ export function TeacherSessionPage() {
         icon={ClipboardCheck}
         title="1. Attendance"
         description="Mark each learner before or during the session."
-        actions={
-          <button
-            type="button"
-            className="primary"
-            onClick={() => {
-              const r = completeLearningSession(scheduling, openSession.id, activeLearners)
-              if (!r.ok) return err(r.error)
-              setScheduling(r.state)
-              applyCapture(markSessionCompleted(capture))
-              ok('Session completed')
-            }}
-          >
-            <CheckCircle2 className="h-4 w-4" aria-hidden />
-            <span>Complete session</span>
-          </button>
-        }
       >
         <div className="table-wrap">
           <table>
@@ -218,13 +288,13 @@ export function TeacherSessionPage() {
       >
         <div className="observe-entry">
           <p className="observe-entry-copy">
-            Mark attendance above, then enter observation. The board hides menus so you can stay
-            with the class.
+            Leave this page anytime — use <strong>Resume live</strong> on Schedule or Live session
+            to continue. Observation is full-screen.
           </p>
           <div className="btn-row">
             <Link to="/teacher/observe" className="btn primary observe-entry-cta">
               <Eye className="h-4 w-4" aria-hidden />
-              <span>Enter observation</span>
+              <span>{finalizedCount > 0 ? 'Resume observation' : 'Enter observation'}</span>
             </Link>
             <button
               type="button"

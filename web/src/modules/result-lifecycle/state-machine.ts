@@ -137,27 +137,10 @@ function resolveProbe(
     }
   }
 
-  // Continue
-  if (snapshot.status === 'resolution_required') {
-    return {
-      ok: false,
-      error: 'Maximum probe count reached; choose Fail or Done explicitly',
-    }
-  }
-
+  // Continue — unlimited depth. probeCount is the UI "n" (how deep we are).
+  // Legacy snapshots in resolution_required can still Fail/Done; Continue is allowed again
+  // so teachers are never hard-blocked by an old max.
   const nextCount = snapshot.probeCount + 1
-  if (nextCount >= snapshot.maxProbeCount) {
-    return {
-      ok: true,
-      snapshot: {
-        ...snapshot,
-        probeCount: nextCount,
-        status: 'resolution_required',
-      },
-      events: ['probe_continued'],
-    }
-  }
-
   return {
     ok: true,
     snapshot: {

@@ -1,3 +1,11 @@
+import type { CourseDaySlot, CourseSchedule } from '../roster/types'
+import {
+  expandSlotsForMaterialize,
+  normalizeCourseSchedule,
+  normalizeTime,
+  normalizeWeekdays,
+} from '../roster/schedule'
+
 /** 0=Sunday … 6=Saturday (JS Date convention) */
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6
 
@@ -12,16 +20,22 @@ export type WeeklyScheduleInput = {
   durationMinutes: number
 }
 
+/** Legacy: same start time for all selected weekdays */
 export type MultiWeekdayScheduleInput = {
   startDate: string
-  /** Meeting days, e.g. Tue+Wed = [2, 3] */
   weekdays: number[]
-  /** Number of class meetings to generate (default 15) */
   sessionCount: number
-  /** Local start time HH:mm */
   startTime: string
   timeZone: string
   durationMinutes: number
+}
+
+/** Dynamic: each day (or multi-time per day) can have its own time */
+export type MultiSlotScheduleInput = {
+  startDate: string
+  slots: Array<{ weekday: number; startTime: string; durationMinutes: number }>
+  sessionCount: number
+  timeZone: string
 }
 
 export type MaterializedOccurrence = {
@@ -32,6 +46,7 @@ export type MaterializedOccurrence = {
   timeZone: string
   durationMinutes: number
   dayOfWeek: number
+  startTime: string
 }
 
 export type CourseSchedulePlan = {
@@ -67,6 +82,7 @@ export function materializeWeekly(input: WeeklyScheduleInput): MaterializedOccur
       timeZone: input.timeZone,
       durationMinutes: input.durationMinutes,
       dayOfWeek: input.dayOfWeek,
+      startTime: '09:00',
     })
     sequence += 1
     cursor.setUTCDate(cursor.getUTCDate() + 7)
@@ -75,40 +91,82 @@ export function materializeWeekly(input: WeeklyScheduleInput): MaterializedOccur
   return occurrences
 }
 
+function isSlotInput(
+  input: MultiWeekdayScheduleInput | MultiSlotScheduleInput,
+): input is MultiSlotScheduleInput {
+  return 'slots' in input && Array.isArray(input.slots)
+}
+
+function toSlotList(
+  input: MultiWeekdayScheduleInput | MultiSlotScheduleInput,
+): Array<{ weekday: number; startTime: string; durationMinutes: number }> {
+  if (isSlotInput(input)) {
+    return input.slots
+      .filter((s) => s.weekday >= 0 && s.weekday <= 6)
+      .map((s) => ({
+        weekday: s.weekday,
+        startTime: normalizeTime(s.startTime),
+        durationMinutes: s.durationMinutes > 0 ? s.durationMinutes : 60,
+      }))
+      .sort((a, b) => a.weekday - b.weekday || a.startTime.localeCompare(b.startTime))
+  }
+
+  const startTime = normalizeTime(input.startTime)
+  return normalizeWeekdays(input.weekdays).map((weekday) => ({
+    weekday,
+    startTime,
+    durationMinutes: input.durationMinutes,
+  }))
+}
+
 /**
- * Materialize the next `sessionCount` meetings from startDate on selected weekdays.
+ * Materialize the next `sessionCount` meetings from startDate.
+ * Supports different times per weekday and multiple times on the same day.
  * End day is auto-detected as the date of the last occurrence.
- *
- * Example: start Mon 2026-07-06, weekdays Tue+Wed, 15 sessions
- * → meetings every Tue/Wed until 15 dates; endsOn = last meeting date.
  */
-export function materializeSessionCount(input: MultiWeekdayScheduleInput): CourseSchedulePlan {
-  const weekdays = normalizeWeekdays(input.weekdays)
-  if (weekdays.length === 0 || input.sessionCount < 1) {
+export function materializeSessionCount(
+  input: MultiWeekdayScheduleInput | MultiSlotScheduleInput,
+): CourseSchedulePlan {
+  const slots = toSlotList(input)
+  const sessionCount = input.sessionCount
+  const timeZone = input.timeZone
+
+  if (slots.length === 0 || sessionCount < 1) {
     return { occurrences: [], endsOn: null, sessionCount: 0 }
+  }
+
+  const byWeekday = new Map<number, typeof slots>()
+  for (const slot of slots) {
+    const list = byWeekday.get(slot.weekday) ?? []
+    list.push(slot)
+    byWeekday.set(slot.weekday, list)
   }
 
   const start = parseDate(input.startDate)
   const occurrences: MaterializedOccurrence[] = []
   const cursor = new Date(start)
-  // Safety: max ~2 years of daily steps
   const maxSteps = 366 * 2
   let steps = 0
   let sequence = 0
 
-  while (occurrences.length < input.sessionCount && steps < maxSteps) {
+  while (occurrences.length < sessionCount && steps < maxSteps) {
     const dow = cursor.getUTCDay()
-    if (weekdays.includes(dow)) {
+    const daySlots = byWeekday.get(dow)
+    if (daySlots) {
       const plannedStartDate = toIsoDate(cursor)
-      occurrences.push({
-        plannedStartDate,
-        plannedStart: combineDateAndTime(plannedStartDate, input.startTime),
-        sequence,
-        timeZone: input.timeZone,
-        durationMinutes: input.durationMinutes,
-        dayOfWeek: dow,
-      })
-      sequence += 1
+      for (const slot of daySlots) {
+        if (occurrences.length >= sessionCount) break
+        occurrences.push({
+          plannedStartDate,
+          plannedStart: combineDateAndTime(plannedStartDate, slot.startTime),
+          sequence,
+          timeZone,
+          durationMinutes: slot.durationMinutes,
+          dayOfWeek: dow,
+          startTime: slot.startTime,
+        })
+        sequence += 1
+      }
     }
     cursor.setUTCDate(cursor.getUTCDate() + 1)
     steps += 1
@@ -126,8 +184,25 @@ export function materializeSessionCount(input: MultiWeekdayScheduleInput): Cours
   }
 }
 
-/** Compute only the end date for a course auto-schedule (no full list needed in UI previews). */
-export function computeCourseEndDate(input: MultiWeekdayScheduleInput): string | null {
+/** Materialize from a full CourseSchedule object (slots-aware). */
+export function materializeCourseSchedule(
+  startsOn: string,
+  schedule: CourseSchedule,
+): CourseSchedulePlan {
+  const s = normalizeCourseSchedule(schedule)
+  if (!s || !startsOn) return { occurrences: [], endsOn: null, sessionCount: 0 }
+  return materializeSessionCount({
+    startDate: startsOn,
+    slots: expandSlotsForMaterialize(s),
+    sessionCount: s.sessionCount,
+    timeZone: s.timeZone,
+  })
+}
+
+/** Compute only the end date for a course auto-schedule. */
+export function computeCourseEndDate(
+  input: MultiWeekdayScheduleInput | MultiSlotScheduleInput,
+): string | null {
   return materializeSessionCount(input).endsOn
 }
 
@@ -138,9 +213,7 @@ export function formatWeekdaysLabel(weekdays: number[]): string {
     .join(', ')
 }
 
-function normalizeWeekdays(weekdays: number[]): number[] {
-  return [...new Set(weekdays.filter((d) => d >= 0 && d <= 6))].sort((a, b) => a - b)
-}
+export type { CourseDaySlot }
 
 function parseDate(isoDate: string): Date {
   const [y, m, d] = isoDate.split('-').map(Number)
@@ -153,6 +226,6 @@ function toIsoDate(d: Date): string {
 
 /** Store as ISO string with local wall-clock time (no TZ conversion for V1 demo). */
 function combineDateAndTime(isoDate: string, hhmm: string): string {
-  const time = /^\d{2}:\d{2}$/.test(hhmm) ? hhmm : '09:00'
+  const time = normalizeTime(hhmm)
   return `${isoDate}T${time}:00.000Z`
 }

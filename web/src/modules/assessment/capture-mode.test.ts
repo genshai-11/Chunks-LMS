@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   assignedLearnerIndex,
+  goToQuestionIndex,
   nextPosition,
+  previousPosition,
   switchCaptureMode,
   type CapturePosition,
 } from './capture-mode'
@@ -44,5 +46,28 @@ describe('capture mode navigation (one learner per sentence)', () => {
     }
     const next = nextPosition(pos, 6, 3)
     expect(next).toEqual({ mode: 'learner_first', questionIndex: 3, learnerIndex: 0 })
+  })
+
+  it('previousPosition walks back in question-first mode', () => {
+    const pos: CapturePosition = {
+      mode: 'question_first',
+      questionIndex: 2,
+      learnerIndex: 2,
+    }
+    const prev = previousPosition(pos, 5, 3)
+    expect(prev).toEqual({ mode: 'question_first', questionIndex: 1, learnerIndex: 1 })
+  })
+
+  it('goToQuestionIndex clamps and syncs learner', () => {
+    const pos: CapturePosition = {
+      mode: 'question_first',
+      questionIndex: 0,
+      learnerIndex: 0,
+    }
+    expect(goToQuestionIndex(pos, 4, 5, 2)).toEqual({
+      mode: 'question_first',
+      questionIndex: 4,
+      learnerIndex: 0,
+    })
   })
 })

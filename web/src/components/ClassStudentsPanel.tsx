@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
-import { Ban, GraduationCap, ImagePlus, UserPlus, Users, X } from 'lucide-react'
+import { Ban, GraduationCap, ImagePlus, Link2, UserPlus, Users, X } from 'lucide-react'
 import { readImageAsDataUrl } from '../lib/readImageFile'
 import {
   activeEnrollmentsForClass,
   createLearnerAndEnroll,
   endEnrollment,
   enrollLearner,
+  learnerInviteUrl,
   learnersAvailableForClass,
 } from '../modules/roster/service'
 import { useAppState } from '../state/useAppState'
@@ -92,26 +93,48 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
                 />
                 <div className="person-body">
                   <strong>{user?.displayName ?? e.learnerUserId}</strong>
-                  <span>{user?.email ?? 'Learner'}</span>
+                  <span>{user?.email ?? 'No email — add for invite link'}</span>
                 </div>
-                {klass.status === 'active' ? (
-                  <button
-                    type="button"
-                    className="ghost danger"
-                    onClick={() => {
-                      if (!window.confirm(`Remove ${user?.displayName ?? 'learner'} from class?`)) {
-                        return
-                      }
-                      const r = endEnrollment(roster, e.id)
-                      if (!r.ok) return err(r.error)
-                      setRoster(r.state)
-                      ok(`${user?.displayName ?? 'Learner'} removed from class`)
-                    }}
-                  >
-                    <Ban className="h-3.5 w-3.5" aria-hidden />
-                    <span>Remove</span>
-                  </button>
-                ) : null}
+                <div className="row-actions">
+                  {user?.email ? (
+                    <button
+                      type="button"
+                      className="ghost"
+                      title="Copy portal invite link"
+                      onClick={async () => {
+                        const url = learnerInviteUrl(user)
+                        if (!url) return err('Email required for invite link')
+                        try {
+                          await navigator.clipboard.writeText(url)
+                          ok(`Invite link copied for ${user.displayName}`)
+                        } catch {
+                          ok(url)
+                        }
+                      }}
+                    >
+                      <Link2 className="h-3.5 w-3.5" aria-hidden />
+                      <span>Link</span>
+                    </button>
+                  ) : null}
+                  {klass.status === 'active' ? (
+                    <button
+                      type="button"
+                      className="ghost danger"
+                      onClick={() => {
+                        if (!window.confirm(`Remove ${user?.displayName ?? 'learner'} from class?`)) {
+                          return
+                        }
+                        const r = endEnrollment(roster, e.id)
+                        if (!r.ok) return err(r.error)
+                        setRoster(r.state)
+                        ok(`${user?.displayName ?? 'Learner'} removed from class`)
+                      }}
+                    >
+                      <Ban className="h-3.5 w-3.5" aria-hidden />
+                      <span>Remove</span>
+                    </button>
+                  ) : null}
+                </div>
               </li>
             )
           })}
@@ -154,7 +177,12 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
                 })
                 if (!r.ok) return err(r.error)
                 setRoster(r.state)
-                ok(`${r.value.learner.displayName} added to ${klass.name}`)
+                const invite = learnerInviteUrl(r.value.learner)
+                ok(
+                  invite
+                    ? `${r.value.learner.displayName} seated · invite ready (use Link)`
+                    : `${r.value.learner.displayName} added — add email later for invite link`,
+                )
                 setNewName('')
                 setNewEmail('')
                 setNewAvatar(null)
@@ -201,12 +229,12 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
                 />
               </label>
               <label>
-                Email
+                Email (for portal link)
                 <input
                   type="email"
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
-                  placeholder="optional"
+                  placeholder="learner@school.edu"
                   disabled={full}
                 />
               </label>

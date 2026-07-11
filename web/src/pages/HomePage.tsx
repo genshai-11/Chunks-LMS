@@ -1,4 +1,4 @@
-import { GraduationCap, RotateCcw, Shield, Users } from 'lucide-react'
+import { GraduationCap, LogIn, RotateCcw, Shield, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { env } from '../env'
 import { useAppState } from '../state/useAppState'
@@ -7,9 +7,9 @@ const ROLES = [
   { to: '/admin/courses', title: 'Admin', description: 'Courses, classes, people, metrics', icon: Shield },
   { to: '/teacher/session', title: 'Teacher', description: 'Schedule, live observe, analysis', icon: Users },
   {
-    to: '/learner/enrollments',
+    to: '/access',
     title: 'Learner',
-    description: 'Classes, attendance, progress',
+    description: 'Email login · classes · learning days',
     icon: GraduationCap,
   },
 ] as const
@@ -26,6 +26,10 @@ export function HomePage() {
         <h1>Chunks LMS</h1>
         <p>Focus &amp; Awareness observation for small classes.</p>
         <div className="home-tools">
+          <Link to="/access" className="btn ghost">
+            <LogIn className="h-4 w-4" aria-hidden />
+            Learner portal
+          </Link>
           <button
             type="button"
             className="ghost"

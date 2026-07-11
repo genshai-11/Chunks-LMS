@@ -4,7 +4,8 @@ import {
   type MetricSettingsState,
 } from '../modules/metrics/settings'
 import type { ResultRecord } from '../modules/reporting/progress'
-import { createEmptyRoster } from '../modules/roster/seed'
+import { createEmptyRoster, LOCAL_ORG_ID } from '../modules/roster/seed'
+import { normalizeCourseSchedule } from '../modules/roster/schedule'
 import type { Course, DomainUser, RosterState } from '../modules/roster/types'
 import { emptySchedulingState } from '../modules/scheduling/session-lifecycle'
 import type { SchedulingState } from '../modules/scheduling/types'
@@ -31,7 +32,7 @@ function normalizeUser(u: DomainUser): DomainUser {
 function normalizeCourse(c: Course): Course {
   return {
     ...c,
-    schedule: c.schedule ?? null,
+    schedule: normalizeCourseSchedule(c.schedule) ?? c.schedule ?? null,
   }
 }
 
@@ -44,10 +45,23 @@ export function loadPersistedAppState(): PersistedAppState | null {
     const data = JSON.parse(raw) as Partial<PersistedAppState>
     if (!data || data.version !== 1 || !data.roster) return null
 
+    const rawOrg = data.roster.organization ?? createEmptyRoster().organization
+    const orgId =
+      rawOrg.id === 'org-local' || String(rawOrg.id).startsWith('org-local')
+        ? LOCAL_ORG_ID
+        : rawOrg.id
     const roster: RosterState = {
-      organization: data.roster.organization ?? createEmptyRoster().organization,
+      organization: { ...rawOrg, id: orgId },
       users: (data.roster.users ?? []).map(normalizeUser),
-      courses: (data.roster.courses ?? []).map(normalizeCourse),
+      courses: (data.roster.courses ?? []).map((c) =>
+        normalizeCourse({
+          ...c,
+          organizationId:
+            c.organizationId === 'org-local' || c.organizationId === rawOrg.id
+              ? orgId
+              : c.organizationId,
+        }),
+      ),
       classes: data.roster.classes ?? [],
       enrollments: data.roster.enrollments ?? [],
     }

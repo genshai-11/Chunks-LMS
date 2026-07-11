@@ -1,10 +1,17 @@
+import { defaultCourseSchedule } from './schedule'
 import type { DomainUser, RosterState } from './types'
+
+/**
+ * Stable local org UUID (never remap to a random id on each save).
+ * Prevents multiple empty orgs in Supabase and “data vanished” after reload.
+ */
+export const LOCAL_ORG_ID = 'a0000000-0000-4000-8000-000000000001'
 
 /** Empty org — app starts with no mock people/classes. */
 export function createEmptyRoster(): RosterState {
   return {
     organization: {
-      id: 'org-local',
+      id: LOCAL_ORG_ID,
       name: 'My organization',
     },
     users: [],
@@ -72,13 +79,13 @@ export function createSeedRoster(): RosterState {
         startsOn: '2026-07-01',
         // Auto from Tue+Wed × 15 sessions starting 2026-07-01 (Wed)
         endsOn: '2026-08-19',
-        schedule: {
+        schedule: defaultCourseSchedule({
           weekdays: [2, 3], // Tue, Wed
           startTime: '09:00',
           durationMinutes: 60,
           sessionCount: 15,
           timeZone: 'Asia/Ho_Chi_Minh',
-        },
+        }),
       },
     ],
     classes: [

@@ -48,4 +48,8 @@ export const COLOR_SCORE: Record<ResultColor, number> = {
   purple: 3,
 }
 
-export const DEFAULT_MAX_PROBE_COUNT = 2
+/**
+ * Historical field kept for storage/compat. Probe continue is unlimited in UI/domain;
+ * depth is tracked only via probeCount ("n").
+ */
+export const DEFAULT_MAX_PROBE_COUNT = 99

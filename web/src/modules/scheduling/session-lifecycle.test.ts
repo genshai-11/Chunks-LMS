@@ -24,6 +24,7 @@ describe('session lifecycle and attendance', () => {
     if (!created.ok) return
     state = created.state
     const planned = created.value.plannedStart
+    expect(created.value.sessionNumber).toBe(1)
 
     const started = startLearningSession(state, {
       classId,
@@ -34,6 +35,7 @@ describe('session lifecycle and attendance', () => {
     if (!started.ok) return
     expect(started.state.scheduledSessions[0]?.plannedStart).toBe(planned)
     expect(started.value.status).toBe('open')
+    expect(started.value.sessionNumber).toBe(1)
   })
 
   it('rejects duplicate starts for same occurrence / open class session', () => {

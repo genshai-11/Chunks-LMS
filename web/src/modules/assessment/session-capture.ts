@@ -6,7 +6,9 @@ import {
 import type { AssessmentSnapshot, ResultColor } from '../result-lifecycle/types'
 import {
   assignedLearnerIndex,
+  goToQuestionIndex,
   nextPosition,
+  previousPosition,
   switchCaptureMode,
   syncPositionToAssignment,
   type CaptureMode,
@@ -165,10 +167,61 @@ export function recordColorForCurrent(
   const attempt = currentAttempt(state)
   if (!attempt) return { ok: false, error: 'No current Assessment Attempt' }
 
+  // Draft → provisional (or green probe). Finalized → correction (change result).
+  if (
+    attempt.snapshot.status === 'finalized' ||
+    attempt.snapshot.status === 'corrected'
+  ) {
+    return correctColorForCurrent(state, color, 'Changed during observation', at)
+  }
+
+  if (
+    attempt.snapshot.status === 'probe_open' ||
+    attempt.snapshot.status === 'resolution_required'
+  ) {
+    return {
+      ok: false,
+      error: 'Resolve green probe first (Fail / Continue / Done)',
+    }
+  }
+
   const result = applyLifecycleCommand(attempt.snapshot, {
     type: 'record_provisional',
     color,
     at,
+  })
+  if (!result.ok) return { ok: false, error: result.error }
+
+  const updated: AssessmentAttempt = { ...attempt, snapshot: result.snapshot }
+  return {
+    ok: true,
+    value: updated,
+    state: {
+      ...state,
+      attempts: state.attempts.map((a) => (a.id === attempt.id ? updated : a)),
+    },
+  }
+}
+
+/** Change a finalized result while still in an open session (audit-preserving correction). */
+export function correctColorForCurrent(
+  state: CaptureSessionState,
+  color: ResultColor,
+  reason = 'Changed during observation',
+  at = new Date().toISOString(),
+): CaptureResult<AssessmentAttempt> {
+  if (state.sessionStatus === 'completed') {
+    return { ok: false, error: 'Session completed — correct from reports if needed' }
+  }
+  const attempt = currentAttempt(state)
+  if (!attempt) return { ok: false, error: 'No current Assessment Attempt' }
+
+  const result = applyLifecycleCommand(attempt.snapshot, {
+    type: 'correct',
+    color,
+    reason,
+    at,
+    actorId: state.teacherUserId,
   })
   if (!result.ok) return { ok: false, error: result.error }
 
@@ -216,8 +269,67 @@ export function advancePosition(state: CaptureSessionState): CaptureSessionState
   }
 }
 
+export function retreatPosition(state: CaptureSessionState): CaptureSessionState {
+  return {
+    ...state,
+    position: previousPosition(
+      state.position,
+      state.questions.length,
+      state.learnerIds.length,
+    ),
+  }
+}
+
+export function jumpToQuestion(
+  state: CaptureSessionState,
+  questionIndex: number,
+): CaptureSessionState {
+  return {
+    ...state,
+    position: goToQuestionIndex(
+      state.position,
+      questionIndex,
+      state.questions.length,
+      state.learnerIds.length,
+    ),
+  }
+}
+
 export function markSessionCompleted(state: CaptureSessionState): CaptureSessionState {
   return { ...state, sessionStatus: 'completed' }
+}
+
+/** Session rollup for observe summary / heatmap. */
+export function sessionColorSummary(state: CaptureSessionState): {
+  done: number
+  total: number
+  byColor: Record<ResultColor | 'open' | 'draft', number>
+  maxProbeDepth: number
+} {
+  const byColor: Record<ResultColor | 'open' | 'draft', number> = {
+    red: 0,
+    yellow: 0,
+    green: 0,
+    purple: 0,
+    open: 0,
+    draft: 0,
+  }
+  let done = 0
+  let maxProbeDepth = 0
+  for (const a of state.attempts) {
+    maxProbeDepth = Math.max(maxProbeDepth, a.snapshot.probeCount)
+    const s = a.snapshot.status
+    if (s === 'finalized' || s === 'corrected') {
+      done += 1
+      const c = a.snapshot.effectiveColor
+      if (c) byColor[c] += 1
+    } else if (s === 'probe_open' || s === 'resolution_required') {
+      byColor.open += 1
+    } else {
+      byColor.draft += 1
+    }
+  }
+  return { done, total: state.attempts.length, byColor, maxProbeDepth }
 }
 
 export function attemptsForQuestion(

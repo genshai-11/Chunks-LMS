@@ -2,11 +2,12 @@ import { useMemo } from 'react'
 import { ClipboardCheck, Clock3 } from 'lucide-react'
 import { PageHeader } from '../../components/PageHeader'
 import { EmptyState, Panel } from '../../components/ui'
+import { useActiveLearner } from '../../hooks/useActiveLearner'
 import { useAppState } from '../../state/useAppState'
 
 export function LearnerAttendancePage() {
-  const { roster, scheduling } = useAppState()
-  const learner = roster.users.find((u) => u.roles.includes('learner'))
+  const { scheduling } = useAppState()
+  const learner = useActiveLearner()
   const myAttendance = useMemo(
     () => scheduling.attendance.filter((a) => a.learnerUserId === learner?.id),
     [scheduling.attendance, learner?.id],

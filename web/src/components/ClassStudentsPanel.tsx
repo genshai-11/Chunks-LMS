@@ -1,11 +1,24 @@
 import { useMemo, useState } from 'react'
-import { Ban, GraduationCap, ImagePlus, Link2, UserPlus, Users, X } from 'lucide-react'
+import {
+  Ban,
+  ClipboardCopy,
+  GraduationCap,
+  ImagePlus,
+  Link2,
+  Mail,
+  UserPlus,
+  Users,
+  X,
+} from 'lucide-react'
 import { readImageAsDataUrl } from '../lib/readImageFile'
 import {
   activeEnrollmentsForClass,
+  classInviteLines,
   createLearnerAndEnroll,
   endEnrollment,
   enrollLearner,
+  formatClassInviteClipboard,
+  learnerInviteMailto,
   learnerInviteUrl,
   learnersAvailableForClass,
 } from '../modules/roster/service'
@@ -26,7 +39,7 @@ type Props = {
  * - list roster with avatars
  * - enroll existing directory learner
  * - quick-add new learner (profile + seat)
- * - end enrollment
+ * - copy / email portal invite links (share-link V1 — no Clerk for learners)
  */
 export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Props) {
   const { roster, setRoster } = useAppState()
@@ -45,6 +58,10 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
     () => (klass ? learnersAvailableForClass(roster, klass.id) : []),
     [roster, klass],
   )
+  const inviteReady = useMemo(
+    () => (klass ? classInviteLines(roster, klass.id) : []),
+    [roster, klass],
+  )
 
   if (!klass) {
     return <EmptyState icon={Users} title="Class not found" />
@@ -52,12 +69,25 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
 
   const full = active.length >= klass.capacity
   const seatsLabel = `${active.length}/${klass.capacity} seats`
+  const missingEmail = active.filter((e) => {
+    const u = roster.users.find((x) => x.id === e.learnerUserId)
+    return !u?.email?.trim()
+  }).length
 
   function ok(msg: string) {
     onMessage?.(msg)
   }
   function err(msg: string) {
     onError?.(msg)
+  }
+
+  async function copyText(text: string, success: string) {
+    try {
+      await navigator.clipboard.writeText(text)
+      ok(success)
+    } catch {
+      ok(text)
+    }
   }
 
   return (
@@ -68,22 +98,47 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
             <GraduationCap className="h-4 w-4" aria-hidden />
             Students in {klass.name}
           </p>
-          <p className="meta">{seatsLabel}
-            {klass.status !== 'active' ? ' · class not active' : ''}</p>
+          <p className="meta">
+            {seatsLabel}
+            {klass.status !== 'active' ? ' · class not active' : ''}
+            {inviteReady.length > 0 ? ` · ${inviteReady.length} invite ready` : ''}
+            {missingEmail > 0 ? ` · ${missingEmail} missing email` : ''}
+          </p>
         </div>
         <span className={`badge${full ? '' : ' success'}`}>{seatsLabel}</span>
       </div>
+
+      {inviteReady.length > 0 ? (
+        <div className="class-students-invite-bar">
+          <button
+            type="button"
+            className="ghost"
+            title="Copy all portal links"
+            onClick={() =>
+              void copyText(
+                formatClassInviteClipboard(roster, klass.id),
+                `Copied ${inviteReady.length} invite link(s)`,
+              )
+            }
+          >
+            <ClipboardCopy className="h-3.5 w-3.5" aria-hidden />
+            <span>Copy all links</span>
+          </button>
+        </div>
+      ) : null}
 
       {active.length === 0 ? (
         <EmptyState
           icon={Users}
           title="No students yet"
-          description="Add a new student or enroll someone from People."
+          description="Add a student with email to get a shareable portal link."
         />
       ) : (
         <ul className="person-list class-students-list">
           {active.map((e) => {
             const user = roster.users.find((u) => u.id === e.learnerUserId)
+            const url = user ? learnerInviteUrl(user) : null
+            const mailto = user ? learnerInviteMailto(user) : null
             return (
               <li key={e.id} className="person-row">
                 <UserAvatar
@@ -93,28 +148,30 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
                 />
                 <div className="person-body">
                   <strong>{user?.displayName ?? e.learnerUserId}</strong>
-                  <span>{user?.email ?? 'No email — add for invite link'}</span>
+                  <span>
+                    {user?.email ?? 'No email — required for invite link'}
+                    {url ? ' · invite ready' : ''}
+                  </span>
                 </div>
                 <div className="row-actions">
-                  {user?.email ? (
+                  {url ? (
                     <button
                       type="button"
                       className="ghost"
                       title="Copy portal invite link"
-                      onClick={async () => {
-                        const url = learnerInviteUrl(user)
-                        if (!url) return err('Email required for invite link')
-                        try {
-                          await navigator.clipboard.writeText(url)
-                          ok(`Invite link copied for ${user.displayName}`)
-                        } catch {
-                          ok(url)
-                        }
-                      }}
+                      onClick={() =>
+                        void copyText(url, `Invite link copied for ${user?.displayName}`)
+                      }
                     >
                       <Link2 className="h-3.5 w-3.5" aria-hidden />
-                      <span>Link</span>
+                      <span>Copy</span>
                     </button>
+                  ) : null}
+                  {mailto ? (
+                    <a className="btn ghost" href={mailto} title="Open email with invite link">
+                      <Mail className="h-3.5 w-3.5" aria-hidden />
+                      <span>Email</span>
+                    </a>
                   ) : null}
                   {klass.status === 'active' ? (
                     <button
@@ -170,9 +227,12 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
               onSubmit={(e) => {
                 e.preventDefault()
                 if (full) return err(`Class is full (${klass.capacity})`)
+                if (!newEmail.trim()) {
+                  return err('Email is required so you can share a portal login link')
+                }
                 const r = createLearnerAndEnroll(roster, klass.id, {
                   displayName: newName,
-                  email: newEmail || null,
+                  email: newEmail,
                   avatarUrl: newAvatar,
                 })
                 if (!r.ok) return err(r.error)
@@ -180,8 +240,8 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
                 const invite = learnerInviteUrl(r.value.learner)
                 ok(
                   invite
-                    ? `${r.value.learner.displayName} seated · invite ready (use Link)`
-                    : `${r.value.learner.displayName} added — add email later for invite link`,
+                    ? `${r.value.learner.displayName} seated · invite ready — Copy or Email`
+                    : `${r.value.learner.displayName} added`,
                 )
                 setNewName('')
                 setNewEmail('')
@@ -229,15 +289,20 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
                 />
               </label>
               <label>
-                Email (for portal link)
+                Email (portal login)
                 <input
                   type="email"
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
                   placeholder="learner@school.edu"
+                  required
                   disabled={full}
                 />
               </label>
+              <p className="meta form-span-full">
+                After seating, use <strong>Copy</strong> or <strong>Email</strong> to send their
+                login link. Learners do not use Clerk.
+              </p>
               <button type="submit" className="primary" disabled={full}>
                 <UserPlus className="h-4 w-4" aria-hidden />
                 <span>Add &amp; seat</span>
@@ -252,10 +317,14 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
                 if (full) return err(`Class is full (${klass.capacity})`)
                 const r = enrollLearner(roster, klass.id, existingId)
                 if (!r.ok) return err(r.error)
-                const name =
-                  roster.users.find((u) => u.id === existingId)?.displayName ?? 'Learner'
+                const learner = roster.users.find((u) => u.id === existingId)
+                const name = learner?.displayName ?? 'Learner'
                 setRoster(r.state)
-                ok(`${name} enrolled in ${klass.name}`)
+                if (learnerInviteUrl(learner!)) {
+                  ok(`${name} enrolled · invite ready`)
+                } else {
+                  ok(`${name} enrolled — add email on People to enable invite link`)
+                }
                 setExistingId('')
               }}
             >
@@ -275,7 +344,7 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
                   {available.map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.displayName}
-                      {u.email ? ` · ${u.email}` : ''}
+                      {u.email ? ` · ${u.email}` : ' · no email'}
                     </option>
                   ))}
                 </select>

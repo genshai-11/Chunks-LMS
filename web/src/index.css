@@ -820,6 +820,14 @@
     @apply mb-3;
   }
 
+  .class-students-invite-bar {
+    @apply flex flex-wrap gap-2 mb-3;
+  }
+
+  .auth-role-pill {
+    @apply hidden sm:inline text-[10px] uppercase tracking-wide font-bold text-slate-500;
+  }
+
   .class-students-full {
     @apply mt-2 text-amber-700;
   }

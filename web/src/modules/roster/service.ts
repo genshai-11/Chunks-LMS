@@ -188,6 +188,28 @@ export function previewCourseSchedule(course: Pick<Course, 'startsOn' | 'schedul
   return materializeCourseSchedule(course.startsOn, schedule)
 }
 
+/** Normalize learner portal emails for uniqueness checks. */
+export function normalizeLearnerEmail(email: string | null | undefined): string | null {
+  const t = email?.trim().toLowerCase() ?? ''
+  return t || null
+}
+
+/** True if another learner already owns this email. */
+export function isLearnerEmailTaken(
+  state: RosterState,
+  email: string | null | undefined,
+  exceptUserId?: string,
+): boolean {
+  const needle = normalizeLearnerEmail(email)
+  if (!needle) return false
+  return state.users.some(
+    (u) =>
+      u.roles.includes('learner') &&
+      u.id !== exceptUserId &&
+      normalizeLearnerEmail(u.email) === needle,
+  )
+}
+
 /** Invite URL so a learner can open their portal by email. */
 export function learnerInviteUrl(
   learner: DomainUser,
@@ -196,6 +218,54 @@ export function learnerInviteUrl(
   if (!learner.email?.trim()) return null
   const base = origin || ''
   return `${base}/access?email=${encodeURIComponent(learner.email.trim())}`
+}
+
+/** mailto: so staff can send the invite from their mail client. */
+export function learnerInviteMailto(
+  learner: DomainUser,
+  origin = typeof window !== 'undefined' ? window.location.origin : '',
+): string | null {
+  const url = learnerInviteUrl(learner, origin)
+  if (!url || !learner.email?.trim()) return null
+  const subject = encodeURIComponent('Your Chunks LMS progress link')
+  const body = encodeURIComponent(
+    `Hi ${learner.displayName},\n\nOpen your learning portal (attendance & progress):\n\n${url}\n\nUse the email your teacher registered for you.\n`,
+  )
+  return `mailto:${learner.email.trim()}?subject=${subject}&body=${body}`
+}
+
+export type ClassInviteLine = {
+  learner: DomainUser
+  url: string
+  mailto: string
+}
+
+/** Active seats that have an invite-ready email. */
+export function classInviteLines(
+  state: RosterState,
+  classId: string,
+  origin = typeof window !== 'undefined' ? window.location.origin : '',
+): ClassInviteLine[] {
+  const lines: ClassInviteLine[] = []
+  for (const e of activeEnrollmentsForClass(state, classId)) {
+    const learner = state.users.find((u) => u.id === e.learnerUserId)
+    if (!learner) continue
+    const url = learnerInviteUrl(learner, origin)
+    const mailto = learnerInviteMailto(learner, origin)
+    if (url && mailto) lines.push({ learner, url, mailto })
+  }
+  return lines
+}
+
+/** Plain text block of all invite URLs for clipboard. */
+export function formatClassInviteClipboard(
+  state: RosterState,
+  classId: string,
+  origin = typeof window !== 'undefined' ? window.location.origin : '',
+): string {
+  return classInviteLines(state, classId, origin)
+    .map((l) => `${l.learner.displayName} <${l.learner.email}>: ${l.url}`)
+    .join('\n')
 }
 
 export function archiveCourse(state: RosterState, courseId: string): RosterResult<Course> {
@@ -493,10 +563,15 @@ export function addLearnerProfile(
   const displayName = input.displayName.trim()
   if (!displayName) return { ok: false, error: 'Learner name is required' }
 
+  const email = input.email?.trim() || null
+  if (email && isLearnerEmailTaken(state, email)) {
+    return { ok: false, error: 'A learner with this email already exists' }
+  }
+
   const user: DomainUser = {
     id: newId('user'),
     displayName,
-    email: input.email?.trim() || null,
+    email,
     avatarUrl: input.avatarUrl ?? null,
     roles: ['learner'],
   }
@@ -577,10 +652,20 @@ export function updateUserProfile(
     input.displayName !== undefined ? input.displayName.trim() : user.displayName
   if (!displayName) return { ok: false, error: 'Name is required' }
 
+  const nextEmail =
+    input.email !== undefined ? input.email?.trim() || null : user.email
+  if (
+    user.roles.includes('learner') &&
+    nextEmail &&
+    isLearnerEmailTaken(state, nextEmail, userId)
+  ) {
+    return { ok: false, error: 'A learner with this email already exists' }
+  }
+
   const updated: DomainUser = {
     ...user,
     displayName,
-    email: input.email !== undefined ? input.email?.trim() || null : user.email,
+    email: nextEmail,
     avatarUrl:
       input.avatarUrl !== undefined ? input.avatarUrl || null : user.avatarUrl,
   }

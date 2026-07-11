@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthProvider'
+import { StaffGate } from './auth/StaffGate'
 import { AppShell } from './components/AppShell'
 import { HomePage } from './pages/HomePage'
 import { AdminLayout } from './pages/admin/AdminLayout'
@@ -30,7 +31,14 @@ export default function App() {
               <Route path="/" element={<HomePage />} />
               <Route path="/access" element={<LearnerAccessPage />} />
 
-              <Route path="/admin" element={<AdminLayout />}>
+              <Route
+                path="/admin"
+                element={
+                  <StaffGate role="admin">
+                    <AdminLayout />
+                  </StaffGate>
+                }
+              >
                 <Route index element={<Navigate to="courses" replace />} />
                 <Route path="courses" element={<AdminCoursesPage />} />
                 <Route path="classes" element={<AdminClassesPage />} />
@@ -39,9 +47,23 @@ export default function App() {
                 <Route path="metrics" element={<AdminMetricsPage />} />
               </Route>
 
-              <Route path="/teacher/observe" element={<TeacherObservePage />} />
+              <Route
+                path="/teacher/observe"
+                element={
+                  <StaffGate role="teacher">
+                    <TeacherObservePage />
+                  </StaffGate>
+                }
+              />
 
-              <Route path="/teacher" element={<TeacherLayout />}>
+              <Route
+                path="/teacher"
+                element={
+                  <StaffGate role="teacher">
+                    <TeacherLayout />
+                  </StaffGate>
+                }
+              >
                 <Route index element={<Navigate to="session" replace />} />
                 <Route path="calendar" element={<TeacherCalendarPage />} />
                 <Route path="session" element={<TeacherSessionPage />} />
@@ -49,6 +71,7 @@ export default function App() {
                 <Route path="progress" element={<Navigate to="/teacher/analysis" replace />} />
               </Route>
 
+              {/* Learner portal — share link only; no Clerk */}
               <Route path="/learner" element={<LearnerLayout />}>
                 <Route index element={<Navigate to="enrollments" replace />} />
                 <Route path="enrollments" element={<LearnerEnrollmentsPage />} />

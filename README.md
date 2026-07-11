@@ -12,7 +12,7 @@ Foundation change `establish-lms-foundation` is **implemented** (OpenSpec tasks 
 - GitHub Actions **CI** + **CD** (Vercel preview/production)
 - Progress reporting with session/week/month/custom windows
 
-**Production readiness (role tracking/management):** ~55–60%. Next work is access spine, multi-class context, Admin ops boards, and hosted e2e — see the completion plan below.
+**Production readiness (role tracking/management):** ~55–60%. V1 identity: **Clerk = Admin + Teacher only**; **learners = email profile + share link** (no membership). Next: staff Clerk gates, invite UX, multi-class, ops boards — see the completion plan.
 
 ## Start here
 

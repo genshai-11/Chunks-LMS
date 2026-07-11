@@ -1,24 +1,45 @@
 import { GraduationCap, LogIn, RotateCcw, Shield, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { useStaffSession } from '../auth/useStaffSession'
 import { env } from '../env'
 import { useAppState } from '../state/useAppState'
 
-const ROLES = [
-  { to: '/admin/courses', title: 'Admin', description: 'Courses, classes, people, metrics', icon: Shield },
-  { to: '/teacher/session', title: 'Teacher', description: 'Schedule, live observe, analysis', icon: Users },
-  {
-    to: '/access',
-    title: 'Learner',
-    description: 'Email login · classes · learning days',
-    icon: GraduationCap,
-  },
-] as const
-
 export function HomePage() {
   const { resetAll, ledger, roster } = useAppState()
+  const session = useStaffSession()
   const className = roster.classes[0]?.name
   const courseCode = roster.courses[0]?.code
   const people = roster.users.length
+
+  const chips: Array<{
+    to: string
+    title: string
+    description: string
+    icon: typeof Shield
+  }> = []
+
+  if (session.canAccess('admin')) {
+    chips.push({
+      to: '/admin/courses',
+      title: 'Admin',
+      description: 'Courses, classes, people, metrics',
+      icon: Shield,
+    })
+  }
+  if (session.canAccess('teacher')) {
+    chips.push({
+      to: '/teacher/session',
+      title: 'Teacher',
+      description: 'Schedule, live observe, analysis',
+      icon: Users,
+    })
+  }
+  chips.push({
+    to: '/access',
+    title: 'Learner portal',
+    description: 'Open invite link or enter registered email',
+    icon: GraduationCap,
+  })
 
   return (
     <div className="home-compact">
@@ -38,20 +59,25 @@ export function HomePage() {
             <LogIn className="h-4 w-4" aria-hidden />
             Learner portal
           </Link>
-          <button
-            type="button"
-            className="ghost"
-            onClick={() => {
-              if (!window.confirm('Clear all local data (people, classes, sessions, results)?')) return
-              resetAll()
-            }}
-          >
-            <RotateCcw className="h-4 w-4" aria-hidden />
-            Clear data
-          </button>
+          {(session.authBypass || session.canAccess('admin')) && (
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => {
+                if (!window.confirm('Clear all local data (people, classes, sessions, results)?')) {
+                  return
+                }
+                resetAll()
+              }}
+            >
+              <RotateCcw className="h-4 w-4" aria-hidden />
+              Clear data
+            </button>
+          )}
         </div>
         <p className="meta home-meta">
           {env.isConfigured ? 'Connected' : 'Local'}
+          {session.authBypass ? ' · staff bypass' : session.signedIn ? ' · staff signed in' : ' · staff sign-in for Admin/Teacher'}
           {people > 0 ? ` · ${people} people` : ' · empty org'}
           {courseCode ? ` · ${courseCode}` : ''}
           {className ? ` · ${className}` : ''}
@@ -60,7 +86,7 @@ export function HomePage() {
       </header>
 
       <nav className="home-role-row" aria-label="Enter as">
-        {ROLES.map((role) => {
+        {chips.map((role) => {
           const Icon = role.icon
           return (
             <Link key={role.to} to={role.to} className="home-role-chip">
@@ -73,6 +99,13 @@ export function HomePage() {
           )
         })}
       </nav>
+
+      {!session.signedIn && !session.authBypass ? (
+        <p className="meta" style={{ textAlign: 'center', marginTop: 16 }}>
+          Admin and Teacher require a Clerk staff account. Learners never use Clerk — share their
+          invite link from the class roster.
+        </p>
+      ) : null}
     </div>
   )
 }

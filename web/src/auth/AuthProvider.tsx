@@ -1,19 +1,36 @@
 import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/react'
 import type { ReactNode } from 'react'
+import { env } from '../env'
+import { useStaffSession } from './useStaffSession'
 
 type Props = { children?: ReactNode }
 
 /**
  * Layout wrapper for app content.
- * ClerkProvider lives in main.tsx when a publishable key is configured
- * and VITE_AUTH_BYPASS is not enabled (so CI/tests can still run without secrets).
+ * ClerkProvider lives in main.tsx when a publishable key is configured.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
-/** Sign-in / sign-up / user menu controls for the top bar. */
+/** Sign-in / sign-up / user menu controls for the top bar (staff). */
 export function AuthChrome({ children }: Props) {
+  const session = useStaffSession()
+
+  if (session.authBypass && !session.clerkEnabled) {
+    return (
+      <div className="auth-chrome">
+        <span className="meta" title="VITE_AUTH_BYPASS — local/CI only">
+          Staff bypass
+        </span>
+        {children}
+      </div>
+    )
+  }
+
+  if (!env.clerkPublishableKey) {
+    return <div className="auth-chrome">{children}</div>
+  }
 
   return (
     <div className="auth-chrome">
@@ -21,18 +38,23 @@ export function AuthChrome({ children }: Props) {
         <div className="auth-actions">
           <SignInButton mode="modal">
             <button type="button" className="ghost">
-              Sign in
+              Staff sign in
             </button>
           </SignInButton>
           <SignUpButton mode="modal">
             <button type="button" className="primary">
-              Sign up
+              Staff sign up
             </button>
           </SignUpButton>
         </div>
       </Show>
       <Show when="signed-in">
         <div className="auth-actions">
+          {session.staffRoles.length > 0 ? (
+            <span className="meta auth-role-pill" title="Staff roles">
+              {session.staffRoles.join(' · ')}
+            </span>
+          ) : null}
           <UserButton />
           {children}
         </div>

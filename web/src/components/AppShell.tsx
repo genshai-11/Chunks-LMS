@@ -10,12 +10,12 @@ import {
 import { NavLink, useLocation } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { AuthChrome } from '../auth/AuthProvider'
+import { useStaffSession } from '../auth/useStaffSession'
 import { useAppState } from '../state/useAppState'
 
-const ROLES = [
-  { to: '/admin', label: 'Admin', icon: Shield },
-  { to: '/teacher', label: 'Teacher', icon: Users },
-  { to: '/learner', label: 'Learner', icon: GraduationCap },
+const STAFF_NAV = [
+  { to: '/admin', label: 'Admin', icon: Shield, role: 'admin' as const },
+  { to: '/teacher', label: 'Teacher', icon: Users, role: 'teacher' as const },
 ]
 
 function BackendBadge() {
@@ -54,10 +54,7 @@ function BackendBadge() {
 
   return (
     <div className="backend-cluster">
-      <span
-        className={`backend-badge is-${backendStatus}`}
-        title={title}
-      >
+      <span className={`backend-badge is-${backendStatus}`} title={title}>
         {backendStatus === 'syncing' || backendStatus === 'booting' ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
         ) : backendStatus === 'error' || backendStatus === 'offline' ? (
@@ -75,12 +72,7 @@ function BackendBadge() {
       >
         <RefreshCw className="h-3.5 w-3.5" aria-hidden />
       </button>
-      <button
-        type="button"
-        className="backend-icon-btn"
-        title="Push now"
-        onClick={() => void syncNow()}
-      >
+      <button type="button" className="backend-icon-btn" title="Push now" onClick={() => void syncNow()}>
         <Cloud className="h-3.5 w-3.5" aria-hidden />
       </button>
     </div>
@@ -89,11 +81,16 @@ function BackendBadge() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
+  const session = useStaffSession()
   const focusMode = pathname === '/teacher/observe'
 
   if (focusMode) {
     return <div className="shell shell-focus">{children}</div>
   }
+
+  const staffLinks = STAFF_NAV.filter((r) => session.canAccess(r.role))
+  // Show staff nav only when bypass or signed-in staff; otherwise only portal entry
+  const showStaffNav = session.authBypass || (session.signedIn && session.isStaff)
 
   return (
     <div className="shell">
@@ -110,20 +107,31 @@ export function AppShell({ children }: { children: ReactNode }) {
           <span className="topbar-brand-text">Chunks LMS</span>
         </NavLink>
 
-        <nav className="topbar-roles" aria-label="Switch role">
-          {ROLES.map((r) => {
-            const Icon = r.icon
-            return (
-              <NavLink
-                key={r.to}
-                to={r.to}
-                className={({ isActive }) => `topbar-role${isActive ? ' is-active' : ''}`}
-              >
-                <Icon className="h-3.5 w-3.5" aria-hidden strokeWidth={1.75} />
-                {r.label}
-              </NavLink>
-            )
-          })}
+        <nav className="topbar-roles" aria-label="Workspaces">
+          {showStaffNav
+            ? staffLinks.map((r) => {
+                const Icon = r.icon
+                return (
+                  <NavLink
+                    key={r.to}
+                    to={r.to}
+                    className={({ isActive }) => `topbar-role${isActive ? ' is-active' : ''}`}
+                  >
+                    <Icon className="h-3.5 w-3.5" aria-hidden strokeWidth={1.75} />
+                    {r.label}
+                  </NavLink>
+                )
+              })
+            : null}
+          <NavLink
+            to="/access"
+            className={({ isActive }) =>
+              `topbar-role${isActive || pathname.startsWith('/learner') ? ' is-active' : ''}`
+            }
+          >
+            <GraduationCap className="h-3.5 w-3.5" aria-hidden strokeWidth={1.75} />
+            Portal
+          </NavLink>
         </nav>
 
         <div className="topbar-actions">

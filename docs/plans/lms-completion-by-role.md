@@ -47,8 +47,8 @@
 | Domain modules + unit tests | **~90%** | Roster, scheduling, capture, lifecycle, metrics, reporting covered |
 | DB schema + migrations | **~85%** | Foundation + live capture + session numbers; seed exists |
 | Role UI surfaces | **~75%** | Admin / Teacher / Learner pages exist; overview routes unused |
-| Staff auth (Clerk Admin/Teacher) | **~35%** | Clerk chrome present; **no route guards** by role |
-| Learner share-link portal | **~70%** | `/access?email=` + copy invite exist; polish send/copy UX |
+| Staff auth (Clerk Admin/Teacher) | **~75%** | Phase A: `StaffGate`, allowlist/metadata, auth bypass for CI |
+| Learner share-link portal | **~85%** | Phase A: copy / mailto / copy-all; unique email; no first-learner fallback |
 | Multi-user production sync | **~40%** | Workspace full-replace sync + live assessment path; fragile for concurrent users |
 | Org-wide tracking / ops | **~35%** | Metrics admin config yes; no org dashboard, no audit UI, weak multi-class |
 | Hosted production readiness | **~40%** | CI/CD docs exist; Clerk for staff not hardened on hosted |
@@ -174,9 +174,11 @@ Align product language with `CONTEXT.md`:
 
 ## 5. Phased completion plan
 
-### Phase A — Staff Clerk + learner share links (no membership) — **P0**
+### Phase A — Staff Clerk + learner share links (no membership) — **P0** ✅ implemented
 
 **Outcome:** Admin/Teacher use Clerk; learners use email invite links only. No membership product.
+
+**Shipped:** `StaffGate`, `resolveStaffRoles` (metadata / email allowlist / bootstrap), role-aware top bar & home chips, learner copy/mailto/copy-all, unique learner email, no first-learner portal leak, `VITE_AUTH_BYPASS` for CI.
 
 1. **Clerk gates staff only**
    - `/admin/*` requires signed-in Clerk user with app role **admin**.

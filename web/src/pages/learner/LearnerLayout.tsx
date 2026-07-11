@@ -14,6 +14,11 @@ export function LearnerLayout() {
   const learner = useActiveLearner()
   const { pathname } = useLocation()
 
+  // Share-link session required — no Clerk for learners
+  if (!learner) {
+    return <Navigate to="/access" replace />
+  }
+
   if (pathname === '/learner' || pathname === '/learner/') {
     return <Navigate to="/learner/enrollments" replace />
   }
@@ -21,11 +26,9 @@ export function LearnerLayout() {
   return (
     <RoleWorkspace
       title="Learning"
-      subtitle={learner?.displayName ?? 'Learner'}
+      subtitle={learner.displayName}
       leading={
-        learner ? (
-          <UserAvatar name={learner.displayName} avatarUrl={learner.avatarUrl} size="md" />
-        ) : undefined
+        <UserAvatar name={learner.displayName} avatarUrl={learner.avatarUrl} size="md" />
       }
       navLabel="Learner menu"
       items={ITEMS}

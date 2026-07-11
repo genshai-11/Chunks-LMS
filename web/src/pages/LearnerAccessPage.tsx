@@ -8,8 +8,9 @@ import { findLearnerByEmail } from '../modules/roster/service'
 import { useAppState } from '../state/useAppState'
 
 /**
- * Learner portal entry: open invite link with ?email= or type email to view profile.
- * (Full Clerk magic-link auth can replace this later; V1 uses email match + local session.)
+ * Learner portal entry (V1): share link `/access?email=` or type registered email.
+ * No Clerk / no org membership for learners — staff copies invite from class roster.
+ * Admin & Teacher use Clerk separately. Clerk learner accounts are deferred.
  */
 export function LearnerAccessPage() {
   const { roster, setActiveLearnerUserId, activeLearnerUserId } = useAppState()
@@ -17,20 +18,30 @@ export function LearnerAccessPage() {
   const navigate = useNavigate()
   const [email, setEmail] = useState(params.get('email') ?? '')
   const [error, setError] = useState<string | null>(null)
+  const [linkMiss, setLinkMiss] = useState(false)
 
   useEffect(() => {
     const fromQuery = params.get('email')
-    if (!fromQuery) return
+    if (!fromQuery) {
+      setLinkMiss(false)
+      return
+    }
     const learner = findLearnerByEmail(roster, fromQuery)
     if (learner) {
       setActiveLearnerUserId(learner.id)
+      setLinkMiss(false)
       navigate('/learner/enrollments', { replace: true })
+    } else {
+      setEmail(fromQuery)
+      setLinkMiss(true)
     }
   }, [params, roster, setActiveLearnerUserId, navigate])
 
   const current =
     activeLearnerUserId
-      ? roster.users.find((u) => u.id === activeLearnerUserId)
+      ? roster.users.find(
+          (u) => u.id === activeLearnerUserId && u.roles.includes('learner'),
+        )
       : null
 
   return (
@@ -39,11 +50,11 @@ export function LearnerAccessPage() {
         icon={GraduationCap}
         kicker="Learner"
         title="Open your portal"
-        subtitle="Use the email your admin registered to view classes, learning days, and progress."
+        subtitle="Open the invite link from your teacher, or enter the email they registered for you. No staff password needed."
       />
 
       {current ? (
-        <Panel icon={GraduationCap} title="Signed in as" description="Continue to your classes.">
+        <Panel icon={GraduationCap} title="Portal open" description="Continue to your classes.">
           <div className="access-current">
             <UserAvatar name={current.displayName} avatarUrl={current.avatarUrl} size="lg" />
             <div>
@@ -59,7 +70,7 @@ export function LearnerAccessPage() {
               className="ghost"
               onClick={() => setActiveLearnerUserId(null)}
             >
-              Switch learner
+              Use a different email
             </button>
           </div>
         </Panel>
@@ -68,16 +79,22 @@ export function LearnerAccessPage() {
       <Panel
         icon={Mail}
         title="Enter with email"
-        description="Admin must add your email on the learner profile first."
+        description="Must match the email on your learner profile (from the invite link)."
       >
+        {linkMiss ? (
+          <p className="banner err" role="alert">
+            No learner matches that invite email. Check the link or ask your teacher to re-send it.
+          </p>
+        ) : null}
         <form
           className="form-grid"
           onSubmit={(e) => {
             e.preventDefault()
             setError(null)
+            setLinkMiss(false)
             const learner = findLearnerByEmail(roster, email)
             if (!learner) {
-              setError('No learner found with that email. Ask admin to add your email.')
+              setError('No learner found with that email. Ask your teacher to share the invite link.')
               return
             }
             setActiveLearnerUserId(learner.id)
@@ -97,22 +114,17 @@ export function LearnerAccessPage() {
           </label>
           <button type="submit" className="primary">
             <LogIn className="h-4 w-4" aria-hidden />
-            <span>View my profile</span>
+            <span>Open my portal</span>
           </button>
         </form>
-        {error ? <p className="flash error mt-3">{error}</p> : null}
+        {error ? <p className="banner err mt-3" role="alert">{error}</p> : null}
       </Panel>
 
       {roster.users.filter((u) => u.roles.includes('learner')).length === 0 ? (
         <EmptyState
           icon={GraduationCap}
           title="No learners yet"
-          description="Admin creates learners under Classes → Students (with email), then shares the invite link."
-          action={
-            <Link to="/admin/classes" className="btn ghost">
-              Admin · Classes
-            </Link>
-          }
+          description="Staff creates learners under Classes → Students (with email), then shares the invite link."
         />
       ) : null}
     </div>

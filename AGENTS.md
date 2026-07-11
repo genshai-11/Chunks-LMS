@@ -52,30 +52,45 @@ Current change: `establish-lms-foundation` — **apply complete** (all tasks che
 - CI/CD: `.github/workflows/ci.yml`, `cd.yml`, `docs/ops/ci-cd.md`
 - Demo: local workspace + Teacher Observe / Analysis panels (seed via Admin or tests)
 
+## V1 identity (product decision)
+
+**No organization membership product for now.**
+
+| Role | Access | Notes |
+|------|--------|--------|
+| **Admin** | Clerk sign-in | Staff only |
+| **Teacher** | Clerk sign-in | Staff only |
+| **Learner** | **Share link** | Profile **email** registered by staff → invite URL `/access?email=…` (copy/send). No Clerk learner account. |
+
+- Staff maps Clerk → domain admin/teacher (allowlist / `clerk_user_id`) — **not** membership UI.
+- Learner portal is read-only, scoped to the matched email profile (`activeLearnerUserId`).
+- Membership, multi-org, and Clerk-for-learners are **Phase F / later**.
+
 ## LMS maturity (post-foundation review)
 
 | Layer | ~% | Reality check |
 |-------|----|----------------|
 | Domain + ADRs + unit tests | 90–95 | Solid measurement core |
 | Role UI (CRUD / observe / analysis) | ~75 | Surfaces exist; overview pages not routed |
-| Real role auth + RLS-backed sessions | ~30 | Top bar free role switch; learner email portal |
+| Staff Clerk (Admin/Teacher gates) | ~75 | Phase A: StaffGate + role allowlist/metadata; `VITE_AUTH_BYPASS` for CI |
+| Learner share-link portal | ~85 | Phase A: copy/mailto/copy-all; no first-learner leak; email required |
 | Multi-class / org-wide tracking | ~35 | Teacher binds first class only; weak Admin ops |
-| Hosted multi-user production | ~40 | CI/CD ready; Clerk↔Supabase not hardened |
+| Hosted multi-user production | ~40 | CI/CD ready; staff Clerk not hardened |
 | **Overall V1 production readiness** | **~55–60** | Foundation demo ~85% |
 
 ### Flow today
 
 ```text
-Home → Admin (courses/classes/people/enrollments/metrics)
-     → Teacher (schedule → live session → observe → analysis)
-     → Learner (/access email → classes → attendance → analysis)
+Home → Admin (Clerk)  courses/classes/people/enrollments/metrics
+     → Teacher (Clerk) schedule → live → observe → analysis
+     → Learner (share link) /access?email= → classes → attendance → analysis
 ```
 
 ### Blockers to “100% V1 by role”
 
-1. No route guards — any visitor can open Admin/Teacher/Learner.
+1. ~~Staff routes unguarded~~ — Phase A done (`StaffGate`, role-aware top bar).
 2. Teacher has no class switcher (always first assigned class).
-3. Learner identity is email match, not Clerk subject.
+3. ~~Learner invite UX~~ — Phase A: copy / email / copy-all + unique email.
 4. Admin lacks org ops board, attendance matrix, audit/correction UI.
 5. Workspace full-replace sync unsafe for concurrent Admin+Teacher.
 6. Overview dashboards exist as pages but are not in the router.
@@ -86,14 +101,14 @@ Home → Admin (courses/classes/people/enrollments/metrics)
 
 | Phase | Focus | Priority |
 |-------|--------|----------|
-| **A** | Access spine — route guards, Clerk→Supabase JWT, membership sync, real learner login | P0 |
-| **B** | Role homes + class/enrollment context switchers; Admin analysis over any class | P0 |
-| **C** | Ops tracking — Admin session board, attendance matrix, audit + post-session correction | P1 |
+| **A** | Clerk gate Admin/Teacher + learner share-link polish (**no membership**) | P0 |
+| **B** | Role homes + class/enrollment switchers; Admin analysis any class | P0 |
+| **C** | Ops tracking — session board, attendance matrix, audit + post-session correction | P1 |
 | **D** | Entity-level sync; ledger from finalized events; no full-replace clobber | P1 |
-| **E** | Hosted preview e2e + runbook; archive OpenSpec foundation when A–B exit | P0/P1 |
-| **F** | Explicitly later — notifications, multi-teacher, content/CCI/CVR | out of V1 |
+| **E** | Hosted e2e + runbook (staff Clerk + share links); archive OpenSpec when A–B exit | P0/P1 |
+| **F** | Later — membership, learner Clerk, notifications, multi-teacher, content/CCI/CVR | out of V1 |
 
-**V1 “100%” definition:** Admin can provision + monitor + audit; Teacher runs assigned classes end-to-end (multi-class); Learner signs in and sees only own finalized progress; RLS denies cross-role/cross-learner; one hosted course runs without data loss.
+**V1 “100%” definition:** Admin/Teacher via Clerk provision + teach + audit; learners open **email invite links** and see only own progress; multi-class teacher works; one hosted course runs without data loss. Membership is not required for V1.
 
 ## Engineering constraints
 
@@ -102,6 +117,8 @@ Home → Admin (courses/classes/people/enrollments/metrics)
 - Only finalized results feed progress metrics.
 - Treat question sequence numbers as presentation, not stable identity.
 - Keep learner-first and question-first as UI modes over the same domain model.
-- Enforce authorization in Supabase RLS, not only in application UI.
+- Staff workspaces: gate with Clerk (Admin/Teacher). Learner portal: email invite scope only — never expose other learners’ rows.
+- Prefer Supabase RLS for staff-backed data paths when configured; do not block V1 on full membership RLS.
 - Treat V1 metrics as operational indicators, not validated psychometric instruments.
 - Keep resource content and CCI/CVR integrations outside the V1 core domain.
+- Do not build organization membership UI or Clerk learner accounts unless product reopens that scope.

@@ -23,8 +23,8 @@ import {
   addTeacherProfile,
   countDuplicateEmailGroups,
   deleteUserProfile,
-  listLearners,
-  listTeachers,
+  listActiveLearners,
+  listActiveTeachers,
   listTeachersRaw,
   listLearnersRaw,
   mergeDuplicateAccountsByEmail,
@@ -62,7 +62,7 @@ function invitationMailto(user: DomainUser): string {
 }
 
 export function AdminPeoplePage() {
-  const { roster, setRoster } = useAppState()
+  const { roster, setRoster, syncNow } = useAppState()
   const { message, error, ok, err } = useFlash()
   const [tab, setTab] = useState<Tab>('teachers')
   const [showAdd, setShowAdd] = useState(false)
@@ -70,8 +70,8 @@ export function AdminPeoplePage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState<Draft>(emptyDraft)
 
-  const teachers = useMemo(() => listTeachers(roster), [roster])
-  const learners = useMemo(() => listLearners(roster), [roster])
+  const teachers = useMemo(() => listActiveTeachers(roster), [roster])
+  const learners = useMemo(() => listActiveLearners(roster), [roster])
   const rawTeacherCount = useMemo(() => listTeachersRaw(roster).length, [roster])
   const rawLearnerCount = useMemo(() => listLearnersRaw(roster).length, [roster])
   const dupGroups = useMemo(() => countDuplicateEmailGroups(roster), [roster])
@@ -80,7 +80,7 @@ export function AdminPeoplePage() {
   const rawCount = tab === 'teachers' ? rawTeacherCount : rawLearnerCount
   const hiddenDupes = Math.max(0, rawCount - rows.length)
 
-  function createAccount() {
+  async function createAccount() {
     if (tab === 'teachers') {
       const r = addTeacherProfile(roster, {
         displayName: draft.displayName,
@@ -89,6 +89,7 @@ export function AdminPeoplePage() {
       })
       if (!r.ok) return err(r.error)
       setRoster(r.state)
+      await syncNow({ roster: r.state })
       ok(`Teacher ${r.value.displayName} added`)
     } else {
       const r = addLearnerProfile(roster, {
@@ -98,13 +99,14 @@ export function AdminPeoplePage() {
       })
       if (!r.ok) return err(r.error)
       setRoster(r.state)
+      await syncNow({ roster: r.state })
       ok(`Learner ${r.value.displayName} added`)
     }
     setDraft(emptyDraft())
     setShowAdd(false)
   }
 
-  function saveEdit(id: string) {
+  async function saveEdit(id: string) {
     const r = updateUserProfile(roster, id, {
       displayName: editDraft.displayName,
       email: editDraft.email || null,
@@ -112,6 +114,7 @@ export function AdminPeoplePage() {
     })
     if (!r.ok) return err(r.error)
     setRoster(r.state)
+    await syncNow({ roster: r.state })
     setEditingId(null)
     ok(`${r.value.displayName} updated`)
   }
@@ -228,7 +231,11 @@ export function AdminPeoplePage() {
               />
             </label>
             <div className="avatar-field">
-              <UserAvatar name={draft.displayName || 'User'} avatarUrl={draft.avatarUrl} size="lg" />
+              <UserAvatar
+                name={draft.displayName || 'User'}
+                avatarUrl={draft.avatarUrl}
+                size="lg"
+              />
               <div className="avatar-field-actions">
                 <label className="btn ghost avatar-file-label">
                   <ImagePlus className="h-3.5 w-3.5" aria-hidden />
@@ -322,14 +329,16 @@ export function AdminPeoplePage() {
                             className="row-input"
                             type="email"
                             value={editDraft.email}
-                            onChange={(e) =>
-                              setEditDraft((d) => ({ ...d, email: e.target.value }))
-                            }
+                            onChange={(e) => setEditDraft((d) => ({ ...d, email: e.target.value }))}
                             aria-label="Email"
                             placeholder="Email"
                           />
                           <div className="flex items-center gap-2">
-                            <UserAvatar name={editDraft.displayName || 'User'} avatarUrl={editDraft.avatarUrl} size="sm" />
+                            <UserAvatar
+                              name={editDraft.displayName || 'User'}
+                              avatarUrl={editDraft.avatarUrl}
+                              size="sm"
+                            />
                             <label className="btn ghost btn-sm py-1 px-2 cursor-pointer flex items-center gap-1">
                               <ImagePlus className="h-3 w-3" aria-hidden />
                               <span>Upload</span>
@@ -345,7 +354,11 @@ export function AdminPeoplePage() {
                                     const url = await readImageAsDataUrl(file)
                                     setEditDraft((d) => ({ ...d, avatarUrl: url }))
                                   } catch (error) {
-                                    err(error instanceof Error ? error.message : 'Could not read image')
+                                    err(
+                                      error instanceof Error
+                                        ? error.message
+                                        : 'Could not read image',
+                                    )
                                   }
                                 }}
                               />
@@ -362,7 +375,11 @@ export function AdminPeoplePage() {
                             ) : null}
                           </div>
                           <div className="row-actions">
-                            <button type="button" className="primary" onClick={() => saveEdit(u.id)}>
+                            <button
+                              type="button"
+                              className="primary"
+                              onClick={() => saveEdit(u.id)}
+                            >
                               <Check className="h-3.5 w-3.5" aria-hidden />
                               Save
                             </button>
@@ -382,7 +399,9 @@ export function AdminPeoplePage() {
                     <tr
                       key={u.id}
                       className={
-                        (u.accountStatus ?? 'active') === 'inactive' ? 'accounts-row-inactive' : undefined
+                        (u.accountStatus ?? 'active') === 'inactive'
+                          ? 'accounts-row-inactive'
+                          : undefined
                       }
                     >
                       <td>
@@ -433,9 +452,7 @@ export function AdminPeoplePage() {
                             type="button"
                             className="ghost"
                             title={
-                              (u.accountStatus ?? 'active') === 'active'
-                                ? 'Deactivate'
-                                : 'Activate'
+                              (u.accountStatus ?? 'active') === 'active' ? 'Deactivate' : 'Activate'
                             }
                             onClick={() => {
                               const next =
@@ -443,6 +460,7 @@ export function AdminPeoplePage() {
                               const r = setAccountStatus(roster, u.id, next)
                               if (!r.ok) return err(r.error)
                               setRoster(r.state)
+                              void syncNow({ roster: r.state })
                               ok(`${u.displayName} → ${next}`)
                             }}
                           >
@@ -472,6 +490,7 @@ export function AdminPeoplePage() {
                               const r = deleteUserProfile(roster, u.id)
                               if (!r.ok) return err(r.error)
                               setRoster(r.state)
+                              void syncNow({ roster: r.state })
                               ok(`${u.displayName} deleted`)
                             }}
                           >

@@ -14,10 +14,7 @@ function parseSessionKind(value: string | null | undefined): SessionKind {
   return 'regular'
 }
 import { emptySchedulingState } from '../modules/scheduling/session-lifecycle'
-import {
-  protectedLearningSessionIds,
-  prunableIds,
-} from '../modules/sync/entity-sync'
+import { dedupeById, protectedLearningSessionIds, prunableIds } from '../modules/sync/entity-sync'
 import { rolesForWorkspaceUser, userIdsForWorkspace } from '../modules/sync/workspace-graph'
 import { getSupabase } from './supabase'
 
@@ -676,9 +673,10 @@ export async function saveWorkspaceToSupabase(
         if (toDelete.length > 0) await sb.from('scheduled_sessions').delete().in('id', toDelete)
       }
 
-      if (scheduling.scheduledSessions.length > 0) {
+      const scheduledRows = dedupeById(scheduling.scheduledSessions)
+      if (scheduledRows.length > 0) {
         const { error } = await sb.from('scheduled_sessions').upsert(
-          scheduling.scheduledSessions.map((s) => ({
+          scheduledRows.map((s) => ({
             id: s.id,
             class_id: s.classId,
             planned_start: s.plannedStart,
@@ -691,7 +689,7 @@ export async function saveWorkspaceToSupabase(
         )
         if (error) {
           const { error: e2 } = await sb.from('scheduled_sessions').upsert(
-            scheduling.scheduledSessions.map((s) => ({
+            scheduledRows.map((s) => ({
               id: s.id,
               class_id: s.classId,
               planned_start: s.plannedStart,
@@ -740,8 +738,9 @@ export async function saveWorkspaceToSupabase(
         }
       }
 
-      if (scheduling.learningSessions.length > 0) {
-        const baseRows = scheduling.learningSessions.map((s) => ({
+      const learningRows = dedupeById(scheduling.learningSessions)
+      if (learningRows.length > 0) {
+        const baseRows = learningRows.map((s) => ({
           id: s.id,
           class_id: s.classId,
           scheduled_session_id: s.scheduledSessionId,
@@ -760,7 +759,7 @@ export async function saveWorkspaceToSupabase(
         if (error) {
           // Retry without optional columns if migration not applied
           const { error: e2 } = await sb.from('learning_sessions').upsert(
-            scheduling.learningSessions.map((s) => ({
+            learningRows.map((s) => ({
               id: s.id,
               class_id: s.classId,
               scheduled_session_id: s.scheduledSessionId,
@@ -793,9 +792,10 @@ export async function saveWorkspaceToSupabase(
         if (toDelete.length > 0) await sb.from('attendance_records').delete().in('id', toDelete)
       }
 
-      if (scheduling.attendance.length > 0) {
+      const attendanceRows = dedupeById(scheduling.attendance)
+      if (attendanceRows.length > 0) {
         const { error } = await sb.from('attendance_records').upsert(
-          scheduling.attendance.map((a) => ({
+          attendanceRows.map((a) => ({
             id: a.id,
             learning_session_id: a.learningSessionId,
             learner_user_id: a.learnerUserId,
@@ -814,19 +814,51 @@ export async function saveWorkspaceToSupabase(
   }
 }
 
-export async function verifyWorkspacePersistence(snapshot: WorkspaceSnapshot): Promise<VerifySyncResult> {
+export async function verifyWorkspacePersistence(
+  snapshot: WorkspaceSnapshot,
+): Promise<VerifySyncResult> {
   const expected = normalizeIdsForDb(snapshot)
-  const loaded = await loadWorkspaceFromSupabase({ organizationId: expected.roster.organization.id })
+  const loaded = await loadWorkspaceFromSupabase({
+    organizationId: expected.roster.organization.id,
+  })
   if (!loaded.ok) return { ok: false, error: `reload failed: ${loaded.error}` }
 
   const missing = [
-    ...missingIds('users', expected.roster.users.map((u) => u.id), loaded.data.roster.users.map((u) => u.id)),
-    ...missingIds('courses', expected.roster.courses.map((c) => c.id), loaded.data.roster.courses.map((c) => c.id)),
-    ...missingIds('classes', expected.roster.classes.map((c) => c.id), loaded.data.roster.classes.map((c) => c.id)),
-    ...missingIds('enrollments', expected.roster.enrollments.map((e) => e.id), loaded.data.roster.enrollments.map((e) => e.id)),
-    ...missingIds('scheduled', expected.scheduling.scheduledSessions.map((s) => s.id), loaded.data.scheduling.scheduledSessions.map((s) => s.id)),
-    ...missingIds('learning', expected.scheduling.learningSessions.map((s) => s.id), loaded.data.scheduling.learningSessions.map((s) => s.id)),
-    ...missingIds('attendance', expected.scheduling.attendance.map((a) => a.id), loaded.data.scheduling.attendance.map((a) => a.id)),
+    ...missingIds(
+      'users',
+      expected.roster.users.map((u) => u.id),
+      loaded.data.roster.users.map((u) => u.id),
+    ),
+    ...missingIds(
+      'courses',
+      expected.roster.courses.map((c) => c.id),
+      loaded.data.roster.courses.map((c) => c.id),
+    ),
+    ...missingIds(
+      'classes',
+      expected.roster.classes.map((c) => c.id),
+      loaded.data.roster.classes.map((c) => c.id),
+    ),
+    ...missingIds(
+      'enrollments',
+      expected.roster.enrollments.map((e) => e.id),
+      loaded.data.roster.enrollments.map((e) => e.id),
+    ),
+    ...missingIds(
+      'scheduled',
+      expected.scheduling.scheduledSessions.map((s) => s.id),
+      loaded.data.scheduling.scheduledSessions.map((s) => s.id),
+    ),
+    ...missingIds(
+      'learning',
+      expected.scheduling.learningSessions.map((s) => s.id),
+      loaded.data.scheduling.learningSessions.map((s) => s.id),
+    ),
+    ...missingIds(
+      'attendance',
+      expected.scheduling.attendance.map((a) => a.id),
+      loaded.data.scheduling.attendance.map((a) => a.id),
+    ),
   ]
 
   if (missing.length > 0) {

@@ -13,11 +13,7 @@ import type {
 } from './types'
 
 export { defaultCourseSchedule } from './schedule'
-export {
-  formatScheduleLabel,
-  formatWeekdaysLabel,
-  normalizeCourseSchedule,
-} from './schedule'
+export { formatScheduleLabel, formatWeekdaysLabel, normalizeCourseSchedule } from './schedule'
 
 export function listTeachers(state: RosterState): DomainUser[] {
   return dedupeUsersByEmail(state.users.filter((u) => u.roles.includes('teacher')))
@@ -37,10 +33,7 @@ export function listLearnersRaw(state: RosterState): DomainUser[] {
   return state.users.filter((u) => u.roles.includes('learner'))
 }
 
-export function findLearnerByEmail(
-  state: RosterState,
-  email: string,
-): DomainUser | null {
+export function findLearnerByEmail(state: RosterState, email: string): DomainUser | null {
   const needle = email.trim().toLowerCase()
   if (!needle) return null
   return (
@@ -123,11 +116,7 @@ export function updateCourse(
   const name = input.name !== undefined ? input.name.trim() : course.name
   if (!code || !name) return { ok: false, error: 'Course code and name are required' }
 
-  if (
-    state.courses.some(
-      (c) => c.id !== courseId && c.code.toLowerCase() === code.toLowerCase(),
-    )
-  ) {
+  if (state.courses.some((c) => c.id !== courseId && c.code.toLowerCase() === code.toLowerCase())) {
     return { ok: false, error: `Course code ${code} already exists` }
   }
 
@@ -174,9 +163,7 @@ export function isEmailTaken(
 ): boolean {
   const needle = normalizeEmail(email)
   if (!needle) return false
-  return state.users.some(
-    (u) => u.id !== exceptUserId && normalizeEmail(u.email) === needle,
-  )
+  return state.users.some((u) => u.id !== exceptUserId && normalizeEmail(u.email) === needle)
 }
 
 /** True if another learner already owns this email. */
@@ -253,8 +240,7 @@ export function mergeDuplicateAccountsByEmail(
     const mergedRoles = [...new Set(group.flatMap((u) => u.roles))] as DomainUser['roles']
     const anyActive = group.some((u) => (u.accountStatus ?? 'active') === 'active')
     const avatarUrl = group.find((u) => u.avatarUrl)?.avatarUrl ?? keeper.avatarUrl
-    const displayName =
-      group.find((u) => u.displayName.trim())?.displayName ?? keeper.displayName
+    const displayName = group.find((u) => u.displayName.trim())?.displayName ?? keeper.displayName
 
     users = users.map((u) =>
       u.id === keeper.id
@@ -290,9 +276,7 @@ export function mergeDuplicateAccountsByEmail(
         continue
       }
       seatKey.add(key)
-      nextEnrollments.push(
-        learnerId === e.learnerUserId ? e : { ...e, learnerUserId: learnerId },
-      )
+      nextEnrollments.push(learnerId === e.learnerUserId ? e : { ...e, learnerUserId: learnerId })
     }
     enrollments = nextEnrollments
 
@@ -492,9 +476,7 @@ export function updateClass(
   }
 
   const teacherUserId = input.teacherUserId ?? klass.teacherUserId
-  const teacher = state.users.find(
-    (u) => u.id === teacherUserId && u.roles.includes('teacher'),
-  )
+  const teacher = state.users.find((u) => u.id === teacherUserId && u.roles.includes('teacher'))
   if (!teacher) return { ok: false, error: 'Teacher not found' }
 
   const capacity = input.capacity ?? klass.capacity
@@ -515,7 +497,11 @@ export function updateClass(
     input.schedule !== undefined
       ? normalizeCourseSchedule(input.schedule)
       : normalizeCourseSchedule(klass.schedule)
-  if (input.schedule !== undefined && input.schedule && (!nextSchedule || nextSchedule.slots.length === 0)) {
+  if (
+    input.schedule !== undefined &&
+    input.schedule &&
+    (!nextSchedule || nextSchedule.slots.length === 0)
+  ) {
     return { ok: false, error: 'Add at least one day and time for auto-schedule' }
   }
 
@@ -596,9 +582,7 @@ export function assignTeacher(
   const klass = state.classes.find((c) => c.id === classId)
   if (!klass || klass.status !== 'active') return { ok: false, error: 'Active class not found' }
 
-  const teacher = state.users.find(
-    (u) => u.id === teacherUserId && u.roles.includes('teacher'),
-  )
+  const teacher = state.users.find((u) => u.id === teacherUserId && u.roles.includes('teacher'))
   if (!teacher) return { ok: false, error: 'Teacher not found' }
 
   if (klass.teacherUserId === teacherUserId) {
@@ -632,9 +616,7 @@ export function enrollLearner(
   const klass = state.classes.find((c) => c.id === classId && c.status === 'active')
   if (!klass) return { ok: false, error: 'Active class not found' }
 
-  const learner = state.users.find(
-    (u) => u.id === learnerUserId && u.roles.includes('learner'),
-  )
+  const learner = state.users.find((u) => u.id === learnerUserId && u.roles.includes('learner'))
   if (!learner) return { ok: false, error: 'Learner not found' }
 
   const existing = state.enrollments.find(
@@ -777,9 +759,7 @@ export function createLearnerAndEnroll(
 
 /** Learners not currently active in this class (available to enroll). */
 export function learnersAvailableForClass(state: RosterState, classId: string): DomainUser[] {
-  const activeIds = new Set(
-    activeEnrollmentsForClass(state, classId).map((e) => e.learnerUserId),
-  )
+  const activeIds = new Set(activeEnrollmentsForClass(state, classId).map((e) => e.learnerUserId))
   return listActiveLearners(state).filter((u) => !activeIds.has(u.id))
 }
 
@@ -825,12 +805,10 @@ export function updateUserProfile(
   const user = state.users.find((u) => u.id === userId)
   if (!user) return { ok: false, error: 'User not found' }
 
-  const displayName =
-    input.displayName !== undefined ? input.displayName.trim() : user.displayName
+  const displayName = input.displayName !== undefined ? input.displayName.trim() : user.displayName
   if (!displayName) return { ok: false, error: 'Name is required' }
 
-  const nextEmail =
-    input.email !== undefined ? input.email?.trim() || null : user.email
+  const nextEmail = input.email !== undefined ? input.email?.trim() || null : user.email
   if (!nextEmail && (user.roles.includes('learner') || user.roles.includes('teacher'))) {
     return { ok: false, error: 'Email is required for teacher and learner accounts' }
   }
@@ -842,8 +820,7 @@ export function updateUserProfile(
     ...user,
     displayName,
     email: nextEmail,
-    avatarUrl:
-      input.avatarUrl !== undefined ? input.avatarUrl || null : user.avatarUrl,
+    avatarUrl: input.avatarUrl !== undefined ? input.avatarUrl || null : user.avatarUrl,
     accountStatus: input.accountStatus ?? user.accountStatus ?? 'active',
   }
 
@@ -889,10 +866,22 @@ export function deleteUserProfile(
   if (state.classes.some((c) => c.teacherUserId === userId && c.status === 'active')) {
     return { ok: false, error: 'Cannot delete teacher assigned to an active class' }
   }
-  if (state.enrollments.some((e) => e.learnerUserId === userId)) {
+  if (user.roles.includes('learner') && state.enrollments.some((e) => e.learnerUserId === userId)) {
+    const now = new Date().toISOString()
     return {
-      ok: false,
-      error: 'Cannot delete learner with enrollment history; end enrollments and keep profile',
+      ok: true,
+      value: { id: userId },
+      state: {
+        ...state,
+        users: state.users.map((u) =>
+          u.id === userId ? { ...u, accountStatus: 'inactive' as const } : u,
+        ),
+        enrollments: state.enrollments.map((e) =>
+          e.learnerUserId === userId && e.status === 'active'
+            ? { ...e, status: 'ended' as const, endedAt: now }
+            : e,
+        ),
+      },
     }
   }
   // Soft block: still teaching ended classes is ok to delete only if we reassign — keep simple:

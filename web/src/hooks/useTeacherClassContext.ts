@@ -57,7 +57,7 @@ export function useTeacherClassContext(): TeacherClassContext {
     options,
     classRow: option?.classRow ?? null,
     course: option?.course ?? null,
-    teacher: option?.teacher ?? null,
+    teacher: option?.teacher ?? signedInTeacher ?? null,
     seats: option?.seats ?? 0,
     activeClassId: option?.classRow.id ?? null,
     setActiveClassId,

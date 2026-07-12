@@ -3,6 +3,7 @@ import type { LearningSession, SchedulingState } from '../scheduling/types'
 import {
   acquireSessionLock,
   canHoldSessionLock,
+  dedupeById,
   mergeScheduling,
   protectedLearningSessionIds,
   prunableIds,
@@ -27,6 +28,19 @@ function ls(partial: Partial<LearningSession> & { id: string; classId: string })
 }
 
 describe('prunableIds / protected sessions', () => {
+  it('dedupes rows by id before bulk upsert', () => {
+    expect(
+      dedupeById([
+        { id: 's1', value: 1 },
+        { id: 's1', value: 2 },
+        { id: 's2', value: 3 },
+      ]),
+    ).toEqual([
+      { id: 's1', value: 2 },
+      { id: 's2', value: 3 },
+    ])
+  })
+
   it('never prunes protected open session ids', () => {
     const protectedIds = protectedLearningSessionIds(
       {
@@ -107,16 +121,10 @@ describe('session locks', () => {
     expect(locked.ok).toBe(true)
     if (!locked.ok) return
     expect(locked.session.ownerUserId).toBe('teacher-a')
-    expect(canHoldSessionLock(locked.session, 'teacher-b', '2026-07-11T10:00:30.000Z')).toBe(
-      false,
-    )
-    expect(canHoldSessionLock(locked.session, 'teacher-a', '2026-07-11T10:00:30.000Z')).toBe(
-      true,
-    )
+    expect(canHoldSessionLock(locked.session, 'teacher-b', '2026-07-11T10:00:30.000Z')).toBe(false)
+    expect(canHoldSessionLock(locked.session, 'teacher-a', '2026-07-11T10:00:30.000Z')).toBe(true)
     // after expiry
-    expect(
-      canHoldSessionLock(locked.session, 'teacher-b', '2026-07-11T10:02:00.000Z'),
-    ).toBe(true)
+    expect(canHoldSessionLock(locked.session, 'teacher-b', '2026-07-11T10:02:00.000Z')).toBe(true)
     const released = releaseSessionLock(locked.session)
     expect(released.ownerUserId).toBeNull()
   })

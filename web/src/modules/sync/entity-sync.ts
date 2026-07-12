@@ -36,15 +36,17 @@ export function prunableIds(
   return remoteIds.filter((id) => !keep.has(id) && !protectedIds.has(id))
 }
 
+/** Last write wins by id before bulk upsert; duplicate IDs in one PostgREST payload can 409. */
+export function dedupeById<T extends { id: string }>(rows: T[]): T[] {
+  return Array.from(new Map(rows.map((row) => [row.id, row])).values())
+}
+
 /**
  * Merge remote scheduling into local so another browser's open session is not lost.
  * Remote open sessions win for the same class if local lacks them.
  * Local attendance/sessions are kept when IDs match (local status wins if both completed).
  */
-export function mergeScheduling(
-  local: SchedulingState,
-  remote: SchedulingState,
-): SchedulingState {
+export function mergeScheduling(local: SchedulingState, remote: SchedulingState): SchedulingState {
   const schedById = new Map(local.scheduledSessions.map((s) => [s.id, s]))
   for (const s of remote.scheduledSessions) {
     if (!schedById.has(s.id)) schedById.set(s.id, s)

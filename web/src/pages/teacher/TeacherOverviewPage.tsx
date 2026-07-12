@@ -21,10 +21,11 @@ import { EmptyState, Panel, StatCard } from '../../components/ui'
 import { useFlash } from '../../hooks/useFlash'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import {
-  activeEnrollmentsForClass,
-  createLearnerAndEnroll,
+  addLearnerProfile,
+  enrollLearner,
   formatClassInviteClipboard,
   learnerInviteUrl,
+  listActiveLearners,
 } from '../../modules/roster/service'
 import {
   formatPercent,
@@ -66,24 +67,28 @@ export function TeacherOverviewPage() {
   ).length
 
   const learners = useMemo(() => {
-    if (!classRow) return []
-    return activeEnrollmentsForClass(roster, classRow.id).map((enrollment) => {
-      const user = roster.users.find((x) => x.id === enrollment.learnerUserId)
+    return listActiveLearners(roster).map((user) => {
+      const activeEnrollmentRows = roster.enrollments.filter(
+        (e) => e.learnerUserId === user.id && e.status === 'active',
+      )
       const sessionRows = summarizeLearnerSessions({
         ledger,
         scheduling,
-        learnerUserId: enrollment.learnerUserId,
-        classId: classRow.id,
+        learnerUserId: user.id,
+        classId: classRow?.id,
       })
       const rfcStats = learnerRfcStats(sessionRows)
       return {
-        id: enrollment.learnerUserId,
-        name: user?.displayName ?? enrollment.learnerUserId,
-        avatarUrl: user?.avatarUrl ?? null,
-        email: user?.email ?? null,
-        invite: user ? learnerInviteUrl(user) : null,
-        accountStatus: user?.accountStatus ?? 'active',
-        enrolledAt: enrollment.startedAt,
+        id: user.id,
+        name: user.displayName,
+        avatarUrl: user.avatarUrl ?? null,
+        email: user.email ?? null,
+        invite: learnerInviteUrl(user),
+        accountStatus: user.accountStatus ?? 'active',
+        classIds: activeEnrollmentRows.map((e) => e.classId),
+        assignedToActiveClass: classRow
+          ? activeEnrollmentRows.some((e) => e.classId === classRow.id)
+          : false,
         sessions: rfcStats.count,
         finalized: sessionRows.reduce((sum, row) => sum + row.total, 0),
         rfcMin: rfcStats.min,
@@ -98,33 +103,41 @@ export function TeacherOverviewPage() {
     learners.find((learner) => learner.id === activeLearnerUserId) ?? learners[0] ?? null
 
   async function addLearner() {
-    if (!classRow) return
-    const result = createLearnerAndEnroll(roster, classRow.id, {
+    const result = addLearnerProfile(roster, {
       displayName: newName,
       email: newEmail,
     })
     if (!result.ok) return err(result.error)
     setRoster(result.state)
-    setActiveLearnerUserId(result.value.learner.id)
+    setActiveLearnerUserId(result.value.id)
     setNewName('')
     setNewEmail('')
     await syncNow({ roster: result.state })
-    ok(`Added ${result.value.learner.displayName}`)
+    ok(`Added ${result.value.displayName}. Assign a class label when ready.`)
   }
 
-  if (!classRow || !teacher) {
+  async function assignActiveClass(learnerId: string) {
+    if (!classRow) return err('Create or select a class label first')
+    const result = enrollLearner(roster, classRow.id, learnerId)
+    if (!result.ok) return err(result.error)
+    setRoster(result.state)
+    await syncNow({ roster: result.state })
+    ok('Class label assigned')
+  }
+
+  if (!teacher) {
     return (
       <>
         <PageHeader
           icon={Users}
           kicker="Teacher"
           title="Learners"
-          subtitle="Create a class and seat learners to start teaching."
+          subtitle="Create learners first. Class labels can be assigned later."
         />
         <EmptyState
           icon={School}
-          title="No class yet"
-          description="Teacher owns classes and programs. Create a class, then add learners."
+          title="Teacher profile missing"
+          description="Ask Admin to create your Teacher account and mark it active."
           action={
             <Link to="/teacher/classes" className="btn primary">
               <School className="h-4 w-4" aria-hidden />
@@ -140,10 +153,12 @@ export function TeacherOverviewPage() {
     <>
       <PageHeader
         icon={Home}
-        kicker={course?.code ?? 'Program'}
+        kicker={course?.code ?? 'Learners'}
         title="Learner dashboard"
-        subtitle={`${seats} learners · ${course?.name ?? classRow.name} · start ${
-          classRow?.startsOn ?? '—'
+        subtitle={`${learners.length} learners · ${
+          classRow
+            ? `${course?.name ?? classRow.name} · ${seats} in class`
+            : 'no class label selected yet'
         } · ${taughtDays}/${plannedSessions || '—'} sessions${
           hasMultiple ? ` · ${options.length} classes` : ''
         }`}
@@ -196,7 +211,7 @@ export function TeacherOverviewPage() {
       <Panel
         icon={UserPlus}
         title="Add learner"
-        description="Simple teacher workflow: add name/email, then start session or open profile."
+        description="Create the learner profile first. Assign a class label later when needed."
       >
         <div className="teacher-add-learner">
           <label>
@@ -227,7 +242,7 @@ export function TeacherOverviewPage() {
         title="Learners"
         description="Manage learner list, open profile, track RFC progress, or start a session for one learner."
         actions={
-          inviteReady > 0 ? (
+          inviteReady > 0 && classRow ? (
             <button
               type="button"
               className="ghost"
@@ -261,6 +276,9 @@ export function TeacherOverviewPage() {
                 learner={learner}
                 selected={selectedLearner?.id === learner.id}
                 openSession={Boolean(openSession)}
+                activeClassName={classRow?.name ?? null}
+                canAssignActiveClass={Boolean(classRow) && !learner.assignedToActiveClass}
+                onAssignActiveClass={() => assignActiveClass(learner.id)}
                 onSelect={() => setActiveLearnerUserId(learner.id)}
                 onCopied={(text) => ok(text)}
               />
@@ -323,6 +341,15 @@ export function TeacherOverviewPage() {
                           <Eye className="h-4 w-4" aria-hidden />
                           Profile
                         </Link>
+                        {classRow && !learner.assignedToActiveClass ? (
+                          <button
+                            type="button"
+                            className="ghost"
+                            onClick={() => assignActiveClass(learner.id)}
+                          >
+                            Assign {classRow.name}
+                          </button>
+                        ) : null}
                         <Link
                           to={`/teacher/session?learner=${encodeURIComponent(learner.id)}`}
                           className="btn primary"
@@ -358,6 +385,9 @@ function LearnerCard({
   learner,
   selected,
   openSession,
+  activeClassName,
+  canAssignActiveClass,
+  onAssignActiveClass,
   onSelect,
   onCopied,
 }: {
@@ -372,9 +402,13 @@ function LearnerCard({
     rfcMin: number | null
     rfcMax: number | null
     rfcAvg: number | null
+    classIds: string[]
   }
   selected: boolean
   openSession: boolean
+  activeClassName: string | null
+  canAssignActiveClass: boolean
+  onAssignActiveClass: () => void
   onSelect: () => void
   onCopied: (message: string) => void
 }) {
@@ -402,9 +436,15 @@ function LearnerCard({
         </span>
       </div>
       <p className="meta my-0">
-        {learner.sessions} session(s) · {learner.finalized} finalized observations
+        {learner.sessions} session(s) · {learner.finalized} finalized observations ·{' '}
+        {learner.classIds.length ? `${learner.classIds.length} class label(s)` : 'No class label'}
       </p>
       <div className="btn-row teacher-learner-card-actions">
+        {canAssignActiveClass && activeClassName ? (
+          <button type="button" className="ghost" onClick={onAssignActiveClass}>
+            Assign {activeClassName}
+          </button>
+        ) : null}
         <Link to={`/teacher/learner/${encodeURIComponent(learner.id)}`} className="btn ghost">
           <Eye className="h-4 w-4" aria-hidden />
           Profile

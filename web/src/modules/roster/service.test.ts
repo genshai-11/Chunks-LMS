@@ -28,6 +28,7 @@ import {
   mergeDuplicateAccountsByEmail,
   listTeachers,
   listTeachersRaw,
+  listActiveLearners,
   countDuplicateEmailGroups,
 } from './service'
 
@@ -189,7 +190,9 @@ describe('admin roster workflows', () => {
     expect(result.value.enrollment.status).toBe('active')
     expect(activeEnrollmentsForClass(result.state, classId)).toHaveLength(before + 1)
     expect(
-      learnersAvailableForClass(result.state, classId).some((u) => u.id === result.value.learner.id),
+      learnersAvailableForClass(result.state, classId).some(
+        (u) => u.id === result.value.learner.id,
+      ),
     ).toBe(false)
   })
 
@@ -239,7 +242,19 @@ describe('admin roster workflows', () => {
     expect(state.users.find((u) => u.id === teacher.id)?.displayName).toBe('Lead Teacher')
 
     expect(deleteUserProfile(state, teacher.id).ok).toBe(false)
-    expect(deleteUserProfile(state, learner.id).ok).toBe(false)
+    const hidden = deleteUserProfile(state, learner.id)
+    expect(hidden.ok).toBe(true)
+    if (!hidden.ok) return
+    expect(hidden.state.users.find((u) => u.id === learner.id)?.accountStatus).toBe('inactive')
+    expect(listActiveLearners(hidden.state).some((u) => u.id === learner.id)).toBe(false)
+    expect(hidden.state.enrollments.filter((e) => e.learnerUserId === learner.id)).not.toHaveLength(
+      0,
+    )
+    expect(
+      hidden.state.enrollments
+        .filter((e) => e.learnerUserId === learner.id)
+        .every((e) => e.status === 'ended'),
+    ).toBe(true)
 
     const orphan = addLearnerProfile(state, {
       displayName: 'Orphan',
@@ -255,9 +270,7 @@ describe('admin roster workflows', () => {
     const seed = createSeedRoster()
     const learner = seed.users.find((u) => u.roles.includes('learner') && u.email)!
     const url = learnerInviteUrl(learner, 'https://lms.example')
-    expect(url).toBe(
-      `https://lms.example/access?email=${encodeURIComponent(learner.email!)}`,
-    )
+    expect(url).toBe(`https://lms.example/access?email=${encodeURIComponent(learner.email!)}`)
     const mailto = learnerInviteMailto(learner, 'https://lms.example')
     expect(mailto).toContain('mailto:')
     expect(mailto).toContain(encodeURIComponent(url!))
@@ -308,9 +321,7 @@ describe('admin roster workflows', () => {
           accountStatus: 'active',
         },
       ],
-      classes: state.classes.map((c, i) =>
-        i === 0 ? { ...c, teacherUserId: cloneId } : c,
-      ),
+      classes: state.classes.map((c, i) => (i === 0 ? { ...c, teacherUserId: cloneId } : c)),
     }
     expect(listTeachersRaw(state).length).toBeGreaterThan(listTeachers(state).length)
     expect(countDuplicateEmailGroups(state)).toBeGreaterThanOrEqual(1)
@@ -319,7 +330,11 @@ describe('admin roster workflows', () => {
     expect(merged.ok).toBe(true)
     if (!merged.ok) return
     expect(merged.value.removed).toBeGreaterThanOrEqual(1)
-    expect(listTeachersRaw(merged.state).filter((u) => normalizeEmail(u.email) === normalizeEmail(teacher.email)).length).toBe(1)
+    expect(
+      listTeachersRaw(merged.state).filter(
+        (u) => normalizeEmail(u.email) === normalizeEmail(teacher.email),
+      ).length,
+    ).toBe(1)
     expect(merged.state.classes.every((c) => c.teacherUserId !== cloneId)).toBe(true)
   })
 })

@@ -32,7 +32,11 @@ import { attemptNDepth } from '../../modules/assessment/probe-metrics'
 
 import type { PolicyActor } from '../../modules/identity/access-policy'
 import { getSupabase } from '../../lib/supabase'
-import { activeEnrollmentsForClass } from '../../modules/roster/service'
+import {
+  activeEnrollmentsForClass,
+  enrollLearner,
+  listActiveLearners,
+} from '../../modules/roster/service'
 import { subscribeToClassSnapshots } from '../../modules/realtime/snapshot-channel'
 import {
   completeLearningSession,
@@ -60,6 +64,7 @@ const SESSION_KINDS: { id: SessionKind; label: string; hint: string }[] = [
 export function TeacherSessionPage() {
   const {
     roster,
+    setRoster,
     scheduling,
     setScheduling,
     capture,
@@ -78,6 +83,7 @@ export function TeacherSessionPage() {
       classRow ? activeEnrollmentsForClass(roster, classRow.id).map((e) => e.learnerUserId) : [],
     [classRow, roster],
   )
+  const activeLearnerIds = useMemo(() => listActiveLearners(roster).map((u) => u.id), [roster])
 
   const openSession = scheduling.learningSessions.find(
     (s) => s.classId === classRow?.id && s.status === 'open',
@@ -86,10 +92,10 @@ export function TeacherSessionPage() {
   /** Learners in this capture: session participants or full roster */
   const sessionLearnerIds = useMemo(() => {
     if (openSession?.participantLearnerIds?.length) {
-      return openSession.participantLearnerIds.filter((id) => enrolledIds.includes(id))
+      return openSession.participantLearnerIds.filter((id) => activeLearnerIds.includes(id))
     }
-    return enrolledIds
-  }, [openSession, enrolledIds])
+    return activeLearnerIds
+  }, [openSession, activeLearnerIds])
 
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [sessionKind, setSessionKind] = useState<SessionKind>('regular')
@@ -97,22 +103,21 @@ export function TeacherSessionPage() {
   // Default multi-select: preselect query learner, else all enrolled
   useEffect(() => {
     if (openSession) return
-    if (enrolledIds.length === 0) {
+    if (activeLearnerIds.length === 0) {
       setSelectedIds([])
       return
     }
-    if (preselect && enrolledIds.includes(preselect)) {
+    if (preselect && activeLearnerIds.includes(preselect)) {
       setSelectedIds([preselect])
     } else {
       setSelectedIds(enrolledIds)
     }
-  }, [enrolledIds, preselect, openSession])
+  }, [activeLearnerIds, enrolledIds, preselect, openSession])
 
   const totalDays =
     classRow?.schedule?.sessionCount ??
     scheduling.scheduledSessions.filter(
-      (s) =>
-        s.classId === classRow?.id && s.status !== 'cancelled' && s.status !== 'rescheduled',
+      (s) => s.classId === classRow?.id && s.status !== 'cancelled' && s.status !== 'rescheduled',
     ).length ??
     null
   const dayNumber = openSession
@@ -182,10 +187,9 @@ export function TeacherSessionPage() {
     ) {
       return
     }
-    const ids =
-      openSession.participantLearnerIds?.length
-        ? openSession.participantLearnerIds
-        : enrolledIds
+    const ids = openSession.participantLearnerIds?.length
+      ? openSession.participantLearnerIds
+      : activeLearnerIds
     setCapture(
       createCaptureSession({
         learningSessionId: openSession.id,
@@ -198,7 +202,7 @@ export function TeacherSessionPage() {
     openSession,
     teacher,
     capture,
-    enrolledIds,
+    activeLearnerIds,
     metricSettings.defaultMaxProbeCount,
     setCapture,
   ])
@@ -209,9 +213,7 @@ export function TeacherSessionPage() {
   }
 
   function toggleLearner(id: string) {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    )
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
   }
 
   async function startLiveNow() {
@@ -219,6 +221,15 @@ export function TeacherSessionPage() {
     if (selectedIds.length === 0) {
       return err('Select at least one learner before starting')
     }
+    let rosterForSession = roster
+    for (const learnerId of selectedIds) {
+      if (enrolledIds.includes(learnerId)) continue
+      const enrolled = enrollLearner(rosterForSession, classRow.id, learnerId)
+      if (!enrolled.ok) return err(enrolled.error)
+      rosterForSession = enrolled.state
+    }
+    if (rosterForSession !== roster) setRoster(rosterForSession)
+
     const maxProbe = metricSettings.defaultMaxProbeCount
     const r = startLearningSession(scheduling, {
       classId: classRow.id,
@@ -251,7 +262,7 @@ export function TeacherSessionPage() {
     // Observe works local-first even if this fails.
     const { ensureLearningSessionOnServer } = await import('../../lib/live-assessment')
     const ensured = await ensureLearningSessionOnServer(r.value)
-    const pushed = await syncNow({ scheduling: sched, roster })
+    const pushed = await syncNow({ scheduling: sched, roster: rosterForSession })
     if (ensured.ok || pushed) {
       ok(
         `Live session started · ${selectedIds.length} learner(s)${
@@ -295,8 +306,8 @@ export function TeacherSessionPage() {
               <button
                 type="button"
                 className="ghost"
-                onClick={() => setSelectedIds(enrolledIds)}
-                disabled={enrolledIds.length === 0}
+                onClick={() => setSelectedIds(activeLearnerIds)}
+                disabled={activeLearnerIds.length === 0}
               >
                 Select all
               </button>
@@ -311,30 +322,26 @@ export function TeacherSessionPage() {
             </div>
           }
         >
-          {enrolledIds.length === 0 ? (
+          {activeLearnerIds.length === 0 ? (
             <EmptyState
               icon={Users}
-              title="No enrolled learners"
-              description="Seat learners from Classes first."
+              title="No learners yet"
+              description="Create learner profiles from Teacher → Learners first."
               action={
-                <Link to="/teacher/classes" className="btn ghost">
-                  Classes
+                <Link to="/teacher" className="btn ghost">
+                  Learners
                 </Link>
               }
             />
           ) : (
             <ul className="person-list">
-              {enrolledIds.map((id) => {
+              {activeLearnerIds.map((id) => {
                 const user = roster.users.find((u) => u.id === id)
                 const checked = selectedIds.includes(id)
                 return (
                   <li key={id}>
                     <label className="person-row-check">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleLearner(id)}
-                      />
+                      <input type="checkbox" checked={checked} onChange={() => toggleLearner(id)} />
                       <UserAvatar
                         name={user?.displayName ?? id}
                         avatarUrl={user?.avatarUrl}
@@ -343,7 +350,10 @@ export function TeacherSessionPage() {
                       <span>
                         <strong>{user?.displayName ?? id}</strong>
                         <span className="meta" style={{ display: 'block', margin: 0 }}>
-                          {user?.email ?? 'No email'}
+                          {user?.email ?? 'No email'} ·{' '}
+                          {enrolledIds.includes(id)
+                            ? 'Class assigned'
+                            : 'Will assign class on start'}
                         </span>
                       </span>
                     </label>
@@ -377,7 +387,9 @@ export function TeacherSessionPage() {
 
         <EmptyState
           icon={Radio}
-          title={selectedIds.length ? `Ready · ${selectedIds.length} learner(s)` : 'Select learners'}
+          title={
+            selectedIds.length ? `Ready · ${selectedIds.length} learner(s)` : 'Select learners'
+          }
           description="Start the next teaching day."
           action={
             <div className="btn-row">
@@ -441,9 +453,7 @@ export function TeacherSessionPage() {
           <div className="page-actions">
             <Link to={observeTo} className="btn primary">
               <Eye className="h-4 w-4" aria-hidden />
-              <span>
-                {finalizedCount > 0 ? `Resume ${dayBadge}` : `Observe ${dayBadge}`}
-              </span>
+              <span>{finalizedCount > 0 ? `Resume ${dayBadge}` : `Observe ${dayBadge}`}</span>
             </Link>
             <button
               type="button"
@@ -492,9 +502,7 @@ export function TeacherSessionPage() {
         <StatCard
           icon={Layers}
           label={PROBE_METRIC_LABELS.nDepthAvg}
-          value={
-            probeAgg?.nDepthAvg == null ? '—' : probeAgg.nDepthAvg.toFixed(1)
-          }
+          value={probeAgg?.nDepthAvg == null ? '—' : probeAgg.nDepthAvg.toFixed(1)}
           hint={PROBE_METRIC_TOOLTIPS.nDepthAvg}
         />
       </div>
@@ -534,9 +542,7 @@ export function TeacherSessionPage() {
                   <td className="font-mono text-xs tabular-nums">{col.qCount}</td>
                   <td className="font-mono text-xs tabular-nums">{col.done}</td>
                   <td className="font-mono text-xs tabular-nums">{col.nCount}</td>
-                  <td className="font-mono text-xs tabular-nums">
-                    {col.nDepthMax ?? '—'}
-                  </td>
+                  <td className="font-mono text-xs tabular-nums">{col.nDepthMax ?? '—'}</td>
                   <td className="font-mono text-xs tabular-nums">
                     {col.nDepthAvg == null ? '—' : col.nDepthAvg.toFixed(1)}
                   </td>
@@ -565,8 +571,7 @@ export function TeacherSessionPage() {
               {sessionLearnerIds.map((learnerId) => {
                 const user = roster.users.find((u) => u.id === learnerId)
                 const record = scheduling.attendance.find(
-                  (a) =>
-                    a.learningSessionId === openSession.id && a.learnerUserId === learnerId,
+                  (a) => a.learningSessionId === openSession.id && a.learnerUserId === learnerId,
                 )
                 return (
                   <tr key={learnerId}>
@@ -629,9 +634,7 @@ export function TeacherSessionPage() {
           <div className="btn-row">
             <Link to={observeTo} className="btn primary observe-entry-cta">
               <Eye className="h-4 w-4" aria-hidden />
-              <span>
-                {finalizedCount > 0 ? `Resume ${dayBadge}` : `Enter ${dayBadge}`}
-              </span>
+              <span>{finalizedCount > 0 ? `Resume ${dayBadge}` : `Enter ${dayBadge}`}</span>
             </Link>
             <button
               type="button"
@@ -648,10 +651,10 @@ export function TeacherSessionPage() {
             </button>
           </div>
           <p className="meta">
-            Mode {capture.position.mode.replace('_', '-')} · Q{' '}
-            {capture.position.questionIndex + 1}/{Math.max(capture.questions.length, 1)} ·{' '}
-            {finalizedCount}/{capture.attempts.length || '—'} finalized · Peak{' '}
-            {PROBE_METRIC_LABELS.nDepth}={captureSummary?.maxProbeDepth ?? 0}
+            Mode {capture.position.mode.replace('_', '-')} · Q {capture.position.questionIndex + 1}/
+            {Math.max(capture.questions.length, 1)} · {finalizedCount}/
+            {capture.attempts.length || '—'} finalized · Peak {PROBE_METRIC_LABELS.nDepth}=
+            {captureSummary?.maxProbeDepth ?? 0}
           </p>
         </div>
 
@@ -697,9 +700,7 @@ export function TeacherSessionPage() {
                           <span className="capture-dot">·</span>
                         )}
                       </td>
-                      <td className="font-mono text-xs tabular-nums">
-                        {n != null ? n : '—'}
-                      </td>
+                      <td className="font-mono text-xs tabular-nums">{n != null ? n : '—'}</td>
                     </tr>
                   )
                 })}

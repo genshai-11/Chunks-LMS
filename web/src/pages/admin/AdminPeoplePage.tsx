@@ -3,6 +3,8 @@ import {
   Check,
   GraduationCap,
   ImagePlus,
+  Link2,
+  Mail,
   Pencil,
   Trash2,
   UserPlus,
@@ -29,6 +31,27 @@ import { useAppState } from '../../state/useAppState'
 type Draft = { displayName: string; email: string; avatarUrl: string | null }
 
 const emptyDraft = (): Draft => ({ displayName: '', email: '', avatarUrl: null })
+
+function invitationUrl(user: DomainUser): string {
+  const origin = window.location.origin
+  if (user.roles.includes('learner') && user.email) {
+    return `${origin}/access?email=${encodeURIComponent(user.email)}`
+  }
+  return origin
+}
+
+function invitationMailto(user: DomainUser): string {
+  const role = user.roles.includes('learner')
+    ? 'Learner'
+    : user.roles.includes('teacher')
+      ? 'Teacher'
+      : 'Staff'
+  const subject = encodeURIComponent(`Chunks LMS ${role} invitation`)
+  const body = encodeURIComponent(
+    `Hi ${user.displayName},\n\nOpen your Chunks LMS invitation:\n${invitationUrl(user)}\n`,
+  )
+  return `mailto:${encodeURIComponent(user.email ?? '')}?subject=${subject}&body=${body}`
+}
 
 function AvatarField({
   name,
@@ -204,9 +227,7 @@ function PersonEditor({
                             className="row-input"
                             type="email"
                             value={editDraft.email}
-                            onChange={(e) =>
-                              setEditDraft((d) => ({ ...d, email: e.target.value }))
-                            }
+                            onChange={(e) => setEditDraft((d) => ({ ...d, email: e.target.value }))}
                             aria-label="Email"
                           />
                         </td>
@@ -247,6 +268,22 @@ function PersonEditor({
                     <td className="font-mono text-xs text-slate-500">{u.email ?? '—'}</td>
                     <td>
                       <div className="row-actions">
+                        {u.email ? (
+                          <>
+                            <button
+                              type="button"
+                              className="ghost"
+                              onClick={() => void navigator.clipboard.writeText(invitationUrl(u))}
+                            >
+                              <Link2 className="h-3.5 w-3.5" aria-hidden />
+                              <span>Copy invite</span>
+                            </button>
+                            <a className="btn ghost" href={invitationMailto(u)}>
+                              <Mail className="h-3.5 w-3.5" aria-hidden />
+                              <span>Send</span>
+                            </a>
+                          </>
+                        ) : null}
                         <button
                           type="button"
                           className="ghost"
@@ -262,11 +299,7 @@ function PersonEditor({
                           <Pencil className="h-3.5 w-3.5" aria-hidden />
                           <span>Edit</span>
                         </button>
-                        <button
-                          type="button"
-                          className="ghost danger"
-                          onClick={() => onDelete(u)}
-                        >
+                        <button type="button" className="ghost danger" onClick={() => onDelete(u)}>
                           <Trash2 className="h-3.5 w-3.5" aria-hidden />
                           <span>Delete</span>
                         </button>

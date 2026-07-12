@@ -1,5 +1,5 @@
 import { GraduationCap, LogIn, RotateCcw, Shield, Users } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { useStaffSession } from '../auth/useStaffSession'
 import { env } from '../env'
 import { useAppState } from '../state/useAppState'
@@ -10,6 +10,10 @@ export function HomePage() {
   const className = roster.classes[0]?.name
   const courseCode = roster.courses[0]?.code
   const people = roster.users.length
+
+  if (session.ready && session.signedIn && !session.authBypass) {
+    return <Navigate to={session.canAccess('admin') ? '/admin' : '/teacher'} replace />
+  }
 
   const chips: Array<{
     to: string
@@ -77,7 +81,11 @@ export function HomePage() {
         </div>
         <p className="meta home-meta">
           {env.isConfigured ? 'Connected' : 'Local'}
-          {session.authBypass ? ' · staff bypass' : session.signedIn ? ' · staff signed in' : ' · staff sign-in for Admin/Teacher'}
+          {session.authBypass
+            ? ' · staff bypass'
+            : session.signedIn
+              ? ' · staff signed in'
+              : ' · staff sign-in for Admin/Teacher'}
           {people > 0 ? ` · ${people} people` : ' · empty org'}
           {courseCode ? ` · ${courseCode}` : ''}
           {className ? ` · ${className}` : ''}

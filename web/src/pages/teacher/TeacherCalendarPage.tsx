@@ -13,7 +13,7 @@ import {
   Timer,
   Trash2,
 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Flash } from '../../components/Flash'
 import { PageHeader } from '../../components/PageHeader'
 import { EmptyState, Panel } from '../../components/ui'
@@ -95,9 +95,18 @@ function statusClass(status: ScheduledSession['status']): string {
 }
 
 export function TeacherCalendarPage() {
-  const { roster, scheduling, setScheduling, setCapture, metricSettings } = useAppState()
+  const {
+    roster,
+    scheduling,
+    setScheduling,
+    setCapture,
+    metricSettings,
+    activeLearnerUserId,
+    setActiveLearnerUserId,
+  } = useAppState()
   const { message, error, ok, err } = useFlash()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const today = useMemo(() => {
     const t = new Date()
     t.setHours(0, 0, 0, 0)
@@ -110,11 +119,14 @@ export function TeacherCalendarPage() {
   const [slotHour, setSlotHour] = useState(9)
 
   const { classRow, course, teacher } = useTeacherClassContext()
-  const activeLearners = useMemo(
-    () =>
-      classRow ? activeEnrollmentsForClass(roster, classRow.id).map((e) => e.learnerUserId) : [],
-    [classRow, roster],
-  )
+  const preferredLearnerId = searchParams.get('learner') ?? activeLearnerUserId
+  const activeLearners = useMemo(() => {
+    const ids = classRow
+      ? activeEnrollmentsForClass(roster, classRow.id).map((e) => e.learnerUserId)
+      : []
+    if (!preferredLearnerId || !ids.includes(preferredLearnerId)) return ids
+    return [preferredLearnerId, ...ids.filter((id) => id !== preferredLearnerId)]
+  }, [classRow, roster, preferredLearnerId])
   const openSession = scheduling.learningSessions.find(
     (s) => s.classId === classRow?.id && s.status === 'open',
   )
@@ -186,6 +198,7 @@ export function TeacherCalendarPage() {
     })
     if (!r.ok) return err(r.error)
     setScheduling(r.state)
+    if (preferredLearnerId) setActiveLearnerUserId(preferredLearnerId)
     setCapture(
       createCaptureSession({
         learningSessionId: r.value.id,
@@ -509,10 +522,7 @@ export function TeacherCalendarPage() {
             </label>
             <label>
               Start hour
-              <select
-                value={slotHour}
-                onChange={(e) => setSlotHour(Number(e.target.value))}
-              >
+              <select value={slotHour} onChange={(e) => setSlotHour(Number(e.target.value))}>
                 {Array.from({ length: 14 }, (_, i) => i + 7).map((h) => (
                   <option key={h} value={h}>
                     {String(h).padStart(2, '0')}:00
@@ -522,10 +532,7 @@ export function TeacherCalendarPage() {
             </label>
             <label>
               Duration
-              <select
-                value={duration}
-                onChange={(e) => setDuration(Number(e.target.value))}
-              >
+              <select value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
                 {[30, 45, 60, 90, 120].map((m) => (
                   <option key={m} value={m}>
                     {m} min

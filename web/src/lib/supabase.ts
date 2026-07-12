@@ -15,7 +15,7 @@ export function getSupabase(): SupabaseClient<Database> | null {
   if (!env.supabaseUrl || !env.supabaseAnonKey) return null
   if (!client) {
     client = createClient<Database>(env.supabaseUrl, env.supabaseAnonKey, {
-      accessToken: async () => accessTokenProvider?.() ?? null,
+      accessToken: async () => (env.supabaseClerkAuth ? (accessTokenProvider?.() ?? null) : null),
       auth: {
         persistSession: false,
         autoRefreshToken: false,
@@ -33,7 +33,7 @@ export function getSupabase(): SupabaseClient<Database> | null {
 export async function setSupabaseAccessToken(token: string | null): Promise<void> {
   const supabase = getSupabase()
   if (!supabase) return
-  if (token) {
+  if (token && env.supabaseClerkAuth) {
     await supabase.realtime.setAuth(token)
   } else {
     await supabase.realtime.setAuth()

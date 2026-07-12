@@ -6,6 +6,8 @@ const envSchema = z.object({
   VITE_SUPABASE_URL: z.string().url().optional().or(z.literal('')).default(''),
   VITE_SUPABASE_ANON_KEY: z.string().optional().default(''),
   VITE_AUTH_BYPASS: z.string().optional().default('false'),
+  /** Enable only after Clerk is registered under Supabase Third-Party Auth. */
+  VITE_SUPABASE_CLERK_AUTH: z.string().optional().default('false'),
   /** Comma-separated admin emails (Clerk primary email). Empty = bootstrap any signed-in staff. */
   VITE_STAFF_ADMIN_EMAILS: z.string().optional().default(''),
   /** Comma-separated teacher emails. Empty = bootstrap any signed-in staff. */
@@ -27,6 +29,7 @@ export type AppEnv = {
   supabaseAnonKey: string
   /** Local/CI only — grants Admin+Teacher without sign-in. Never true in production. */
   authBypass: boolean
+  supabaseClerkAuth: boolean
   staffAdminEmails: string[]
   staffTeacherEmails: string[]
   /** Clerk + Supabase both configured */
@@ -41,6 +44,7 @@ function readEnv(): AppEnv {
     VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
     VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
     VITE_AUTH_BYPASS: import.meta.env.VITE_AUTH_BYPASS,
+    VITE_SUPABASE_CLERK_AUTH: import.meta.env.VITE_SUPABASE_CLERK_AUTH,
     VITE_STAFF_ADMIN_EMAILS: import.meta.env.VITE_STAFF_ADMIN_EMAILS,
     VITE_STAFF_TEACHER_EMAILS: import.meta.env.VITE_STAFF_TEACHER_EMAILS,
     MODE: import.meta.env.MODE,
@@ -59,6 +63,7 @@ function readEnv(): AppEnv {
         VITE_SUPABASE_URL: '',
         VITE_SUPABASE_ANON_KEY: '',
         VITE_AUTH_BYPASS: 'false',
+        VITE_SUPABASE_CLERK_AUTH: 'false',
         VITE_STAFF_ADMIN_EMAILS: '',
         VITE_STAFF_TEACHER_EMAILS: '',
       }
@@ -77,6 +82,7 @@ function readEnv(): AppEnv {
     supabaseUrl,
     supabaseAnonKey,
     authBypass,
+    supabaseClerkAuth: truthy(data.VITE_SUPABASE_CLERK_AUTH),
     staffAdminEmails: parseEmailList(data.VITE_STAFF_ADMIN_EMAILS),
     staffTeacherEmails: parseEmailList(data.VITE_STAFF_TEACHER_EMAILS),
     isConfigured: Boolean(clerkPublishableKey && supabaseUrl && supabaseAnonKey),

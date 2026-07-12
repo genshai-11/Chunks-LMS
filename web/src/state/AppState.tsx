@@ -14,6 +14,7 @@ import {
   saveWorkspaceToSupabase,
 } from '../lib/supabase-sync'
 import { mergeScheduling } from '../modules/sync/entity-sync'
+import { chooseBootstrapSource } from '../modules/sync/bootstrap-policy'
 import { rebuildLedgerFromCloud } from '../lib/reconciliation-fetch'
 import { AppStateContext, type BackendStatus } from './app-state-context'
 import { clearPersistedAppState, loadPersistedAppState, savePersistedAppState } from './persist'
@@ -32,10 +33,7 @@ import {
   type CorrectResultInput,
 } from '../modules/ops/audit'
 import type { OpsAuditEvent } from '../modules/ops/types'
-import {
-  loadOrgMetricSettings,
-  saveOrgMetricSettings,
-} from '../lib/org-settings-sync'
+import { loadOrgMetricSettings, saveOrgMetricSettings } from '../lib/org-settings-sync'
 
 function ledgerFromCapture(
   capture: CaptureSessionState,
@@ -96,6 +94,13 @@ function rebaseRosterOrganization(
     organization: { id: organizationId, name },
     courses: r.courses.map((course) => ({ ...course, organizationId })),
   }
+}
+
+function syncPhaseError(
+  phase: 'auth' | 'provision' | 'load' | 'write' | 'reload',
+  message: string,
+): string {
+  return `[${phase}] ${message}`
 }
 
 function ensureStableOrg(r: RosterState): RosterState {
@@ -179,7 +184,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // Signed-out staff: keep local cache, do not wipe, skip cloud until sign-in
       if (staffSession.clerkEnabled && !staffSession.signedIn && !staffSession.authBypass) {
         setBackendStatus(isSupabaseConfigured() ? 'offline' : 'offline')
-        setBackendError('Sign in to load and sync Supabase workspace')
+        setBackendError(syncPhaseError('auth', 'Sign in to load and sync Supabase workspace'))
         bootDone.current = true
         return
       }
@@ -200,7 +205,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         })
         if (!provisioned.ok) {
           setBackendStatus('error')
-          setBackendError(provisioned.error)
+          setBackendError(syncPhaseError('provision', provisioned.error))
           return
         }
         organizationId = provisioned.organizationId
@@ -210,7 +215,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       if (cancelled) return
       if (!loaded.ok) {
         setBackendStatus('error')
-        setBackendError(loaded.error)
+        setBackendError(syncPhaseError('load', loaded.error))
         bootDone.current = true
         return
       }
@@ -219,9 +224,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         roster: ensureStableOrg(loaded.data.roster),
         scheduling: loaded.data.scheduling,
       }
-      const localRoster = ensureStableOrg(
-        persistedRef.current?.roster ?? liveRef.current.roster,
-      )
+      const localRoster = ensureStableOrg(persistedRef.current?.roster ?? liveRef.current.roster)
       const live = {
         roster: organizationId
           ? rebaseRosterOrganization(localRoster, organizationId, remote.roster.organization.name)
@@ -234,11 +237,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       skipNextSync.current = true
 
       let authoritativeRoster = remote.roster
-      if (wRemote > 0) {
+      const source = chooseBootstrapSource(wRemote, wLive)
+      if (source === 'cloud') {
         // Cloud roster authoritative; merge scheduling so open remote sessions survive.
         setRoster(remote.roster)
         setScheduling(mergeScheduling(live.scheduling, remote.scheduling))
-      } else if (wLive > 0) {
+      } else if (source === 'local') {
         // One-time migration from this browser into the empty Clerk workspace.
         authoritativeRoster = live.roster
         setRoster(live.roster)
@@ -288,7 +292,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       void saveOrgMetricSettings(orgId, metricSettings)
     }, 800)
     return () => clearTimeout(t)
-  }, [metricSettings, roster.organization.id])
+  }, [metricSettings, roster])
 
   // Debounced Supabase save
   useEffect(() => {
@@ -327,7 +331,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setLastSyncedAt(new Date().toISOString())
       } else {
         setBackendStatus('error')
-        setBackendError(result.error)
+        setBackendError(syncPhaseError('write', result.error))
       }
     }, 700)
 
@@ -367,7 +371,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setLastSyncedAt(new Date().toISOString())
     } else {
       setBackendStatus('error')
-      setBackendError(result.error)
+      setBackendError(syncPhaseError('write', result.error))
     }
   }, [roster, scheduling])
 
@@ -382,7 +386,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     })
     if (!provisioned.ok) {
       setBackendStatus('error')
-      setBackendError(provisioned.error)
+      setBackendError(syncPhaseError('reload', provisioned.error))
       return
     }
     const loaded = await loadWorkspaceFromSupabase({
@@ -390,7 +394,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     })
     if (!loaded.ok) {
       setBackendStatus('error')
-      setBackendError(loaded.error)
+      setBackendError(syncPhaseError('reload', loaded.error))
       return
     }
     skipNextSync.current = true

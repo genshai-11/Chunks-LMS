@@ -6,7 +6,7 @@ import { activeEnrollmentsForClass } from '../../modules/roster/service'
 import { useAppState } from '../../state/useAppState'
 
 export function TeacherAnalysisPage() {
-  const { roster, scheduling, ledger, metricSettings } = useAppState()
+  const { roster, scheduling, ledger, metricSettings, activeLearnerUserId } = useAppState()
   const { classRow, course } = useTeacherClassContext()
 
   const learners = classRow
@@ -19,7 +19,10 @@ export function TeacherAnalysisPage() {
     return (
       <>
         <PageHeader kicker="Teacher" title="Analysis & progress" />
-        <div className="empty-state">Assign a class and course first (Admin). Use the class switcher when you teach more than one.</div>
+        <div className="empty-state">
+          Assign a class and course first (Admin). Use the class switcher when you teach more than
+          one.
+        </div>
       </>
     )
   }
@@ -59,6 +62,7 @@ export function TeacherAnalysisPage() {
           }))}
         emptyHint="Start a live session and finalize Focus / Awareness colors to populate this report."
         metricSettings={metricSettings}
+        learnerUserId={activeLearnerUserId ?? undefined}
       />
     </>
   )

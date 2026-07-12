@@ -1,12 +1,12 @@
 import { useEffect, useMemo } from 'react'
 import {
-  listTeacherClassOptions,
   listTeacherOperableClasses,
   resolveActiveClass,
   toClassOption,
   type ClassOption,
 } from '../modules/roster/class-context'
 import { useAppState } from '../state/useAppState'
+import { useStaffSession } from '../auth/useStaffSession'
 
 export type TeacherClassContext = {
   options: ClassOption[]
@@ -22,9 +22,21 @@ export type TeacherClassContext = {
 /** Active class for Teacher workspace (multi-class switcher). */
 export function useTeacherClassContext(): TeacherClassContext {
   const { roster, activeClassId, setActiveClassId } = useAppState()
+  const staffSession = useStaffSession()
+  const signedInTeacher = roster.users.find(
+    (user) =>
+      user.roles.includes('teacher') &&
+      Boolean(staffSession.email) &&
+      user.email?.toLowerCase() === staffSession.email?.toLowerCase(),
+  )
 
-  const classes = useMemo(() => listTeacherOperableClasses(roster), [roster])
-  const options = useMemo(() => listTeacherClassOptions(roster), [roster])
+  const classes = useMemo(() => {
+    const all = listTeacherOperableClasses(roster)
+    return staffSession.canAccess('admin') || !signedInTeacher
+      ? all
+      : all.filter((row) => row.teacherUserId === signedInTeacher.id)
+  }, [roster, staffSession, signedInTeacher])
+  const options = useMemo(() => classes.map((row) => toClassOption(roster, row)), [classes, roster])
   const classRow = useMemo(
     () => resolveActiveClass(classes, activeClassId),
     [classes, activeClassId],

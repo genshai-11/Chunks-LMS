@@ -37,6 +37,7 @@ import {
 import { ObserveHeatmap } from '../../components/ObserveHeatmap'
 import { UserAvatar } from '../../components/UserAvatar'
 import type { ResultColor } from '../../modules/result-lifecycle/types'
+import { PROBE_ACTIONS } from '../../modules/assessment/probe-actions'
 import {
   resolveSessionDayNumber,
   sessionDayBadge,
@@ -562,7 +563,7 @@ export function TeacherObservePage() {
         if (k === 'f') {
           e.preventDefault()
           resolveProbe('fail')
-        } else if (k === 'c') {
+        } else if (k === 'p' || k === 'c') {
           e.preventDefault()
           resolveProbe('continue')
         } else if (k === 'd' || k === 'enter') {
@@ -879,31 +880,20 @@ export function TeacherObservePage() {
               className={`observe-dock observe-dock-lg${reaction ? ` is-glowing is-${reaction.color}` : ''}`}
             >
               {probeOpen ? (
-                <div className="observe-dock-probe" role="group" aria-label="Resolve green">
-                  <button
-                    type="button"
-                    className="observe-dock-probe-btn fail"
-                    onClick={() => resolveProbe('fail')}
-                    disabled={liveSaving}
-                  >
-                    Fail
-                  </button>
-                  <button
-                    type="button"
-                    className="observe-dock-probe-btn cont"
-                    onClick={() => resolveProbe('continue')}
-                    disabled={liveSaving}
-                  >
-                    Cont
-                  </button>
-                  <button
-                    type="button"
-                    className="observe-dock-probe-btn done"
-                    onClick={() => resolveProbe('done')}
-                    disabled={liveSaving}
-                  >
-                    Done
-                  </button>
+                <div className="observe-dock-probe" role="group" aria-label="Resolve probe">
+                  {PROBE_ACTIONS.map((action) => (
+                    <button
+                      key={action.outcome}
+                      type="button"
+                      className={`observe-dock-probe-btn ${action.className}`}
+                      onClick={() => resolveProbe(action.outcome)}
+                      disabled={liveSaving}
+                      aria-label={`${action.label} probe`}
+                    >
+                      <span>{action.label}</span>
+                      <kbd>{action.shortcut}</kbd>
+                    </button>
+                  ))}
                 </div>
               ) : (
                 <div className="observe-dock-colors" role="group" aria-label="Result color">
@@ -1016,7 +1006,7 @@ export function TeacherObservePage() {
               </div>
               <div className="observe-key-row">
                 <span>
-                  <kbd>F</kbd>/<kbd>C</kbd>/<kbd>D</kbd> Probe Action
+                  <kbd>F</kbd>/<kbd>P</kbd>/<kbd>D</kbd> Fail / Pass / Done
                 </span>
               </div>
             </div>

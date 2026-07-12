@@ -2,14 +2,17 @@ import {
   CalendarDays,
   ChartColumn,
   ClipboardCopy,
+  Eye,
   Home,
   Link2,
+  Play,
   Radio,
   School,
   Users,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { PageHeader } from '../../components/PageHeader'
+import { UserAvatar } from '../../components/UserAvatar'
 import { EmptyState, NavTile, Panel, PersonRow, StatCard } from '../../components/ui'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import { useFlash } from '../../hooks/useFlash'
@@ -22,7 +25,8 @@ import {
 import { useAppState } from '../../state/useAppState'
 
 export function TeacherOverviewPage() {
-  const { roster, scheduling, capture, ledger } = useAppState()
+  const { roster, scheduling, capture, ledger, activeLearnerUserId, setActiveLearnerUserId } =
+    useAppState()
   const { options, classRow, course, teacher, seats, hasMultiple } = useTeacherClassContext()
   const { message, error, ok, err } = useFlash()
 
@@ -30,9 +34,7 @@ export function TeacherOverviewPage() {
     (s) => s.classId === classRow?.id && s.status === 'open',
   )
   const scheduled = scheduling.scheduledSessions.filter((s) => s.classId === classRow?.id).length
-  const classResults = classRow
-    ? ledger.filter((r) => r.classId === classRow.id).length
-    : 0
+  const classResults = classRow ? ledger.filter((r) => r.classId === classRow.id).length : 0
 
   const learners = classRow
     ? activeEnrollmentsForClass(roster, classRow.id).map((e) => {
@@ -48,6 +50,29 @@ export function TeacherOverviewPage() {
     : []
 
   const inviteReady = learners.filter((l) => l.invite).length
+  const selectedLearner =
+    learners.find((learner) => learner.id === activeLearnerUserId) ?? learners[0] ?? null
+  const selectedResults = selectedLearner
+    ? ledger.filter(
+        (result) => result.classId === classRow?.id && result.learnerUserId === selectedLearner.id,
+      )
+    : []
+  const selectedRisk = selectedResults.filter(
+    (result) => result.effectiveColor === 'red' || result.effectiveColor === 'yellow',
+  ).length
+  const selectedRfc =
+    selectedResults.length > 0 ? Math.round((selectedRisk / selectedResults.length) * 100) : null
+  const selectedRac = selectedRfc == null ? null : 100 - selectedRfc
+  const selectedAttendance = selectedLearner
+    ? scheduling.attendance.filter(
+        (record) =>
+          record.learnerUserId === selectedLearner.id &&
+          scheduling.learningSessions.some(
+            (session) =>
+              session.id === record.learningSessionId && session.classId === classRow?.id,
+          ),
+      )
+    : []
 
   const nextScheduled = scheduling.scheduledSessions
     .filter((s) => s.classId === classRow?.id && s.status === 'scheduled')
@@ -154,6 +179,77 @@ export function TeacherOverviewPage() {
         </div>
       </Panel>
 
+      {selectedLearner ? (
+        <Panel
+          icon={Users}
+          title="Learner profile"
+          description="Finalized Focus & Awareness indicators for the selected learner."
+        >
+          <div className="teacher-learner-profile">
+            <div className="teacher-learner-identity">
+              <UserAvatar
+                name={selectedLearner.name}
+                avatarUrl={selectedLearner.avatarUrl}
+                size="xl"
+              />
+              <div>
+                <h3>{selectedLearner.name}</h3>
+                <p>{selectedLearner.email ?? 'No email'}</p>
+              </div>
+            </div>
+            <div className="teacher-learner-metrics" aria-label="Learner progress summary">
+              <span>
+                <strong>{selectedResults.length}</strong>
+                <small>Finalized</small>
+              </span>
+              <span>
+                <strong>{selectedRfc == null ? '—' : `${selectedRfc}%`}</strong>
+                <small>RFC</small>
+              </span>
+              <span>
+                <strong>{selectedRac == null ? '—' : `${selectedRac}%`}</strong>
+                <small>RAC</small>
+              </span>
+              <span>
+                <strong>{selectedAttendance.length}</strong>
+                <small>Attendance</small>
+              </span>
+            </div>
+            <div className="btn-row teacher-learner-actions">
+              <Link
+                to={`/teacher/calendar?learner=${encodeURIComponent(selectedLearner.id)}`}
+                className="btn primary"
+                onClick={() => setActiveLearnerUserId(selectedLearner.id)}
+              >
+                <Play className="h-4 w-4" aria-hidden />
+                {openSession ? 'Resume session' : 'Start session'}
+              </Link>
+              <Link
+                to={`/teacher/analysis?learner=${encodeURIComponent(selectedLearner.id)}`}
+                className="btn ghost"
+                onClick={() => setActiveLearnerUserId(selectedLearner.id)}
+              >
+                <Eye className="h-4 w-4" aria-hidden />
+                View report
+              </Link>
+              {selectedLearner.invite ? (
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(selectedLearner.invite!)
+                    ok(`Invite copied for ${selectedLearner.name}`)
+                  }}
+                >
+                  <Link2 className="h-4 w-4" aria-hidden />
+                  Copy invite
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </Panel>
+      ) : null}
+
       <Panel
         icon={Users}
         title="Roster & invites"
@@ -199,23 +295,33 @@ export function TeacherOverviewPage() {
                 meta={l.email ?? 'No email — no invite link'}
                 avatarUrl={l.avatarUrl}
                 actions={
-                  l.invite ? (
+                  <div className="row-actions">
                     <button
                       type="button"
-                      className="ghost"
-                      onClick={async () => {
-                        try {
-                          await navigator.clipboard.writeText(l.invite!)
-                          ok(`Invite copied for ${l.name}`)
-                        } catch {
-                          ok(l.invite!)
-                        }
-                      }}
+                      className={selectedLearner?.id === l.id ? 'primary' : 'ghost'}
+                      onClick={() => setActiveLearnerUserId(l.id)}
                     >
-                      <Link2 className="h-3.5 w-3.5" aria-hidden />
-                      <span>Copy</span>
+                      <Eye className="h-3.5 w-3.5" aria-hidden />
+                      <span>{selectedLearner?.id === l.id ? 'Selected' : 'Profile'}</span>
                     </button>
-                  ) : undefined
+                    {l.invite ? (
+                      <button
+                        type="button"
+                        className="ghost"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(l.invite!)
+                            ok(`Invite copied for ${l.name}`)
+                          } catch {
+                            ok(l.invite!)
+                          }
+                        }}
+                      >
+                        <Link2 className="h-3.5 w-3.5" aria-hidden />
+                        <span>Copy</span>
+                      </button>
+                    ) : null}
+                  </div>
                 }
               />
             ))}

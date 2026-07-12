@@ -2145,21 +2145,20 @@
   }
 
   .observe-dock-probe-btn {
-    @apply relative flex w-14 h-14 sm:w-16 sm:h-16 shrink-0 flex-col items-center justify-center rounded-full border-2 border-slate-950 text-xs font-bold transition-all duration-200 cursor-pointer active:scale-95;
-    box-shadow: inset 0 4px 6px rgba(0, 0, 0, 0.6);
+    @apply relative flex h-16 w-16 shrink-0 cursor-pointer flex-col items-center justify-center rounded-full border-2 border-slate-500 bg-slate-800 text-xs font-bold text-slate-100 shadow-lg transition-all duration-150 hover:border-slate-300 hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 sm:h-[4.5rem] sm:w-[4.5rem];
+    box-shadow:
+      inset 0 2px 5px rgb(255 255 255 / 0.08),
+      0 8px 18px rgb(0 0 0 / 0.32);
   }
 
-  .observe-dock-probe-btn.fail {
-    @apply bg-gradient-to-b from-[#ff3b30] to-[#e50914] text-white shadow-[0_0_20px_5px_#ef4444,_inset_0_2px_6px_rgba(255,255,255,0.55)] border-white/30 scale-105;
-  }
-  .observe-dock-probe-btn.cont {
-    @apply bg-gradient-to-b from-[#ffe600] to-[#f59e0b] text-yellow-950 shadow-[0_0_20px_5px_#f59e0b,_inset_0_2px_6px_rgba(255,255,255,0.65)] border-white/30 scale-105;
-  }
+  .observe-dock-probe-btn.fail,
+  .observe-dock-probe-btn.pass,
   .observe-dock-probe-btn.done {
-    @apply bg-gradient-to-b from-[#34c759] to-[#099268] text-white shadow-[0_0_20px_5px_#10b981,_inset_0_2px_6px_rgba(255,255,255,0.55)] border-white/30 scale-105;
+    @apply border-slate-500 bg-slate-800 text-slate-100;
   }
+
   .observe-dock-probe-btn kbd {
-    @apply rounded border border-white/20 bg-black/20 px-1 font-mono text-[7px] mt-0.5 opacity-70;
+    @apply mt-1 rounded border border-white/20 bg-black/20 px-1.5 py-0.5 font-mono text-[8px] text-slate-300;
   }
 
   .observe-dock-tools {
@@ -2288,8 +2287,10 @@
     }
 
     .observe-dock-probe-btn {
-      @apply w-12 h-12 min-h-0 rounded-full p-1.5 border-2 border-slate-950 text-[9px] flex flex-col items-center justify-center;
-      box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.6);
+      @apply flex h-16 min-h-16 w-16 min-w-16 flex-col items-center justify-center rounded-full border-2 border-slate-500 bg-slate-800 p-1.5 text-[10px] text-slate-100;
+      box-shadow:
+        inset 0 2px 5px rgb(255 255 255 / 0.08),
+        0 6px 14px rgb(0 0 0 / 0.3);
     }
 
     .observe-dock-tools {
@@ -2915,6 +2916,53 @@
 
   .chart-plot {
     @apply h-[280px] w-full;
+  }
+
+  .teacher-learner-profile {
+    @apply grid gap-4 lg:grid-cols-[minmax(13rem,0.75fr)_minmax(20rem,1.25fr)];
+  }
+
+  .teacher-learner-identity {
+    @apply flex items-center gap-4 rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm;
+  }
+
+  .teacher-learner-identity h3,
+  .teacher-class-card h3 {
+    @apply m-0 font-display text-lg font-bold text-slate-900;
+  }
+
+  .teacher-learner-identity p,
+  .teacher-class-card p {
+    @apply m-0 mt-1 text-xs text-slate-500;
+  }
+
+  .teacher-learner-metrics {
+    @apply grid grid-cols-2 gap-2 sm:grid-cols-4;
+  }
+
+  .teacher-learner-metrics span {
+    @apply flex min-h-20 flex-col items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-center shadow-sm;
+  }
+
+  .teacher-learner-metrics strong {
+    @apply font-display text-xl font-black text-slate-900;
+  }
+
+  .teacher-learner-metrics small {
+    @apply mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-500;
+  }
+
+  .teacher-learner-actions {
+    @apply lg:col-span-2;
+  }
+
+  .teacher-class-form,
+  .teacher-class-edit {
+    @apply mb-3 grid gap-3 sm:grid-cols-3;
+  }
+
+  .teacher-class-card {
+    @apply flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between;
   }
 
   .sr-only {

@@ -1,6 +1,6 @@
 import { Archive, Check, Pencil, Plus, School, UserMinus, UserPlus, Users, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+
 import { Flash } from '../../components/Flash'
 import { PageHeader } from '../../components/PageHeader'
 import { UserAvatar } from '../../components/UserAvatar'
@@ -14,7 +14,6 @@ import {
   defaultCourseSchedule,
   endClass,
   endEnrollment,
-  listLearners,
   updateClass,
 } from '../../modules/roster/service'
 import { useAppState } from '../../state/useAppState'
@@ -79,7 +78,7 @@ export function TeacherClassesPage() {
       }
     })
   }, [roster, effectiveSeatClassId])
-  const allLearners = useMemo(() => listLearners(roster), [roster])
+
 
   if (!teacher) {
     return (

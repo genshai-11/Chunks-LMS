@@ -1,5 +1,4 @@
 import {
-  CalendarDays,
   ChartColumn,
   ClipboardCopy,
   Eye,

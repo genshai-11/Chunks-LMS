@@ -9,7 +9,6 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { PageHeader } from '../../components/PageHeader'
-import { UserAvatar } from '../../components/UserAvatar'
 import { EditableAvatar } from '../../components/EditableAvatar'
 import { EmptyState, NavTile, Panel, StatCard } from '../../components/ui'
 import { useLearnerClassContext } from '../../hooks/useLearnerClassContext'

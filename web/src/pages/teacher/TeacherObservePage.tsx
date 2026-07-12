@@ -304,8 +304,6 @@ export function TeacherObservePage() {
   const qNum = capture ? capture.position.questionIndex + 1 : 0
   const qTotal = capture?.questions.length ?? 0
   const probeDepth = attempt?.snapshot.probeCount ?? 0
-  const probeDepthMax =
-    attempt?.snapshot.maxProbeCount ?? capture?.maxProbeCount ?? openSession?.maxProbeCount ?? 0
   const isFinalized =
     attempt?.snapshot.status === 'finalized' || attempt?.snapshot.status === 'corrected'
   const probeOpen =

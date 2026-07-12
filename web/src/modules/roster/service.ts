@@ -767,7 +767,7 @@ export function learnersAvailableForClass(state: RosterState, classId: string): 
   const activeIds = new Set(
     activeEnrollmentsForClass(state, classId).map((e) => e.learnerUserId),
   )
-  return listLearners(state).filter((u) => !activeIds.has(u.id))
+  return listActiveLearners(state).filter((u) => !activeIds.has(u.id))
 }
 
 export function addTeacherProfile(

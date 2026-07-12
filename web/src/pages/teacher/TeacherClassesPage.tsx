@@ -1,18 +1,23 @@
-import { Archive, Check, Pencil, Plus, School, UserPlus, X } from 'lucide-react'
-import { useState } from 'react'
+import { Archive, Check, Pencil, Plus, School, UserMinus, UserPlus, Users, X } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Flash } from '../../components/Flash'
 import { PageHeader } from '../../components/PageHeader'
+import { UserAvatar } from '../../components/UserAvatar'
 import { EmptyState, Panel } from '../../components/ui'
 import { useFlash } from '../../hooks/useFlash'
 import {
+  activeEnrollmentsForClass,
   createClass,
   createCourse,
   createLearnerAndEnroll,
   defaultCourseSchedule,
   endClass,
+  endEnrollment,
   enrollLearner,
   learnersAvailableForClass,
   listActiveLearners,
+  listLearners,
   updateClass,
 } from '../../modules/roster/service'
 import { useAppState } from '../../state/useAppState'
@@ -55,11 +60,37 @@ export function TeacherClassesPage() {
     startsOn: new Date().toISOString().slice(0, 10),
     sessionCount: 15,
   })
+  const activeClassRows = useMemo(
+    () => classes.filter((c) => c.status === 'active'),
+    [classes],
+  )
   const [seatClassId, setSeatClassId] = useState<string | null>(null)
   const [seatLearnerId, setSeatLearnerId] = useState('')
   const [newLearnerName, setNewLearnerName] = useState('')
   const [newLearnerEmail, setNewLearnerEmail] = useState('')
-  const activeLearners = listActiveLearners(roster)
+
+  const effectiveSeatClassId = seatClassId ?? activeClassRows[0]?.id ?? null
+  const availableToSeat = useMemo(
+    () =>
+      effectiveSeatClassId
+        ? learnersAvailableForClass(roster, effectiveSeatClassId)
+        : listActiveLearners(roster),
+    [roster, effectiveSeatClassId],
+  )
+  const seatedInClass = useMemo(() => {
+    if (!effectiveSeatClassId) return []
+    return activeEnrollmentsForClass(roster, effectiveSeatClassId).map((e) => {
+      const u = roster.users.find((x) => x.id === e.learnerUserId)
+      return {
+        enrollmentId: e.id,
+        learnerId: e.learnerUserId,
+        name: u?.displayName ?? e.learnerUserId,
+        email: u?.email ?? null,
+        avatarUrl: u?.avatarUrl ?? null,
+      }
+    })
+  }, [roster, effectiveSeatClassId])
+  const allLearners = useMemo(() => listLearners(roster), [roster])
 
   if (!teacher) {
     return (
@@ -322,99 +353,174 @@ export function TeacherClassesPage() {
       <Panel
         icon={UserPlus}
         title="Seat learners"
-        description="Enroll an active learner account into one of your classes (or create + enroll)."
+        description="Pick a free account, or create a new learner. Already-seated names are listed below (not in the free list)."
       >
-        <div className="form-grid teacher-class-form">
-          <label>
-            Class
-            <select
-              value={seatClassId ?? classes[0]?.id ?? ''}
-              onChange={(e) => setSeatClassId(e.target.value || null)}
-            >
-              {classes
-                .filter((c) => c.status === 'active')
-                .map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
+        {!effectiveSeatClassId ? (
+          <EmptyState
+            icon={School}
+            title="Create a class first"
+            description="Then you can seat learners into it."
+          />
+        ) : (
+          <>
+            <div className="form-grid teacher-class-form">
+              <label>
+                Class
+                <select
+                  value={effectiveSeatClassId}
+                  onChange={(e) => {
+                    setSeatClassId(e.target.value || null)
+                    setSeatLearnerId('')
+                  }}
+                >
+                  {activeClassRows.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Existing learner (not yet in this class)
+                <select
+                  value={seatLearnerId}
+                  onChange={(e) => setSeatLearnerId(e.target.value)}
+                  disabled={availableToSeat.length === 0}
+                >
+                  <option value="">
+                    {availableToSeat.length === 0
+                      ? allLearners.length === 0
+                        ? '— no learner accounts —'
+                        : '— all learners already seated —'
+                      : '— pick —'}
                   </option>
-                ))}
-            </select>
-          </label>
-          <label>
-            Existing learner
-            <select
-              value={seatLearnerId}
-              onChange={(e) => setSeatLearnerId(e.target.value)}
-            >
-              <option value="">— pick —</option>
-              {(seatClassId || classes[0]?.id
-                ? learnersAvailableForClass(roster, seatClassId || classes[0]!.id)
-                : activeLearners
-              ).map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.displayName}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <button
-          type="button"
-          className="primary"
-          disabled={!seatLearnerId || !(seatClassId || classes[0]?.id)}
-          onClick={() => {
-            const classId = seatClassId || classes[0]?.id
-            if (!classId) return err('Create a class first')
-            const result = enrollLearner(roster, classId, seatLearnerId)
-            if (!result.ok) return err(result.error)
-            setRoster(result.state)
-            setSeatLearnerId('')
-            ok('Learner seated')
-          }}
-        >
-          <UserPlus className="h-4 w-4" aria-hidden /> Enroll
-        </button>
+                  {availableToSeat.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.displayName}
+                      {u.email ? ` · ${u.email}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
 
-        <div className="form-grid teacher-class-form" style={{ marginTop: '1rem' }}>
-          <label>
-            New learner name
-            <input
-              value={newLearnerName}
-              onChange={(e) => setNewLearnerName(e.target.value)}
-              placeholder="Display name"
-            />
-          </label>
-          <label>
-            Email (portal invite)
-            <input
-              type="email"
-              value={newLearnerEmail}
-              onChange={(e) => setNewLearnerEmail(e.target.value)}
-              placeholder="learner@school.edu"
-            />
-          </label>
-        </div>
-        <button
-          type="button"
-          className="ghost"
-          disabled={!newLearnerName.trim() || !(seatClassId || classes[0]?.id)}
-          onClick={() => {
-            const classId = seatClassId || classes[0]?.id
-            if (!classId) return err('Create a class first')
-            if (!newLearnerEmail.trim()) return err('Email required for learner invite')
-            const result = createLearnerAndEnroll(roster, classId, {
-              displayName: newLearnerName,
-              email: newLearnerEmail.trim(),
-            })
-            if (!result.ok) return err(result.error)
-            setRoster(result.state)
-            setNewLearnerName('')
-            setNewLearnerEmail('')
-            ok(`Seated ${result.value.learner.displayName}`)
-          }}
-        >
-          <Plus className="h-4 w-4" aria-hidden /> Create + enroll
-        </button>
+            {availableToSeat.length === 0 && allLearners.length > 0 ? (
+              <p className="meta" role="status" style={{ marginTop: 8 }}>
+                All <strong>{allLearners.length}</strong> learner account
+                {allLearners.length === 1 ? '' : 's'} already sit in this class. Use{' '}
+                <strong>Create + enroll</strong> for someone new, or go to{' '}
+                <Link to="/teacher/session" className="underline font-semibold">
+                  Live session
+                </Link>{' '}
+                to teach seated learners.
+              </p>
+            ) : null}
+
+            {allLearners.length === 0 ? (
+              <p className="meta" role="status" style={{ marginTop: 8 }}>
+                No learner profiles in roster yet — create one below, or ask Admin → Accounts to add
+                learners first.
+              </p>
+            ) : null}
+
+            <button
+              type="button"
+              className="primary"
+              disabled={!seatLearnerId || !effectiveSeatClassId}
+              onClick={() => {
+                if (!effectiveSeatClassId) return err('Create a class first')
+                if (!seatLearnerId) return err('Pick a learner')
+                const result = enrollLearner(roster, effectiveSeatClassId, seatLearnerId)
+                if (!result.ok) return err(result.error)
+                setRoster(result.state)
+                setSeatLearnerId('')
+                ok('Learner seated')
+              }}
+            >
+              <UserPlus className="h-4 w-4" aria-hidden /> Enroll selected
+            </button>
+
+            <div className="form-grid teacher-class-form" style={{ marginTop: '1rem' }}>
+              <label>
+                New learner name
+                <input
+                  value={newLearnerName}
+                  onChange={(e) => setNewLearnerName(e.target.value)}
+                  placeholder="Display name"
+                />
+              </label>
+              <label>
+                Email (portal invite)
+                <input
+                  type="email"
+                  value={newLearnerEmail}
+                  onChange={(e) => setNewLearnerEmail(e.target.value)}
+                  placeholder="learner@school.edu"
+                />
+              </label>
+            </div>
+            <button
+              type="button"
+              className="ghost"
+              disabled={!newLearnerName.trim() || !effectiveSeatClassId}
+              onClick={() => {
+                if (!effectiveSeatClassId) return err('Create a class first')
+                if (!newLearnerEmail.trim()) return err('Email required for learner invite')
+                const result = createLearnerAndEnroll(roster, effectiveSeatClassId, {
+                  displayName: newLearnerName,
+                  email: newLearnerEmail.trim(),
+                })
+                if (!result.ok) return err(result.error)
+                setRoster(result.state)
+                setNewLearnerName('')
+                setNewLearnerEmail('')
+                ok(`Seated ${result.value.learner.displayName}`)
+              }}
+            >
+              <Plus className="h-4 w-4" aria-hidden /> Create + enroll
+            </button>
+
+            <div style={{ marginTop: '1.25rem' }}>
+              <p className="panel-title" style={{ marginBottom: 8 }}>
+                <Users className="inline h-4 w-4" aria-hidden /> Seated now ({seatedInClass.length})
+              </p>
+              {seatedInClass.length === 0 ? (
+                <p className="meta">Nobody seated in this class yet.</p>
+              ) : (
+                <ul className="person-list">
+                  {seatedInClass.map((row) => (
+                    <li key={row.enrollmentId} className="person-row">
+                      <span className="cell-with-avatar">
+                        <UserAvatar name={row.name} avatarUrl={row.avatarUrl} size="sm" />
+                        <span>
+                          <strong>{row.name}</strong>
+                          <span className="meta" style={{ display: 'block', margin: 0 }}>
+                            {row.email ?? 'No email'}
+                          </span>
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        className="ghost"
+                        title="End enrollment (keeps history)"
+                        onClick={() => {
+                          if (!window.confirm(`Remove ${row.name} from this class?`)) return
+                          const result = endEnrollment(roster, row.enrollmentId)
+                          if (!result.ok) return err(result.error)
+                          setRoster(result.state)
+                          ok(`${row.name} enrollment ended — they reappear in Existing learner`)
+                        }}
+                      >
+                        <UserMinus className="h-3.5 w-3.5" aria-hidden />
+                        <span>Remove</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </>
+        )}
       </Panel>
     </>
   )

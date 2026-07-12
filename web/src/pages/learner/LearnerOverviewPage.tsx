@@ -10,12 +10,14 @@ import {
 import { Link } from 'react-router-dom'
 import { PageHeader } from '../../components/PageHeader'
 import { UserAvatar } from '../../components/UserAvatar'
+import { EditableAvatar } from '../../components/EditableAvatar'
 import { EmptyState, NavTile, Panel, StatCard } from '../../components/ui'
 import { useLearnerClassContext } from '../../hooks/useLearnerClassContext'
 import { useAppState } from '../../state/useAppState'
+import { updateUserProfile } from '../../modules/roster/service'
 
 export function LearnerOverviewPage() {
-  const { scheduling, ledger } = useAppState()
+  const { roster, setRoster, syncNow, scheduling, ledger } = useAppState()
   const { learner, options, classRow, course, hasMultiple } = useLearnerClassContext()
 
   const myAttendance = useMemo(() => {
@@ -65,11 +67,18 @@ export function LearnerOverviewPage() {
   return (
     <>
       <div className="learner-dash-head">
-        <UserAvatar
+        <EditableAvatar
           name={learner.displayName}
           avatarUrl={learner.avatarUrl}
           size="xl"
           className="learner-dash-avatar"
+          onSave={async (url) => {
+            const r = updateUserProfile(roster, learner.id, { avatarUrl: url })
+            if (r.ok) {
+              setRoster(r.state)
+              await syncNow({ roster: r.state })
+            }
+          }}
         />
         <PageHeader
           icon={Home}

@@ -416,12 +416,7 @@ export function TeacherObservePage() {
           appendFinalizedFromCapture(next)
           flash(color)
         } else if (outcome === 'continue') {
-          const max = result.data.snapshot.maxProbeCount
-          flash(
-            max > 0
-              ? `n=${result.data.snapshot.probeCount} · depth max ${max}`
-              : `n=${result.data.snapshot.probeCount}`,
-          )
+          flash(`n=${result.data.snapshot.probeCount}`)
         }
       } finally {
         setLiveSaving(false)
@@ -738,9 +733,8 @@ export function TeacherObservePage() {
               <>
                 <p className="observe-rail-name">{learner?.displayName ?? 'Learner'}</p>
                 {probeOpen ? (
-                  <p className="observe-rail-n" title="n = probe depth after Green; depth max = session ceiling">
+                  <p className="observe-rail-n" title="n = probe depth after Green">
                     n={probeDepth}
-                    {probeDepthMax > 0 ? ` · max ${probeDepthMax}` : ''}
                   </p>
                 ) : null}
               </>
@@ -894,15 +888,9 @@ export function TeacherObservePage() {
               {probeOpen ? (
                 <p
                   className="observe-depth-inline"
-                  title="n = how deep after Green (Continue). depth max = session max probe setting."
+                  title="n = how deep after Green (Continue)."
                 >
                   n=<strong>{probeDepth}</strong>
-                  {probeDepthMax > 0 ? (
-                    <>
-                      {' '}
-                      · depth max=<strong>{probeDepthMax}</strong>
-                    </>
-                  ) : null}
                 </p>
               ) : null}
             </div>

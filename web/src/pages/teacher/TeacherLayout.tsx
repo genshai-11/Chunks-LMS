@@ -3,6 +3,9 @@ import { ClassContextSelect } from '../../components/ClassContextSelect'
 import { RoleWorkspace } from '../../components/RoleWorkspace'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import { useAppState } from '../../state/useAppState'
+import { useStaffSession } from '../../auth/useStaffSession'
+import { updateUserProfile } from '../../modules/roster/service'
+import { EditableAvatar } from '../../components/EditableAvatar'
 
 const ITEMS = [
   { to: '/teacher', label: 'Learners', icon: Users, end: true },
@@ -14,8 +17,15 @@ const ITEMS = [
 ]
 
 export function TeacherLayout() {
-  const { scheduling, capture } = useAppState()
+  const { roster, setRoster, syncNow, scheduling, capture } = useAppState()
+  const staffSession = useStaffSession()
   const { options, classRow, seats, activeClassId, setActiveClassId } = useTeacherClassContext()
+
+  const currentUser = roster.users.find(
+    (user) =>
+      Boolean(staffSession.email) &&
+      user.email?.toLowerCase() === staffSession.email?.toLowerCase(),
+  )
 
   const liveOpen = Boolean(
     classRow &&
@@ -35,6 +45,22 @@ export function TeacherLayout() {
           ? `${seats} learners · cap ${classRow.capacity}${liveOpen ? ' · LIVE' : ''}`
           : 'No class assigned'
       }
+      leading={
+        currentUser ? (
+          <EditableAvatar
+            name={currentUser.displayName}
+            avatarUrl={currentUser.avatarUrl}
+            size="md"
+            onSave={async (url) => {
+              const r = updateUserProfile(roster, currentUser.id, { avatarUrl: url })
+              if (r.ok) {
+                setRoster(r.state)
+                await syncNow({ roster: r.state })
+              }
+            }}
+          />
+        ) : undefined
+      }
       contextSlot={
         <ClassContextSelect
           variant="teacher"
@@ -49,3 +75,4 @@ export function TeacherLayout() {
     />
   )
 }
+

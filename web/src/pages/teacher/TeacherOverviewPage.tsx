@@ -13,7 +13,7 @@ import {
 import { Link } from 'react-router-dom'
 import { PageHeader } from '../../components/PageHeader'
 import { UserAvatar } from '../../components/UserAvatar'
-import { EmptyState, NavTile, Panel, StatCard } from '../../components/ui'
+import { EmptyState, Panel, StatCard } from '../../components/ui'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import { useFlash } from '../../hooks/useFlash'
 import { Flash } from '../../components/Flash'
@@ -128,22 +128,6 @@ export function TeacherOverviewPage() {
 
       <div className="stat-grid">
         <StatCard
-          icon={Users}
-          label="Learners"
-          value={`${seats}`}
-          hint={course ? `${course.code} · cap ${classRow.capacity}` : `cap ${classRow.capacity}`}
-        />
-        <StatCard
-          icon={CalendarDays}
-          label="Program"
-          value={plannedSessions || '—'}
-          hint={
-            course?.startsOn
-              ? `Start ${course.startsOn}${course.endsOn ? ` → ${course.endsOn}` : ''}`
-              : 'Set start + session count on course'
-          }
-        />
-        <StatCard
           icon={Radio}
           label="Live"
           value={openSession ? `Day ${openSession.sessionNumber ?? '—'}` : 'Idle'}
@@ -168,40 +152,6 @@ export function TeacherOverviewPage() {
           hint="Portal email ready"
         />
       </div>
-
-      <Panel
-        icon={Play}
-        title="Do next"
-        description="Learner tree first → start session with one or many → observe by learner columns."
-      >
-        <div className="list-cards">
-          <NavTile
-            to="/teacher/session"
-            title={openSession ? 'Resume live session' : 'Start session'}
-            description={
-              openSession
-                ? 'Attendance + Observe (multi-learner columns).'
-                : 'Pick 1+ learners, optional pretest/posttest label, then observe.'
-            }
-            icon={Radio}
-            cta="Go"
-          />
-          <NavTile
-            to="/teacher/analysis"
-            title="Analysis"
-            description="RFC trajectory, n count / n depth max / n depth avg from finalized data."
-            icon={ChartColumn}
-            cta="Go"
-          />
-          <NavTile
-            to="/teacher/classes"
-            title="Classes & seating"
-            description="Programs, capacity, enroll learners under this teacher."
-            icon={School}
-            cta="Go"
-          />
-        </div>
-      </Panel>
 
       <Panel
         icon={Users}
@@ -247,13 +197,6 @@ export function TeacherOverviewPage() {
               <thead>
                 <tr>
                   <th scope="col">Learner</th>
-                  <th scope="col" title="Course / program label">
-                    Program
-                  </th>
-                  <th scope="col" title="Enrollment or course start">
-                    Start
-                  </th>
-                  <th scope="col">Sessions</th>
                   <th scope="col" title="(Red+Yellow)/finalized from real ledger">
                     RFC
                   </th>
@@ -263,16 +206,18 @@ export function TeacherOverviewPage() {
                   <th scope="col" title="Times teacher selected Green (2) / entered probe">
                     n count
                   </th>
-                  <th scope="col">
-                    <span className="sr-only">Actions</span>
-                  </th>
                 </tr>
               </thead>
               <tbody>
                 {learners.map((l) => {
                   const selected = selectedLearner?.id === l.id
                   return (
-                    <tr key={l.id} className={selected ? 'bg-slate-50/80' : undefined}>
+                    <tr
+                      key={l.id}
+                      style={{ cursor: 'pointer' }}
+                      className={`transition-colors hover:bg-slate-100/50 ${selected ? 'bg-slate-100/80 font-medium' : ''}`}
+                      onClick={() => setActiveLearnerUserId(l.id)}
+                    >
                       <td>
                         <span className="cell-with-avatar">
                           <UserAvatar name={l.name} avatarUrl={l.avatarUrl} size="sm" />
@@ -289,15 +234,6 @@ export function TeacherOverviewPage() {
                           </span>
                         </span>
                       </td>
-                      <td>
-                        <span className="badge">{course?.code ?? '—'}</span>
-                      </td>
-                      <td className="font-mono text-xs">
-                        {(course?.startsOn ?? l.enrolledAt.slice(0, 10)) || '—'}
-                      </td>
-                      <td className="font-mono text-xs tabular-nums">
-                        {taughtDays}/{plannedSessions || '—'}
-                      </td>
                       <td className="font-mono text-xs tabular-nums">
                         {l.rfc == null ? '—' : `${Math.round(l.rfc * 100)}%`}
                         <div className="meta" style={{ margin: 0 }}>
@@ -309,51 +245,6 @@ export function TeacherOverviewPage() {
                       </td>
                       <td className="font-mono text-xs tabular-nums">
                         {l.nCount == null ? '—' : Math.round(l.nCount)}
-                      </td>
-                      <td>
-                        <div className="row-actions">
-                          <button
-                            type="button"
-                            className={selected ? 'primary' : 'ghost'}
-                            onClick={() => setActiveLearnerUserId(l.id)}
-                          >
-                            <Eye className="h-3.5 w-3.5" aria-hidden />
-                            <span>{selected ? 'Selected' : 'Select'}</span>
-                          </button>
-                          <Link
-                            to={`/teacher/session?learner=${encodeURIComponent(l.id)}`}
-                            className="btn ghost"
-                            onClick={() => setActiveLearnerUserId(l.id)}
-                          >
-                            <Play className="h-3.5 w-3.5" aria-hidden />
-                            <span>Session</span>
-                          </Link>
-                          <Link
-                            to={`/teacher/analysis?learner=${encodeURIComponent(l.id)}`}
-                            className="btn ghost"
-                            onClick={() => setActiveLearnerUserId(l.id)}
-                          >
-                            <ChartColumn className="h-3.5 w-3.5" aria-hidden />
-                            <span>Report</span>
-                          </Link>
-                          {l.invite ? (
-                            <button
-                              type="button"
-                              className="ghost"
-                              onClick={async () => {
-                                try {
-                                  await navigator.clipboard.writeText(l.invite!)
-                                  ok(`Invite copied for ${l.name}`)
-                                } catch {
-                                  ok(l.invite!)
-                                }
-                              }}
-                            >
-                              <Link2 className="h-3.5 w-3.5" aria-hidden />
-                              <span>Invite</span>
-                            </button>
-                          ) : null}
-                        </div>
                       </td>
                     </tr>
                   )
@@ -431,6 +322,23 @@ export function TeacherOverviewPage() {
                 <Eye className="h-4 w-4" aria-hidden />
                 View report
               </Link>
+              {selectedLearner.invite ? (
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(selectedLearner.invite!)
+                      ok(`Invite copied for ${selectedLearner.name}`)
+                    } catch {
+                      ok(selectedLearner.invite!)
+                    }
+                  }}
+                >
+                  <Link2 className="h-4 w-4" aria-hidden />
+                  <span>Copy invite</span>
+                </button>
+              ) : null}
             </div>
           </div>
         </Panel>

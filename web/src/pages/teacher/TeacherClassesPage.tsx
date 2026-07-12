@@ -14,9 +14,6 @@ import {
   defaultCourseSchedule,
   endClass,
   endEnrollment,
-  enrollLearner,
-  learnersAvailableForClass,
-  listActiveLearners,
   listLearners,
   updateClass,
 } from '../../modules/roster/service'
@@ -65,18 +62,10 @@ export function TeacherClassesPage() {
     [classes],
   )
   const [seatClassId, setSeatClassId] = useState<string | null>(null)
-  const [seatLearnerId, setSeatLearnerId] = useState('')
   const [newLearnerName, setNewLearnerName] = useState('')
   const [newLearnerEmail, setNewLearnerEmail] = useState('')
 
   const effectiveSeatClassId = seatClassId ?? activeClassRows[0]?.id ?? null
-  const availableToSeat = useMemo(
-    () =>
-      effectiveSeatClassId
-        ? learnersAvailableForClass(roster, effectiveSeatClassId)
-        : listActiveLearners(roster),
-    [roster, effectiveSeatClassId],
-  )
   const seatedInClass = useMemo(() => {
     if (!effectiveSeatClassId) return []
     return activeEnrollmentsForClass(roster, effectiveSeatClassId).map((e) => {
@@ -353,7 +342,7 @@ export function TeacherClassesPage() {
       <Panel
         icon={UserPlus}
         title="Seat learners"
-        description="Pick a free account, or create a new learner. Already-seated names are listed below (not in the free list)."
+        description="Create a new learner. Already-seated names are listed below."
       >
         {!effectiveSeatClassId ? (
           <EmptyState
@@ -370,7 +359,6 @@ export function TeacherClassesPage() {
                   value={effectiveSeatClassId}
                   onChange={(e) => {
                     setSeatClassId(e.target.value || null)
-                    setSeatLearnerId('')
                   }}
                 >
                   {activeClassRows.map((c) => (
@@ -380,65 +368,7 @@ export function TeacherClassesPage() {
                   ))}
                 </select>
               </label>
-              <label>
-                Existing learner (not yet in this class)
-                <select
-                  value={seatLearnerId}
-                  onChange={(e) => setSeatLearnerId(e.target.value)}
-                  disabled={availableToSeat.length === 0}
-                >
-                  <option value="">
-                    {availableToSeat.length === 0
-                      ? allLearners.length === 0
-                        ? '— no learner accounts —'
-                        : '— all learners already seated —'
-                      : '— pick —'}
-                  </option>
-                  {availableToSeat.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.displayName}
-                      {u.email ? ` · ${u.email}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </label>
             </div>
-
-            {availableToSeat.length === 0 && allLearners.length > 0 ? (
-              <p className="meta" role="status" style={{ marginTop: 8 }}>
-                All <strong>{allLearners.length}</strong> learner account
-                {allLearners.length === 1 ? '' : 's'} already sit in this class. Use{' '}
-                <strong>Create + enroll</strong> for someone new, or go to{' '}
-                <Link to="/teacher/session" className="underline font-semibold">
-                  Live session
-                </Link>{' '}
-                to teach seated learners.
-              </p>
-            ) : null}
-
-            {allLearners.length === 0 ? (
-              <p className="meta" role="status" style={{ marginTop: 8 }}>
-                No learner profiles in roster yet — create one below, or ask Admin → Accounts to add
-                learners first.
-              </p>
-            ) : null}
-
-            <button
-              type="button"
-              className="primary"
-              disabled={!seatLearnerId || !effectiveSeatClassId}
-              onClick={() => {
-                if (!effectiveSeatClassId) return err('Create a class first')
-                if (!seatLearnerId) return err('Pick a learner')
-                const result = enrollLearner(roster, effectiveSeatClassId, seatLearnerId)
-                if (!result.ok) return err(result.error)
-                setRoster(result.state)
-                setSeatLearnerId('')
-                ok('Learner seated')
-              }}
-            >
-              <UserPlus className="h-4 w-4" aria-hidden /> Enroll selected
-            </button>
 
             <div className="form-grid teacher-class-form" style={{ marginTop: '1rem' }}>
               <label>
@@ -508,7 +438,7 @@ export function TeacherClassesPage() {
                           const result = endEnrollment(roster, row.enrollmentId)
                           if (!result.ok) return err(result.error)
                           setRoster(result.state)
-                          ok(`${row.name} enrollment ended — they reappear in Existing learner`)
+                          ok(`${row.name} enrollment ended`)
                         }}
                       >
                         <UserMinus className="h-3.5 w-3.5" aria-hidden />

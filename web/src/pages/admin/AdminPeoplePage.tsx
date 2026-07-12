@@ -33,9 +33,9 @@ import type { DomainUser } from '../../modules/roster/types'
 import { useAppState } from '../../state/useAppState'
 
 type Tab = 'teachers' | 'learners'
-type Draft = { displayName: string; email: string }
+type Draft = { displayName: string; email: string; avatarUrl?: string }
 
-const emptyDraft = (): Draft => ({ displayName: '', email: '' })
+const emptyDraft = (): Draft => ({ displayName: '', email: '', avatarUrl: '' })
 
 function invitationUrl(user: DomainUser): string {
   const origin = window.location.origin
@@ -83,6 +83,7 @@ export function AdminPeoplePage() {
       const r = addTeacherProfile(roster, {
         displayName: draft.displayName,
         email: draft.email || null,
+        avatarUrl: draft.avatarUrl || null,
       })
       if (!r.ok) return err(r.error)
       setRoster(r.state)
@@ -91,6 +92,7 @@ export function AdminPeoplePage() {
       const r = addLearnerProfile(roster, {
         displayName: draft.displayName,
         email: draft.email.trim(),
+        avatarUrl: draft.avatarUrl || null,
       })
       if (!r.ok) return err(r.error)
       setRoster(r.state)
@@ -104,6 +106,7 @@ export function AdminPeoplePage() {
     const r = updateUserProfile(roster, id, {
       displayName: editDraft.displayName,
       email: editDraft.email || null,
+      avatarUrl: editDraft.avatarUrl || null,
     })
     if (!r.ok) return err(r.error)
     setRoster(r.state)
@@ -222,6 +225,14 @@ export function AdminPeoplePage() {
                 placeholder={tab === 'learners' ? 'learner@school.edu' : 'teacher@school.edu'}
               />
             </label>
+            <label>
+              Avatar URL
+              <input
+                value={draft.avatarUrl || ''}
+                onChange={(e) => setDraft((d) => ({ ...d, avatarUrl: e.target.value }))}
+                placeholder="https://example.com/avatar.jpg"
+              />
+            </label>
             <button type="submit" className="primary">
               <Check className="h-4 w-4" aria-hidden />
               <span>Save</span>
@@ -287,6 +298,15 @@ export function AdminPeoplePage() {
                             }
                             aria-label="Email"
                             placeholder="Email"
+                          />
+                          <input
+                            className="row-input"
+                            value={editDraft.avatarUrl || ''}
+                            onChange={(e) =>
+                              setEditDraft((d) => ({ ...d, avatarUrl: e.target.value }))
+                            }
+                            aria-label="Avatar URL"
+                            placeholder="Avatar URL"
                           />
                           <div className="row-actions">
                             <button type="button" className="primary" onClick={() => saveEdit(u.id)}>
@@ -384,6 +404,7 @@ export function AdminPeoplePage() {
                               setEditDraft({
                                 displayName: u.displayName,
                                 email: u.email ?? '',
+                                avatarUrl: u.avatarUrl ?? '',
                               })
                             }}
                           >

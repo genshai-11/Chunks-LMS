@@ -5,8 +5,10 @@ import {
   completeLearningSession,
   createScheduledSession,
   emptySchedulingState,
+  nextTeachingDayNumber,
   recordAttendance,
   rescheduleSession,
+  reindexSessionNumbers,
   startLearningSession,
 } from './session-lifecycle'
 
@@ -140,6 +142,7 @@ describe('session lifecycle and attendance', () => {
       classId,
       plannedStart: '2026-07-20T09:00:00.000Z',
       durationMinutes: 60,
+      sessionNumber: 1,
     })
     if (!a.ok) throw new Error(a.error)
     state = a.state
@@ -147,14 +150,77 @@ describe('session lifecycle and attendance', () => {
       classId,
       plannedStart: '2026-07-22T09:00:00.000Z',
       durationMinutes: 60,
+      sessionNumber: 2,
     })
     if (!b.ok) throw new Error(b.error)
-    state = b.state
+    state = reindexSessionNumbers(b.state, classId)
 
     const del = deleteScheduledSession(state, a.value.id)
     expect(del.ok).toBe(true)
     if (!del.ok) return
     expect(del.state.scheduledSessions).toHaveLength(1)
     expect(del.state.scheduledSessions[0]?.sessionNumber).toBe(1)
+  })
+
+  it('assigns Day 2 after Day 1 even when a 15-slot course plan exists (not Day 16)', () => {
+    let state = emptySchedulingState()
+    // Simulate applied course plan with 15 placeholders
+    for (let i = 1; i <= 15; i++) {
+      const created = createScheduledSession(state, {
+        classId,
+        plannedStart: `2026-08-${String(i).padStart(2, '0')}T09:00:00.000Z`,
+        durationMinutes: 60,
+        sessionNumber: i,
+      })
+      if (!created.ok) throw new Error(created.error)
+      state = created.state
+    }
+    state = reindexSessionNumbers(state, classId)
+    expect(state.scheduledSessions).toHaveLength(15)
+
+    // Live Day 1 from first plan slot
+    const day1 = startLearningSession(state, {
+      classId,
+      scheduledSessionId: state.scheduledSessions[0]!.id,
+      at: '2026-08-01T09:05:00.000Z',
+    })
+    if (!day1.ok) throw new Error(day1.error)
+    expect(day1.value.sessionNumber).toBe(1)
+    state = day1.state
+
+    // Complete day 1 so we can open day 2
+    for (const learnerId of learners) {
+      const att = recordAttendance(state, {
+        learningSessionId: day1.value.id,
+        learnerUserId: learnerId,
+        status: 'present',
+      })
+      if (!att.ok) throw new Error(att.error)
+      state = att.state
+    }
+    const done = completeLearningSession(state, day1.value.id, learners)
+    if (!done.ok) throw new Error(done.error)
+    state = done.state
+
+    expect(nextTeachingDayNumber(state, classId)).toBe(2)
+
+    // Ad-hoc / flexible start must be Day 2, not 16
+    const day2 = startLearningSession(state, {
+      classId,
+      at: '2026-08-02T09:00:00.000Z',
+    })
+    expect(day2.ok).toBe(true)
+    if (!day2.ok) return
+    expect(day2.value.sessionNumber).toBe(2)
+
+    // Flexible calendar slot also gets provisional next teaching day (2), not 16
+    const flexible = createScheduledSession(state, {
+      classId,
+      plannedStart: '2026-08-03T10:00:00.000Z',
+      durationMinutes: 60,
+    })
+    expect(flexible.ok).toBe(true)
+    if (!flexible.ok) return
+    expect(flexible.value.sessionNumber).toBe(2)
   })
 })

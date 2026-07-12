@@ -4,22 +4,27 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Eye,
+  Gauge,
   Info,
+  Layers,
   Play,
   Plus,
   Radio,
+  Users,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Flash } from '../../components/Flash'
 import { PageHeader } from '../../components/PageHeader'
 import { UserAvatar } from '../../components/UserAvatar'
-import { EmptyState, Panel } from '../../components/ui'
+import { EmptyState, Panel, StatCard } from '../../components/ui'
 import { useFlash } from '../../hooks/useFlash'
 import {
   addSessionQuestion,
   createCaptureSession,
   markSessionCompleted,
+  sessionColorSummary,
 } from '../../modules/assessment/session-capture'
+
 import type { PolicyActor } from '../../modules/identity/access-policy'
 import { getSupabase } from '../../lib/supabase'
 import { activeEnrollmentsForClass } from '../../modules/roster/service'
@@ -78,6 +83,15 @@ export function TeacherSessionPage() {
   const dayBadge = sessionDayBadge(dayNumber, totalDays || null)
   const dayLabel = sessionLabel(dayNumber, openSession?.startedAt, totalDays || null)
   const observeTo = dayNumber != null ? `/teacher/observe${sessionDayHash(dayNumber)}` : '/teacher/observe'
+  const learnerCount = activeLearners.length
+  const presentCount = openSession
+    ? scheduling.attendance.filter(
+        (a) =>
+          a.learningSessionId === openSession.id &&
+          (a.status === 'present' || a.status === 'late'),
+      ).length
+    : 0
+  const captureSummary = capture ? sessionColorSummary(capture) : null
 
   const teacherActor = useMemo<PolicyActor | null>(
     () =>
@@ -180,17 +194,17 @@ export function TeacherSessionPage() {
           icon={Radio}
           kicker="Teacher"
           title="Live session"
-          subtitle="Start a day (Day 1…15) or resume from Schedule."
+          subtitle="Start the next teaching day (Day 1, then 2, …) or open a planned slot from Schedule."
         />
         <EmptyState
           icon={Radio}
           title="No live session yet"
-          description="Start a live session here, or pick a planned slot on Schedule."
+          description="Start Day N here (next after days already taught), or pick a calendar slot on Schedule. Course plan slots are only placeholders."
           action={
             <div className="btn-row">
               <button type="button" className="primary" onClick={startLiveNow}>
                 <Play className="h-4 w-4" aria-hidden />
-                <span>Start session</span>
+                <span>Start next day</span>
               </button>
               <Link to="/teacher/calendar" className="btn ghost">
                 <CalendarDays className="h-4 w-4" aria-hidden />
@@ -241,10 +255,41 @@ export function TeacherSessionPage() {
       />
       <Flash message={message} error={error} />
 
+      <div className="stat-grid" style={{ marginBottom: '1rem' }}>
+        <StatCard
+          icon={Users}
+          label="Learners in class"
+          value={`${learnerCount}${classRow ? ` / ${classRow.capacity}` : ''}`}
+          hint="Enrolled seats"
+        />
+        <StatCard
+          icon={ClipboardCheck}
+          label="Present / late"
+          value={`${presentCount} / ${learnerCount}`}
+          hint="Marked for this live day"
+        />
+        <StatCard
+          icon={Layers}
+          label="Depth max"
+          value={
+            openSession?.maxProbeCount ??
+            capture?.maxProbeCount ??
+            metricSettings.defaultMaxProbeCount
+          }
+          hint="Session max probe setting"
+        />
+        <StatCard
+          icon={Gauge}
+          label="Peak n"
+          value={captureSummary ? captureSummary.maxProbeDepth : 0}
+          hint="Highest probe n this session"
+        />
+      </div>
+
       <Panel
         icon={ClipboardCheck}
         title="1. Attendance"
-        description="Mark each learner before or during the session."
+        description={`${learnerCount} learner${learnerCount === 1 ? '' : 's'} enrolled · mark present/late/absent before Observe.`}
       >
         <div className="table-wrap">
           <table>
@@ -359,15 +404,24 @@ export function TeacherSessionPage() {
                   <th scope="col">Q#</th>
                   <th scope="col">Learner</th>
                   <th scope="col">Result</th>
+                  <th scope="col" title="Probe depth after Green — each Continue increases n">
+                    n
+                  </th>
+                  <th scope="col" title="Configured max probe depth for this session">
+                    depth max
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {capture.questions.map((q) => {
                   const a = capture.attempts.find((x) => x.sessionQuestionId === q.id)
-                  const color =
-                    a?.snapshot.effectiveColor ?? a?.snapshot.provisionalColor ?? null
+                  const snap = a?.snapshot
+                  const color = snap?.effectiveColor ?? snap?.provisionalColor ?? null
                   const user = roster.users.find((u) => u.id === q.assignedLearnerUserId)
                   const name = user?.displayName ?? q.assignedLearnerUserId
+                  const n =
+                    snap && (snap.enteredProbeFlow || snap.probeCount > 0) ? snap.probeCount : null
+                  const depthMax = snap?.maxProbeCount ?? capture.maxProbeCount
                   return (
                     <tr key={q.id}>
                       <th scope="row" className="font-mono text-xs">
@@ -386,16 +440,25 @@ export function TeacherSessionPage() {
                           <span className="capture-dot">·</span>
                         )}
                       </td>
+                      <td className="font-mono text-xs tabular-nums">
+                        {n != null ? n : '—'}
+                      </td>
+                      <td className="font-mono text-xs tabular-nums text-slate-500">
+                        {snap || color ? depthMax : '—'}
+                      </td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
             <p className="meta mt-2">
-              Rule: 1 sentence → 1 learner (round-robin). With {capture.questions.length} Q and{' '}
-              {capture.learnerIds.length} learners, each gets ~
-              {Math.floor(capture.questions.length / Math.max(capture.learnerIds.length, 1))}–
-              {Math.ceil(capture.questions.length / Math.max(capture.learnerIds.length, 1))} results.
+              <strong>n</strong> = probe depth after Green (Continue / resolve).{' '}
+              <strong>depth max</strong> = session max probe setting. Peak n this session:{' '}
+              <span className="font-mono">{captureSummary?.maxProbeDepth ?? 0}</span>
+              {' · '}
+              {learnerCount} learners · {capture.questions.length} Q · each ~
+              {Math.floor(capture.questions.length / Math.max(learnerCount, 1))}–
+              {Math.ceil(capture.questions.length / Math.max(learnerCount, 1))} results.
             </p>
           </div>
         )}

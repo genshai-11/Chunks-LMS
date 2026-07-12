@@ -25,6 +25,7 @@ import {
   cancelScheduledSession,
   createScheduledSession,
   deleteScheduledSession,
+  nextTeachingDayNumber,
   startLearningSession,
 } from '../../modules/scheduling/session-lifecycle'
 import {
@@ -174,6 +175,8 @@ export function TeacherCalendarPage() {
   }, [sessions, selectedDay])
 
   const upcomingCount = sessions.filter((s) => s.status === 'scheduled').length
+  const nextDay = classRow ? nextTeachingDayNumber(scheduling, classRow.id) : 1
+  const totalPlanDays = course?.schedule?.sessionCount ?? null
 
   if (!classRow || !teacher) {
     return (
@@ -260,9 +263,9 @@ export function TeacherCalendarPage() {
     <>
       <PageHeader
         icon={CalendarDays}
-        kicker={classRow.name}
+        kicker={`${course?.code ?? 'Class'} · ${classRow.name}`}
         title="Schedule"
-        subtitle="Week view · plan sessions and start class live."
+        subtitle={`Per-class calendar (level/group: ${classRow.name}). Fixed plan from course ${course?.code ?? '—'} or add flexible slots. Next live day = Day ${nextDay}${totalPlanDays ? ` / ~${totalPlanDays}` : ''}.`}
         actions={
           <div className="page-actions">
             {course?.schedule && course.startsOn ? (
@@ -279,7 +282,7 @@ export function TeacherCalendarPage() {
                   ok(
                     r.value.length === 0
                       ? 'Schedule already applied (no new slots)'
-                      : `Applied course schedule · ${r.value.length} sessions added`,
+                      : `Applied ${course.code ?? 'course'} plan · ${r.value.length} slots (Day numbers follow live teaching order)`,
                   )
                   if (course.startsOn) {
                     const d = new Date(course.startsOn + 'T12:00:00')
@@ -300,7 +303,7 @@ export function TeacherCalendarPage() {
             ) : (
               <button type="button" className="primary" onClick={() => startSession()}>
                 <Play className="h-4 w-4" aria-hidden />
-                <span>Start session</span>
+                <span>Start Day {nextDay}</span>
               </button>
             )}
           </div>
@@ -382,7 +385,9 @@ export function TeacherCalendarPage() {
                     daySessions.map((s) => (
                       <div key={s.id} className={statusClass(s.status)}>
                         <span className="sched-card-time">
-                          {s.sessionNumber != null ? `D${s.sessionNumber} · ` : ''}
+                          {s.status === 'completed' && s.sessionNumber != null
+                            ? `D${s.sessionNumber} · `
+                            : ''}
                           {formatSessionClock(s.plannedStart)}
                         </span>
                         <span className="sched-card-meta">{s.durationMinutes}m</span>
@@ -435,7 +440,11 @@ export function TeacherCalendarPage() {
                   <div className="sched-agenda-time">
                     <Clock3 className="h-3.5 w-3.5" aria-hidden />
                     <span>
-                      {s.sessionNumber != null ? `Day ${s.sessionNumber} · ` : ''}
+                      {s.status === 'completed' && s.sessionNumber != null
+                        ? `Day ${s.sessionNumber} · `
+                        : s.status === 'scheduled'
+                          ? 'Planned · '
+                          : ''}
                       {formatSessionTimeRange(s.plannedStart, s.durationMinutes)}
                     </span>
                   </div>
@@ -495,8 +504,8 @@ export function TeacherCalendarPage() {
 
         <Panel
           icon={CalendarPlus}
-          title="Quick schedule"
-          description="Add a slot on the selected day"
+          title="Flexible slot"
+          description={`Add an extra meeting on this day. When you Start, it becomes Day ${nextDay} (next after days already taught) — not the last course-plan index.`}
           defaultOpen
         >
           <form

@@ -18,18 +18,66 @@ export function emptySchedulingState(): SchedulingState {
   return { scheduledSessions: [], learningSessions: [], attendance: [] }
 }
 
-/** Re-number scheduled sessions for a class by plannedStart (1..N). */
+/**
+ * Highest teaching day already used for this class (open or completed live sessions).
+ * Does NOT count future planned schedule slots — those are calendar placeholders only.
+ */
+export function maxTeachingDayNumber(state: SchedulingState, classId: string): number {
+  return state.learningSessions
+    .filter((ls) => ls.classId === classId && ls.sessionNumber != null && ls.sessionNumber > 0)
+    .reduce((m, ls) => Math.max(m, ls.sessionNumber ?? 0), 0)
+}
+
+/** Next Day N for a live class (Day 1, then 2, …) — ignores unused course-plan slots. */
+export function nextTeachingDayNumber(state: SchedulingState, classId: string): number {
+  return maxTeachingDayNumber(state, classId) + 1
+}
+
+/**
+ * Re-number *unstarted* planned slots for a class by plannedStart.
+ * Preserves sessionNumber on slots that already have a live Learning Session
+ * (teaching Day N must not jump when the course plan has 15 placeholders).
+ */
 export function reindexSessionNumbers(
   state: SchedulingState,
   classId: string,
 ): SchedulingState {
+  const linkedScheduledIds = new Set(
+    state.learningSessions
+      .filter((ls) => ls.classId === classId && ls.scheduledSessionId)
+      .map((ls) => ls.scheduledSessionId as string),
+  )
+  const teachingByScheduled = new Map<string, number>()
+  for (const ls of state.learningSessions) {
+    if (ls.classId !== classId || !ls.scheduledSessionId) continue
+    if (ls.sessionNumber != null && ls.sessionNumber > 0) {
+      teachingByScheduled.set(ls.scheduledSessionId, ls.sessionNumber)
+    }
+  }
+
+  const maxTaught = maxTeachingDayNumber(state, classId)
+  let planCursor = maxTaught
+
   const ordered = state.scheduledSessions
     .filter((s) => s.classId === classId && s.status !== 'cancelled' && s.status !== 'rescheduled')
     .slice()
     .sort((a, b) => a.plannedStart.localeCompare(b.plannedStart))
 
   const numberById = new Map<string, number>()
-  ordered.forEach((s, i) => numberById.set(s.id, i + 1))
+  for (const s of ordered) {
+    if (linkedScheduledIds.has(s.id) && teachingByScheduled.has(s.id)) {
+      numberById.set(s.id, teachingByScheduled.get(s.id)!)
+      continue
+    }
+    if (linkedScheduledIds.has(s.id)) {
+      // Live session exists but no number yet — leave for startLearningSession
+      numberById.set(s.id, s.sessionNumber ?? planCursor + 1)
+      continue
+    }
+    // Future / unstarted plan slots: continue after last taught day
+    planCursor += 1
+    numberById.set(s.id, planCursor)
+  }
 
   return {
     ...state,
@@ -40,13 +88,8 @@ export function reindexSessionNumbers(
       }
       return { ...s, sessionNumber: numberById.get(s.id) ?? s.sessionNumber }
     }),
-    learningSessions: state.learningSessions.map((ls) => {
-      if (ls.classId !== classId) return ls
-      if (ls.scheduledSessionId && numberById.has(ls.scheduledSessionId)) {
-        return { ...ls, sessionNumber: numberById.get(ls.scheduledSessionId)! }
-      }
-      return ls
-    }),
+    // Never rewrite learning-session day numbers from plan reindex
+    learningSessions: state.learningSessions,
   }
 }
 
@@ -62,6 +105,7 @@ export function createScheduledSession(
   if (input.durationMinutes < 1) {
     return { ok: false, error: 'Duration must be positive' }
   }
+  const hasExplicitNumber = input.sessionNumber !== undefined && input.sessionNumber !== null
   const session: ScheduledSession = {
     id: newId('sched'),
     classId: input.classId,
@@ -69,19 +113,23 @@ export function createScheduledSession(
     durationMinutes: input.durationMinutes,
     status: 'scheduled',
     rescheduledFromId: null,
-    sessionNumber: input.sessionNumber ?? null,
+    // Flexible slot: provisional next teaching day (not max of a 15-slot course plan).
+    // Live start always re-assigns from learningSessions only.
+    sessionNumber: hasExplicitNumber
+      ? input.sessionNumber!
+      : nextTeachingDayNumber(state, input.classId),
   }
   const withRow = {
     ...state,
     scheduledSessions: [...state.scheduledSessions, session],
   }
-  const reindexed = reindexSessionNumbers(withRow, input.classId)
-  const value = reindexed.scheduledSessions.find((s) => s.id === session.id) ?? session
-  return {
-    ok: true,
-    value,
-    state: reindexed,
+
+  // Course-plan batch passes explicit numbers and reindexes once at the end.
+  // Flexible teacher adds must not renumber the whole plan (that caused Day 16).
+  if (hasExplicitNumber) {
+    return { ok: true, value: session, state: withRow }
   }
+  return { ok: true, value: session, state: withRow }
 }
 
 /**
@@ -280,20 +328,9 @@ export function startLearningSession(
     return { ok: false, error: 'Class already has an open Learning Session' }
   }
 
-  let sessionNumber: number | null = null
-  if (scheduledSessionId) {
-    const scheduled = state.scheduledSessions.find((s) => s.id === scheduledSessionId)
-    sessionNumber = scheduled?.sessionNumber ?? null
-  }
-  if (sessionNumber == null) {
-    const maxN = state.scheduledSessions
-      .filter((s) => s.classId === input.classId && s.sessionNumber != null)
-      .reduce((m, s) => Math.max(m, s.sessionNumber ?? 0), 0)
-    const adHocCount = state.learningSessions.filter(
-      (ls) => ls.classId === input.classId && !ls.scheduledSessionId,
-    ).length
-    sessionNumber = maxN > 0 ? maxN + adHocCount + 1 : adHocCount + 1
-  }
+  // Teaching Day N is sequential for live work: after Day 1, next live is Day 2 —
+  // never "max planned course slots + 1" (that produced Day 16 with a 15-day plan).
+  const sessionNumber = nextTeachingDayNumber(state, input.classId)
 
   const ownerUserId = input.ownerUserId ?? null
   const ttl = input.lockTtlMs ?? 5 * 60 * 1000
@@ -313,11 +350,19 @@ export function startLearningSession(
       : null,
   }
 
+  // Stamp the linked calendar slot with the real teaching day
+  const scheduledSessions = scheduledSessionId
+    ? state.scheduledSessions.map((s) =>
+        s.id === scheduledSessionId ? { ...s, sessionNumber } : s,
+      )
+    : state.scheduledSessions
+
   return {
     ok: true,
     value: session,
     state: {
       ...state,
+      scheduledSessions,
       learningSessions: [...state.learningSessions, session],
     },
   }

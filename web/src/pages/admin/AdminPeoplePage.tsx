@@ -105,6 +105,7 @@ function PersonEditor({
   icon: Icon,
   createLabel,
   withAvatar,
+  emailRequired,
   onCreate,
   onUpdate,
   onDelete,
@@ -115,6 +116,8 @@ function PersonEditor({
   icon: typeof Users
   createLabel: string
   withAvatar?: boolean
+  /** Learners need email for /access invite links */
+  emailRequired?: boolean
   onCreate: (draft: Draft) => void
   onUpdate: (id: string, draft: Draft) => void
   onDelete: (user: DomainUser) => void
@@ -342,12 +345,13 @@ function PersonEditor({
             />
           </label>
           <label>
-            Email
+            Email{emailRequired ? ' (portal invite)' : ''}
             <input
               type="email"
               value={createDraft.email}
               onChange={(e) => setCreateDraft((d) => ({ ...d, email: e.target.value }))}
-              placeholder="optional"
+              placeholder={emailRequired ? 'learner@school.edu' : 'optional'}
+              required={emailRequired}
             />
           </label>
           <button type="submit" className="primary">
@@ -355,6 +359,11 @@ function PersonEditor({
             <span>{createLabel}</span>
           </button>
         </form>
+        {emailRequired ? (
+          <p className="meta mt-2">
+            After save: use Copy link on the row. Learner opens that link — no Clerk account.
+          </p>
+        ) : null}
       </div>
     </Panel>
   )
@@ -372,7 +381,7 @@ export function AdminPeoplePage() {
         icon={Users}
         kicker="Admin"
         title="People"
-        subtitle="Create, edit, or delete teacher and learner profiles. Learners can have a photo."
+        subtitle="Only staff (Clerk admin/teacher) manage profiles here. Learners are roster profiles with an email invite — they do not sign in with Clerk. After adding a learner, copy their portal link (or enroll them in a class first)."
       />
       <Flash message={message} error={error} />
 
@@ -416,16 +425,18 @@ export function AdminPeoplePage() {
           icon={GraduationCap}
           createLabel="Add learner"
           withAvatar
+          emailRequired
           onAvatarError={err}
           onCreate={(draft) => {
+            if (!draft.email.trim()) return err('Learner email is required for the portal invite')
             const r = addLearnerProfile(roster, {
               displayName: draft.displayName,
-              email: draft.email || null,
+              email: draft.email.trim(),
               avatarUrl: draft.avatarUrl,
             })
             if (!r.ok) return err(r.error)
             setRoster(r.state)
-            ok(`Learner ${r.value.displayName} added`)
+            ok(`Learner ${r.value.displayName} added — copy their portal link from the row`)
           }}
           onUpdate={(id, draft) => {
             const r = updateUserProfile(roster, id, {

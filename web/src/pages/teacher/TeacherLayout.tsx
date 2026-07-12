@@ -32,7 +32,7 @@ export function TeacherLayout() {
       title="Teaching"
       subtitle={
         classRow
-          ? `${seats}/${classRow.capacity} seats${liveOpen ? ' · LIVE' : ''}`
+          ? `${seats} learners · cap ${classRow.capacity}${liveOpen ? ' · LIVE' : ''}`
           : 'No class assigned'
       }
       contextSlot={

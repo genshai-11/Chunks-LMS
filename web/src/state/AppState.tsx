@@ -174,34 +174,63 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const liveRef = useRef({ roster, scheduling })
   liveRef.current = { roster, scheduling }
 
-  // Boot: authenticated cloud is authoritative. Local data is used only once to
-  // bootstrap an empty Clerk-linked workspace, then cloud wins on every browser.
+  // Boot: staff (signed-in) cloud is authoritative for writes; signed-out learners
+  // still load a read-only snapshot so /access?email= works without Clerk.
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       bootDone.current = false
       if (staffSession.clerkEnabled && !staffSession.ready) return
-      // Signed-out staff: keep local cache, do not wipe, skip cloud until sign-in
-      if (staffSession.clerkEnabled && !staffSession.signedIn && !staffSession.authBypass) {
-        setBackendStatus(isSupabaseConfigured() ? 'offline' : 'offline')
-        setBackendError(syncPhaseError('auth', 'Sign in to load and sync Supabase workspace'))
-        bootDone.current = true
-        return
-      }
+
+      const staffAuthed =
+        staffSession.authBypass || (staffSession.clerkEnabled && staffSession.signedIn)
+      const canProvisionStaff =
+        Boolean(staffSession.userId) &&
+        (staffSession.authBypass || staffSession.staffRoles.length > 0)
+
       if (!isSupabaseConfigured()) {
+        // Offline: restore local cache so learner invite still works on this browser.
+        const cached = persistedRef.current
+        if (cached && staffSession.clerkEnabled && !staffAuthed) {
+          skipNextSync.current = true
+          setRoster(ensureStableOrg(cached.roster))
+          setScheduling(cached.scheduling)
+          if (cached.ledger) setLedger(cached.ledger)
+        }
         setBackendStatus('offline')
         setBackendError(null)
         bootDone.current = true
         return
       }
 
+      // Signed-in Clerk user with no staff role: do not create a personal empty
+      // org or clobber roster — StaffGate will explain how to get access.
+      if (
+        staffSession.clerkEnabled &&
+        staffSession.signedIn &&
+        !staffSession.authBypass &&
+        staffSession.staffRoles.length === 0
+      ) {
+        setBackendStatus('offline')
+        setBackendError(
+          syncPhaseError(
+            'auth',
+            'Signed in but no staff role (Clerk metadata or VITE_STAFF_*_EMAILS allowlist)',
+          ),
+        )
+        bootDone.current = true
+        return
+      }
+
       let organizationId: string | undefined
-      if (staffSession.userId) {
+      if (canProvisionStaff && staffSession.userId) {
         const provisioned = await ensureClerkWorkspace({
           clerkUserId: staffSession.userId,
           email: staffSession.email,
           displayName: staffSession.displayName ?? staffSession.email ?? 'Chunks Staff',
-          roles: staffSession.staffRoles,
+          roles: staffSession.staffRoles.length
+            ? staffSession.staffRoles
+            : ['admin', 'teacher'],
         })
         if (!provisioned.ok) {
           setBackendStatus('error')
@@ -211,7 +240,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         organizationId = provisioned.organizationId
       }
 
-      const loaded = await loadWorkspaceFromSupabase({ organizationId })
+      // Learners (signed out): load richest workspace without org filter (V1 demo RLS).
+      // Staff: scoped to their provisioned organization.
+      const loaded = await loadWorkspaceFromSupabase(
+        organizationId ? { organizationId } : undefined,
+      )
       if (cancelled) return
       if (!loaded.ok) {
         setBackendStatus('error')
@@ -238,7 +271,27 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
       let authoritativeRoster = remote.roster
       const source = chooseBootstrapSource(wRemote, wLive)
-      if (source === 'cloud') {
+
+      if (!staffAuthed) {
+        // Read-only portal path: prefer cloud; fall back to this browser's cache.
+        // Never push local → cloud while signed out.
+        if (source === 'cloud' || (source === 'empty' && wRemote === 0 && wLive === 0)) {
+          setRoster(remote.roster)
+          setScheduling(
+            wRemote > 0
+              ? mergeScheduling(live.scheduling, remote.scheduling)
+              : remote.scheduling,
+          )
+          authoritativeRoster = remote.roster
+        } else if (source === 'local') {
+          authoritativeRoster = live.roster
+          setRoster(live.roster)
+          setScheduling(live.scheduling)
+        } else {
+          setRoster(remote.roster)
+          setScheduling(remote.scheduling)
+        }
+      } else if (source === 'cloud') {
         // Cloud roster authoritative; merge scheduling so open remote sessions survive.
         setRoster(remote.roster)
         setScheduling(mergeScheduling(live.scheduling, remote.scheduling))
@@ -262,6 +315,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
 
       setBackendStatus('online')
+      // Learners load cloud read-only; do not surface a sticky "error" banner.
       setBackendError(null)
       setLastSyncedAt(new Date().toISOString())
       bootDone.current = true
@@ -283,21 +337,25 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     })
   }, [roster, scheduling, metricSettings, ledger, auditLog])
 
-  // Persist metric settings to Supabase org_settings when available
+  // Persist metric settings to Supabase org_settings when available (staff only)
   useEffect(() => {
     if (!bootDone.current) return
     if (!isSupabaseConfigured()) return
+    if (!staffSession.authBypass && !staffSession.signedIn) return
+    if (!staffSession.authBypass && staffSession.staffRoles.length === 0) return
     const orgId = ensureStableOrg(roster).organization.id
     const t = setTimeout(() => {
       void saveOrgMetricSettings(orgId, metricSettings)
     }, 800)
     return () => clearTimeout(t)
-  }, [metricSettings, roster])
+  }, [metricSettings, roster, staffSession.authBypass, staffSession.signedIn, staffSession.staffRoles.length])
 
-  // Debounced Supabase save
+  // Debounced Supabase save — staff only (learners must never write the workspace)
   useEffect(() => {
     if (!bootDone.current) return
     if (!isSupabaseConfigured()) return
+    if (!staffSession.authBypass && !staffSession.signedIn) return
+    if (!staffSession.authBypass && staffSession.staffRoles.length === 0) return
     if (skipNextSync.current) {
       skipNextSync.current = false
       return
@@ -338,7 +396,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return () => {
       if (syncTimer.current) clearTimeout(syncTimer.current)
     }
-  }, [roster, scheduling])
+  }, [roster, scheduling, staffSession.authBypass, staffSession.signedIn, staffSession.staffRoles.length])
 
   const resetAll = useCallback(() => {
     clearPersistedAppState()
@@ -359,6 +417,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setBackendStatus('offline')
       return
     }
+    if (!staffSession.authBypass && !staffSession.signedIn) {
+      setBackendError('Sign in as staff to sync changes')
+      return
+    }
+    if (!staffSession.authBypass && staffSession.staffRoles.length === 0) {
+      setBackendError('No staff role — cannot sync')
+      return
+    }
     setBackendStatus('syncing')
     const result = await saveWorkspaceToSupabase(
       { roster: ensureStableOrg(roster), scheduling },
@@ -373,7 +439,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setBackendStatus('error')
       setBackendError(syncPhaseError('write', result.error))
     }
-  }, [roster, scheduling])
+  }, [roster, scheduling, staffSession.authBypass, staffSession.signedIn, staffSession.staffRoles.length])
 
   const reloadFromSupabase = useCallback(async () => {
     if (!isSupabaseConfigured() || !staffSession.userId) return

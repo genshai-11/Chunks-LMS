@@ -13,12 +13,13 @@ import { useAppState } from '../state/useAppState'
  * Admin & Teacher use Clerk separately. Clerk learner accounts are deferred.
  */
 export function LearnerAccessPage() {
-  const { roster, setActiveLearnerUserId, activeLearnerUserId } = useAppState()
+  const { roster, setActiveLearnerUserId, activeLearnerUserId, backendStatus } = useAppState()
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const [email, setEmail] = useState(params.get('email') ?? '')
   const [error, setError] = useState<string | null>(null)
   const [linkMiss, setLinkMiss] = useState(false)
+  const booting = backendStatus === 'booting'
 
   useEffect(() => {
     const fromQuery = params.get('email')
@@ -26,6 +27,8 @@ export function LearnerAccessPage() {
       setLinkMiss(false)
       return
     }
+    // Wait until workspace boot finishes so cloud roster is available.
+    if (booting) return
     const learner = findLearnerByEmail(roster, fromQuery)
     if (learner) {
       setActiveLearnerUserId(learner.id)
@@ -35,7 +38,7 @@ export function LearnerAccessPage() {
       setEmail(fromQuery)
       setLinkMiss(true)
     }
-  }, [params, roster, setActiveLearnerUserId, navigate])
+  }, [params, roster, setActiveLearnerUserId, navigate, booting])
 
   const current =
     activeLearnerUserId
@@ -50,7 +53,7 @@ export function LearnerAccessPage() {
         icon={GraduationCap}
         kicker="Learner"
         title="Open your portal"
-        subtitle="Open the invite link from your teacher, or enter the email they registered for you. No staff password needed."
+        subtitle="Use the invite link from your teacher, or type the exact email on your learner profile. Do not sign in with Clerk — that is for staff only."
       />
 
       {current ? (
@@ -81,9 +84,15 @@ export function LearnerAccessPage() {
         title="Enter with email"
         description="Must match the email on your learner profile (from the invite link)."
       >
-        {linkMiss ? (
+        {booting ? (
+          <p className="meta" role="status">
+            Loading class roster…
+          </p>
+        ) : null}
+        {linkMiss && !booting ? (
           <p className="banner err" role="alert">
-            No learner matches that invite email. Check the link or ask your teacher to re-send it.
+            No learner matches that invite email. Check the link or ask your teacher to re-send it
+            (email must match the learner profile exactly).
           </p>
         ) : null}
         <form
@@ -92,9 +101,15 @@ export function LearnerAccessPage() {
             e.preventDefault()
             setError(null)
             setLinkMiss(false)
+            if (booting) {
+              setError('Still loading roster — try again in a moment.')
+              return
+            }
             const learner = findLearnerByEmail(roster, email)
             if (!learner) {
-              setError('No learner found with that email. Ask your teacher to share the invite link.')
+              setError(
+                'No learner found with that email. Ask your teacher to share the invite link (must match the email on your profile).',
+              )
               return
             }
             setActiveLearnerUserId(learner.id)

@@ -10,8 +10,9 @@ export type ScheduledSession = {
   status: ScheduleStatus
   rescheduledFromId: string | null
   /**
-   * 1-based buổi index within the class course plan (e.g. 1..15).
-   * Null for ad-hoc slots until reindexed.
+   * Teaching Day N for this class (1, 2, 3…).
+   * Unstarted plan slots may show a provisional number; live start always uses next
+   * teaching day after completed/open sessions (not max of the full course plan).
    */
   sessionNumber: number | null
 }
@@ -25,7 +26,7 @@ export type LearningSession = {
   startedAt: string
   completedAt: string | null
   maxProbeCount: number
-  /** Inherited from scheduled session or assigned when started */
+  /** Teaching Day N assigned when the live session starts (sequential per class) */
   sessionNumber: number | null
   /**
    * Soft lock: teacher currently authorized to capture for an open session.

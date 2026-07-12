@@ -74,9 +74,26 @@ export function StaffGate({ role, children }: Props) {
               : `Your account has no ${role} role.`
           }
         />
-        <div className="panel" style={{ maxWidth: 420, margin: '0 auto' }}>
+        <div className="panel" style={{ maxWidth: 480, margin: '0 auto' }}>
           <p className="meta">
             Your staff roles: {session.staffRoles.length ? session.staffRoles.join(', ') : 'none'}
+          </p>
+          <p className="meta" style={{ marginTop: 8 }}>
+            Grant access by either:
+          </p>
+          <ul className="meta" style={{ marginTop: 6, paddingLeft: 18 }}>
+            <li>
+              Add your Clerk primary email to <code>VITE_STAFF_ADMIN_EMAILS</code> /{' '}
+              <code>VITE_STAFF_TEACHER_EMAILS</code> (Vercel env) and redeploy
+            </li>
+            <li>
+              Or set Clerk user public metadata:{' '}
+              <code>{`{ "chunksRole": "admin" }`}</code> (or <code>"teacher"</code> /{' '}
+              <code>"staff"</code>)
+            </li>
+          </ul>
+          <p className="meta" style={{ marginTop: 8 }}>
+            Learners do not use Clerk — open the invite link at <code>/access?email=…</code>.
           </p>
           <div className="btn-row" style={{ marginTop: 12 }}>
             {session.canAccess('admin') ? (

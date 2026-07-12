@@ -116,6 +116,12 @@ export function TeacherOverviewPage() {
       <Flash message={message} error={error} />
 
       <div className="stat-grid">
+        <StatCard
+          icon={Users}
+          label="Learners"
+          value={`${seats} / ${classRow.capacity}`}
+          hint="Enrolled in this class"
+        />
         <StatCard icon={CalendarDays} label="Scheduled" value={scheduled} hint="Sessions planned" />
         <StatCard
           icon={Radio}
@@ -143,15 +149,19 @@ export function TeacherOverviewPage() {
         />
       </div>
 
-      <Panel icon={Home} title="Do next" description="Primary teaching path for this class.">
+      <Panel
+        icon={Home}
+        title="Do next"
+        description={`Course ${course?.code ?? '—'} is shared; this class has its own roster, capacity, and calendar.`}
+      >
         <div className="list-cards">
           <NavTile
             to="/teacher/calendar"
             title="Schedule"
             description={
               nextScheduled
-                ? `Next session ${new Date(nextScheduled.plannedStart).toLocaleString()}`
-                : 'Plan sessions or start ad-hoc.'
+                ? `Next planned ${new Date(nextScheduled.plannedStart).toLocaleString()} · or add a flexible slot`
+                : 'Apply course plan and/or add flexible days for this class only.'
             }
             icon={CalendarDays}
             cta="Go"
@@ -163,8 +173,8 @@ export function TeacherOverviewPage() {
               openSession
                 ? 'Attendance and Observe are open.'
                 : capture?.sessionStatus === 'completed'
-                  ? 'Last session finished — start a new one from Schedule.'
-                  : 'Start from Schedule first.'
+                  ? 'Last day finished — start the next teaching day.'
+                  : 'Start Day 1…N here, or from a Schedule slot.'
             }
             icon={Radio}
             cta="Go"

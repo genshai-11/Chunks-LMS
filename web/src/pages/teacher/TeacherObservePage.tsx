@@ -272,6 +272,8 @@ export function TeacherObservePage() {
   const qNum = capture ? capture.position.questionIndex + 1 : 0
   const qTotal = capture?.questions.length ?? 0
   const probeDepth = attempt?.snapshot.probeCount ?? 0
+  const probeDepthMax =
+    attempt?.snapshot.maxProbeCount ?? capture?.maxProbeCount ?? openSession?.maxProbeCount ?? 0
   const isFinalized =
     attempt?.snapshot.status === 'finalized' || attempt?.snapshot.status === 'corrected'
   const probeOpen =
@@ -379,7 +381,12 @@ export function TeacherObservePage() {
           appendFinalizedFromCapture(next)
           flash(color)
         } else if (outcome === 'continue') {
-          flash(`n=${result.data.snapshot.probeCount}`)
+          const max = result.data.snapshot.maxProbeCount
+          flash(
+            max > 0
+              ? `n=${result.data.snapshot.probeCount} · depth max ${max}`
+              : `n=${result.data.snapshot.probeCount}`,
+          )
         }
       } finally {
         setLiveSaving(false)
@@ -684,7 +691,12 @@ export function TeacherObservePage() {
             {mapOpen ? (
               <>
                 <p className="observe-rail-name">{learner?.displayName ?? 'Learner'}</p>
-                {probeOpen ? <p className="observe-rail-n">n={probeDepth}</p> : null}
+                {probeOpen ? (
+                  <p className="observe-rail-n" title="n = probe depth after Green; depth max = session ceiling">
+                    n={probeDepth}
+                    {probeDepthMax > 0 ? ` · max ${probeDepthMax}` : ''}
+                  </p>
+                ) : null}
               </>
             ) : null}
           </div>
@@ -834,8 +846,17 @@ export function TeacherObservePage() {
                 </div>
               </div>
               {probeOpen ? (
-                <p className="observe-depth-inline">
-                  Probe n=<strong>{probeDepth}</strong>
+                <p
+                  className="observe-depth-inline"
+                  title="n = how deep after Green (Continue). depth max = session max probe setting."
+                >
+                  n=<strong>{probeDepth}</strong>
+                  {probeDepthMax > 0 ? (
+                    <>
+                      {' '}
+                      · depth max=<strong>{probeDepthMax}</strong>
+                    </>
+                  ) : null}
                 </p>
               ) : null}
             </div>

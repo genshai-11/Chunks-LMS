@@ -426,7 +426,8 @@ export function ProgressAnalysisView({
           {focusLearner ? ` · ${focusLearner.displayName}` : mode === 'teacher' ? ' · class' : ''}
           {kind === 'session' ? ` · ${selectedSessionLabel}` : window ? ` · ${window.label}` : ''}
           {' · '}
-          <strong>n={total}</strong> finalized
+          <strong>{total} finalized</strong>
+          <span className="text-slate-400"> (sample size, not probe n)</span>
         </p>
       </section>
 
@@ -510,7 +511,7 @@ export function ProgressAnalysisView({
             <div className="stat-card">
               <p className="stat-label">Avg score</p>
               <p className="stat-value">{avg ? formatMetricValue(avg) : '—'}</p>
-              <p className="meta">0–3 scale · n={total}</p>
+              <p className="meta">0–3 scale · {total} samples</p>
             </div>
             <div className="stat-card">
               <p className="stat-label">Results</p>

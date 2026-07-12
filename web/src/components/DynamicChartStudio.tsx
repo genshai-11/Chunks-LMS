@@ -360,7 +360,7 @@ export function DynamicChartStudio({
                                 row.key === 'awareness_recovery'
                               ? `${(cell.value * 100).toFixed(1)}%`
                               : cell.value.toFixed(2)}
-                          <span className="text-slate-400"> · n={cell.n}</span>
+                          <span className="text-slate-400"> · sample={cell.n}</span>
                         </td>
                       ))}
                     </tr>

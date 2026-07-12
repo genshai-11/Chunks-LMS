@@ -254,6 +254,33 @@ export function ProgressAnalysisView({
   const rfcTone = trendTone('rfc', rfcDelta)
   const racTone = trendTone('rac', racDelta)
 
+  const additionalMetrics = useMemo(() => {
+    if (!comparison || !metricSettings) return []
+    const primaryKeys: MetricKey[] = ['rfc', 'rac', 'average_performance']
+    return metricSettings.metrics
+      .filter((m) => m.enabled && !primaryKeys.includes(m.key))
+      .map((cfg) => {
+        const obs = pickMetric(comparison.current, cfg.key, metricSettings)
+        const delta = comparison.deltas[cfg.key]
+        return {
+          key: cfg.key,
+          label: cfg.label,
+          definition: cfg.definition,
+          obs,
+          delta,
+        }
+      })
+      .filter(
+        (item): item is {
+          key: MetricKey
+          label: string
+          definition: string
+          obs: MetricObservation
+          delta: number | null | undefined
+        } => item.obs !== null,
+      )
+  }, [comparison, metricSettings])
+
   /** Per-day series for class or focused learner */
   const sessionSeries = useMemo(() => {
     return buildSessionMetricSeries({
@@ -521,6 +548,46 @@ export function ProgressAnalysisView({
               </p>
             </div>
           </div>
+
+          {additionalMetrics.length > 0 && (
+            <div className="analysis-additional-section" style={{ marginTop: 24, marginBottom: 24 }}>
+              <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
+                Additional Indicators (Customized by Admin)
+              </h3>
+              <div className="stat-grid" style={{ marginBottom: 24 }}>
+                {additionalMetrics.map((item) => {
+                  const valStr = formatMetricValue(item.obs)
+                  const delta = item.delta
+                  const tone =
+                    delta == null || Math.abs(delta) < 0.05
+                      ? ('flat' as const)
+                      : ['purple_mastery_rate', 'awareness_recovery', 'focus_stability'].includes(
+                            item.key,
+                          )
+                        ? delta > 0
+                          ? ('up' as const)
+                          : ('down' as const)
+                        : ('flat' as const)
+
+                  return (
+                    <div key={item.key} className="stat-card" title={item.definition}>
+                      <p className="stat-label">{item.label}</p>
+                      <p className="stat-value">{valStr}</p>
+                      <p className={`analysis-delta is-${tone}`}>
+                        {tone === 'up' ? (
+                          <TrendingUp className="h-3.5 w-3.5" aria-hidden />
+                        ) : tone === 'down' ? (
+                          <TrendingDown className="h-3.5 w-3.5" aria-hidden />
+                        ) : null}
+                        {formatDelta(item.key, delta)}
+                        <span className="analysis-delta-note"> vs prior window</span>
+                      </p>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="analysis-grid">
             <div className="panel">

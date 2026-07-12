@@ -11,6 +11,7 @@ import './index.css'
 
 function Root() {
   if (!env.canBoot) {
+    const vercelEnv = String(import.meta.env.VITE_VERCEL_ENV ?? '').trim() || 'local'
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-950 text-white p-4 text-center">
         <div className="max-w-md p-6 bg-slate-900 rounded-2xl border border-white/10 shadow-xl">
@@ -24,6 +25,16 @@ function Root() {
             Learners use share links at <code className="text-slate-300">/access</code> and do not
             need Clerk.
           </p>
+          <p className="text-xs text-slate-600 mt-4 font-mono">
+            env={vercelEnv} · clerk={env.clerkPublishableKey ? 'set' : 'missing'} · bypass=
+            {env.authBypass ? 'on' : 'off'}
+          </p>
+          {vercelEnv === 'production' ? (
+            <p className="text-xs text-amber-500/90 mt-2">
+              Production ignores VITE_AUTH_BYPASS. Add the Clerk publishable key in Vercel →
+              Settings → Environment Variables, then Redeploy.
+            </p>
+          ) : null}
         </div>
       </div>
     )

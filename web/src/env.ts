@@ -68,13 +68,22 @@ function readEnv(): AppEnv {
         VITE_STAFF_TEACHER_EMAILS: '',
       }
 
-  const clerkPublishableKey = data.VITE_CLERK_PUBLISHABLE_KEY
+  const clerkPublishableKey = (data.VITE_CLERK_PUBLISHABLE_KEY ?? '').trim()
   const supabaseUrl = data.VITE_SUPABASE_URL
   const supabaseAnonKey = data.VITE_SUPABASE_ANON_KEY
-  const authBypass = truthy(data.VITE_AUTH_BYPASS) && !import.meta.env.PROD
 
-  if (truthy(data.VITE_AUTH_BYPASS) && import.meta.env.PROD) {
-    console.warn('VITE_AUTH_BYPASS is ignored in production builds')
+  /**
+   * Vite sets PROD=true for every `vite build` (local preview, Vercel Preview, and
+   * Production). Only block staff auth bypass on real Vercel Production deploys.
+   * Local + Vercel Preview may use VITE_AUTH_BYPASS for demos without Clerk.
+   */
+  const vercelEnv = String(import.meta.env.VITE_VERCEL_ENV ?? '').trim()
+  const isVercelProduction = vercelEnv === 'production'
+  const authBypassRequested = truthy(data.VITE_AUTH_BYPASS)
+  const authBypass = authBypassRequested && !isVercelProduction
+
+  if (authBypassRequested && isVercelProduction) {
+    console.warn('VITE_AUTH_BYPASS is ignored on Vercel Production — set VITE_CLERK_PUBLISHABLE_KEY')
   }
 
   return {

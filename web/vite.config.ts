@@ -10,6 +10,14 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  /**
+   * Vercel sets VERCEL_ENV=production|preview|development at build time.
+   * Vite always sets import.meta.env.PROD=true for `vite build` (including preview
+   * deploys), so staff auth bypass must key off the real deployment target.
+   */
+  define: {
+    'import.meta.env.VITE_VERCEL_ENV': JSON.stringify(process.env.VERCEL_ENV ?? ''),
+  },
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
@@ -17,3 +25,4 @@ export default defineConfig({
     css: false,
   },
 })
+

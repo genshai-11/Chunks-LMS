@@ -12,7 +12,6 @@ import { AdminEnrollmentsPage } from './pages/admin/AdminEnrollmentsPage'
 import { AdminMetricsPage } from './pages/admin/AdminMetricsPage'
 import { AdminAnalysisPage } from './pages/admin/AdminAnalysisPage'
 import { AdminOpsPage } from './pages/admin/AdminOpsPage'
-import { AdminAttendancePage } from './pages/admin/AdminAttendancePage'
 import { AdminAuditPage } from './pages/admin/AdminAuditPage'
 import { AdminIntegrityPage } from './pages/admin/AdminIntegrityPage'
 import { TeacherLayout } from './pages/teacher/TeacherLayout'
@@ -26,7 +25,6 @@ import { TeacherLearnerProfilePage } from './pages/teacher/TeacherLearnerProfile
 import { LearnerLayout } from './pages/learner/LearnerLayout'
 import { LearnerOverviewPage } from './pages/learner/LearnerOverviewPage'
 import { LearnerEnrollmentsPage } from './pages/learner/LearnerEnrollmentsPage'
-import { LearnerAttendancePage } from './pages/learner/LearnerAttendancePage'
 import { LearnerAnalysisPage } from './pages/learner/LearnerAnalysisPage'
 import { LearnerAccessPage } from './pages/LearnerAccessPage'
 import { AppStateProvider } from './state/AppState'
@@ -51,7 +49,7 @@ export default function App() {
               >
                 <Route index element={<AdminOverviewPage />} />
                 <Route path="ops" element={<AdminOpsPage />} />
-                <Route path="attendance" element={<AdminAttendancePage />} />
+                <Route path="attendance" element={<Navigate to="/admin/ops" replace />} />
                 <Route path="audit" element={<AdminAuditPage />} />
                 <Route path="integrity" element={<AdminIntegrityPage />} />
                 <Route path="courses" element={<AdminCoursesPage />} />
@@ -92,7 +90,7 @@ export default function App() {
               <Route path="/learner" element={<LearnerLayout />}>
                 <Route index element={<LearnerOverviewPage />} />
                 <Route path="enrollments" element={<LearnerEnrollmentsPage />} />
-                <Route path="attendance" element={<LearnerAttendancePage />} />
+                <Route path="attendance" element={<Navigate to="/learner" replace />} />
                 <Route path="results" element={<Navigate to="/learner/analysis" replace />} />
                 <Route path="analysis" element={<LearnerAnalysisPage />} />
                 <Route path="progress" element={<Navigate to="/learner/analysis" replace />} />

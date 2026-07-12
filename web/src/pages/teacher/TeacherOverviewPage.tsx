@@ -45,6 +45,7 @@ export function TeacherOverviewPage() {
     ledger,
     activeLearnerUserId,
     setActiveLearnerUserId,
+    setActiveClassId,
     syncNow,
   } = useAppState()
   const { options, classRow, course, teacher, seats, hasMultiple } = useTeacherClassContext()
@@ -71,6 +72,15 @@ export function TeacherOverviewPage() {
       const activeEnrollmentRows = roster.enrollments.filter(
         (e) => e.learnerUserId === user.id && e.status === 'active',
       )
+      const matchingOpenSession = scheduling.learningSessions.find(
+        (session) =>
+          session.status === 'open' &&
+          activeEnrollmentRows.some((enrollment) => enrollment.classId === session.classId) &&
+          Boolean(session.participantLearnerIds?.includes(user.id)),
+      )
+      const assignedToActiveClass = classRow
+        ? activeEnrollmentRows.some((e) => e.classId === classRow.id)
+        : false
       const sessionRows = summarizeLearnerSessions({
         ledger,
         scheduling,
@@ -86,11 +96,15 @@ export function TeacherOverviewPage() {
         invite: learnerInviteUrl(user),
         accountStatus: user.accountStatus ?? 'active',
         classIds: activeEnrollmentRows.map((e) => e.classId),
-        assignedToActiveClass: classRow
-          ? activeEnrollmentRows.some((e) => e.classId === classRow.id)
-          : false,
+        assignedToActiveClass,
         sessions: rfcStats.count,
         finalized: sessionRows.reduce((sum, row) => sum + row.total, 0),
+        hasMatchingOpenSession: Boolean(matchingOpenSession),
+        preferredClassId:
+          matchingOpenSession?.classId ??
+          (assignedToActiveClass ? classRow?.id : null) ??
+          activeEnrollmentRows[0]?.classId ??
+          null,
         rfcMin: rfcStats.min,
         rfcMax: rfcStats.max,
         rfcAvg: rfcStats.avg,
@@ -275,11 +289,14 @@ export function TeacherOverviewPage() {
                 key={learner.id}
                 learner={learner}
                 selected={selectedLearner?.id === learner.id}
-                openSession={Boolean(openSession)}
+                openSession={learner.hasMatchingOpenSession}
                 activeClassName={classRow?.name ?? null}
                 canAssignActiveClass={Boolean(classRow) && !learner.assignedToActiveClass}
                 onAssignActiveClass={() => assignActiveClass(learner.id)}
-                onSelect={() => setActiveLearnerUserId(learner.id)}
+                onSelect={() => {
+                  setActiveLearnerUserId(learner.id)
+                  if (learner.classIds[0]) setActiveClassId(learner.classIds[0])
+                }}
                 onCopied={(text) => ok(text)}
               />
             ))}
@@ -353,7 +370,10 @@ export function TeacherOverviewPage() {
                         <Link
                           to={`/teacher/session?learner=${encodeURIComponent(learner.id)}`}
                           className="btn primary"
-                          onClick={() => setActiveLearnerUserId(learner.id)}
+                          onClick={() => {
+                            setActiveLearnerUserId(learner.id)
+                            if (learner.classIds[0]) setActiveClassId(learner.classIds[0])
+                          }}
                         >
                           <Play className="h-4 w-4" aria-hidden />
                           Start
@@ -403,6 +423,7 @@ function LearnerCard({
     rfcMax: number | null
     rfcAvg: number | null
     classIds: string[]
+    hasMatchingOpenSession: boolean
   }
   selected: boolean
   openSession: boolean

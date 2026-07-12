@@ -2,7 +2,6 @@ import { useMemo } from 'react'
 import {
   BookMarked,
   ChartColumn,
-  ClipboardCheck,
   GraduationCap,
   Home,
   ListChecks,
@@ -18,16 +17,6 @@ import { updateUserProfile } from '../../modules/roster/service'
 export function LearnerOverviewPage() {
   const { roster, setRoster, syncNow, scheduling, ledger } = useAppState()
   const { learner, options, classRow, course, hasMultiple } = useLearnerClassContext()
-
-  const myAttendance = useMemo(() => {
-    if (!learner) return []
-    const rows = scheduling.attendance.filter((a) => a.learnerUserId === learner.id)
-    if (!classRow) return rows
-    const sessionIds = new Set(
-      scheduling.learningSessions.filter((s) => s.classId === classRow.id).map((s) => s.id),
-    )
-    return rows.filter((a) => sessionIds.has(a.learningSessionId))
-  }, [scheduling.attendance, scheduling.learningSessions, learner, classRow])
 
   const myResults = useMemo(() => {
     if (!learner) return []
@@ -88,14 +77,13 @@ export function LearnerOverviewPage() {
               ? `${classRow.name}${course?.code ? ` · ${course.code}` : ''}${
                   hasMultiple ? ` · ${options.length} classes` : ''
                 }`
-              : 'Your classes, attendance, and progress — read only.'
+              : 'Your classes and progress — read only.'
           }
         />
       </div>
 
       <div className="stat-grid">
         <StatCard icon={BookMarked} label="My classes" value={options.length} />
-        <StatCard icon={ClipboardCheck} label="Attendance" value={myAttendance.length} />
         <StatCard icon={ListChecks} label="Results" value={myResults.length} hint="Finalized" />
         <StatCard
           icon={ChartColumn}
@@ -150,13 +138,6 @@ export function LearnerOverviewPage() {
 
       <Panel icon={Home} title="Shortcuts" description="Jump to your records.">
         <div className="list-cards">
-          <NavTile
-            to="/learner/attendance"
-            title="Attendance"
-            description="Present, late, absent, or excused."
-            icon={ClipboardCheck}
-            cta="Open"
-          />
           <NavTile
             to="/learner/analysis"
             title="Analysis"

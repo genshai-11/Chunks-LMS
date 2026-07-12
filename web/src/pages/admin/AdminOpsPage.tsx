@@ -7,7 +7,6 @@ import {
   Radio,
   TriangleAlert,
 } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import { PageHeader } from '../../components/PageHeader'
 import { EmptyState, Panel, StatCard } from '../../components/ui'
 import {
@@ -59,13 +58,7 @@ export function AdminOpsPage() {
         icon={LayoutDashboard}
         kicker="Admin"
         title="Ops board"
-        subtitle="Today’s sessions, attendance completion, open capture risk."
-        actions={
-          <Link to="/admin/attendance" className="btn ghost">
-            <ClipboardCheck className="h-4 w-4" aria-hidden />
-            Attendance matrix
-          </Link>
-        }
+        subtitle="Today’s sessions, automatic attendance completion, open capture risk."
       />
 
       <div className="stat-grid">
@@ -194,9 +187,7 @@ export function AdminOpsPage() {
                 {classSummaries.map((c) => (
                   <tr key={c.classRow.id}>
                     <td>
-                      <Link to={`/admin/attendance?class=${c.classRow.id}`} className="underline">
-                        {c.classRow.name}
-                      </Link>
+                      <span className="font-medium text-slate-800">{c.classRow.name}</span>
                     </td>
                     <td>{c.sessions}</td>
                     <td>{c.avgRate != null ? `${c.avgRate}%` : '—'}</td>

@@ -53,7 +53,7 @@ type CourseDraft = {
 }
 
 export function TeacherClassesPage() {
-  const { roster, setRoster, setActiveClassId, ledger, scheduling, syncNow } = useAppState()
+  const { roster, setRoster, setActiveClassId, setActiveLearnerUserId, ledger, scheduling, syncNow } = useAppState()
   const staffSession = useStaffSession()
 
   const teacher =
@@ -528,7 +528,10 @@ export function TeacherClassesPage() {
                   <Link
                     to={`/teacher/session?learner=${encodeURIComponent(learner.id)}`}
                     className="btn primary flex-1 flex justify-center gap-1.5 text-xs py-1.5"
-                    onClick={() => setActiveClassId(learner.classes[0]?.id || '')}
+                    onClick={() => {
+                      setActiveLearnerUserId(learner.id)
+                      setActiveClassId(learner.classes[0]?.id || '')
+                    }}
                   >
                     <Play className="h-3.5 w-3.5" aria-hidden />
                     <span>Observe</span>

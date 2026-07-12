@@ -23,6 +23,7 @@ import { TeacherObservePage } from './pages/teacher/TeacherObservePage'
 import { TeacherAnalysisPage } from './pages/teacher/TeacherAnalysisPage'
 import { TeacherArchivePage } from './pages/teacher/TeacherArchivePage'
 import { TeacherClassesPage } from './pages/teacher/TeacherClassesPage'
+import { TeacherLearnerProfilePage } from './pages/teacher/TeacherLearnerProfilePage'
 import { LearnerLayout } from './pages/learner/LearnerLayout'
 import { LearnerOverviewPage } from './pages/learner/LearnerOverviewPage'
 import { LearnerEnrollmentsPage } from './pages/learner/LearnerEnrollmentsPage'
@@ -81,6 +82,7 @@ export default function App() {
               >
                 <Route index element={<TeacherOverviewPage />} />
                 <Route path="classes" element={<TeacherClassesPage />} />
+                <Route path="learner/:learnerId" element={<TeacherLearnerProfilePage />} />
                 <Route path="calendar" element={<TeacherCalendarPage />} />
                 <Route path="session" element={<TeacherSessionPage />} />
                 <Route path="archive" element={<TeacherArchivePage />} />

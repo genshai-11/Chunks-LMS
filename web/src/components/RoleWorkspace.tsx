@@ -1,7 +1,7 @@
+import { useState, type ReactNode } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
-import { Circle } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { Circle, Menu } from 'lucide-react'
 import type { SectionTab } from './SectionTabs'
 
 type Props = {
@@ -26,6 +26,7 @@ export function RoleWorkspace({
   footer,
 }: Props) {
   const location = useLocation()
+  const [mobileExpanded, setMobileExpanded] = useState(false)
 
   return (
     <div className="workspace">
@@ -52,7 +53,17 @@ export function RoleWorkspace({
       </aside>
 
       <div className="workspace-main">
-        <nav className="mobile-nav" aria-label={navLabel}>
+        <nav className={`mobile-nav${mobileExpanded ? ' is-expanded' : ''}`} aria-label={navLabel}>
+          <button
+            type="button"
+            className="mobile-nav-toggle"
+            onClick={() => setMobileExpanded((value) => !value)}
+            aria-expanded={mobileExpanded}
+            title={mobileExpanded ? 'Hide labels' : 'Show menu labels'}
+          >
+            <Menu className="h-4 w-4" aria-hidden />
+            <span className="mobile-nav-label">{title}</span>
+          </button>
           {items.map((item) => {
             const Icon = item.icon
             return (
@@ -60,10 +71,13 @@ export function RoleWorkspace({
                 key={item.to}
                 to={item.to}
                 end={item.end}
+                title={item.label}
+                aria-label={item.label}
                 className={({ isActive }) => (isActive ? 'is-active' : undefined)}
+                onClick={() => setMobileExpanded(false)}
               >
-                {Icon ? <Icon className="h-3.5 w-3.5" aria-hidden strokeWidth={1.75} /> : null}
-                {item.label}
+                {Icon ? <Icon className="h-4 w-4" aria-hidden strokeWidth={1.75} /> : null}
+                <span className="mobile-nav-label">{item.label}</span>
               </NavLink>
             )
           })}

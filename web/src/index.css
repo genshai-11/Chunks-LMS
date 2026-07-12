@@ -182,15 +182,34 @@
   }
 
   .mobile-nav {
-    @apply flex gap-1.5 overflow-x-auto border-b border-slate-200/80 bg-white px-4 py-2.5 lg:hidden;
+    @apply sticky top-[var(--topbar-h)] z-20 flex gap-1.5 overflow-x-auto border-b border-slate-200/80 bg-white/95 px-3 py-2 shadow-sm backdrop-blur lg:hidden;
   }
 
-  .mobile-nav a {
-    @apply inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-500;
+  .mobile-nav a,
+  .mobile-nav-toggle {
+    @apply inline-flex h-10 w-10 shrink-0 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-0 text-xs font-semibold text-slate-500 transition-colors;
   }
 
-  .mobile-nav a.is-active {
+  .mobile-nav a.is-active,
+  .mobile-nav-toggle[aria-expanded='true'] {
     @apply border-slate-900 bg-slate-900 text-white;
+  }
+
+  .mobile-nav-label {
+    @apply sr-only;
+  }
+
+  .mobile-nav.is-expanded {
+    @apply flex-wrap overflow-visible;
+  }
+
+  .mobile-nav.is-expanded a,
+  .mobile-nav.is-expanded .mobile-nav-toggle {
+    @apply h-auto w-auto px-3 py-2;
+  }
+
+  .mobile-nav.is-expanded .mobile-nav-label {
+    @apply not-sr-only;
   }
 
   .workspace-main {
@@ -433,7 +452,7 @@
 
   /* ——— Feedback / badges (DESIGN.md §5.4) ——— */
   .banner {
-    @apply flex items-start gap-2.5 rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm;
+    @apply fixed bottom-4 left-4 right-4 z-50 flex items-start gap-2.5 rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm shadow-xl sm:left-auto sm:right-5 sm:max-w-md;
   }
 
   .banner.ok {
@@ -3011,6 +3030,103 @@
 
   .teacher-class-card {
     @apply flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between;
+  }
+
+  .teacher-add-learner {
+    @apply grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end;
+  }
+
+  .teacher-add-learner label,
+  .teacher-profile-card label {
+    @apply flex flex-col gap-1 text-xs font-bold uppercase tracking-wider text-slate-500;
+  }
+
+  .teacher-learner-grid {
+    @apply grid gap-3 md:grid-cols-2 xl:grid-cols-3;
+  }
+
+  .teacher-learner-card {
+    @apply flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md;
+  }
+
+  .teacher-learner-card.is-selected {
+    @apply border-slate-900 ring-2 ring-slate-900/10;
+  }
+
+  .teacher-learner-card-main,
+  .learner-inline-button {
+    @apply flex w-full items-center gap-3 rounded-xl border-0 bg-transparent p-0 text-left text-slate-900;
+  }
+
+  .teacher-learner-card-main strong,
+  .learner-inline-button strong {
+    @apply block font-display text-base font-bold text-slate-900;
+  }
+
+  .teacher-learner-card-main small,
+  .learner-inline-button small {
+    @apply block text-xs text-slate-500;
+  }
+
+  .teacher-learner-mini-stats {
+    @apply grid grid-cols-3 gap-2;
+  }
+
+  .teacher-learner-mini-stats span {
+    @apply rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center;
+  }
+
+  .teacher-learner-mini-stats strong {
+    @apply block font-mono text-sm font-bold text-slate-900;
+  }
+
+  .teacher-learner-mini-stats small {
+    @apply text-[10px] font-bold uppercase tracking-wider text-slate-500;
+  }
+
+  .teacher-learner-card-actions {
+    @apply mt-auto;
+  }
+
+  .teacher-profile-grid {
+    @apply grid gap-4 lg:grid-cols-[minmax(18rem,0.8fr)_minmax(20rem,1.2fr)];
+  }
+
+  .teacher-profile-card {
+    @apply grid gap-3;
+  }
+
+  .column-toggle-row {
+    @apply mb-3 flex flex-wrap gap-2;
+  }
+
+  .column-toggle-row button {
+    @apply px-3 py-1.5 text-xs;
+  }
+
+  .learner-session-table-wrap table,
+  .learner-list-table table {
+    @apply min-w-[42rem];
+  }
+
+  @media (max-width: 640px) {
+    .teacher-add-learner,
+    .teacher-profile-grid {
+      @apply grid-cols-1;
+    }
+
+    .teacher-learner-card {
+      @apply rounded-xl p-3;
+    }
+
+    .page-actions {
+      @apply w-full;
+    }
+
+    .page-actions .btn,
+    .page-actions button {
+      @apply flex-1 justify-center;
+    }
   }
 
   .sr-only {

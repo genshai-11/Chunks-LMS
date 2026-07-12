@@ -16,6 +16,9 @@
 - [x] 3.2 Build visual learner cards/profile with finalized-only metrics and attendance
 - [x] 3.3 Add Start session, View report, and Copy invite actions
 - [x] 3.4 Preserve selected Class/Learner context in Teacher Analysis
+- [x] 3.5 Add simplified add-Learner workflow from Teacher dashboard
+- [x] 3.6 Add dedicated Learner profile page with editable profile, session color totals, and configurable columns
+- [x] 3.7 Add list/grid learner dashboard with RFC min/max/avg by session
 
 ## 4. Teacher class management and invitations
 
@@ -35,4 +38,5 @@
 - [x] 6.1 Run install, lint, typecheck, targeted tests, and full test suite
 - [x] 6.2 Run production build and OpenSpec validation
 - [x] 6.3 Validate/apply migrations and production environment configuration
-- [x] 6.4 Deploy CI/CD and verify same-account sync in two browser contexts
+- [x] 6.4 Add mobile icon/expand navigation, popup notifications, and tooltip titles for key metrics
+- [ ] 6.5 Deploy CI/CD and verify same-account sync in two browser contexts

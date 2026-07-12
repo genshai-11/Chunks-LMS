@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import {
   Check,
   GraduationCap,
+  ImagePlus,
   Link2,
   Mail,
   Pencil,
@@ -12,6 +13,7 @@ import {
   X,
 } from 'lucide-react'
 import { Flash } from '../../components/Flash'
+import { readImageAsDataUrl } from '../../lib/readImageFile'
 import { PageHeader } from '../../components/PageHeader'
 import { UserAvatar } from '../../components/UserAvatar'
 import { EmptyState, Panel } from '../../components/ui'
@@ -225,14 +227,41 @@ export function AdminPeoplePage() {
                 placeholder={tab === 'learners' ? 'learner@school.edu' : 'teacher@school.edu'}
               />
             </label>
-            <label>
-              Avatar URL
-              <input
-                value={draft.avatarUrl || ''}
-                onChange={(e) => setDraft((d) => ({ ...d, avatarUrl: e.target.value }))}
-                placeholder="https://example.com/avatar.jpg"
-              />
-            </label>
+            <div className="avatar-field">
+              <UserAvatar name={draft.displayName || 'User'} avatarUrl={draft.avatarUrl} size="lg" />
+              <div className="avatar-field-actions">
+                <label className="btn ghost avatar-file-label">
+                  <ImagePlus className="h-3.5 w-3.5" aria-hidden />
+                  <span>{draft.avatarUrl ? 'Change photo' : 'Photo'}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    onChange={async (ev) => {
+                      const file = ev.target.files?.[0]
+                      ev.target.value = ''
+                      if (!file) return
+                      try {
+                        const url = await readImageAsDataUrl(file)
+                        setDraft((d) => ({ ...d, avatarUrl: url }))
+                      } catch (error) {
+                        err(error instanceof Error ? error.message : 'Could not read image')
+                      }
+                    }}
+                  />
+                </label>
+                {draft.avatarUrl ? (
+                  <button
+                    type="button"
+                    className="ghost danger"
+                    onClick={() => setDraft((d) => ({ ...d, avatarUrl: '' }))}
+                  >
+                    <X className="h-3.5 w-3.5" aria-hidden />
+                    <span>Remove</span>
+                  </button>
+                ) : null}
+              </div>
+            </div>
             <button type="submit" className="primary">
               <Check className="h-4 w-4" aria-hidden />
               <span>Save</span>
@@ -299,15 +328,39 @@ export function AdminPeoplePage() {
                             aria-label="Email"
                             placeholder="Email"
                           />
-                          <input
-                            className="row-input"
-                            value={editDraft.avatarUrl || ''}
-                            onChange={(e) =>
-                              setEditDraft((d) => ({ ...d, avatarUrl: e.target.value }))
-                            }
-                            aria-label="Avatar URL"
-                            placeholder="Avatar URL"
-                          />
+                          <div className="flex items-center gap-2">
+                            <UserAvatar name={editDraft.displayName || 'User'} avatarUrl={editDraft.avatarUrl} size="sm" />
+                            <label className="btn ghost btn-sm py-1 px-2 cursor-pointer flex items-center gap-1">
+                              <ImagePlus className="h-3 w-3" aria-hidden />
+                              <span>Upload</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="sr-only"
+                                onChange={async (ev) => {
+                                  const file = ev.target.files?.[0]
+                                  ev.target.value = ''
+                                  if (!file) return
+                                  try {
+                                    const url = await readImageAsDataUrl(file)
+                                    setEditDraft((d) => ({ ...d, avatarUrl: url }))
+                                  } catch (error) {
+                                    err(error instanceof Error ? error.message : 'Could not read image')
+                                  }
+                                }}
+                              />
+                            </label>
+                            {editDraft.avatarUrl ? (
+                              <button
+                                type="button"
+                                className="ghost danger btn-sm p-1"
+                                onClick={() => setEditDraft((d) => ({ ...d, avatarUrl: '' }))}
+                                title="Remove photo"
+                              >
+                                <X className="h-3 w-3" aria-hidden />
+                              </button>
+                            ) : null}
+                          </div>
                           <div className="row-actions">
                             <button type="button" className="primary" onClick={() => saveEdit(u.id)}>
                               <Check className="h-3.5 w-3.5" aria-hidden />

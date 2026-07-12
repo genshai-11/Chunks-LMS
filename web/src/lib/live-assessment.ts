@@ -1,12 +1,24 @@
-import type {
-  AssessmentAttempt,
-  CaptureSessionState,
-  SessionQuestion,
+/**
+ * Live observation capture.
+ *
+ * Strategy: **local-first**. Domain capture always works in the browser so teachers
+ * are never blocked by cloud lag/RLS. When Supabase is reachable we also:
+ *   1) upsert the open learning_session
+ *   2) try RPC create/record/resolve
+ * Local domain results still feed the progress ledger via appendFinalizedFromCapture.
+ */
+import {
+  addSessionQuestion,
+  type AssessmentAttempt,
+  type CaptureSessionState,
+  type SessionQuestion,
 } from '../modules/assessment/session-capture'
 import type { CaptureMode } from '../modules/assessment/capture-mode'
+import { applyLifecycleCommand } from '../modules/result-lifecycle/state-machine'
 import type { AssessmentSnapshot, ResultColor } from '../modules/result-lifecycle/types'
 import type { RosterState } from '../modules/roster/types'
 import type { ResultRecord } from '../modules/reporting/progress'
+import type { LearningSession } from '../modules/scheduling/types'
 import { getSupabase } from './supabase'
 
 type DbSnapshot = {
@@ -67,6 +79,93 @@ function attemptFromDb(row: DbAttempt, snapshot: DbSnapshot): AssessmentAttempt 
   }
 }
 
+function localAddQuestion(
+  capture: CaptureSessionState,
+  externalRef?: string | null,
+): Result<CaptureSessionState> {
+  const r = addSessionQuestion(capture, { externalRef: externalRef ?? null })
+  if (!r.ok) return { ok: false, error: r.error }
+  return { ok: true, data: r.state }
+}
+
+function localMutateAttempt(
+  attempt: AssessmentAttempt,
+  command: Parameters<typeof applyLifecycleCommand>[1],
+): Result<AssessmentAttempt> {
+  const r = applyLifecycleCommand(attempt.snapshot, command)
+  if (!r.ok) return { ok: false, error: r.error }
+  return { ok: true, data: { ...attempt, snapshot: r.snapshot } }
+}
+
+/**
+ * Force-upsert one open learning session so RPCs can find it.
+ * Does not depend on full workspace debounce sync.
+ */
+export async function ensureLearningSessionOnServer(
+  session: LearningSession,
+): Promise<Result<true>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+
+  const classCheck = await sb.from('classes').select('id').eq('id', session.classId).maybeSingle()
+  if (classCheck.error) return { ok: false, error: classCheck.error.message }
+  if (!classCheck.data) {
+    return {
+      ok: false,
+      error: 'Class is not on the server yet. Open Teacher → Classes, then Sync.',
+    }
+  }
+
+  // scheduled_session_id must exist or be null (FK)
+  let scheduledId = session.scheduledSessionId
+  if (scheduledId) {
+    const sched = await sb
+      .from('scheduled_sessions')
+      .select('id')
+      .eq('id', scheduledId)
+      .maybeSingle()
+    if (sched.error || !sched.data) scheduledId = null
+  }
+
+  const fullRow = {
+    id: session.id,
+    class_id: session.classId,
+    scheduled_session_id: scheduledId,
+    status: session.status,
+    planned_question_count: session.plannedQuestionCount,
+    started_at: session.startedAt,
+    completed_at: session.completedAt,
+    max_probe_count: session.maxProbeCount,
+    session_number: session.sessionNumber,
+    owner_user_id: session.ownerUserId,
+    lock_expires_at: session.lockExpiresAt,
+    session_kind: session.sessionKind ?? 'regular',
+    participant_learner_ids: session.participantLearnerIds,
+  }
+
+  let { error } = await sb.from('learning_sessions').upsert(fullRow, { onConflict: 'id' })
+  if (error) {
+    // Retry minimal columns (older schema / optional columns)
+    const minimal = {
+      id: fullRow.id,
+      class_id: fullRow.class_id,
+      scheduled_session_id: fullRow.scheduled_session_id,
+      status: fullRow.status,
+      planned_question_count: fullRow.planned_question_count,
+      started_at: fullRow.started_at,
+      completed_at: fullRow.completed_at,
+      max_probe_count: fullRow.max_probe_count,
+      session_number: fullRow.session_number,
+    }
+    const retry = await sb.from('learning_sessions').upsert(minimal, { onConflict: 'id' })
+    if (retry.error) {
+      return { ok: false, error: `learning_sessions upsert: ${retry.error.message}` }
+    }
+  }
+
+  return { ok: true, data: true as const }
+}
+
 export async function loadLiveCapture(input: {
   learningSessionId: string
   teacherUserId: string
@@ -74,9 +173,14 @@ export async function loadLiveCapture(input: {
   sessionStatus: 'open' | 'completed'
   maxProbeCount: number
   mode?: CaptureMode
+  /** Keep existing local board when cloud is empty/unavailable */
+  fallback?: CaptureSessionState | null
 }): Promise<Result<CaptureSessionState>> {
   const sb = client()
-  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  if (!sb) {
+    if (input.fallback) return { ok: true, data: input.fallback }
+    return { ok: false, error: 'Supabase is not configured' }
+  }
 
   const [questionsResult, attemptsResult] = await Promise.all([
     sb
@@ -86,11 +190,24 @@ export async function loadLiveCapture(input: {
       .order('sequence_number'),
     sb.from('assessment_attempts').select('*').eq('learning_session_id', input.learningSessionId),
   ])
-  if (questionsResult.error) return { ok: false, error: questionsResult.error.message }
-  if (attemptsResult.error) return { ok: false, error: attemptsResult.error.message }
+
+  // Cloud read failed → keep local board
+  if (questionsResult.error || attemptsResult.error) {
+    if (input.fallback) return { ok: true, data: input.fallback }
+    return {
+      ok: false,
+      error: questionsResult.error?.message ?? attemptsResult.error?.message ?? 'load failed',
+    }
+  }
 
   const dbQuestions = (questionsResult.data ?? []) as DbQuestion[]
   const dbAttempts = (attemptsResult.data ?? []) as DbAttempt[]
+
+  // Cloud empty but we already have local questions → keep local (local-first)
+  if (dbQuestions.length === 0 && input.fallback && input.fallback.questions.length > 0) {
+    return { ok: true, data: input.fallback }
+  }
+
   const attemptIds = dbAttempts.map((attempt) => attempt.id)
   let snapshots: DbSnapshot[] = []
   if (attemptIds.length > 0) {
@@ -98,7 +215,10 @@ export async function loadLiveCapture(input: {
       .from('assessment_attempt_snapshots')
       .select('*')
       .in('attempt_id', attemptIds)
-    if (snapshotResult.error) return { ok: false, error: snapshotResult.error.message }
+    if (snapshotResult.error) {
+      if (input.fallback) return { ok: true, data: input.fallback }
+      return { ok: false, error: snapshotResult.error.message }
+    }
     snapshots = (snapshotResult.data ?? []) as DbSnapshot[]
   }
 
@@ -125,6 +245,14 @@ export async function loadLiveCapture(input: {
     return snapshot ? [attemptFromDb(attempt, snapshot)] : []
   })
 
+  // Prefer richer board (local vs cloud)
+  if (
+    input.fallback &&
+    input.fallback.questions.length > questions.length
+  ) {
+    return { ok: true, data: input.fallback }
+  }
+
   return {
     ok: true,
     data: {
@@ -136,7 +264,7 @@ export async function loadLiveCapture(input: {
       attempts,
       maxProbeCount: input.maxProbeCount,
       position: {
-        mode: input.mode ?? 'question_first',
+        mode: input.mode ?? input.fallback?.position.mode ?? 'question_first',
         questionIndex: Math.max(0, questions.length - 1),
         learnerIndex:
           questions.length > 0
@@ -150,29 +278,34 @@ export async function loadLiveCapture(input: {
 export async function createLiveQuestion(input: {
   capture: CaptureSessionState
   externalRef?: string | null
+  /** Open learning session — required to push session row before RPC */
+  openSession?: LearningSession | null
 }): Promise<Result<CaptureSessionState>> {
-  const sb = client()
-  if (!sb) return { ok: false, error: 'Supabase is not configured' }
   if (input.capture.learnerIds.length === 0) return { ok: false, error: 'No active learners' }
 
-  // Fail fast with a clear message if the live day never reached Supabase.
-  const remote = await sb
-    .from('learning_sessions')
-    .select('id, status, class_id')
-    .eq('id', input.capture.learningSessionId)
-    .maybeSingle()
-  if (remote.error) {
-    return { ok: false, error: `Session lookup failed: ${remote.error.message}` }
-  }
-  if (!remote.data) {
-    return {
-      ok: false,
-      error:
-        'Live day is not on the server yet. Go back to Live session → Sync, or re-start the day so it uploads before Observe.',
+  const sb = client()
+
+  // No supabase → pure local
+  if (!sb) return localAddQuestion(input.capture, input.externalRef)
+
+  // Best-effort: ensure open day exists on server
+  if (input.openSession) {
+    const ensured = await ensureLearningSessionOnServer(input.openSession)
+    if (!ensured.ok) {
+      // Still observe locally
+      console.warn('[live] ensure session:', ensured.error)
+      return localAddQuestion(input.capture, input.externalRef)
     }
-  }
-  if (remote.data.status !== 'open') {
-    return { ok: false, error: 'This learning session is not open on the server.' }
+  } else {
+    // Try soft check; if missing, local
+    const remote = await sb
+      .from('learning_sessions')
+      .select('id, status')
+      .eq('id', input.capture.learningSessionId)
+      .maybeSingle()
+    if (remote.error || !remote.data || remote.data.status !== 'open') {
+      return localAddQuestion(input.capture, input.externalRef)
+    }
   }
 
   const learnerIndex = input.capture.questions.length % input.capture.learnerIds.length
@@ -183,44 +316,40 @@ export async function createLiveQuestion(input: {
     p_learner_user_id: learnerUserId,
     p_external_ref: input.externalRef ?? null,
   })
+
   if (result.error) {
-    const msg = result.error.message || 'create_session_question_attempt failed'
-    // Map common RPC exceptions to actionable teacher copy
-    if (msg.includes('not found') || msg.includes('not assigned')) {
-      return {
-        ok: false,
-        error:
-          'Teacher profile does not match class assignment on server (or session missing). Sync roster, confirm class teacher, then retry.',
-      }
-    }
-    if (msg.includes('not actively enrolled')) {
-      return {
-        ok: false,
-        error: 'Learner is not actively enrolled on the server. Seat them under Classes and Sync.',
-      }
-    }
-    return { ok: false, error: msg }
+    console.warn('[live] create_session_question_attempt:', result.error.message)
+    return localAddQuestion(input.capture, input.externalRef)
   }
 
-  return loadLiveCapture({
+  // Reload cloud board; if empty, keep local add
+  const local = localAddQuestion(input.capture, input.externalRef)
+  const loaded = await loadLiveCapture({
     learningSessionId: input.capture.learningSessionId,
     teacherUserId: input.capture.teacherUserId,
     learnerIds: input.capture.learnerIds,
     sessionStatus: input.capture.sessionStatus,
     maxProbeCount: input.capture.maxProbeCount,
     mode: input.capture.position.mode,
+    fallback: local.ok ? local.data : input.capture,
   })
+  return loaded
 }
 
 async function mutateSnapshot(
   attempt: AssessmentAttempt,
   rpc: string,
   params: Record<string, unknown>,
+  localCommand: Parameters<typeof applyLifecycleCommand>[1],
 ): Promise<Result<AssessmentAttempt>> {
   const sb = client()
-  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  if (!sb) return localMutateAttempt(attempt, localCommand)
+
   const result = await sb.rpc(rpc, params)
-  if (result.error) return { ok: false, error: result.error.message }
+  if (result.error) {
+    console.warn(`[live] ${rpc}:`, result.error.message)
+    return localMutateAttempt(attempt, localCommand)
+  }
   const row = result.data as DbSnapshot
   return { ok: true, data: { ...attempt, snapshot: snapshotFromDb(row) } }
 }
@@ -229,30 +358,47 @@ export async function recordLiveColor(
   attempt: AssessmentAttempt,
   color: ResultColor,
 ): Promise<Result<AssessmentAttempt>> {
+  const at = new Date().toISOString()
   if (attempt.snapshot.status === 'finalized' || attempt.snapshot.status === 'corrected') {
-    return mutateSnapshot(attempt, 'correct_final_result', {
+    return mutateSnapshot(
+      attempt,
+      'correct_final_result',
+      {
+        p_attempt_id: attempt.id,
+        p_color: color,
+        p_reason: 'Changed during live observation',
+        p_actor_user_id: attempt.teacherUserId,
+      },
+      { type: 'correct', color, reason: 'Changed during observation', at, actorId: attempt.teacherUserId },
+    )
+  }
+  return mutateSnapshot(
+    attempt,
+    'record_provisional_result',
+    {
       p_attempt_id: attempt.id,
       p_color: color,
-      p_reason: 'Changed during live observation',
       p_actor_user_id: attempt.teacherUserId,
-    })
-  }
-  return mutateSnapshot(attempt, 'record_provisional_result', {
-    p_attempt_id: attempt.id,
-    p_color: color,
-    p_actor_user_id: attempt.teacherUserId,
-  })
+    },
+    { type: 'record_provisional', color, at },
+  )
 }
 
 export async function resolveLiveProbe(
   attempt: AssessmentAttempt,
   outcome: 'fail' | 'continue' | 'done',
 ): Promise<Result<AssessmentAttempt>> {
-  return mutateSnapshot(attempt, 'resolve_probe', {
-    p_attempt_id: attempt.id,
-    p_outcome: outcome,
-    p_actor_user_id: attempt.teacherUserId,
-  })
+  const at = new Date().toISOString()
+  return mutateSnapshot(
+    attempt,
+    'resolve_probe',
+    {
+      p_attempt_id: attempt.id,
+      p_outcome: outcome,
+      p_actor_user_id: attempt.teacherUserId,
+    },
+    { type: 'resolve_probe', outcome, at },
+  )
 }
 
 export async function loadLiveLedger(roster: RosterState): Promise<Result<ResultRecord[]>> {

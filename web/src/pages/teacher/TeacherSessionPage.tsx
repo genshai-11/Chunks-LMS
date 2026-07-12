@@ -248,18 +248,22 @@ export function TeacherSessionPage() {
         maxProbeCount: maxProbe,
       }),
     )
-    // Observe RPC needs the learning_session row in Supabase — flush now (don't wait 700ms debounce).
+    // Best-effort cloud push (full workspace + dedicated session upsert).
+    // Observe works local-first even if this fails.
+    const { ensureLearningSessionOnServer } = await import('../../lib/live-assessment')
+    const ensured = await ensureLearningSessionOnServer(r.value)
     const pushed = await syncNow({ scheduling: sched, roster })
-    if (!pushed) {
-      return err(
-        'Session is open locally but cloud sync failed. Tap Sync, then try Observe again.',
+    if (ensured.ok || pushed) {
+      ok(
+        `Live session started · ${selectedIds.length} learner(s)${
+          sessionKind !== 'regular' ? ` · ${sessionKind}` : ''
+        }`,
+      )
+    } else {
+      ok(
+        `Live session started offline · ${selectedIds.length} learner(s) — Observe works locally; Sync when ready`,
       )
     }
-    ok(
-      `Live session started · ${selectedIds.length} learner(s)${
-        sessionKind !== 'regular' ? ` · ${sessionKind}` : ''
-      } · synced`,
-    )
   }
 
   if (!classRow || !teacher) {

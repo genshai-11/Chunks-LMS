@@ -52,6 +52,7 @@ import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import { useAppState } from '../../state/useAppState'
 import {
   createLiveQuestion,
+  ensureLearningSessionOnServer,
   loadLiveCapture,
   recordLiveColor,
   replaceLiveAttempt,
@@ -123,6 +124,10 @@ export function TeacherObservePage() {
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 639px)').matches : false,
   )
   const railWidthRef = useRef(railWidth)
+  const captureRef = useRef(capture)
+  useEffect(() => {
+    captureRef.current = capture
+  }, [capture])
 
   useEffect(() => {
     setRailWidth(readSavedRailWidth())
@@ -201,18 +206,45 @@ export function TeacherObservePage() {
       setLiveLoading(false)
       return
     }
+    const learnerIds =
+      openSession.participantLearnerIds?.length
+        ? openSession.participantLearnerIds
+        : activeLearnerIds
+
+    // Push open day to server (best-effort) so RPC can work when online
+    void ensureLearningSessionOnServer(openSession)
+
+    // Prefer existing capture board as fallback so cloud empty/errors don't wipe local work
+    const existing = captureRef.current
     const result = await loadLiveCapture({
       learningSessionId: openSession.id,
       teacherUserId: teacher.id,
-      learnerIds: activeLearnerIds,
+      learnerIds,
       sessionStatus: openSession.status,
       maxProbeCount: openSession.maxProbeCount,
+      fallback: existing,
     })
     if (result.ok) {
+      // Don't overwrite a richer local board with an empty cloud board
+      if (
+        existing &&
+        existing.questions.length > 0 &&
+        result.data.questions.length < existing.questions.length
+      ) {
+        setLiveLoading(false)
+        return
+      }
       setCapture(result.data)
-    } else {
-      setToast(result.error)
-      window.setTimeout(() => setToast(null), 1800)
+    } else if (!existing) {
+      const { createCaptureSession } = await import('../../modules/assessment/session-capture')
+      setCapture(
+        createCaptureSession({
+          learningSessionId: openSession.id,
+          teacherUserId: teacher.id,
+          learnerIds,
+          maxProbeCount: openSession.maxProbeCount,
+        }),
+      )
     }
     setLiveLoading(false)
   }, [openSession, teacher, activeLearnerIds, setCapture])
@@ -304,14 +336,17 @@ export function TeacherObservePage() {
       if (state.position.questionIndex < state.questions.length - 1) {
         return advancePosition(state)
       }
-      const created = await createLiveQuestion({ capture: state })
+      const created = await createLiveQuestion({
+        capture: state,
+        openSession: openSession ?? null,
+      })
       if (!created.ok) {
         flash(created.error)
         return state
       }
       return created.data
     },
-    [flash],
+    [flash, openSession],
   )
 
   const recordColor = useCallback(
@@ -408,16 +443,27 @@ export function TeacherObservePage() {
     if (!capture || liveSaving) return
     setLiveSaving(true)
     try {
-      const result = await createLiveQuestion({ capture })
+      if (openSession) {
+        const ensured = await ensureLearningSessionOnServer(openSession)
+        if (!ensured.ok) {
+          // Local observe still works; surface soft warning once
+          console.warn('[observe] session push:', ensured.error)
+        }
+      }
+      const result = await createLiveQuestion({
+        capture,
+        openSession: openSession ?? null,
+      })
       if (!result.ok) {
         flash(result.error)
         return
       }
       setCapture(result.data)
+      flash('Q1 ready')
     } finally {
       setLiveSaving(false)
     }
-  }, [capture, liveSaving, setCapture, flash])
+  }, [capture, liveSaving, setCapture, flash, openSession])
 
   const prevCell = useCallback(() => {
     if (!capture || capture.questions.length === 0) return

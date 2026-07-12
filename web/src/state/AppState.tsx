@@ -412,34 +412,51 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setMetricSettingsState(createDefaultMetricSettings())
   }, [])
 
-  const syncNow = useCallback(async () => {
-    if (!isSupabaseConfigured()) {
-      setBackendStatus('offline')
-      return
-    }
-    if (!staffSession.authBypass && !staffSession.signedIn) {
-      setBackendError('Sign in as staff to sync changes')
-      return
-    }
-    if (!staffSession.authBypass && staffSession.staffRoles.length === 0) {
-      setBackendError('No staff role — cannot sync')
-      return
-    }
-    setBackendStatus('syncing')
-    const result = await saveWorkspaceToSupabase(
-      { roster: ensureStableOrg(roster), scheduling },
-      { allowEmptyWipe: allowEmptyWipeOnce.current },
-    )
-    allowEmptyWipeOnce.current = false
-    if (result.ok) {
-      setBackendStatus('online')
-      setBackendError(null)
-      setLastSyncedAt(new Date().toISOString())
-    } else {
+  const syncNow = useCallback(
+    async (override?: { roster?: RosterState; scheduling?: SchedulingState }) => {
+      if (!isSupabaseConfigured()) {
+        setBackendStatus('offline')
+        return false
+      }
+      if (!staffSession.authBypass && !staffSession.signedIn) {
+        setBackendError('Sign in as staff to sync changes')
+        return false
+      }
+      if (!staffSession.authBypass && staffSession.staffRoles.length === 0) {
+        setBackendError('No staff role — cannot sync')
+        return false
+      }
+      setBackendStatus('syncing')
+      // Prefer explicit snapshot (caller just mutated scheduling/roster) over stale React state.
+      const snapshot = {
+        roster: ensureStableOrg(override?.roster ?? roster),
+        scheduling: override?.scheduling ?? scheduling,
+      }
+      const normalized = normalizeIdsForDb(snapshot)
+      if (
+        normalized.roster.organization.id !== snapshot.roster.organization.id ||
+        normalized.roster.users.some((u, i) => u.id !== snapshot.roster.users[i]?.id)
+      ) {
+        skipNextSync.current = true
+        setRoster(normalized.roster)
+        setScheduling(normalized.scheduling)
+      }
+      const result = await saveWorkspaceToSupabase(normalized, {
+        allowEmptyWipe: allowEmptyWipeOnce.current,
+      })
+      allowEmptyWipeOnce.current = false
+      if (result.ok) {
+        setBackendStatus('online')
+        setBackendError(null)
+        setLastSyncedAt(new Date().toISOString())
+        return true
+      }
       setBackendStatus('error')
       setBackendError(syncPhaseError('write', result.error))
-    }
-  }, [roster, scheduling, staffSession.authBypass, staffSession.signedIn, staffSession.staffRoles.length])
+      return false
+    },
+    [roster, scheduling, staffSession.authBypass, staffSession.signedIn, staffSession.staffRoles.length],
+  )
 
   const reloadFromSupabase = useCallback(async () => {
     if (!isSupabaseConfigured() || !staffSession.userId) return

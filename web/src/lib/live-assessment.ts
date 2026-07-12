@@ -155,6 +155,26 @@ export async function createLiveQuestion(input: {
   if (!sb) return { ok: false, error: 'Supabase is not configured' }
   if (input.capture.learnerIds.length === 0) return { ok: false, error: 'No active learners' }
 
+  // Fail fast with a clear message if the live day never reached Supabase.
+  const remote = await sb
+    .from('learning_sessions')
+    .select('id, status, class_id')
+    .eq('id', input.capture.learningSessionId)
+    .maybeSingle()
+  if (remote.error) {
+    return { ok: false, error: `Session lookup failed: ${remote.error.message}` }
+  }
+  if (!remote.data) {
+    return {
+      ok: false,
+      error:
+        'Live day is not on the server yet. Go back to Live session → Sync, or re-start the day so it uploads before Observe.',
+    }
+  }
+  if (remote.data.status !== 'open') {
+    return { ok: false, error: 'This learning session is not open on the server.' }
+  }
+
   const learnerIndex = input.capture.questions.length % input.capture.learnerIds.length
   const learnerUserId = input.capture.learnerIds[learnerIndex]!
   const result = await sb.rpc('create_session_question_attempt', {
@@ -163,7 +183,24 @@ export async function createLiveQuestion(input: {
     p_learner_user_id: learnerUserId,
     p_external_ref: input.externalRef ?? null,
   })
-  if (result.error) return { ok: false, error: result.error.message }
+  if (result.error) {
+    const msg = result.error.message || 'create_session_question_attempt failed'
+    // Map common RPC exceptions to actionable teacher copy
+    if (msg.includes('not found') || msg.includes('not assigned')) {
+      return {
+        ok: false,
+        error:
+          'Teacher profile does not match class assignment on server (or session missing). Sync roster, confirm class teacher, then retry.',
+      }
+    }
+    if (msg.includes('not actively enrolled')) {
+      return {
+        ok: false,
+        error: 'Learner is not actively enrolled on the server. Seat them under Classes and Sync.',
+      }
+    }
+    return { ok: false, error: msg }
+  }
 
   return loadLiveCapture({
     learningSessionId: input.capture.learningSessionId,

@@ -104,6 +104,7 @@ export function TeacherCalendarPage() {
     metricSettings,
     activeLearnerUserId,
     setActiveLearnerUserId,
+    syncNow,
   } = useAppState()
   const { message, error, ok, err } = useFlash()
   const navigate = useNavigate()
@@ -188,7 +189,7 @@ export function TeacherCalendarPage() {
     )
   }
 
-  function startSession(scheduledSessionId?: string) {
+  async function startSession(scheduledSessionId?: string) {
     if (activeLearners.length === 0) {
       return err('Seat at least one learner before starting a live session')
     }
@@ -216,8 +217,11 @@ export function TeacherCalendarPage() {
         maxProbeCount: maxProbe,
       }),
     )
-    ok('Live session started')
-    // Open live classroom immediately (attendance + observe)
+    const pushed = await syncNow({ scheduling: r.state, roster })
+    if (!pushed) {
+      return err('Session opened locally but cloud sync failed — tap Sync before Observe')
+    }
+    ok('Live session started · synced')
     navigate('/teacher/session')
   }
 

@@ -32,7 +32,15 @@ export type AppStateValue = {
   backendStatus: BackendStatus
   backendError: string | null
   lastSyncedAt: string | null
-  syncNow: () => Promise<void>
+  /**
+   * Push roster + scheduling to Supabase immediately.
+   * Pass override when React state has not re-rendered yet (e.g. right after start session).
+   * Returns false if write failed or staff cannot sync.
+   */
+  syncNow: (override?: {
+    roster?: RosterState
+    scheduling?: SchedulingState
+  }) => Promise<boolean>
   reloadFromSupabase: () => Promise<void>
   supabaseEnabled: boolean
   /** Which learner portal is active (email / invite link) */

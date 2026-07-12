@@ -67,6 +67,7 @@ export function TeacherSessionPage() {
     setCapture,
     appendFinalizedFromCapture,
     metricSettings,
+    syncNow,
   } = useAppState()
   const { message, error, ok, err } = useFlash()
   const { classRow, course, teacher } = useTeacherClassContext()
@@ -214,7 +215,7 @@ export function TeacherSessionPage() {
     )
   }
 
-  function startLiveNow() {
+  async function startLiveNow() {
     if (!classRow || !teacher) return
     if (selectedIds.length === 0) {
       return err('Select at least one learner before starting')
@@ -228,15 +229,6 @@ export function TeacherSessionPage() {
       participantLearnerIds: selectedIds,
     })
     if (!r.ok) return err(r.error)
-    setScheduling(r.state)
-    setCapture(
-      createCaptureSession({
-        learningSessionId: r.value.id,
-        teacherUserId: teacher.id,
-        learnerIds: selectedIds,
-        maxProbeCount: maxProbe,
-      }),
-    )
     // Mark selected as present by default
     let sched = r.state
     for (const lid of selectedIds) {
@@ -248,10 +240,25 @@ export function TeacherSessionPage() {
       if (att.ok) sched = att.state
     }
     setScheduling(sched)
+    setCapture(
+      createCaptureSession({
+        learningSessionId: r.value.id,
+        teacherUserId: teacher.id,
+        learnerIds: selectedIds,
+        maxProbeCount: maxProbe,
+      }),
+    )
+    // Observe RPC needs the learning_session row in Supabase — flush now (don't wait 700ms debounce).
+    const pushed = await syncNow({ scheduling: sched, roster })
+    if (!pushed) {
+      return err(
+        'Session is open locally but cloud sync failed. Tap Sync, then try Observe again.',
+      )
+    }
     ok(
       `Live session started · ${selectedIds.length} learner(s)${
         sessionKind !== 'regular' ? ` · ${sessionKind}` : ''
-      }`,
+      } · synced`,
     )
   }
 

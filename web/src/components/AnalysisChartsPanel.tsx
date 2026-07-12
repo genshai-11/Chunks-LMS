@@ -18,6 +18,8 @@ import {
   YAxis,
 } from 'recharts'
 import type { MetricKey } from '../modules/metrics/calculate'
+import type { MetricSettingsState } from '../modules/metrics/settings'
+import { getEnabledMetricKeys } from '../modules/metrics/settings'
 import type { ResultRecord } from '../modules/reporting/progress'
 import {
   buildSessionMetricSeries,
@@ -45,15 +47,31 @@ type Props = {
   totalDays?: number | null
   /** Compact: hide advanced multi-metric toggles */
   compact?: boolean
+  /** Admin-enabled metrics control which chips appear */
+  metricSettings?: MetricSettingsState
 }
 
-const CORE_METRICS: { key: MetricKey; label: string; color: string }[] = [
-  { key: 'rfc', label: 'RFC (struggle %)', color: '#dc2626' },
-  { key: 'rac', label: 'RAC (success %)', color: '#059669' },
-  { key: 'average_performance', label: 'Avg score', color: '#4f46e5' },
-  { key: 'n_count', label: 'n count', color: '#0ea5e9' },
-  { key: 'n_depth_max', label: 'n depth max', color: '#f97316' },
-  { key: 'n_depth_avg', label: 'n depth avg', color: '#a855f7' },
+const METRIC_COLORS: Partial<Record<MetricKey, string>> = {
+  rfc: '#dc2626',
+  rac: '#059669',
+  average_performance: '#4f46e5',
+  purple_mastery_rate: '#7c3aed',
+  clarification_rate: '#0891b2',
+  clarification_depth: '#0d9488',
+  n_count: '#0ea5e9',
+  n_depth_max: '#f97316',
+  n_depth_avg: '#a855f7',
+  awareness_recovery: '#db2777',
+  focus_stability: '#64748b',
+}
+
+const FALLBACK_METRICS: MetricKey[] = [
+  'rfc',
+  'rac',
+  'average_performance',
+  'n_count',
+  'n_depth_max',
+  'n_depth_avg',
 ]
 
 const COLOR_HEX: Record<ResultColor, string> = {
@@ -138,11 +156,30 @@ export function AnalysisChartsPanel({
   learnerUserId,
   totalDays,
   compact = false,
+  metricSettings,
 }: Props) {
   const [layout, setLayout] = useState<'multi' | 'single'>('multi')
   const [chartKind, setChartKind] = useState<AnalysisChartKind>('line')
   const [metrics, setMetrics] = useState<MetricKey[]>(['rfc', 'rac'])
   const [selectedDays, setSelectedDays] = useState<string[]>([])
+
+  const availableMetrics = useMemo((): Array<{ key: MetricKey; label: string; color: string }> => {
+    const keys =
+      metricSettings && getEnabledMetricKeys(metricSettings).length > 0
+        ? getEnabledMetricKeys(metricSettings)
+        : FALLBACK_METRICS
+    return keys.map((key) => ({
+      key,
+      label: metricSettings?.metrics.find((m) => m.key === key)?.label ?? key,
+      color: METRIC_COLORS[key] ?? '#64748b',
+    }))
+  }, [metricSettings])
+
+  // Drop chart series that Admin disabled
+  const activeMetrics = useMemo(
+    () => metrics.filter((k) => availableMetrics.some((m) => m.key === k)),
+    [metrics, availableMetrics],
+  )
 
   const points = useMemo(
     () =>
@@ -152,9 +189,9 @@ export function AnalysisChartsPanel({
         courseId,
         classId,
         learnerUserId,
-        metricKeys: CORE_METRICS.map((m) => m.key),
+        metricKeys: availableMetrics.map((m) => m.key),
       }),
-    [ledger, learningSessions, courseId, classId, learnerUserId],
+    [ledger, learningSessions, courseId, classId, learnerUserId, availableMetrics],
   )
 
   const filtered = useMemo(() => {
@@ -162,21 +199,38 @@ export function AnalysisChartsPanel({
     return points.filter((p) => selectedDays.includes(p.learningSessionId))
   }, [points, selectedDays])
 
-  const trendRows = useMemo(() => toChartRows(filtered, metrics), [filtered, metrics])
+  const trendRows = useMemo(
+    () => toChartRows(filtered, activeMetrics),
+    [filtered, activeMetrics],
+  )
 
   const colorRows = useMemo(
-    () => colorByDay(filtered, ledger.filter((r) => !learnerUserId || r.learnerUserId === learnerUserId), totalDays),
-    [filtered, ledger, learnerUserId, totalDays],
+    () =>
+      colorByDay(
+        filtered,
+        ledger.filter((r) => {
+          if (learnerUserId && r.learnerUserId !== learnerUserId) return false
+          if (classId && r.classId !== classId) return false
+          if (r.courseId !== courseId) return false
+          return true
+        }),
+        totalDays,
+      ),
+    [filtered, ledger, learnerUserId, classId, courseId, totalDays],
   )
 
   const colorMixPie = useMemo(() => {
     const counts = { red: 0, yellow: 0, green: 0, purple: 0 }
-    const ids = new Set(filtered.map((p) => p.learningSessionId))
+    // Scope to selected days when set; otherwise all days that have series points
+    const ids = new Set(
+      (selectedDays.length > 0 ? filtered : points).map((p) => p.learningSessionId),
+    )
     for (const r of ledger) {
       if (learnerUserId && r.learnerUserId !== learnerUserId) continue
-      if (ids.size > 0 && !ids.has(r.learningSessionId)) continue
       if (classId && r.classId !== classId) continue
       if (r.courseId !== courseId) continue
+      // Only count results that belong to a day in scope (prevents orphan / wrong totals)
+      if (ids.size > 0 && !ids.has(r.learningSessionId)) continue
       counts[r.effectiveColor] += 1
     }
     return (Object.keys(counts) as ResultColor[]).map((c) => ({
@@ -184,7 +238,9 @@ export function AnalysisChartsPanel({
       value: counts[c],
       fill: COLOR_HEX[c],
     })).filter((d) => d.value > 0)
-  }, [filtered, ledger, learnerUserId, classId, courseId])
+  }, [filtered, points, selectedDays, ledger, learnerUserId, classId, courseId])
+
+  const colorMixTotal = colorMixPie.reduce((s, d) => s + d.value, 0)
 
   function toggleMetric(key: MetricKey) {
     setMetrics((prev) => {
@@ -215,45 +271,39 @@ export function AnalysisChartsPanel({
     )
   }
 
-  const metricMeta = (key: MetricKey) => CORE_METRICS.find((m) => m.key === key)
+  const metricMeta = (key: MetricKey) => availableMetrics.find((m) => m.key === key)
 
   const trendChart = (kind: AnalysisChartKind, height = 260) => {
-    if (trendRows.length === 0 || metrics.length === 0) {
+    if (trendRows.length === 0 || activeMetrics.length === 0) {
       return <p className="meta">Select at least one metric.</p>
     }
 
     if (kind === 'pie') {
-      // Pie of latest session metrics or average RFC/RAC across days
-      const pieFromMetrics = metrics.map((key) => {
-        const vals = filtered
-          .map((p) => p.metrics[key])
-          .filter((v): v is number => typeof v === 'number')
-        const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0
-        const meta = metricMeta(key)
-        const isRatio = key === 'rfc' || key === 'rac'
-        return {
-          name: meta?.label ?? key,
-          value: isRatio ? Math.round(avg * 1000) / 10 : Math.round(avg * 100) / 100,
-          fill: meta?.color ?? '#64748b',
-        }
-      })
+      // Color mix only — never mix ratio metrics into a count pie (that caused wrong 69 vs 4-2-1-14)
+      if (colorMixPie.length === 0) {
+        return <p className="meta">No finalized colors in scope (sample=0).</p>
+      }
       return (
         <ResponsiveContainer width="100%" height={height}>
           <PieChart>
             <Pie
-              data={pieFromMetrics}
+              data={colorMixPie}
               dataKey="value"
               nameKey="name"
               cx="50%"
               cy="50%"
               outerRadius={Math.min(100, height / 2 - 20)}
-              label
+              label={({ name, value, percent }) =>
+                `${name} ${value} (${((percent ?? 0) * 100).toFixed(0)}%)`
+              }
             >
-              {pieFromMetrics.map((d) => (
+              {colorMixPie.map((d) => (
                 <Cell key={d.name} fill={d.fill} />
               ))}
             </Pie>
-            <Tooltip formatter={(v, n) => pctTooltip(v as number, String(n))} />
+            <Tooltip
+              formatter={(v, n) => [`${v} results`, String(n)]}
+            />
             <Legend />
           </PieChart>
         </ResponsiveContainer>
@@ -269,7 +319,7 @@ export function AnalysisChartsPanel({
             <YAxis tick={{ fontSize: 11 }} />
             <Tooltip formatter={(v, n) => pctTooltip(v as number, String(n))} />
             <Legend />
-            {metrics.map((k) => (
+            {activeMetrics.map((k) => (
               <Bar
                 key={k}
                 dataKey={k}
@@ -292,7 +342,7 @@ export function AnalysisChartsPanel({
             <YAxis tick={{ fontSize: 11 }} />
             <Tooltip formatter={(v, n) => pctTooltip(v as number, String(n))} />
             <Legend />
-            {metrics.map((k) => (
+            {activeMetrics.map((k) => (
               <Area
                 key={k}
                 type="monotone"
@@ -310,9 +360,8 @@ export function AnalysisChartsPanel({
     }
 
     if (kind === 'composed') {
-      // RFC/RAC as lines (%), avg as bars if selected
-      const lineKeys = metrics.filter((k) => k === 'rfc' || k === 'rac')
-      const barKeys = metrics.filter((k) => k === 'average_performance')
+      const lineKeys = activeMetrics.filter((k) => k === 'rfc' || k === 'rac')
+      const barKeys = activeMetrics.filter((k) => k === 'average_performance')
       return (
         <ResponsiveContainer width="100%" height={height}>
           <ComposedChart data={trendRows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -346,7 +395,7 @@ export function AnalysisChartsPanel({
               />
             ))}
             {lineKeys.length === 0 &&
-              metrics.map((k) => (
+              activeMetrics.map((k) => (
                 <Line
                   key={k}
                   yAxisId="left"
@@ -363,7 +412,6 @@ export function AnalysisChartsPanel({
       )
     }
 
-    // line default
     return (
       <ResponsiveContainer width="100%" height={height}>
         <LineChart data={trendRows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -372,7 +420,7 @@ export function AnalysisChartsPanel({
           <YAxis tick={{ fontSize: 11 }} />
           <Tooltip formatter={(v, n) => pctTooltip(v as number, String(n))} />
           <Legend />
-          {metrics.map((k) => (
+          {activeMetrics.map((k) => (
             <Line
               key={k}
               type="monotone"
@@ -406,27 +454,35 @@ export function AnalysisChartsPanel({
   )
 
   const colorPieChart = (height = 240) => (
-    <ResponsiveContainer width="100%" height={height}>
-      <PieChart>
-        <Pie
-          data={colorMixPie}
-          dataKey="value"
-          nameKey="name"
-          cx="50%"
-          cy="50%"
-          outerRadius={Math.min(90, height / 2 - 24)}
-          label={({ name, percent }) =>
-            `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
-          }
-        >
-          {colorMixPie.map((d) => (
-            <Cell key={d.name} fill={d.fill} />
-          ))}
-        </Pie>
-        <Tooltip />
-        <Legend />
-      </PieChart>
-    </ResponsiveContainer>
+    <div>
+      <p className="meta" style={{ textAlign: 'center', marginBottom: 4 }}>
+        sample={colorMixTotal}
+        {colorMixPie.length
+          ? ` · ${colorMixPie.map((d) => `${d.name[0]!.toUpperCase()}${d.value}`).join(' ')}`
+          : ''}
+      </p>
+      <ResponsiveContainer width="100%" height={height - 28}>
+        <PieChart>
+          <Pie
+            data={colorMixPie}
+            dataKey="value"
+            nameKey="name"
+            cx="50%"
+            cy="50%"
+            outerRadius={Math.min(90, (height - 28) / 2 - 20)}
+            label={({ name, value, percent }) =>
+              `${name} ${value} (${((percent ?? 0) * 100).toFixed(0)}%)`
+            }
+          >
+            {colorMixPie.map((d) => (
+              <Cell key={d.name} fill={d.fill} />
+            ))}
+          </Pie>
+          <Tooltip formatter={(v, n) => [`${v} results`, String(n)]} />
+          <Legend />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
   )
 
   return (
@@ -469,10 +525,10 @@ export function AnalysisChartsPanel({
         ) : null}
 
         <div className="analysis-filter-block analysis-filter-grow">
-          <span className="analysis-filter-label">Metrics on trend</span>
+          <span className="analysis-filter-label">Metrics on trend (show/hide)</span>
           <div className="analysis-chip-row">
-            {CORE_METRICS.map((m) => {
-              const on = metrics.includes(m.key)
+            {availableMetrics.map((m) => {
+              const on = activeMetrics.includes(m.key)
               return (
                 <button
                   key={m.key}
@@ -480,6 +536,7 @@ export function AnalysisChartsPanel({
                   className={`analysis-chip${on ? ' is-active' : ''}`}
                   style={on ? { borderColor: m.color, color: m.color } : undefined}
                   aria-pressed={on}
+                  title={metricSettings?.metrics.find((x) => x.key === m.key)?.definition}
                   onClick={() => toggleMetric(m.key)}
                 >
                   {m.label}
@@ -547,7 +604,7 @@ export function AnalysisChartsPanel({
           <article className="analysis-chart-card">
             <header className="analysis-chart-card-head">
               <h3>Color mix</h3>
-              <span className="meta">Pie · scope filter</span>
+              <span className="meta">Pie · finalized counts only</span>
             </header>
             <div className="analysis-chart-body">
               {colorMixPie.length === 0 ? (
@@ -571,7 +628,7 @@ export function AnalysisChartsPanel({
             <header className="analysis-chart-card-head">
               <h3>
                 {chartKind === 'pie'
-                  ? 'Metric averages'
+                  ? 'Color mix (finalized)'
                   : chartKind === 'composed'
                     ? 'Combo trend'
                     : `${chartKind[0]!.toUpperCase()}${chartKind.slice(1)} trend by day`}

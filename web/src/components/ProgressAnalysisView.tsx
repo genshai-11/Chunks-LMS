@@ -28,9 +28,19 @@ import type { DomainUser } from '../modules/roster/types'
 import type { ResultColor } from '../modules/result-lifecycle/types'
 import { COLOR_SCORE } from '../modules/result-lifecycle/types'
 import type { MetricSettingsState } from '../modules/metrics/settings'
+import { getEnabledMetricKeys } from '../modules/metrics/settings'
 import type { MetricKey, MetricObservation } from '../modules/metrics/calculate'
 import { AnalysisChartsPanel } from './AnalysisChartsPanel'
 import { UserAvatar } from './UserAvatar'
+
+const DAY_TABLE_DEFAULT: MetricKey[] = [
+  'rfc',
+  'rac',
+  'average_performance',
+  'n_count',
+  'n_depth_max',
+  'n_depth_avg',
+]
 
 type SessionOpt = {
   id: string
@@ -290,7 +300,28 @@ export function ProgressAnalysisView({
     return { count, avg, max }
   }, [windowRecords])
 
-  /** Per-day series for class or focused learner */
+  /** Metrics available for by-day columns (Admin-enabled ∩ catalog defaults) */
+  const dayMetricOptions = useMemo((): MetricKey[] => {
+    if (metricSettings) {
+      const enabled = getEnabledMetricKeys(metricSettings)
+      return enabled.length > 0 ? enabled : DAY_TABLE_DEFAULT
+    }
+    return DAY_TABLE_DEFAULT
+  }, [metricSettings])
+
+  const [dayColumns, setDayColumns] = useState<MetricKey[]>(() => [
+    'rfc',
+    'rac',
+    'average_performance',
+  ])
+
+  // Drop columns that Admin disabled; keep order of dayMetricOptions
+  const visibleDayColumns = useMemo(
+    () => dayMetricOptions.filter((k) => dayColumns.includes(k)),
+    [dayMetricOptions, dayColumns],
+  )
+
+  /** Per-day series for class or focused learner — all enabled metrics from real ledger */
   const sessionSeries = useMemo(() => {
     return buildSessionMetricSeries({
       ledger: scopedLedger,
@@ -312,16 +343,38 @@ export function ProgressAnalysisView({
       courseId,
       classId,
       learnerUserId: focusLearnerId,
-      metricKeys: [
-        'rfc',
-        'rac',
-        'average_performance',
-        'n_count',
-        'n_depth_max',
-        'n_depth_avg',
-      ],
+      metricKeys: dayMetricOptions,
     })
-  }, [scopedLedger, orderedSessions, courseId, classId, focusLearnerId])
+  }, [scopedLedger, orderedSessions, courseId, classId, focusLearnerId, dayMetricOptions])
+
+  function metricLabel(key: MetricKey): string {
+    return metricSettings?.metrics.find((m) => m.key === key)?.label ?? key
+  }
+
+  function formatDayMetric(key: MetricKey, value: number | null | undefined): string {
+    if (value == null) return '—'
+    if (
+      key === 'rfc' ||
+      key === 'rac' ||
+      key.includes('rate') ||
+      key === 'awareness_recovery' ||
+      key === 'purple_mastery_rate'
+    ) {
+      return `${(value * 100).toFixed(1)}%`
+    }
+    if (key === 'n_count' || key === 'n_depth_max') return String(Math.round(value))
+    return value.toFixed(2)
+  }
+
+  function toggleDayColumn(key: MetricKey) {
+    setDayColumns((prev) => {
+      if (prev.includes(key)) {
+        if (prev.length <= 1) return prev
+        return prev.filter((k) => k !== key)
+      }
+      return [...prev, key]
+    })
+  }
 
   const recent = [...windowRecords]
     .sort((a, b) => b.finalizedAt.localeCompare(a.finalizedAt))
@@ -519,9 +572,11 @@ export function ProgressAnalysisView({
       {tab === 'overview' && (
         <div className="analysis-tab-body">
           <p className="analysis-plain-hint">
-            <strong>RFC</strong> = share of Red+Yellow (struggle). Lower is better focus.
+            <strong>Struggle (RFC)</strong> = (Red + Yellow) ÷ finalized sample in the{' '}
+            <em>current filter</em> (course / one day / date range × class or one learner). Source:
+            assessment ledger only — no mock.
             {' · '}
-            <strong>RAC</strong> = share of Green+Purple (success). Higher is better.
+            <strong>RAC</strong> = (Green + Purple) ÷ sample. Lower RFC is better.
           </p>
 
           <div className="stat-grid analysis-kpis">
@@ -651,6 +706,12 @@ export function ProgressAnalysisView({
             <div className="panel">
               <div className="panel-body-inner">
                 <p className="panel-title mb-2">Color mix</p>
+                <p className="meta" style={{ marginTop: 0 }}>
+                  Finalized results in current filter · sample={total}
+                  {total > 0
+                    ? ` · R${counts.red} Y${counts.yellow} G${counts.green} P${counts.purple}`
+                    : ''}
+                </p>
                 {total === 0 ? (
                   <p className="meta">No data in this filter.</p>
                 ) : (
@@ -658,7 +719,7 @@ export function ProgressAnalysisView({
                     {(['red', 'yellow', 'green', 'purple'] as ResultColor[]).map((color) => {
                       const n = counts[color]
                       const p = pct(n, total)
-                      const width = `${Math.max(n ? 8 : 0, (n / maxBar) * 100)}%`
+                      const width = `${Math.max(n ? 8 : 0, (n / Math.max(maxBar, 1)) * 100)}%`
                       return (
                         <div key={color} className="dist-row">
                           <span className={`capture-dot ${color}`}>{color}</span>
@@ -753,6 +814,7 @@ export function ProgressAnalysisView({
             classId={classId}
             learnerUserId={focusLearnerId}
             totalDays={totalDays}
+            metricSettings={metricSettings}
           />
         </div>
       )}
@@ -761,9 +823,28 @@ export function ProgressAnalysisView({
       {tab === 'sessions' && (
         <div className="analysis-tab-body">
           <p className="analysis-plain-hint">
-            Each row is one live day. <strong>Δ RFC</strong> is change vs the previous day
-            (negative pp = less struggle = improvement).
+            Each row is one live day from the <strong>finalized ledger</strong> (not mock).{' '}
+            <strong>RFC</strong> = (Red+Yellow) / sample that day. <strong>Δ RFC</strong> = change
+            vs previous day (negative pp = less struggle = improvement).
           </p>
+          <div className="analysis-chip-row" style={{ marginBottom: 12 }} role="group" aria-label="Day table columns">
+            <span className="analysis-filter-label">Columns</span>
+            {dayMetricOptions.map((key) => {
+              const on = visibleDayColumns.includes(key)
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  className={`analysis-chip${on ? ' is-active' : ''}`}
+                  aria-pressed={on}
+                  title={metricSettings?.metrics.find((m) => m.key === key)?.definition ?? key}
+                  onClick={() => toggleDayColumn(key)}
+                >
+                  {metricLabel(key)}
+                </button>
+              )
+            })}
+          </div>
           {sessionSeries.length === 0 ? (
             <p className="empty-state">No session results yet.</p>
           ) : (
@@ -772,12 +853,28 @@ export function ProgressAnalysisView({
                 <thead>
                   <tr>
                     <th scope="col">Day</th>
-                    <th scope="col">n</th>
-                    <th scope="col">RFC</th>
-                    <th scope="col">Δ RFC</th>
-                    <th scope="col">RAC</th>
-                    <th scope="col">Δ RAC</th>
-                    <th scope="col">Avg</th>
+                    <th scope="col" title="Finalized results that day (sample size, not probe n)">
+                      sample
+                    </th>
+                    {visibleDayColumns.map((key) => (
+                      <th
+                        key={key}
+                        scope="col"
+                        title={metricSettings?.metrics.find((m) => m.key === key)?.definition}
+                      >
+                        {metricLabel(key)}
+                      </th>
+                    ))}
+                    {visibleDayColumns.includes('rfc') ? (
+                      <th scope="col" title="RFC change vs previous day (percentage points)">
+                        Δ RFC
+                      </th>
+                    ) : null}
+                    {visibleDayColumns.includes('rac') ? (
+                      <th scope="col" title="RAC change vs previous day (percentage points)">
+                        Δ RAC
+                      </th>
+                    ) : null}
                     <th scope="col" />
                   </tr>
                 </thead>
@@ -800,28 +897,22 @@ export function ProgressAnalysisView({
                             </small>
                           </span>
                         </th>
-                        <td>{p.attemptCount}</td>
-                        <td>
-                          {p.metrics.rfc != null
-                            ? `${(p.metrics.rfc * 100).toFixed(1)}%`
-                            : '—'}
-                        </td>
-                        <td>
-                          <span className={`analysis-delta is-${rfcT}`}>{formatPp(dRfc)}</span>
-                        </td>
-                        <td>
-                          {p.metrics.rac != null
-                            ? `${(p.metrics.rac * 100).toFixed(1)}%`
-                            : '—'}
-                        </td>
-                        <td>
-                          <span className={`analysis-delta is-${racT}`}>{formatPp(dRac)}</span>
-                        </td>
-                        <td>
-                          {p.metrics.average_performance != null
-                            ? p.metrics.average_performance.toFixed(2)
-                            : '—'}
-                        </td>
+                        <td className="font-mono text-xs tabular-nums">{p.attemptCount}</td>
+                        {visibleDayColumns.map((key) => (
+                          <td key={key} className="font-mono text-xs tabular-nums">
+                            {formatDayMetric(key, p.metrics[key])}
+                          </td>
+                        ))}
+                        {visibleDayColumns.includes('rfc') ? (
+                          <td>
+                            <span className={`analysis-delta is-${rfcT}`}>{formatPp(dRfc)}</span>
+                          </td>
+                        ) : null}
+                        {visibleDayColumns.includes('rac') ? (
+                          <td>
+                            <span className={`analysis-delta is-${racT}`}>{formatPp(dRac)}</span>
+                          </td>
+                        ) : null}
                         <td>
                           <button
                             type="button"
@@ -856,7 +947,9 @@ export function ProgressAnalysisView({
               <thead>
                 <tr>
                   <th scope="col">Learner</th>
-                  <th scope="col">n</th>
+                  <th scope="col" title="Finalized sample size">
+                    sample
+                  </th>
                   <th scope="col">RFC</th>
                   <th scope="col">Δ RFC</th>
                   <th scope="col">RAC</th>

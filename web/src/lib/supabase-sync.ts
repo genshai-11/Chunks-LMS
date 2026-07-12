@@ -468,22 +468,54 @@ export async function saveWorkspaceToSupabase(
 
     // 2) Users — upsert only (never delete users; other browser may still reference)
     if (roster.users.length > 0) {
-      const { error } = await sb.from('users').upsert(
-        roster.users.map((u) => ({
+      const ids = roster.users.map((u) => u.id)
+      // Preserve real Clerk ids so re-login does not create duplicate staff rows.
+      const { data: existingUsers } = await sb
+        .from('users')
+        .select('id, clerk_user_id')
+        .in('id', ids)
+      const clerkById = new Map(
+        (existingUsers ?? []).map((row) => [row.id as string, row.clerk_user_id as string]),
+      )
+
+      const compactAvatar = (url: string | null) => {
+        if (!url) return null
+        // Huge data-URLs blow PostgREST payloads → 400
+        if (url.startsWith('data:') && url.length > 40_000) return null
+        return url
+      }
+
+      const baseRows = roster.users.map((u) => {
+        const existingClerk = clerkById.get(u.id)
+        const clerkUserId =
+          existingClerk && !existingClerk.startsWith('local_')
+            ? existingClerk
+            : existingClerk || `local_${u.id}`
+        return {
           id: u.id,
-          clerk_user_id: `local_${u.id}`,
+          clerk_user_id: clerkUserId,
           display_name: u.displayName,
           email: u.email,
-          avatar_url: u.avatarUrl,
-          account_status: u.accountStatus ?? 'active',
+          avatar_url: compactAvatar(u.avatarUrl),
           updated_at: new Date().toISOString(),
-        })),
-        { onConflict: 'id' },
-      )
-      if (error) return { ok: false, error: `users: ${error.message}` }
+        }
+      })
+
+      const withStatus = baseRows.map((row, i) => ({
+        ...row,
+        account_status: roster.users[i]!.accountStatus ?? 'active',
+      }))
+
+      let { error } = await sb.from('users').upsert(withStatus, { onConflict: 'id' })
+      if (error) {
+        // Migration not applied yet, or avatar rejected — retry without optional fields
+        const { error: e2 } = await sb.from('users').upsert(baseRows, { onConflict: 'id' })
+        if (e2) return { ok: false, error: `users: ${e2.message}` }
+      }
     }
 
-    // 3) Memberships — upsert roles; only full replace when pruning wipe
+    // 3) Memberships — upsert current roles; drop memberships for users removed locally
+    //    so Admin "delete account" actually disappears after reload (V1 single-org).
     {
       const rows = roster.users.flatMap((u) =>
         u.roles.map((role) => ({
@@ -500,6 +532,19 @@ export async function saveWorkspaceToSupabase(
           .from('organization_memberships')
           .upsert(rows, { onConflict: 'organization_id,user_id,role' })
         if (error) return { ok: false, error: `memberships: ${error.message}` }
+      }
+
+      // Reconcile: remove org memberships for users no longer in local roster
+      const keepIds = new Set(roster.users.map((u) => u.id))
+      const { data: existingMembers } = await sb
+        .from('organization_memberships')
+        .select('id, user_id')
+        .eq('organization_id', orgId)
+      const orphanMemberIds = (existingMembers ?? [])
+        .filter((m) => !keepIds.has(m.user_id as string))
+        .map((m) => m.id as string)
+      if (orphanMemberIds.length > 0) {
+        await sb.from('organization_memberships').delete().in('id', orphanMemberIds)
       }
     }
 

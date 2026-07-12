@@ -24,7 +24,10 @@ const LABELS: Record<MetricKey, string> = {
   average_performance: 'Average performance',
   purple_mastery_rate: 'Purple mastery',
   clarification_rate: 'Clarification rate',
-  clarification_depth: 'Clarification depth',
+  clarification_depth: 'Clarification depth (legacy)',
+  n_count: 'n count',
+  n_depth_max: 'n depth max',
+  n_depth_avg: 'n depth avg',
   awareness_recovery: 'Awareness recovery',
   focus_stability: 'Focus stability',
 }

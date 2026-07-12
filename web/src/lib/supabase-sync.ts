@@ -277,6 +277,10 @@ export async function loadWorkspaceFromSupabase(options?: {
         email: (u.email as string | null) ?? null,
         avatarUrl: ((u as { avatar_url?: string | null }).avatar_url ?? null) as string | null,
         roles: rolesByUser.get(u.id as string) ?? ['learner'],
+        accountStatus:
+          (u as { account_status?: string | null }).account_status === 'inactive'
+            ? ('inactive' as const)
+            : ('active' as const),
       }))
 
     const courseIds = new Set((coursesRes.data ?? []).map((c) => c.id as string))
@@ -336,7 +340,10 @@ export async function loadWorkspaceFromSupabase(options?: {
           session_number?: number | null
           owner_user_id?: string | null
           lock_expires_at?: string | null
+          session_kind?: string | null
+          participant_learner_ids?: string[] | null
         }
+        const kind = row.session_kind
         return {
           id: s.id as string,
           classId: s.class_id as string,
@@ -349,6 +356,13 @@ export async function loadWorkspaceFromSupabase(options?: {
           sessionNumber: typeof row.session_number === 'number' ? row.session_number : null,
           ownerUserId: (row.owner_user_id as string | null) ?? null,
           lockExpiresAt: (row.lock_expires_at as string | null) ?? null,
+          sessionKind:
+            kind === 'pretest' || kind === 'posttest' || kind === 'regular'
+              ? kind
+              : ('regular' as const),
+          participantLearnerIds: Array.isArray(row.participant_learner_ids)
+            ? row.participant_learner_ids
+            : null,
         }
       })
 
@@ -460,6 +474,7 @@ export async function saveWorkspaceToSupabase(
           display_name: u.displayName,
           email: u.email,
           avatar_url: u.avatarUrl,
+          account_status: u.accountStatus ?? 'active',
           updated_at: new Date().toISOString(),
         })),
         { onConflict: 'id' },
@@ -677,10 +692,12 @@ export async function saveWorkspaceToSupabase(
           session_number: s.sessionNumber,
           owner_user_id: s.ownerUserId,
           lock_expires_at: s.lockExpiresAt,
+          session_kind: s.sessionKind ?? 'regular',
+          participant_learner_ids: s.participantLearnerIds,
         }))
         const { error } = await sb.from('learning_sessions').upsert(baseRows, { onConflict: 'id' })
         if (error) {
-          // Retry without optional lock columns if migration not applied
+          // Retry without optional columns if migration not applied
           const { error: e2 } = await sb.from('learning_sessions').upsert(
             scheduling.learningSessions.map((s) => ({
               id: s.id,

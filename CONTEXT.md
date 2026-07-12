@@ -5,30 +5,34 @@ Chunks-LMS measures a learner’s Focus and Awareness over a course through teac
 ## People and ownership
 
 **Organization**:
-The administrative scope that owns users, courses, classes, metric templates, and reports.
+The administrative scope that owns users, metric templates, and reports.
 _Avoid_: Tenant, school account
 
 **User**:
-A person authenticated to access an Organization.
+A person authenticated to access an Organization (or a learner profile reached by invite link).
 _Avoid_: Account, profile
 
+**Account Status**:
+Active or inactive for a Teacher or Learner profile. Admin may deactivate without deleting history.
+_Avoid_: Banned, deleted
+
 **Teacher**:
-A User responsible for observing and assessing Learners in an assigned Class.
+A User who owns classes/programs for their learners, starts sessions (selecting 1..N learners), observes, and analyses progress.
 _Avoid_: Instructor, assessor
 
 **Learner**:
-A User whose Focus and Awareness progress is observed across a Course.
+A User whose Focus and Awareness progress is observed across a Course (program label). Access via email invite, not Clerk in V1.
 _Avoid_: Student, participant
 
 ## Learning structure
 
-**Course**:
-A longitudinal learning program over which Learner progress is measured.
+**Course** (program label):
+A longitudinal learning program over which Learner progress is measured — **owned by Teacher** in product UX (Admin does not manage courses).
 May include an **auto-schedule**: start day, weekdays (e.g. Tue/Wed), meeting time, and session count (default 15 class days). The course **end date is auto-detected** as the date of the last meeting.
-_Avoid_: Curriculum, program
+_Avoid_: Curriculum only (prefer “program” in Teacher UI)
 
 **Class**:
-A Teacher-led cohort of Learners taking one Course.
+A Teacher-led cohort of Learners taking one Course — created and seated by Teacher.
 _Avoid_: Room, group, cohort
 
 **Enrollment**:
@@ -41,6 +45,7 @@ _Avoid_: Lesson, booking
 
 **Learning Session**:
 The actual teaching and assessment occurrence associated with a Class.
+May carry **session kind** (regular, pretest, posttest) for RFC baseline comparison, and an optional **participant learner list** (subset of the class for multi-select capture).
 _Avoid_: Round, room session
 
 **Attendance**:

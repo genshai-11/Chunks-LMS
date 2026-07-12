@@ -22,6 +22,8 @@ const sessions: LearningSession[] = [
     sessionNumber: 1,
     ownerUserId: null,
     lockExpiresAt: null,
+    sessionKind: 'regular',
+    participantLearnerIds: null,
   },
   {
     id: 'ls-2',
@@ -35,6 +37,8 @@ const sessions: LearningSession[] = [
     sessionNumber: 2,
     ownerUserId: null,
     lockExpiresAt: null,
+    sessionKind: 'regular',
+    participantLearnerIds: null,
   },
 ]
 

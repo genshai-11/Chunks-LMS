@@ -11,6 +11,7 @@ const users = [
     email: null,
     avatarUrl: null,
     roles: ['learner' as const],
+    accountStatus: 'active' as const,
   },
 ]
 

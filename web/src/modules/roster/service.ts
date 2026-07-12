@@ -574,6 +574,7 @@ export function addLearnerProfile(
     email,
     avatarUrl: input.avatarUrl ?? null,
     roles: ['learner'],
+    accountStatus: 'active',
   }
 
   return {
@@ -585,7 +586,7 @@ export function addLearnerProfile(
 
 /**
  * Create a learner profile and seat them in a class in one step
- * (admin workflow from Courses/Classes — no separate People → Enrollments hop).
+ * (teacher/admin workflow from class roster — no separate enrollments hop).
  */
 export function createLearnerAndEnroll(
   state: RosterState,
@@ -627,6 +628,7 @@ export function addTeacherProfile(
     email: input.email?.trim() || null,
     avatarUrl: input.avatarUrl ?? null,
     roles: ['teacher'],
+    accountStatus: 'active',
   }
 
   return {
@@ -643,6 +645,7 @@ export function updateUserProfile(
     displayName?: string
     email?: string | null
     avatarUrl?: string | null
+    accountStatus?: DomainUser['accountStatus']
   },
 ): RosterResult<DomainUser> {
   const user = state.users.find((u) => u.id === userId)
@@ -668,6 +671,7 @@ export function updateUserProfile(
     email: nextEmail,
     avatarUrl:
       input.avatarUrl !== undefined ? input.avatarUrl || null : user.avatarUrl,
+    accountStatus: input.accountStatus ?? user.accountStatus ?? 'active',
   }
 
   return {
@@ -678,6 +682,24 @@ export function updateUserProfile(
       users: state.users.map((u) => (u.id === userId ? updated : u)),
     },
   }
+}
+
+export function setAccountStatus(
+  state: RosterState,
+  userId: string,
+  accountStatus: DomainUser['accountStatus'],
+): RosterResult<DomainUser> {
+  return updateUserProfile(state, userId, { accountStatus })
+}
+
+/** Active teachers only (for assignment pickers). */
+export function listActiveTeachers(state: RosterState): DomainUser[] {
+  return listTeachers(state).filter((u) => (u.accountStatus ?? 'active') === 'active')
+}
+
+/** Active learners only (for seating / session pick). */
+export function listActiveLearners(state: RosterState): DomainUser[] {
+  return listLearners(state).filter((u) => (u.accountStatus ?? 'active') === 'active')
 }
 
 /**

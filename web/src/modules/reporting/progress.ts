@@ -139,6 +139,7 @@ export function buildLearnerProgressReport(
 export function formatMetricValue(m: MetricObservation): string {
   if (m.value === null) return '—'
   if (m.unit === 'ratio') return `${(m.value * 100).toFixed(1)}%`
+  if (m.unit === 'count') return String(Math.round(m.value))
   return m.value.toFixed(2)
 }
 

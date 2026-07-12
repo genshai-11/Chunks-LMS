@@ -13,7 +13,7 @@ import {
 import { Link } from 'react-router-dom'
 import { PageHeader } from '../../components/PageHeader'
 import { UserAvatar } from '../../components/UserAvatar'
-import { EmptyState, NavTile, Panel, PersonRow, StatCard } from '../../components/ui'
+import { EmptyState, NavTile, Panel, StatCard } from '../../components/ui'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import { useFlash } from '../../hooks/useFlash'
 import { Flash } from '../../components/Flash'
@@ -22,8 +22,13 @@ import {
   formatClassInviteClipboard,
   learnerInviteUrl,
 } from '../../modules/roster/service'
+import { calculateMetrics } from '../../modules/metrics/calculate'
 import { useAppState } from '../../state/useAppState'
 
+/**
+ * Teacher home is learner-first: roster tree with program labels (course),
+ * start date, planned sessions, quick RFC progress — then start session.
+ */
 export function TeacherOverviewPage() {
   const { roster, scheduling, capture, ledger, activeLearnerUserId, setActiveLearnerUserId } =
     useAppState()
@@ -33,18 +38,48 @@ export function TeacherOverviewPage() {
   const openSession = scheduling.learningSessions.find(
     (s) => s.classId === classRow?.id && s.status === 'open',
   )
-  const scheduled = scheduling.scheduledSessions.filter((s) => s.classId === classRow?.id).length
-  const classResults = classRow ? ledger.filter((r) => r.classId === classRow.id).length : 0
+  const plannedSessions =
+    course?.schedule?.sessionCount ??
+    scheduling.scheduledSessions.filter(
+      (s) =>
+        s.classId === classRow?.id && s.status !== 'cancelled' && s.status !== 'rescheduled',
+    ).length ??
+    0
+  const taughtDays = scheduling.learningSessions.filter(
+    (s) => s.classId === classRow?.id && (s.status === 'completed' || s.status === 'open'),
+  ).length
+  const classResults = classRow ? ledger.filter((r) => r.classId === classRow.id) : []
 
   const learners = classRow
     ? activeEnrollmentsForClass(roster, classRow.id).map((e) => {
         const u = roster.users.find((x) => x.id === e.learnerUserId)
+        const learnerLedger = classResults.filter((r) => r.learnerUserId === e.learnerUserId)
+        const metrics =
+          learnerLedger.length > 0
+            ? calculateMetrics(
+                learnerLedger.map((r) => ({
+                  effectiveColor: r.effectiveColor,
+                  enteredProbeFlow: r.enteredProbeFlow,
+                  probeEventCount: r.probeEventCount,
+                  learnerId: r.learnerUserId,
+                })),
+              )
+            : null
+        const rfc = metrics?.find((m) => m.key === 'rfc')
+        const rac = metrics?.find((m) => m.key === 'rac')
+        const nCount = metrics?.find((m) => m.key === 'n_count')
         return {
           id: e.learnerUserId,
           name: u?.displayName ?? e.learnerUserId,
           avatarUrl: u?.avatarUrl ?? null,
           email: u?.email ?? null,
           invite: u ? learnerInviteUrl(u) : null,
+          accountStatus: u?.accountStatus ?? 'active',
+          enrolledAt: e.startedAt,
+          sample: learnerLedger.length,
+          rfc: rfc?.value ?? null,
+          rac: rac?.value ?? null,
+          nCount: nCount?.value ?? null,
         }
       })
     : []
@@ -52,50 +87,24 @@ export function TeacherOverviewPage() {
   const inviteReady = learners.filter((l) => l.invite).length
   const selectedLearner =
     learners.find((learner) => learner.id === activeLearnerUserId) ?? learners[0] ?? null
-  const selectedResults = selectedLearner
-    ? ledger.filter(
-        (result) => result.classId === classRow?.id && result.learnerUserId === selectedLearner.id,
-      )
-    : []
-  const selectedRisk = selectedResults.filter(
-    (result) => result.effectiveColor === 'red' || result.effectiveColor === 'yellow',
-  ).length
-  const selectedRfc =
-    selectedResults.length > 0 ? Math.round((selectedRisk / selectedResults.length) * 100) : null
-  const selectedRac = selectedRfc == null ? null : 100 - selectedRfc
-  const selectedAttendance = selectedLearner
-    ? scheduling.attendance.filter(
-        (record) =>
-          record.learnerUserId === selectedLearner.id &&
-          scheduling.learningSessions.some(
-            (session) =>
-              session.id === record.learningSessionId && session.classId === classRow?.id,
-          ),
-      )
-    : []
-
-  const nextScheduled = scheduling.scheduledSessions
-    .filter((s) => s.classId === classRow?.id && s.status === 'scheduled')
-    .slice()
-    .sort((a, b) => a.plannedStart.localeCompare(b.plannedStart))[0]
 
   if (!classRow || !teacher) {
     return (
       <>
         <PageHeader
-          icon={School}
+          icon={Users}
           kicker="Teacher"
-          title="No class"
-          subtitle="Ask admin to assign you a class."
+          title="Learners"
+          subtitle="Create a class and seat learners to start teaching."
         />
         <EmptyState
           icon={School}
-          title="Nothing assigned yet"
-          description="Create a class and assign a teacher from Admin → Classes."
+          title="No class yet"
+          description="Teacher owns classes and programs. Create a class, then seat learners."
           action={
-            <Link to="/admin/classes" className="btn primary">
+            <Link to="/teacher/classes" className="btn primary">
               <School className="h-4 w-4" aria-hidden />
-              <span>Admin · Classes</span>
+              <span>My classes</span>
             </Link>
           }
         />
@@ -107,9 +116,11 @@ export function TeacherOverviewPage() {
     <>
       <PageHeader
         icon={Home}
-        kicker={course?.code ?? 'Class'}
-        title={classRow.name}
-        subtitle={`${seats} enrolled · capacity ${classRow.capacity} · ${teacher.displayName}${
+        kicker={course?.code ?? 'Program'}
+        title="Learners"
+        subtitle={`${seats} learners · ${course?.name ?? classRow.name} · start ${
+          course?.startsOn ?? '—'
+        } · ${taughtDays}/${plannedSessions || '—'} sessions${
           hasMultiple ? ` · ${options.length} classes` : ''
         }`}
       />
@@ -119,62 +130,58 @@ export function TeacherOverviewPage() {
         <StatCard
           icon={Users}
           label="Learners"
-          value={`${seats} / ${classRow.capacity}`}
-          hint="Enrolled in this class"
+          value={`${seats}`}
+          hint={course ? `${course.code} · cap ${classRow.capacity}` : `cap ${classRow.capacity}`}
         />
-        <StatCard icon={CalendarDays} label="Scheduled" value={scheduled} hint="Sessions planned" />
+        <StatCard
+          icon={CalendarDays}
+          label="Program"
+          value={plannedSessions || '—'}
+          hint={
+            course?.startsOn
+              ? `Start ${course.startsOn}${course.endsOn ? ` → ${course.endsOn}` : ''}`
+              : 'Set start + session count on course'
+          }
+        />
         <StatCard
           icon={Radio}
-          label="Live session"
-          value={openSession ? 'In progress' : 'Idle'}
+          label="Live"
+          value={openSession ? `Day ${openSession.sessionNumber ?? '—'}` : 'Idle'}
           hint={
             openSession
-              ? 'Capture is open'
-              : nextScheduled
-                ? `Next ${new Date(nextScheduled.plannedStart).toLocaleString()}`
-                : 'Start from Schedule'
+              ? openSession.sessionKind !== 'regular'
+                ? openSession.sessionKind
+                : 'Capture open'
+              : 'Start with selected learners'
           }
         />
         <StatCard
           icon={ChartColumn}
-          label="Results"
-          value={classResults}
-          hint="Finalized for this class"
+          label="Finalized"
+          value={classResults.length}
+          hint="Real ledger rows"
         />
         <StatCard
           icon={Link2}
-          label="Invites ready"
+          label="Invites"
           value={`${inviteReady}/${learners.length}`}
-          hint="Seats with portal email"
+          hint="Portal email ready"
         />
       </div>
 
       <Panel
-        icon={Home}
+        icon={Play}
         title="Do next"
-        description={`Course ${course?.code ?? '—'} is shared; this class has its own roster, capacity, and calendar.`}
+        description="Learner tree first → start session with one or many → observe by learner columns."
       >
         <div className="list-cards">
           <NavTile
-            to="/teacher/calendar"
-            title="Schedule"
-            description={
-              nextScheduled
-                ? `Next planned ${new Date(nextScheduled.plannedStart).toLocaleString()} · or add a flexible slot`
-                : 'Apply course plan and/or add flexible days for this class only.'
-            }
-            icon={CalendarDays}
-            cta="Go"
-          />
-          <NavTile
             to="/teacher/session"
-            title={openSession ? 'Resume live session' : 'Live session'}
+            title={openSession ? 'Resume live session' : 'Start session'}
             description={
               openSession
-                ? 'Attendance and Observe are open.'
-                : capture?.sessionStatus === 'completed'
-                  ? 'Last day finished — start the next teaching day.'
-                  : 'Start Day 1…N here, or from a Schedule slot.'
+                ? 'Attendance + Observe (multi-learner columns).'
+                : 'Pick 1+ learners, optional pretest/posttest label, then observe.'
             }
             icon={Radio}
             cta="Go"
@@ -182,88 +189,26 @@ export function TeacherOverviewPage() {
           <NavTile
             to="/teacher/analysis"
             title="Analysis"
-            description="RFC, RAC, and day-by-day progress for this class."
+            description="RFC trajectory, n count / n depth max / n depth avg from finalized data."
             icon={ChartColumn}
+            cta="Go"
+          />
+          <NavTile
+            to="/teacher/classes"
+            title="Classes & seating"
+            description="Programs, capacity, enroll learners under this teacher."
+            icon={School}
             cta="Go"
           />
         </div>
       </Panel>
 
-      {selectedLearner ? (
-        <Panel
-          icon={Users}
-          title="Learner profile"
-          description="Finalized Focus & Awareness indicators for the selected learner."
-        >
-          <div className="teacher-learner-profile">
-            <div className="teacher-learner-identity">
-              <UserAvatar
-                name={selectedLearner.name}
-                avatarUrl={selectedLearner.avatarUrl}
-                size="xl"
-              />
-              <div>
-                <h3>{selectedLearner.name}</h3>
-                <p>{selectedLearner.email ?? 'No email'}</p>
-              </div>
-            </div>
-            <div className="teacher-learner-metrics" aria-label="Learner progress summary">
-              <span>
-                <strong>{selectedResults.length}</strong>
-                <small>Finalized</small>
-              </span>
-              <span>
-                <strong>{selectedRfc == null ? '—' : `${selectedRfc}%`}</strong>
-                <small>RFC</small>
-              </span>
-              <span>
-                <strong>{selectedRac == null ? '—' : `${selectedRac}%`}</strong>
-                <small>RAC</small>
-              </span>
-              <span>
-                <strong>{selectedAttendance.length}</strong>
-                <small>Attendance</small>
-              </span>
-            </div>
-            <div className="btn-row teacher-learner-actions">
-              <Link
-                to={`/teacher/calendar?learner=${encodeURIComponent(selectedLearner.id)}`}
-                className="btn primary"
-                onClick={() => setActiveLearnerUserId(selectedLearner.id)}
-              >
-                <Play className="h-4 w-4" aria-hidden />
-                {openSession ? 'Resume session' : 'Start session'}
-              </Link>
-              <Link
-                to={`/teacher/analysis?learner=${encodeURIComponent(selectedLearner.id)}`}
-                className="btn ghost"
-                onClick={() => setActiveLearnerUserId(selectedLearner.id)}
-              >
-                <Eye className="h-4 w-4" aria-hidden />
-                View report
-              </Link>
-              {selectedLearner.invite ? (
-                <button
-                  type="button"
-                  className="ghost"
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(selectedLearner.invite!)
-                    ok(`Invite copied for ${selectedLearner.name}`)
-                  }}
-                >
-                  <Link2 className="h-4 w-4" aria-hidden />
-                  Copy invite
-                </button>
-              ) : null}
-            </div>
-          </div>
-        </Panel>
-      ) : null}
-
       <Panel
         icon={Users}
-        title="Roster & invites"
-        description="Copy portal links for learners (no Clerk)."
+        title="Learner tree"
+        description={`${course?.code ?? 'Program'} · started ${course?.startsOn ?? '—'} · planned ${
+          plannedSessions || '—'
+        } sessions. Progress uses finalized observations only.`}
         actions={
           inviteReady > 0 ? (
             <button
@@ -288,56 +233,218 @@ export function TeacherOverviewPage() {
         {learners.length === 0 ? (
           <EmptyState
             icon={Users}
-            title="No learners enrolled"
-            description="Ask admin to seat learners into this class."
+            title="No learners seated"
+            description="Seat learners from Classes."
             action={
-              <Link to="/admin/classes" className="btn ghost">
+              <Link to="/teacher/classes" className="btn ghost">
                 Open classes
               </Link>
             }
           />
         ) : (
-          <ul className="person-list">
-            {learners.map((l) => (
-              <PersonRow
-                key={l.id}
-                name={l.name}
-                meta={l.email ?? 'No email — no invite link'}
-                avatarUrl={l.avatarUrl}
-                actions={
-                  <div className="row-actions">
-                    <button
-                      type="button"
-                      className={selectedLearner?.id === l.id ? 'primary' : 'ghost'}
-                      onClick={() => setActiveLearnerUserId(l.id)}
-                    >
-                      <Eye className="h-3.5 w-3.5" aria-hidden />
-                      <span>{selectedLearner?.id === l.id ? 'Selected' : 'Profile'}</span>
-                    </button>
-                    {l.invite ? (
-                      <button
-                        type="button"
-                        className="ghost"
-                        onClick={async () => {
-                          try {
-                            await navigator.clipboard.writeText(l.invite!)
-                            ok(`Invite copied for ${l.name}`)
-                          } catch {
-                            ok(l.invite!)
-                          }
-                        }}
-                      >
-                        <Link2 className="h-3.5 w-3.5" aria-hidden />
-                        <span>Copy</span>
-                      </button>
-                    ) : null}
-                  </div>
-                }
-              />
-            ))}
-          </ul>
+          <div className="table-wrap">
+            <table aria-label="Learner tree">
+              <thead>
+                <tr>
+                  <th scope="col">Learner</th>
+                  <th scope="col" title="Course / program label">
+                    Program
+                  </th>
+                  <th scope="col" title="Enrollment or course start">
+                    Start
+                  </th>
+                  <th scope="col">Sessions</th>
+                  <th scope="col" title="(Red+Yellow)/finalized from real ledger">
+                    RFC
+                  </th>
+                  <th scope="col" title="(Green+Purple)/finalized">
+                    RAC
+                  </th>
+                  <th scope="col" title="Times teacher selected Green (2) / entered probe">
+                    n count
+                  </th>
+                  <th scope="col">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {learners.map((l) => {
+                  const selected = selectedLearner?.id === l.id
+                  return (
+                    <tr key={l.id} className={selected ? 'bg-slate-50/80' : undefined}>
+                      <td>
+                        <span className="cell-with-avatar">
+                          <UserAvatar name={l.name} avatarUrl={l.avatarUrl} size="sm" />
+                          <span>
+                            <strong>{l.name}</strong>
+                            {l.accountStatus === 'inactive' ? (
+                              <span className="badge" style={{ marginLeft: 6 }}>
+                                inactive
+                              </span>
+                            ) : null}
+                            <div className="meta" style={{ margin: 0 }}>
+                              {l.email ?? 'No email'}
+                            </div>
+                          </span>
+                        </span>
+                      </td>
+                      <td>
+                        <span className="badge">{course?.code ?? '—'}</span>
+                      </td>
+                      <td className="font-mono text-xs">
+                        {(course?.startsOn ?? l.enrolledAt.slice(0, 10)) || '—'}
+                      </td>
+                      <td className="font-mono text-xs tabular-nums">
+                        {taughtDays}/{plannedSessions || '—'}
+                      </td>
+                      <td className="font-mono text-xs tabular-nums">
+                        {l.rfc == null ? '—' : `${Math.round(l.rfc * 100)}%`}
+                        <div className="meta" style={{ margin: 0 }}>
+                          sample={l.sample}
+                        </div>
+                      </td>
+                      <td className="font-mono text-xs tabular-nums">
+                        {l.rac == null ? '—' : `${Math.round(l.rac * 100)}%`}
+                      </td>
+                      <td className="font-mono text-xs tabular-nums">
+                        {l.nCount == null ? '—' : Math.round(l.nCount)}
+                      </td>
+                      <td>
+                        <div className="row-actions">
+                          <button
+                            type="button"
+                            className={selected ? 'primary' : 'ghost'}
+                            onClick={() => setActiveLearnerUserId(l.id)}
+                          >
+                            <Eye className="h-3.5 w-3.5" aria-hidden />
+                            <span>{selected ? 'Selected' : 'Select'}</span>
+                          </button>
+                          <Link
+                            to={`/teacher/session?learner=${encodeURIComponent(l.id)}`}
+                            className="btn ghost"
+                            onClick={() => setActiveLearnerUserId(l.id)}
+                          >
+                            <Play className="h-3.5 w-3.5" aria-hidden />
+                            <span>Session</span>
+                          </Link>
+                          <Link
+                            to={`/teacher/analysis?learner=${encodeURIComponent(l.id)}`}
+                            className="btn ghost"
+                            onClick={() => setActiveLearnerUserId(l.id)}
+                          >
+                            <ChartColumn className="h-3.5 w-3.5" aria-hidden />
+                            <span>Report</span>
+                          </Link>
+                          {l.invite ? (
+                            <button
+                              type="button"
+                              className="ghost"
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(l.invite!)
+                                  ok(`Invite copied for ${l.name}`)
+                                } catch {
+                                  ok(l.invite!)
+                                }
+                              }}
+                            >
+                              <Link2 className="h-3.5 w-3.5" aria-hidden />
+                              <span>Invite</span>
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </Panel>
+
+      {selectedLearner ? (
+        <Panel
+          icon={Users}
+          title={selectedLearner.name}
+          description="Quick progress from finalized ledger only — no mock values."
+        >
+          <div className="teacher-learner-profile">
+            <div className="teacher-learner-identity">
+              <UserAvatar
+                name={selectedLearner.name}
+                avatarUrl={selectedLearner.avatarUrl}
+                size="xl"
+              />
+              <div>
+                <h3>{selectedLearner.name}</h3>
+                <p>{selectedLearner.email ?? 'No email'}</p>
+                <p className="meta">
+                  {course?.code ?? '—'} · start {course?.startsOn ?? '—'} · {taughtDays}/
+                  {plannedSessions || '—'} sessions · sample={selectedLearner.sample}
+                </p>
+              </div>
+            </div>
+            <div className="teacher-learner-metrics" aria-label="Learner progress summary">
+              <span>
+                <strong>
+                  {selectedLearner.rfc == null
+                    ? '—'
+                    : `${Math.round(selectedLearner.rfc * 100)}%`}
+                </strong>
+                <small>RFC</small>
+              </span>
+              <span>
+                <strong>
+                  {selectedLearner.rac == null
+                    ? '—'
+                    : `${Math.round(selectedLearner.rac * 100)}%`}
+                </strong>
+                <small>RAC</small>
+              </span>
+              <span>
+                <strong>
+                  {selectedLearner.nCount == null ? '—' : Math.round(selectedLearner.nCount)}
+                </strong>
+                <small>n count</small>
+              </span>
+              <span>
+                <strong>{selectedLearner.sample}</strong>
+                <small>Finalized</small>
+              </span>
+            </div>
+            <div className="btn-row teacher-learner-actions">
+              <Link
+                to={`/teacher/session?learner=${encodeURIComponent(selectedLearner.id)}`}
+                className="btn primary"
+                onClick={() => setActiveLearnerUserId(selectedLearner.id)}
+              >
+                <Play className="h-4 w-4" aria-hidden />
+                {openSession ? 'Resume session' : 'Start session'}
+              </Link>
+              <Link
+                to={`/teacher/analysis?learner=${encodeURIComponent(selectedLearner.id)}`}
+                className="btn ghost"
+                onClick={() => setActiveLearnerUserId(selectedLearner.id)}
+              >
+                <Eye className="h-4 w-4" aria-hidden />
+                View report
+              </Link>
+            </div>
+          </div>
+        </Panel>
+      ) : null}
+
+      {capture?.sessionStatus === 'open' ? (
+        <p className="meta">
+          Capture board is open —{' '}
+          <Link to="/teacher/observe" className="underline font-semibold">
+            continue Observe
+          </Link>
+          .
+        </p>
+      ) : null}
     </>
   )
 }

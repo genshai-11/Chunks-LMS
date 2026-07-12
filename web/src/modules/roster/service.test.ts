@@ -252,6 +252,7 @@ function addTeacher(state: ReturnType<typeof createSeedRoster>) {
         email: 't2@example.com',
         avatarUrl: null,
         roles: ['teacher' as const],
+        accountStatus: 'active' as const,
       },
     ],
   }

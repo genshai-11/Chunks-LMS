@@ -7,6 +7,8 @@ export type Organization = {
   name: string
 }
 
+export type AccountStatus = 'active' | 'inactive'
+
 export type DomainUser = {
   id: string
   displayName: string
@@ -14,6 +16,8 @@ export type DomainUser = {
   /** Optional image URL or data URL for avatar */
   avatarUrl: string | null
   roles: Array<'admin' | 'teacher' | 'learner'>
+  /** Admin can deactivate teacher/learner accounts without deleting history */
+  accountStatus: AccountStatus
 }
 
 /**

@@ -51,6 +51,9 @@ const CORE_METRICS: { key: MetricKey; label: string; color: string }[] = [
   { key: 'rfc', label: 'RFC (struggle %)', color: '#dc2626' },
   { key: 'rac', label: 'RAC (success %)', color: '#059669' },
   { key: 'average_performance', label: 'Avg score', color: '#4f46e5' },
+  { key: 'n_count', label: 'n count', color: '#0ea5e9' },
+  { key: 'n_depth_max', label: 'n depth max', color: '#f97316' },
+  { key: 'n_depth_avg', label: 'n depth avg', color: '#a855f7' },
 ]
 
 const COLOR_HEX: Record<ResultColor, string> = {
@@ -86,6 +89,8 @@ function toSessions(list: SessionOpt[], classId?: string) {
     sessionNumber: s.sessionNumber ?? null,
     ownerUserId: null,
     lockExpiresAt: null,
+    sessionKind: 'regular' as const,
+    participantLearnerIds: null,
   }))
 }
 

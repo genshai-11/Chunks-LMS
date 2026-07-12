@@ -614,6 +614,20 @@
     @apply shrink-0 font-mono text-[10px] font-bold uppercase tracking-wide text-slate-400;
   }
 
+  .person-row-check {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    width: 100%;
+    padding: 0.5rem 0.25rem;
+    cursor: pointer;
+  }
+  .person-row-check input[type='checkbox'] {
+    width: 1.1rem;
+    height: 1.1rem;
+    accent-color: var(--accent, #4f46e5);
+  }
+
   .person-list {
     @apply m-0 flex list-none flex-col gap-2 p-0;
   }

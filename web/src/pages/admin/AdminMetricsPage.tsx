@@ -33,10 +33,10 @@ export function AdminMetricsPage() {
       <PageHeader
         icon={Gauge}
         title="Metrics"
-        subtitle="Show/hide on Analysis · min sample · operational vs experimental · saved locally and to org_settings when Supabase is connected"
+        subtitle="Enabled metrics feed Teacher/Learner charts (real ledger only). Labels & definitions are tooltips. Probe: n count / n depth max / n depth avg."
         actions={
           <label className="field field-inline" style={{ margin: 0 }}>
-            Max probes
+            Probe ceiling
             <input
               type="number"
               min={1}
@@ -45,13 +45,20 @@ export function AdminMetricsPage() {
               onChange={(e) => {
                 const next = setDefaultMaxProbeCount(metricSettings, Number(e.target.value))
                 setMetricSettings(next)
-                ok(`Max probes = ${next.defaultMaxProbeCount}`)
+                ok(`Probe ceiling = ${next.defaultMaxProbeCount}`)
               }}
+              title="Session maxProbeCount default — not the same as observed n depth max"
             />
           </label>
         }
       />
       <Flash message={message} error={error} />
+
+      <p className="meta" style={{ marginBottom: '0.75rem' }}>
+        <strong>n count</strong> = Green (2) entries · <strong>n depth</strong> = probe depth per
+        question · <strong>n depth max/avg</strong> = peak/mean observed depth (not the ceiling
+        above). Sample size is never labeled “n”.
+      </p>
 
       <div className="table-wrap">
           <table>
@@ -60,8 +67,10 @@ export function AdminMetricsPage() {
                 <th scope="col">Metric</th>
                 <th scope="col">Show</th>
                 <th scope="col">Status</th>
-                <th scope="col">Min n</th>
-                <th scope="col">Definition</th>
+                <th scope="col" title="Minimum finalized sample before chart shows a value">
+                  Min sample
+                </th>
+                <th scope="col">Definition / formula</th>
               </tr>
             </thead>
             <tbody>

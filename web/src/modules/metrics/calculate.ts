@@ -7,6 +7,9 @@ export type MetricKey =
   | 'purple_mastery_rate'
   | 'clarification_rate'
   | 'clarification_depth'
+  | 'n_count'
+  | 'n_depth_max'
+  | 'n_depth_avg'
   | 'awareness_recovery'
   | 'focus_stability'
 
@@ -91,7 +94,34 @@ export const METRIC_CATALOG: MetricCatalogEntry[] = [
     key: 'clarification_depth',
     version: '1.0.0',
     status: 'experimental',
-    definition: 'probe-event count / probed attempts',
+    definition: 'probe-event count / probed attempts (legacy alias of n depth avg)',
+    direction: 'contextual',
+    unit: 'score',
+    minSample: 1,
+  },
+  {
+    key: 'n_count',
+    version: '1.0.0',
+    status: 'operational',
+    definition: 'count of finalized attempts where teacher selected Green (2) / entered probe',
+    direction: 'contextual',
+    unit: 'count',
+    minSample: 1,
+  },
+  {
+    key: 'n_depth_max',
+    version: '1.0.0',
+    status: 'operational',
+    definition: 'max probeCount among probed attempts (peak n depth; not session maxProbeCount)',
+    direction: 'contextual',
+    unit: 'count',
+    minSample: 1,
+  },
+  {
+    key: 'n_depth_avg',
+    version: '1.0.0',
+    status: 'operational',
+    definition: 'mean probeCount among probed attempts (n depth avg)',
     direction: 'contextual',
     unit: 'score',
     minSample: 1,
@@ -151,6 +181,9 @@ export function calculateMetrics(finalized: FinalizedAttempt[]): MetricObservati
   const scoreSum = finalized.reduce((s, a) => s + COLOR_SCORE[a.effectiveColor], 0)
   const probed = finalized.filter((a) => a.enteredProbeFlow)
   const probeEventTotal = probed.reduce((s, a) => s + a.probeEventCount, 0)
+  const probeDepthMax =
+    probed.length === 0 ? null : Math.max(...probed.map((a) => a.probeEventCount))
+  const probeDepthAvg = probed.length === 0 ? null : probeEventTotal / probed.length
   const recovered = probed.filter(
     (a) => a.effectiveColor === 'green' || a.effectiveColor === 'purple',
   ).length
@@ -161,11 +194,10 @@ export function calculateMetrics(finalized: FinalizedAttempt[]): MetricObservati
   const purpleRate = observation('purple_mastery_rate', ratio(purple, n), n)
   // Clarification rate: 0 when N>0 and none probed; null when N=0
   const clarRate = observation('clarification_rate', n === 0 ? null : probed.length / n, n)
-  const clarDepth = observation(
-    'clarification_depth',
-    probed.length === 0 ? null : probeEventTotal / probed.length,
-    probed.length,
-  )
+  const clarDepth = observation('clarification_depth', probeDepthAvg, probed.length)
+  const nCount = observation('n_count', n === 0 ? null : probed.length, n)
+  const nDepthMax = observation('n_depth_max', probeDepthMax, probed.length)
+  const nDepthAvg = observation('n_depth_avg', probeDepthAvg, probed.length)
   const awareness = observation(
     'awareness_recovery',
     probed.length === 0 ? null : recovered / probed.length,
@@ -173,7 +205,19 @@ export function calculateMetrics(finalized: FinalizedAttempt[]): MetricObservati
   )
   const stability = observation('focus_stability', focusStability(finalized), n)
 
-  return [rfc, rac, avg, purpleRate, clarRate, clarDepth, awareness, stability]
+  return [
+    rfc,
+    rac,
+    avg,
+    purpleRate,
+    clarRate,
+    clarDepth,
+    nCount,
+    nDepthMax,
+    nDepthAvg,
+    awareness,
+    stability,
+  ]
 }
 
 /**

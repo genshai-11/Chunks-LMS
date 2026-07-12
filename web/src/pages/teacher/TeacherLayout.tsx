@@ -1,11 +1,11 @@
-import { Archive, CalendarDays, ChartColumn, Home, Radio, School } from 'lucide-react'
+import { Archive, CalendarDays, ChartColumn, Radio, School, Users } from 'lucide-react'
 import { ClassContextSelect } from '../../components/ClassContextSelect'
 import { RoleWorkspace } from '../../components/RoleWorkspace'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import { useAppState } from '../../state/useAppState'
 
 const ITEMS = [
-  { to: '/teacher', label: 'Home', icon: Home, end: true },
+  { to: '/teacher', label: 'Learners', icon: Users, end: true },
   { to: '/teacher/classes', label: 'Classes', icon: School },
   { to: '/teacher/calendar', label: 'Schedule', icon: CalendarDays },
   { to: '/teacher/session', label: 'Live session', icon: Radio },

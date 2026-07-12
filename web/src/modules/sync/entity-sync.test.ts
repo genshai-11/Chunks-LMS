@@ -20,6 +20,8 @@ function ls(partial: Partial<LearningSession> & { id: string; classId: string })
     sessionNumber: 1,
     ownerUserId: null,
     lockExpiresAt: null,
+    sessionKind: 'regular',
+    participantLearnerIds: null,
     ...partial,
   }
 }

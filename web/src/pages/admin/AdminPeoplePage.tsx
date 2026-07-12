@@ -6,6 +6,7 @@ import {
   Link2,
   Mail,
   Pencil,
+  Power,
   Trash2,
   UserPlus,
   Users,
@@ -23,6 +24,7 @@ import {
   deleteUserProfile,
   listLearners,
   listTeachers,
+  setAccountStatus,
   updateUserProfile,
 } from '../../modules/roster/service'
 import type { DomainUser } from '../../modules/roster/types'
@@ -37,7 +39,8 @@ function invitationUrl(user: DomainUser): string {
   if (user.roles.includes('learner') && user.email) {
     return `${origin}/access?email=${encodeURIComponent(user.email)}`
   }
-  return origin
+  // Teachers use staff Clerk sign-in at app root
+  return `${origin}/teacher`
 }
 
 function invitationMailto(user: DomainUser): string {
@@ -46,9 +49,12 @@ function invitationMailto(user: DomainUser): string {
     : user.roles.includes('teacher')
       ? 'Teacher'
       : 'Staff'
+  const link = invitationUrl(user)
   const subject = encodeURIComponent(`Chunks LMS ${role} invitation`)
   const body = encodeURIComponent(
-    `Hi ${user.displayName},\n\nOpen your Chunks LMS invitation:\n${invitationUrl(user)}\n`,
+    user.roles.includes('learner')
+      ? `Hi ${user.displayName},\n\nOpen your learner portal (no password):\n${link}\n`
+      : `Hi ${user.displayName},\n\nSign in as Teacher on Chunks LMS:\n${link}\nUse the email associated with your staff account.\n`,
   )
   return `mailto:${encodeURIComponent(user.email ?? '')}?subject=${subject}&body=${body}`
 }
@@ -109,6 +115,7 @@ function PersonEditor({
   onCreate,
   onUpdate,
   onDelete,
+  onToggleActive,
   onAvatarError,
 }: {
   users: DomainUser[]
@@ -121,6 +128,7 @@ function PersonEditor({
   onCreate: (draft: Draft) => void
   onUpdate: (id: string, draft: Draft) => void
   onDelete: (user: DomainUser) => void
+  onToggleActive: (user: DomainUser) => void
   onAvatarError: (msg: string) => void
 }) {
   const [createDraft, setCreateDraft] = useState<Draft>(emptyDraft)
@@ -147,6 +155,7 @@ function PersonEditor({
                 {withAvatar ? <th scope="col">Photo</th> : null}
                 <th scope="col">Name</th>
                 <th scope="col">Email</th>
+                <th scope="col">Status</th>
                 <th scope="col">
                   <span className="sr-only">Actions</span>
                 </th>
@@ -157,7 +166,7 @@ function PersonEditor({
                 editingId === u.id ? (
                   <tr key={u.id} className="bg-slate-50/80">
                     {withAvatar ? (
-                      <td colSpan={4}>
+                      <td colSpan={5}>
                         <div className="person-edit-stack">
                           <AvatarField
                             name={editDraft.displayName || u.displayName}
@@ -234,7 +243,7 @@ function PersonEditor({
                             aria-label="Email"
                           />
                         </td>
-                        <td>
+                        <td colSpan={2}>
                           <div className="row-actions">
                             <button
                               type="button"
@@ -261,7 +270,7 @@ function PersonEditor({
                     )}
                   </tr>
                 ) : (
-                  <tr key={u.id}>
+                  <tr key={u.id} className={(u.accountStatus ?? 'active') === 'inactive' ? 'opacity-60' : undefined}>
                     {withAvatar ? (
                       <td>
                         <UserAvatar name={u.displayName} avatarUrl={u.avatarUrl} size="sm" />
@@ -269,6 +278,13 @@ function PersonEditor({
                     ) : null}
                     <td className="font-medium text-slate-800">{u.displayName}</td>
                     <td className="font-mono text-xs text-slate-500">{u.email ?? '—'}</td>
+                    <td>
+                      <span
+                        className={`badge${(u.accountStatus ?? 'active') === 'active' ? ' success' : ''}`}
+                      >
+                        {u.accountStatus ?? 'active'}
+                      </span>
+                    </td>
                     <td>
                       <div className="row-actions">
                         {u.email ? (
@@ -287,6 +303,21 @@ function PersonEditor({
                             </a>
                           </>
                         ) : null}
+                        <button
+                          type="button"
+                          className="ghost"
+                          onClick={() => onToggleActive(u)}
+                          title={
+                            (u.accountStatus ?? 'active') === 'active'
+                              ? 'Deactivate account'
+                              : 'Reactivate account'
+                          }
+                        >
+                          <Power className="h-3.5 w-3.5" aria-hidden />
+                          <span>
+                            {(u.accountStatus ?? 'active') === 'active' ? 'Deactivate' : 'Activate'}
+                          </span>
+                        </button>
                         <button
                           type="button"
                           className="ghost"
@@ -380,8 +411,8 @@ export function AdminPeoplePage() {
       <PageHeader
         icon={Users}
         kicker="Admin"
-        title="People"
-        subtitle="Only staff (Clerk admin/teacher) manage profiles here. Learners are roster profiles with an email invite — they do not sign in with Clerk. After adding a learner, copy their portal link (or enroll them in a class first)."
+        title="Accounts"
+        subtitle="Activate/deactivate teachers and learners, send invites. Teachers sign in with Clerk; learners open the email portal link. Course/class seating is managed by Teacher."
       />
       <Flash message={message} error={error} />
 
@@ -399,7 +430,7 @@ export function AdminPeoplePage() {
             })
             if (!r.ok) return err(r.error)
             setRoster(r.state)
-            ok(`Teacher ${r.value.displayName} added`)
+            ok(`Teacher ${r.value.displayName} added — copy/send invite`)
           }}
           onUpdate={(id, draft) => {
             const r = updateUserProfile(roster, id, {
@@ -409,6 +440,13 @@ export function AdminPeoplePage() {
             if (!r.ok) return err(r.error)
             setRoster(r.state)
             ok(`${r.value.displayName} updated`)
+          }}
+          onToggleActive={(user) => {
+            const next = (user.accountStatus ?? 'active') === 'active' ? 'inactive' : 'active'
+            const r = setAccountStatus(roster, user.id, next)
+            if (!r.ok) return err(r.error)
+            setRoster(r.state)
+            ok(`${user.displayName} → ${next}`)
           }}
           onDelete={(user) => {
             if (!window.confirm(`Delete ${user.displayName}?`)) return
@@ -447,6 +485,13 @@ export function AdminPeoplePage() {
             if (!r.ok) return err(r.error)
             setRoster(r.state)
             ok(`${r.value.displayName} updated`)
+          }}
+          onToggleActive={(user) => {
+            const next = (user.accountStatus ?? 'active') === 'active' ? 'inactive' : 'active'
+            const r = setAccountStatus(roster, user.id, next)
+            if (!r.ok) return err(r.error)
+            setRoster(r.state)
+            ok(`${user.displayName} → ${next}`)
           }}
           onDelete={(user) => {
             if (!window.confirm(`Delete ${user.displayName}?`)) return

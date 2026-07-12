@@ -68,7 +68,21 @@ describe('metric calculations', () => {
     )
     expect(metrics.find((m) => m.key === 'clarification_rate')!.value).toBe(1)
     expect(metrics.find((m) => m.key === 'clarification_depth')!.value).toBe(2)
+    expect(metrics.find((m) => m.key === 'n_count')!.value).toBe(1)
+    expect(metrics.find((m) => m.key === 'n_depth_max')!.value).toBe(2)
+    expect(metrics.find((m) => m.key === 'n_depth_avg')!.value).toBe(2)
     expect(metrics.find((m) => m.key === 'awareness_recovery')!.value).toBe(1)
+  })
+
+  it('n depth max and avg use real probe depths only', () => {
+    const metrics = calculateMetrics([
+      { effectiveColor: 'green', enteredProbeFlow: true, probeEventCount: 9 },
+      { effectiveColor: 'green', enteredProbeFlow: true, probeEventCount: 1 },
+      { effectiveColor: 'red', enteredProbeFlow: false, probeEventCount: 0 },
+    ])
+    expect(metrics.find((m) => m.key === 'n_count')!.value).toBe(2)
+    expect(metrics.find((m) => m.key === 'n_depth_max')!.value).toBe(9)
+    expect(metrics.find((m) => m.key === 'n_depth_avg')!.value).toBeCloseTo(5)
   })
 
   it('compares equal-duration windows with percentage-point deltas', () => {

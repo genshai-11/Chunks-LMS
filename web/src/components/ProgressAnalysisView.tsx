@@ -281,6 +281,15 @@ export function ProgressAnalysisView({
       )
   }, [comparison, metricSettings])
 
+  const probeStats = useMemo(() => {
+    const probed = windowRecords.filter((r) => r.enteredProbeFlow)
+    const count = probed.length
+    const totalDepth = probed.reduce((sum, r) => sum + r.probeEventCount, 0)
+    const avg = count > 0 ? totalDepth / count : 0
+    const max = count > 0 ? Math.max(...probed.map((r) => r.probeEventCount)) : 0
+    return { count, avg, max }
+  }, [windowRecords])
+
   /** Per-day series for class or focused learner */
   const sessionSeries = useMemo(() => {
     return buildSessionMetricSeries({
@@ -297,11 +306,20 @@ export function ProgressAnalysisView({
         sessionNumber: s.sessionNumber ?? null,
         ownerUserId: null,
         lockExpiresAt: null,
+        sessionKind: 'regular' as const,
+        participantLearnerIds: null,
       })),
       courseId,
       classId,
       learnerUserId: focusLearnerId,
-      metricKeys: ['rfc', 'rac', 'average_performance'],
+      metricKeys: [
+        'rfc',
+        'rac',
+        'average_performance',
+        'n_count',
+        'n_depth_max',
+        'n_depth_avg',
+      ],
     })
   }, [scopedLedger, orderedSessions, courseId, classId, focusLearnerId])
 
@@ -546,6 +564,46 @@ export function ProgressAnalysisView({
               <p className="meta">
                 G/P {counts.green + counts.purple} · R/Y {counts.red + counts.yellow}
               </p>
+            </div>
+          </div>
+
+          <div className="analysis-additional-section" style={{ marginTop: 24, marginBottom: 24 }}>
+            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
+              Probe metrics (from finalized ledger)
+            </h3>
+            <p className="analysis-plain-hint" style={{ marginBottom: 12 }}>
+              <strong>n count</strong> = times teacher selected Green (2).{' '}
+              <strong>n depth</strong> = probe steps on one question (Pass/Continue).{' '}
+              Peak example: Green + Pass×8 + Done → n depth 9. Values below use real observations
+              only.
+            </p>
+            <div className="stat-grid" style={{ marginBottom: 24 }}>
+              <div
+                className="stat-card"
+                title="Number of finalized attempts where teacher selected Green (2) and entered probe"
+              >
+                <p className="stat-label">n count</p>
+                <p className="stat-value">{probeStats.count}</p>
+                <p className="meta">Green (2) entries · sample={total}</p>
+              </div>
+              <div
+                className="stat-card"
+                title="Mean probeCount among probed attempts"
+              >
+                <p className="stat-label">n depth avg</p>
+                <p className="stat-value">
+                  {probeStats.count > 0 ? probeStats.avg.toFixed(1) : '—'}
+                </p>
+                <p className="meta">Mean depth on probed Qs</p>
+              </div>
+              <div
+                className="stat-card"
+                title="Max probeCount among probed attempts (observed peak, not session ceiling)"
+              >
+                <p className="stat-label">n depth max</p>
+                <p className="stat-value">{probeStats.count > 0 ? probeStats.max : '—'}</p>
+                <p className="meta">Peak observed depth</p>
+              </div>
             </div>
           </div>
 

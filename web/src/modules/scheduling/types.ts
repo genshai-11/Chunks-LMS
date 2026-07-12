@@ -1,6 +1,8 @@
 export type ScheduleStatus = 'scheduled' | 'completed' | 'cancelled' | 'rescheduled'
 export type LearningSessionStatus = 'open' | 'completed'
 export type AttendanceStatus = 'present' | 'late' | 'absent' | 'excused'
+/** Baseline / exit labels for longitudinal RFC comparison */
+export type SessionKind = 'regular' | 'pretest' | 'posttest'
 
 export type ScheduledSession = {
   id: string
@@ -35,6 +37,16 @@ export type LearningSession = {
   ownerUserId: string | null
   /** ISO expiry for ownerUserId lock; null means no active lock. */
   lockExpiresAt: string | null
+  /**
+   * Session purpose for baseline comparison (pretest / posttest / regular).
+   * Defaults to regular when missing (legacy snapshots).
+   */
+  sessionKind: SessionKind
+  /**
+   * Learners included in capture for this session (subset of class roster).
+   * Null/empty means “all active enrollments at start” (legacy).
+   */
+  participantLearnerIds: string[] | null
 }
 
 export type AttendanceRecord = {

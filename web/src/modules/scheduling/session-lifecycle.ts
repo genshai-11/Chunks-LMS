@@ -302,6 +302,9 @@ export function startLearningSession(
     /** Soft lock owner (teacher user id) */
     ownerUserId?: string | null
     lockTtlMs?: number
+    sessionKind?: import('./types').SessionKind
+    /** Subset of class learners for this capture; null = all enrolled at start */
+    participantLearnerIds?: string[] | null
   },
 ): SchedulingResult<LearningSession> {
   const at = input.at ?? new Date().toISOString()
@@ -334,6 +337,10 @@ export function startLearningSession(
 
   const ownerUserId = input.ownerUserId ?? null
   const ttl = input.lockTtlMs ?? 5 * 60 * 1000
+  const participants = input.participantLearnerIds?.length
+    ? [...new Set(input.participantLearnerIds)]
+    : null
+
   const session: LearningSession = {
     id: newId('ls'),
     classId: input.classId,
@@ -348,6 +355,8 @@ export function startLearningSession(
     lockExpiresAt: ownerUserId
       ? new Date(new Date(at).getTime() + ttl).toISOString()
       : null,
+    sessionKind: input.sessionKind ?? 'regular',
+    participantLearnerIds: participants,
   }
 
   // Stamp the linked calendar slot with the real teaching day

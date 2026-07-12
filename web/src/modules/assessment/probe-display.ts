@@ -1,14 +1,15 @@
 /**
  * Teacher-facing probe labels.
  *
- * - **n** = probeCount = depth after Green (Continue / resolve steps).
- *   Each Continue increments n; Done/Fail may increment once when leaving probe_open.
- * - **depth max** = maxProbeCount = session ceiling shown to teachers (Continue is unlimited in domain).
+ * - **n depth** = probeCount after Green (Pass/Continue / resolve steps).
+ * - **n count** = session-level count of Green entries (see probe-metrics).
+ * - **ceiling** = maxProbeCount (configured session limit — not observed peak).
  *
- * Do not reuse "n" for sample size / finalized question count — use "finalized" or "N samples".
+ * Do not reuse "n" for sample size / finalized question count — use "finalized" or "sample".
  */
 
 import type { AssessmentSnapshot } from '../result-lifecycle/types'
+import { PROBE_METRIC_LABELS } from './probe-metrics'
 
 export function probeN(snapshot: Pick<AssessmentSnapshot, 'probeCount' | 'enteredProbeFlow'> | null | undefined): number | null {
   if (!snapshot) return null
@@ -16,6 +17,7 @@ export function probeN(snapshot: Pick<AssessmentSnapshot, 'probeCount' | 'entere
   return snapshot.probeCount
 }
 
+/** @deprecated Prefer naming as session ceiling, not n depth max */
 export function probeDepthMax(
   snapshot: Pick<AssessmentSnapshot, 'maxProbeCount'> | null | undefined,
   fallbackMax = 0,
@@ -26,16 +28,14 @@ export function probeDepthMax(
   return fallbackMax
 }
 
-/** Compact cell text: "n=2 · max 3" or "—" */
+/** Compact cell text: "n depth=2" or "—" */
 export function formatProbeCell(
   snapshot: AssessmentSnapshot | null | undefined,
-  sessionMaxProbe?: number,
+  _sessionMaxProbe?: number,
 ): string {
   const n = probeN(snapshot)
   if (n == null) return '—'
-  const max = probeDepthMax(snapshot, sessionMaxProbe ?? 0)
-  if (max > 0) return `n=${n} · max ${max}`
-  return `n=${n}`
+  return `${PROBE_METRIC_LABELS.nDepth}=${n}`
 }
 
 /** Live badge while probe is open */
@@ -44,7 +44,7 @@ export function formatProbeLive(
   maxProbeCount: number,
 ): { nLabel: string; depthLabel: string } {
   return {
-    nLabel: `n=${probeCount}`,
-    depthLabel: maxProbeCount > 0 ? `depth max ${maxProbeCount}` : 'depth max —',
+    nLabel: `${PROBE_METRIC_LABELS.nDepth}=${probeCount}`,
+    depthLabel: maxProbeCount > 0 ? `ceiling ${maxProbeCount}` : 'ceiling —',
   }
 }

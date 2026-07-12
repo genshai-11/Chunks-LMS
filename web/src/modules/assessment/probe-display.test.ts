@@ -19,13 +19,14 @@ describe('probe-display', () => {
     if (!r.ok) throw new Error(r.error)
     expect(probeN(r.snapshot)).toBe(1)
     expect(probeDepthMax(r.snapshot)).toBe(3)
-    expect(formatProbeCell(r.snapshot)).toBe('n=1 · max 3')
+    expect(formatProbeCell(r.snapshot)).toBe('n depth=1')
   })
 
-  it('formatProbeLive shows n and depth max', () => {
+  it('formatProbeLive shows n depth and ceiling', () => {
     expect(formatProbeLive(2, 5)).toEqual({
-      nLabel: 'n=2',
-      depthLabel: 'depth max 5',
+      nLabel: 'n depth=2',
+      depthLabel: 'ceiling 5',
     })
   })
 })
+

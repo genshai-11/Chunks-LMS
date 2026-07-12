@@ -28,6 +28,41 @@ function normalizeUser(u: DomainUser): DomainUser {
   return {
     ...u,
     avatarUrl: u.avatarUrl ?? null,
+    accountStatus: u.accountStatus === 'inactive' ? 'inactive' : 'active',
+  }
+}
+
+function normalizeScheduling(s: SchedulingState): SchedulingState {
+  return {
+    scheduledSessions: s.scheduledSessions ?? [],
+    attendance: s.attendance ?? [],
+    learningSessions: (s.learningSessions ?? []).map((ls) => ({
+      ...ls,
+      sessionKind: ls.sessionKind ?? 'regular',
+      participantLearnerIds: ls.participantLearnerIds ?? null,
+    })),
+  }
+}
+
+/** Ensure newly catalogued metrics appear after app upgrades. */
+function mergeMetricSettings(saved?: MetricSettingsState | null): MetricSettingsState {
+  const defaults = createDefaultMetricSettings()
+  if (!saved?.metrics?.length) return defaults
+  const byKey = new Map(saved.metrics.map((m) => [m.key, m]))
+  return {
+    defaultMaxProbeCount: saved.defaultMaxProbeCount ?? defaults.defaultMaxProbeCount,
+    metrics: defaults.metrics.map((d) => {
+      const prev = byKey.get(d.key)
+      if (!prev) return d
+      return {
+        ...d,
+        enabled: prev.enabled,
+        status: prev.status,
+        minSample: prev.minSample,
+        label: prev.label || d.label,
+        definition: prev.definition || d.definition,
+      }
+    }),
   }
 }
 
@@ -71,10 +106,10 @@ export function loadPersistedAppState(): PersistedAppState | null {
     return {
       version: 1,
       roster,
-      scheduling: data.scheduling ?? emptySchedulingState(),
+      scheduling: normalizeScheduling(data.scheduling ?? emptySchedulingState()),
       capture: data.capture ?? null,
       ledger: data.ledger ?? [],
-      metricSettings: data.metricSettings ?? createDefaultMetricSettings(),
+      metricSettings: mergeMetricSettings(data.metricSettings),
       auditLog: Array.isArray(data.auditLog) ? data.auditLog : [],
       savedAt: data.savedAt ?? new Date().toISOString(),
     }

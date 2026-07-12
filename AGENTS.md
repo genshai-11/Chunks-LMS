@@ -57,58 +57,56 @@ Main specs live under `openspec/specs/` (7 capabilities). No active change by de
 
 **No organization membership product for now.**
 
-| Role | Access | Notes |
+| Role | Access | Scope |
 |------|--------|--------|
-| **Admin** | Clerk sign-in | Staff only |
-| **Teacher** | Clerk sign-in | Staff only |
-| **Learner** | **Share link** | Profile **email** registered by staff → invite URL `/access?email=…` (copy/send). No Clerk learner account. |
+| **Admin** | Clerk sign-in | **Accounts** (teacher/learner active\|inactive, invites) + **Metrics** catalog (enable/label/min sample). Not courses/classes. |
+| **Teacher** | Clerk sign-in | **Learner tree first** → programs/classes/seating → start session (1..N learners, pretest/posttest) → observe → analysis. |
+| **Learner** | **Share link** | Profile **email** registered by Admin → invite URL `/access?email=…`. Read-only own progress. No Clerk learner account. |
 
 - Staff maps Clerk → domain admin/teacher (allowlist / `clerk_user_id`) — **not** membership UI.
 - Learner portal is read-only, scoped to the matched email profile (`activeLearnerUserId`).
 - Membership, multi-org, and Clerk-for-learners are **Phase F / later**.
 
-## LMS maturity (post-foundation review)
+### Flow (current product)
+
+```text
+Home → Admin (Clerk)  accounts (active/inactive · invites) · metrics catalog · analysis
+     → Teacher (Clerk) learners tree → classes/programs → start session (select HV)
+                              → observe (per-learner columns / learner-first) → analysis
+     → Learner (share link)   /access?email= → own attendance · analysis (enabled metrics only)
+```
+
+### Probe counters (product language)
+
+| Label | Meaning | Domain field |
+|-------|---------|--------------|
+| **n count** | Times teacher selected Green (2) / entered probe | `enteredProbeFlow` count |
+| **n depth** | Depth on one question (Pass/Continue + resolve) | `probeCount` |
+| **n depth max** | Peak observed depth in window | `max(probeCount)` on probed |
+| **n depth avg** | Mean depth on probed questions | mean `probeCount` / metric `n_depth_avg` |
+
+Never label finalized sample size as “n” — use `sample=` / finalized.  
+Session **ceiling** (`maxProbeCount`) is not “n depth max”.
+
+### Session labels
+
+`sessionKind`: `regular` | `pretest` | `posttest` — pretest/posttest for RFC baseline vs later change.
+
+### LMS maturity (post flow pivot)
 
 | Layer | ~% | Reality check |
 |-------|----|----------------|
-| Domain + ADRs + unit tests | 90–95 | Solid measurement core |
-| Role UI (CRUD / observe / analysis) | ~90 | Phase B: role homes + class context + Admin analysis |
-| Staff Clerk (Admin/Teacher gates) | ~75 | Phase A: StaffGate + role allowlist/metadata; `VITE_AUTH_BYPASS` for CI |
-| Learner share-link portal | ~90 | Phase A/B: invites + multi-enrollment class picker |
-| Multi-class / org-wide tracking | ~80 | Phase B/C: class context + Admin ops/attendance/audit |
-| Hosted multi-user production | ~85 | Phase E runbook + archived OpenSpec; human executes hosted checklist |
-| **Overall V1 production readiness** | **~88** | Engineering complete for first class; live sign-off via runbook |
+| Domain + ADRs + unit tests | 90–95 | Measurement core + n_* metrics |
+| Role UI (CRUD / observe / analysis) | ~90 | Admin accounts/metrics; Teacher learner-first |
+| Staff Clerk (Admin/Teacher gates) | ~75 | StaffGate + role allowlist; `VITE_AUTH_BYPASS` for CI |
+| Learner share-link portal | ~90 | Invites + multi-enrollment class picker |
+| Multi-class / teacher-owned programs | ~85 | Teacher creates program/class/seat |
+| Hosted multi-user production | ~85 | Runbook + OpenSpec archive |
+| **Overall V1 production readiness** | **~88** | First class shippable; live sign-off via runbook |
 
-### Flow today
+**Full plan (phases A–F):** [`docs/plans/lms-completion-by-role.md`](docs/plans/lms-completion-by-role.md) — still historical for A–E; product flow above is authoritative for Admin vs Teacher ownership.
 
-```text
-Home → Admin (Clerk)  courses/classes/people/enrollments/metrics
-     → Teacher (Clerk) schedule → live → observe → analysis
-     → Learner (share link) /access?email= → classes → attendance → analysis
-```
-
-### Blockers to “100% V1 by role”
-
-1. ~~Staff routes unguarded~~ — Phase A done.
-2. ~~Teacher class switcher / role homes~~ — Phase B done.
-3. ~~Learner invite UX~~ — Phase A; multi-enrollment picker Phase B.
-4. ~~Admin ops / attendance / audit~~ — Phase C done.
-5. ~~Full-replace sync clobber~~ — Phase D: upsert-only + session locks + integrity UI.
-
-**Full plan (phases A–F, role matrix, tickets):** [`docs/plans/lms-completion-by-role.md`](docs/plans/lms-completion-by-role.md)
-
-### Next product work (priority order)
-
-| Phase | Focus | Priority |
-|-------|--------|----------|
-| **A** | Clerk gate Admin/Teacher + learner share-link polish (**no membership**) | ✅ |
-| **B** | Role homes + class/enrollment switchers; Admin analysis any class | ✅ |
-| **C** | Ops tracking — session board, attendance matrix, audit + post-session correction | ✅ |
-| **D** | Entity-level sync; ledger from finalized events; no full-replace clobber | ✅ |
-| **E** | Hosted e2e + runbook; archive OpenSpec foundation | ✅ |
-| **F** | Later — membership, learner Clerk, notifications, multi-teacher, content/CCI/CVR | out of V1 |
-
-**V1 “100%” definition:** Admin/Teacher via Clerk provision + teach + audit; learners open **email invite links** and see only own progress; multi-class teacher works; one hosted course runs without data loss. Membership is not required for V1.
+**V1 “100%” definition:** Admin provisions accounts + metrics; teachers own learners/sessions/capture; learners open **email invite links** and see only own progress from **finalized real data**; multi-class teacher works; hosted course without data loss.
 
 ## Engineering constraints
 

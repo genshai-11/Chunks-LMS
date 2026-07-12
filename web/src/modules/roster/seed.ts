@@ -32,6 +32,7 @@ export function createSeedRoster(): RosterState {
       email: 'admin@example.com',
       avatarUrl: null,
       roles: ['admin'],
+      accountStatus: 'active',
     },
     {
       id: '22222222-2222-2222-2222-222222222202',
@@ -39,6 +40,7 @@ export function createSeedRoster(): RosterState {
       email: 'teacher@example.com',
       avatarUrl: null,
       roles: ['teacher'],
+      accountStatus: 'active',
     },
     {
       id: '22222222-2222-2222-2222-222222222203',
@@ -46,6 +48,7 @@ export function createSeedRoster(): RosterState {
       email: 'l1@example.com',
       avatarUrl: null,
       roles: ['learner'],
+      accountStatus: 'active',
     },
     {
       id: '22222222-2222-2222-2222-222222222204',
@@ -53,6 +56,7 @@ export function createSeedRoster(): RosterState {
       email: 'l2@example.com',
       avatarUrl: null,
       roles: ['learner'],
+      accountStatus: 'active',
     },
     {
       id: '22222222-2222-2222-2222-222222222205',
@@ -60,6 +64,7 @@ export function createSeedRoster(): RosterState {
       email: 'l3@example.com',
       avatarUrl: null,
       roles: ['learner'],
+      accountStatus: 'active',
     },
   ]
 

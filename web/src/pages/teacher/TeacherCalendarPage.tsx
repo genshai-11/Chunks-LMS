@@ -193,11 +193,17 @@ export function TeacherCalendarPage() {
       return err('Seat at least one learner before starting a live session')
     }
     const maxProbe = metricSettings.defaultMaxProbeCount
+    const participants =
+      preferredLearnerId && activeLearners.includes(preferredLearnerId)
+        ? [preferredLearnerId]
+        : activeLearners
     const r = startLearningSession(scheduling, {
       classId: classRow!.id,
       scheduledSessionId,
       maxProbeCount: maxProbe,
       ownerUserId: teacher!.id,
+      sessionKind: 'regular',
+      participantLearnerIds: participants,
     })
     if (!r.ok) return err(r.error)
     setScheduling(r.state)
@@ -206,7 +212,7 @@ export function TeacherCalendarPage() {
       createCaptureSession({
         learningSessionId: r.value.id,
         teacherUserId: teacher!.id,
-        learnerIds: activeLearners,
+        learnerIds: participants,
         maxProbeCount: maxProbe,
       }),
     )

@@ -74,11 +74,7 @@ export function ObserveHeatmap({
           const probeN =
             snap && (snap.enteredProbeFlow || snap.probeCount > 0) ? snap.probeCount : null
           const probeBit =
-            probeN != null
-              ? ` · n=${probeN}${snap?.maxProbeCount ? `/${snap.maxProbeCount}` : ''}`
-              : open
-                ? ' · probe open'
-                : ''
+            probeN != null ? ` · n depth=${probeN}` : open ? ' · probe open' : ''
           return (
             <button
               key={q.id}

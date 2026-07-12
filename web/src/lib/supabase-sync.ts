@@ -18,6 +18,7 @@ import {
   protectedLearningSessionIds,
   prunableIds,
 } from '../modules/sync/entity-sync'
+import { rolesForWorkspaceUser, userIdsForWorkspace } from '../modules/sync/workspace-graph'
 import { getSupabase } from './supabase'
 
 /** Loose client — foundation DB types are partial; cast for sync ops. */
@@ -31,6 +32,8 @@ export type WorkspaceSnapshot = {
 }
 
 export type SyncResult = { ok: true; source: 'supabase' | 'empty' } | { ok: false; error: string }
+
+export type VerifySyncResult = { ok: true } | { ok: false; error: string }
 
 export type ClerkWorkspaceIdentity = {
   clerkUserId: string
@@ -274,20 +277,6 @@ export async function loadWorkspaceFromSupabase(options?: {
       if (!prev.includes(role)) rolesByUser.set(uid, [...prev, role])
     }
 
-    const users: DomainUser[] = (usersRes.data ?? [])
-      .filter((u) => memberUserIds.has(u.id as string))
-      .map((u) => ({
-        id: u.id as string,
-        displayName: u.display_name as string,
-        email: (u.email as string | null) ?? null,
-        avatarUrl: ((u as { avatar_url?: string | null }).avatar_url ?? null) as string | null,
-        roles: rolesByUser.get(u.id as string) ?? ['learner'],
-        accountStatus:
-          (u as { account_status?: string | null }).account_status === 'inactive'
-            ? ('inactive' as const)
-            : ('active' as const),
-      }))
-
     const courseIds = new Set((coursesRes.data ?? []).map((c) => c.id as string))
     const courses = (coursesRes.data ?? []).map((c) => ({
       id: c.id as string,
@@ -322,6 +311,32 @@ export async function loadWorkspaceFromSupabase(options?: {
         startedAt: e.started_at as string,
         endedAt: (e.ended_at as string | null) ?? null,
       }))
+
+    const teacherUserIds = new Set(classes.map((cl) => cl.teacherUserId))
+    const learnerUserIds = new Set(enrollments.map((e) => e.learnerUserId))
+    const workspaceUserIds = userIdsForWorkspace({ classes, enrollments }, memberUserIds)
+
+    const users: DomainUser[] = (usersRes.data ?? [])
+      .filter((u) => workspaceUserIds.has(u.id as string))
+      .map((u) => {
+        const userId = u.id as string
+        return {
+          id: userId,
+          displayName: u.display_name as string,
+          email: (u.email as string | null) ?? null,
+          avatarUrl: ((u as { avatar_url?: string | null }).avatar_url ?? null) as string | null,
+          roles: rolesForWorkspaceUser({
+            userId,
+            membershipRoles: rolesByUser.get(userId) ?? [],
+            teacherUserIds,
+            learnerUserIds,
+          }),
+          accountStatus:
+            (u as { account_status?: string | null }).account_status === 'inactive'
+              ? ('inactive' as const)
+              : ('active' as const),
+        }
+      })
 
     const scheduledSessions = (scheduledRes.data ?? [])
       .filter((s) => classIds.has(s.class_id as string))
@@ -797,6 +812,32 @@ export async function saveWorkspaceToSupabase(
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Save failed' }
   }
+}
+
+export async function verifyWorkspacePersistence(snapshot: WorkspaceSnapshot): Promise<VerifySyncResult> {
+  const expected = normalizeIdsForDb(snapshot)
+  const loaded = await loadWorkspaceFromSupabase({ organizationId: expected.roster.organization.id })
+  if (!loaded.ok) return { ok: false, error: `reload failed: ${loaded.error}` }
+
+  const missing = [
+    ...missingIds('users', expected.roster.users.map((u) => u.id), loaded.data.roster.users.map((u) => u.id)),
+    ...missingIds('courses', expected.roster.courses.map((c) => c.id), loaded.data.roster.courses.map((c) => c.id)),
+    ...missingIds('classes', expected.roster.classes.map((c) => c.id), loaded.data.roster.classes.map((c) => c.id)),
+    ...missingIds('enrollments', expected.roster.enrollments.map((e) => e.id), loaded.data.roster.enrollments.map((e) => e.id)),
+    ...missingIds('scheduled', expected.scheduling.scheduledSessions.map((s) => s.id), loaded.data.scheduling.scheduledSessions.map((s) => s.id)),
+    ...missingIds('learning', expected.scheduling.learningSessions.map((s) => s.id), loaded.data.scheduling.learningSessions.map((s) => s.id)),
+    ...missingIds('attendance', expected.scheduling.attendance.map((a) => a.id), loaded.data.scheduling.attendance.map((a) => a.id)),
+  ]
+
+  if (missing.length > 0) {
+    return { ok: false, error: `missing after reload: ${missing.slice(0, 8).join(', ')}` }
+  }
+  return { ok: true }
+}
+
+function missingIds(label: string, expected: string[], actual: string[]): string[] {
+  const actualSet = new Set(actual)
+  return expected.filter((id) => !actualSet.has(id)).map((id) => `${label}:${id}`)
 }
 
 export function isSupabaseConfigured(): boolean {

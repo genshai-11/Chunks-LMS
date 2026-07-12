@@ -12,6 +12,7 @@ import {
   loadWorkspaceFromSupabase,
   normalizeIdsForDb,
   saveWorkspaceToSupabase,
+  verifyWorkspacePersistence,
 } from '../lib/supabase-sync'
 import { mergeScheduling } from '../modules/sync/entity-sync'
 import { chooseBootstrapSource } from '../modules/sync/bootstrap-policy'
@@ -97,7 +98,7 @@ function rebaseRosterOrganization(
 }
 
 function syncPhaseError(
-  phase: 'auth' | 'provision' | 'load' | 'write' | 'reload',
+  phase: 'auth' | 'provision' | 'load' | 'write' | 'reload' | 'verify',
   message: string,
 ): string {
   return `[${phase}] ${message}`
@@ -446,6 +447,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       })
       allowEmptyWipeOnce.current = false
       if (result.ok) {
+        const verified = await verifyWorkspacePersistence(normalized)
+        if (!verified.ok) {
+          setBackendStatus('error')
+          setBackendError(syncPhaseError('verify', verified.error))
+          return false
+        }
         setBackendStatus('online')
         setBackendError(null)
         setLastSyncedAt(new Date().toISOString())

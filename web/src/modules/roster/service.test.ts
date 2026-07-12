@@ -193,6 +193,33 @@ describe('admin roster workflows', () => {
     ).toBe(false)
   })
 
+  it('enrolls an existing learner profile when create+enroll receives the same email', () => {
+    let state = createSeedRoster()
+    const classId = state.classes[0]!.id
+    const first = state.enrollments.find((e) => e.classId === classId && e.status === 'active')!
+    const freed = endEnrollment(state, first.id)
+    expect(freed.ok).toBe(true)
+    if (!freed.ok) return
+    state = freed.state
+
+    const existing = addLearnerProfile(state, {
+      displayName: 'Existing Learner',
+      email: 'existing@example.com',
+    })
+    expect(existing.ok).toBe(true)
+    if (!existing.ok) return
+
+    const result = createLearnerAndEnroll(existing.state, classId, {
+      displayName: 'Existing Learner Updated Label',
+      email: 'existing@example.com',
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.learner.id).toBe(existing.value.id)
+    expect(result.value.enrollment.learnerUserId).toBe(existing.value.id)
+    expect(result.state.users.filter((u) => u.email === 'existing@example.com')).toHaveLength(1)
+  })
+
   it('rejects createLearnerAndEnroll when class is full', () => {
     const seed = createSeedRoster()
     const classId = seed.classes[0]!.id

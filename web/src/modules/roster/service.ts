@@ -749,6 +749,19 @@ export function createLearnerAndEnroll(
   input: { displayName: string; email?: string | null; avatarUrl?: string | null },
   at = new Date().toISOString(),
 ): RosterResult<{ learner: DomainUser; enrollment: Enrollment }> {
+  const email = normalizeLearnerEmail(input.email)
+  const existing = email ? findLearnerByEmail(state, email) : null
+
+  if (existing) {
+    const enrolled = enrollLearner(state, classId, existing.id, at)
+    if (!enrolled.ok) return enrolled
+    return {
+      ok: true,
+      value: { learner: existing, enrollment: enrolled.value },
+      state: enrolled.state,
+    }
+  }
+
   const created = addLearnerProfile(state, input)
   if (!created.ok) return created
 

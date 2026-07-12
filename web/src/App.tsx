@@ -17,7 +17,6 @@ import { AdminAuditPage } from './pages/admin/AdminAuditPage'
 import { AdminIntegrityPage } from './pages/admin/AdminIntegrityPage'
 import { TeacherLayout } from './pages/teacher/TeacherLayout'
 import { TeacherOverviewPage } from './pages/teacher/TeacherOverviewPage'
-import { TeacherCalendarPage } from './pages/teacher/TeacherCalendarPage'
 import { TeacherSessionPage } from './pages/teacher/TeacherSessionPage'
 import { TeacherObservePage } from './pages/teacher/TeacherObservePage'
 import { TeacherAnalysisPage } from './pages/teacher/TeacherAnalysisPage'
@@ -83,7 +82,6 @@ export default function App() {
                 <Route index element={<TeacherOverviewPage />} />
                 <Route path="classes" element={<TeacherClassesPage />} />
                 <Route path="learner/:learnerId" element={<TeacherLearnerProfilePage />} />
-                <Route path="calendar" element={<TeacherCalendarPage />} />
                 <Route path="session" element={<TeacherSessionPage />} />
                 <Route path="archive" element={<TeacherArchivePage />} />
                 <Route path="analysis" element={<TeacherAnalysisPage />} />

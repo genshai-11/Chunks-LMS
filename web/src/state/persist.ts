@@ -7,7 +7,7 @@ import type { OpsAuditEvent } from '../modules/ops/types'
 import type { ResultRecord } from '../modules/reporting/progress'
 import { createEmptyRoster, LOCAL_ORG_ID } from '../modules/roster/seed'
 import { normalizeCourseSchedule } from '../modules/roster/schedule'
-import type { Course, DomainUser, RosterState } from '../modules/roster/types'
+import type { Class, DomainUser, RosterState } from '../modules/roster/types'
 import { emptySchedulingState } from '../modules/scheduling/session-lifecycle'
 import type { SchedulingState } from '../modules/scheduling/types'
 
@@ -66,7 +66,7 @@ function mergeMetricSettings(saved?: MetricSettingsState | null): MetricSettings
   }
 }
 
-function normalizeCourse(c: Course): Course {
+function normalizeClass(c: Class): Class {
   return {
     ...c,
     schedule: normalizeCourseSchedule(c.schedule) ?? c.schedule ?? null,
@@ -90,16 +90,14 @@ export function loadPersistedAppState(): PersistedAppState | null {
     const roster: RosterState = {
       organization: { ...rawOrg, id: orgId },
       users: (data.roster.users ?? []).map(normalizeUser),
-      courses: (data.roster.courses ?? []).map((c) =>
-        normalizeCourse({
-          ...c,
-          organizationId:
-            c.organizationId === 'org-local' || c.organizationId === rawOrg.id
-              ? orgId
-              : c.organizationId,
-        }),
-      ),
-      classes: data.roster.classes ?? [],
+      courses: (data.roster.courses ?? []).map((c) => ({
+        ...c,
+        organizationId:
+          c.organizationId === 'org-local' || c.organizationId === rawOrg.id
+            ? orgId
+            : c.organizationId,
+      })),
+      classes: (data.roster.classes ?? []).map(normalizeClass),
       enrollments: data.roster.enrollments ?? [],
     }
 

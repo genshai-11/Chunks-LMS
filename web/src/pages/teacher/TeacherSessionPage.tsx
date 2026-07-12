@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  CalendarDays,
   CheckCircle2,
   ClipboardCheck,
   Eye,
@@ -70,7 +69,7 @@ export function TeacherSessionPage() {
     syncNow,
   } = useAppState()
   const { message, error, ok, err } = useFlash()
-  const { classRow, course, teacher } = useTeacherClassContext()
+  const { classRow, teacher } = useTeacherClassContext()
   const [searchParams] = useSearchParams()
   const preselect = searchParams.get('learner')
 
@@ -110,7 +109,7 @@ export function TeacherSessionPage() {
   }, [enrolledIds, preselect, openSession])
 
   const totalDays =
-    course?.schedule?.sessionCount ??
+    classRow?.schedule?.sessionCount ??
     scheduling.scheduledSessions.filter(
       (s) =>
         s.classId === classRow?.id && s.status !== 'cancelled' && s.status !== 'rescheduled',
@@ -379,7 +378,7 @@ export function TeacherSessionPage() {
         <EmptyState
           icon={Radio}
           title={selectedIds.length ? `Ready · ${selectedIds.length} learner(s)` : 'Select learners'}
-          description="Start the next teaching day, or open a planned slot on Schedule."
+          description="Start the next teaching day."
           action={
             <div className="btn-row">
               <button
@@ -391,10 +390,6 @@ export function TeacherSessionPage() {
                 <Play className="h-4 w-4" aria-hidden />
                 <span>Start next day</span>
               </button>
-              <Link to="/teacher/calendar" className="btn ghost">
-                <CalendarDays className="h-4 w-4" aria-hidden />
-                <span>Schedule</span>
-              </Link>
             </div>
           }
         />

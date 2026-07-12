@@ -20,9 +20,7 @@ import {
   PanelLeftOpen,
   Plus,
   Sparkles,
-  Trophy,
   X,
-  Zap,
 } from 'lucide-react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import {
@@ -185,7 +183,7 @@ export function TeacherObservePage() {
 
   const avatarSize = !mapOpen ? 'sm' : railWidth > 300 ? 'xl' : railWidth > 200 ? 'lg' : 'md'
 
-  const { classRow, course, teacher } = useTeacherClassContext()
+  const { classRow, teacher } = useTeacherClassContext()
   const openSession = scheduling.learningSessions.find(
     (s) => s.classId === classRow?.id && s.status === 'open',
   )
@@ -276,8 +274,8 @@ export function TeacherObservePage() {
     (s) => s.classId === classRow?.id && s.status !== 'cancelled' && s.status !== 'rescheduled',
   ).length
   const totalDays =
-    course?.schedule?.sessionCount && course.schedule.sessionCount > 0
-      ? course.schedule.sessionCount
+    classRow?.schedule?.sessionCount && classRow.schedule.sessionCount > 0
+      ? classRow.schedule.sessionCount
       : plannedCount > 0
         ? plannedCount
         : null
@@ -893,38 +891,19 @@ export function TeacherObservePage() {
               ) : null}
             </div>
 
-            {reaction ? (
+            {reaction && reaction.kind === 'happy' ? (
               <div
                 key={reaction.id}
-                className={`observe-react observe-react-${reaction.kind}`}
+                className="observe-react observe-react-happy"
                 aria-hidden
               >
                 <span className="observe-react-symbol">
-                  {reaction.kind === 'celebrate' ? (
-                    <Trophy aria-hidden />
-                  ) : reaction.kind === 'happy' ? (
-                    <Check aria-hidden />
-                  ) : (
-                    <Zap aria-hidden />
-                  )}
+                  <Check aria-hidden />
                 </span>
                 <span className="observe-react-label">
-                  {reaction.kind === 'celebrate'
-                    ? 'Xuất sắc!'
-                    : reaction.kind === 'happy'
-                      ? 'Tập trung tốt!'
-                      : 'Tiếp tục cố gắng!'}
+                  Tập trung tốt!
                 </span>
-                {reaction.kind !== 'fight' ? (
-                  <Sparkles className="observe-react-sparkles" aria-hidden />
-                ) : null}
-                {reaction.kind === 'celebrate' ? (
-                  <span className="observe-react-confetti" aria-hidden>
-                    {Array.from({ length: 10 }, (_, i) => (
-                      <i key={i} />
-                    ))}
-                  </span>
-                ) : null}
+                <Sparkles className="observe-react-sparkles" aria-hidden />
                 <span className="observe-react-burst" />
               </div>
             ) : null}

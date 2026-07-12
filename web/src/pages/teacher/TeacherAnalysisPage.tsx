@@ -42,11 +42,11 @@ export function TeacherAnalysisPage() {
         mode="teacher"
         courseId={course.id}
         courseCode={course.code}
-        courseStart={course.startsOn ?? '2026-07-01'}
-        courseEnd={course.endsOn}
+        courseStart={classRow.startsOn ?? '2026-07-01'}
+        courseEnd={classRow.endsOn}
         classId={classRow.id}
         className={classRow.name}
-        totalDays={course.schedule?.sessionCount ?? null}
+        totalDays={classRow.schedule?.sessionCount ?? null}
         ledger={ledger}
         users={[
           ...learners.filter((u): u is NonNullable<typeof u> => Boolean(u)),

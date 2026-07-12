@@ -385,7 +385,7 @@ export function LearnerEnrollmentsPage() {
                         {course?.name ? ` · ${course.name}` : ''}
                       </td>
                       <td className="text-xs text-slate-600">
-                        {course?.schedule ? formatScheduleLabel(course.schedule) : '—'}
+                        {cl?.schedule ? formatScheduleLabel(cl.schedule) : '—'}
                       </td>
                       <td>
                         <span className={`badge${e.status === 'active' ? ' success' : ''}`}>

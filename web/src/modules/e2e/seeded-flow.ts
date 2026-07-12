@@ -150,7 +150,7 @@ export function runSeededEndToEndFlow(now = '2026-07-11T10:00:00.000Z'): SeededF
 
   const window = resolveReportWindow({
     kind: 'course',
-    courseStart: course.startsOn ?? '2026-07-01',
+    courseStart: classRow.startsOn ?? '2026-07-01',
     courseEnd: '2026-12-31',
   })
   const report = buildCourseProgressReport(ledger, course.id, window, {

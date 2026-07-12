@@ -54,7 +54,7 @@ export function activeEnrollmentsForClass(state: RosterState, classId: string): 
   return state.enrollments.filter((e) => e.classId === classId && e.status === 'active')
 }
 
-function resolveCourseDates(input: {
+function resolveClassDates(input: {
   startsOn?: string | null
   endsOn?: string | null
   schedule?: CourseSchedule | null
@@ -83,9 +83,6 @@ export function createCourse(
   input: {
     code: string
     name: string
-    startsOn?: string | null
-    endsOn?: string | null
-    schedule?: CourseSchedule | null
   },
 ): RosterResult<Course> {
   const code = input.code.trim()
@@ -95,29 +92,12 @@ export function createCourse(
     return { ok: false, error: `Course code ${code} already exists` }
   }
 
-  const normalizedSchedule = normalizeCourseSchedule(input.schedule ?? null)
-  if (input.schedule && (!normalizedSchedule || normalizedSchedule.slots.length === 0)) {
-    return { ok: false, error: 'Add at least one day and time for auto-schedule' }
-  }
-  if (normalizedSchedule && normalizedSchedule.sessionCount < 1) {
-    return { ok: false, error: 'Session count must be at least 1' }
-  }
-
-  const dates = resolveCourseDates({
-    startsOn: input.startsOn ?? null,
-    endsOn: input.endsOn ?? null,
-    schedule: normalizedSchedule,
-  })
-
   const course: Course = {
     id: newId('course'),
     organizationId: state.organization.id,
     code,
     name,
     status: 'active',
-    startsOn: dates.startsOn,
-    endsOn: dates.endsOn,
-    schedule: dates.schedule,
   }
 
   return {
@@ -134,9 +114,6 @@ export function updateCourse(
     code?: string
     name?: string
     status?: Course['status']
-    startsOn?: string | null
-    endsOn?: string | null
-    schedule?: CourseSchedule | null
   },
 ): RosterResult<Course> {
   const course = state.courses.find((c) => c.id === courseId)
@@ -154,28 +131,11 @@ export function updateCourse(
     return { ok: false, error: `Course code ${code} already exists` }
   }
 
-  const nextSchedule =
-    input.schedule !== undefined
-      ? normalizeCourseSchedule(input.schedule)
-      : normalizeCourseSchedule(course.schedule)
-  if (input.schedule !== undefined && input.schedule && (!nextSchedule || nextSchedule.slots.length === 0)) {
-    return { ok: false, error: 'Add at least one day and time for auto-schedule' }
-  }
-
-  const dates = resolveCourseDates({
-    startsOn: input.startsOn !== undefined ? input.startsOn : course.startsOn,
-    endsOn: input.endsOn !== undefined ? input.endsOn : course.endsOn,
-    schedule: nextSchedule,
-  })
-
   const updated: Course = {
     ...course,
     code,
     name,
     status: input.status ?? course.status,
-    startsOn: dates.startsOn,
-    endsOn: dates.endsOn,
-    schedule: dates.schedule,
   }
 
   return {
@@ -188,14 +148,14 @@ export function updateCourse(
   }
 }
 
-/** Preview auto end date + occurrence list for a course schedule. */
-export function previewCourseSchedule(course: Pick<Course, 'startsOn' | 'schedule'>) {
-  if (!course.startsOn || !course.schedule) {
+/** Preview auto end date + occurrence list for a class schedule. */
+export function previewClassSchedule(c: Pick<Class, 'startsOn' | 'schedule'>) {
+  if (!c.startsOn || !c.schedule) {
     return { endsOn: null, occurrences: [], sessionCount: 0 }
   }
-  const schedule = normalizeCourseSchedule(course.schedule)
+  const schedule = normalizeCourseSchedule(c.schedule)
   if (!schedule) return { endsOn: null, occurrences: [], sessionCount: 0 }
-  return materializeCourseSchedule(course.startsOn, schedule)
+  return materializeCourseSchedule(c.startsOn, schedule)
 }
 
 /** Normalize emails for uniqueness checks (case-insensitive). */
@@ -454,6 +414,9 @@ export function createClass(
     name: string
     teacherUserId: string
     capacity?: number
+    startsOn?: string | null
+    endsOn?: string | null
+    schedule?: CourseSchedule | null
   },
 ): RosterResult<Class> {
   const course = state.courses.find((c) => c.id === input.courseId && c.status === 'active')
@@ -470,6 +433,20 @@ export function createClass(
   const name = input.name.trim()
   if (!name) return { ok: false, error: 'Class name is required' }
 
+  const normalizedSchedule = normalizeCourseSchedule(input.schedule ?? null)
+  if (input.schedule && (!normalizedSchedule || normalizedSchedule.slots.length === 0)) {
+    return { ok: false, error: 'Add at least one day and time for auto-schedule' }
+  }
+  if (normalizedSchedule && normalizedSchedule.sessionCount < 1) {
+    return { ok: false, error: 'Session count must be at least 1' }
+  }
+
+  const dates = resolveClassDates({
+    startsOn: input.startsOn ?? null,
+    endsOn: input.endsOn ?? null,
+    schedule: normalizedSchedule,
+  })
+
   // V1: one teacher stored as teacherUserId — reassignment replaces, never dual active teachers.
   const klass: Class = {
     id: newId('class'),
@@ -478,6 +455,9 @@ export function createClass(
     capacity,
     teacherUserId: teacher.id,
     status: 'active',
+    startsOn: dates.startsOn,
+    endsOn: dates.endsOn,
+    schedule: dates.schedule,
   }
 
   return {
@@ -496,6 +476,9 @@ export function updateClass(
     teacherUserId?: string
     capacity?: number
     status?: Class['status']
+    startsOn?: string | null
+    endsOn?: string | null
+    schedule?: CourseSchedule | null
   },
 ): RosterResult<Class> {
   const klass = state.classes.find((c) => c.id === classId)
@@ -528,6 +511,20 @@ export function updateClass(
   const name = input.name !== undefined ? input.name.trim() : klass.name
   if (!name) return { ok: false, error: 'Class name is required' }
 
+  const nextSchedule =
+    input.schedule !== undefined
+      ? normalizeCourseSchedule(input.schedule)
+      : normalizeCourseSchedule(klass.schedule)
+  if (input.schedule !== undefined && input.schedule && (!nextSchedule || nextSchedule.slots.length === 0)) {
+    return { ok: false, error: 'Add at least one day and time for auto-schedule' }
+  }
+
+  const dates = resolveClassDates({
+    startsOn: input.startsOn !== undefined ? input.startsOn : klass.startsOn,
+    endsOn: input.endsOn !== undefined ? input.endsOn : klass.endsOn,
+    schedule: nextSchedule,
+  })
+
   const updated: Class = {
     ...klass,
     courseId,
@@ -535,6 +532,9 @@ export function updateClass(
     capacity,
     teacherUserId,
     status: input.status ?? klass.status,
+    startsOn: dates.startsOn,
+    endsOn: dates.endsOn,
+    schedule: dates.schedule,
   }
 
   return {

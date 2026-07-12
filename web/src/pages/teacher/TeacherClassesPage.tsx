@@ -15,7 +15,7 @@ import {
 import { useMemo, useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 
-import { readImageAsDataUrl } from '../../lib/readImageFile'
+
 import { Flash } from '../../components/Flash'
 import { PageHeader } from '../../components/PageHeader'
 import { UserAvatar } from '../../components/UserAvatar'
@@ -40,12 +40,16 @@ import {
 import { useAppState } from '../../state/useAppState'
 import { useStaffSession } from '../../auth/useStaffSession'
 
-type Draft = { name: string; courseId: string; capacity: number }
+type Draft = {
+  name: string
+  courseId: string
+  capacity: number
+  startsOn: string
+  sessionCount: number
+}
 type CourseDraft = {
   code: string
   name: string
-  startsOn: string
-  sessionCount: number
 }
 
 export function TeacherClassesPage() {
@@ -93,16 +97,18 @@ export function TeacherClassesPage() {
     name: '',
     courseId: courses[0]?.id ?? '',
     capacity: 3,
+    startsOn: new Date().toISOString().slice(0, 10),
+    sessionCount: 15,
   })
   const [editingClassId, setEditingClassId] = useState<string | null>(null)
   const [editClassName, setEditClassName] = useState('')
   const [editClassCapacity, setEditClassCapacity] = useState(3)
+  const [editClassStartsOn, setEditClassStartsOn] = useState('')
+  const [editClassSessionCount, setEditClassSessionCount] = useState(15)
 
   const [courseDraft, setCourseDraft] = useState<CourseDraft>({
     code: '',
     name: '',
-    startsOn: new Date().toISOString().slice(0, 10),
-    sessionCount: 15,
   })
 
   const activeClassRows = useMemo(() => classes.filter((c) => c.status === 'active'), [classes])
@@ -308,39 +314,21 @@ export function TeacherClassesPage() {
           description="Create a learner profile and enroll them into an active class immediately."
         >
           <div className="grid gap-4 md:grid-cols-[auto_1fr] items-start mb-3">
-            <div className="flex flex-col gap-2 items-center p-3 border border-dashed border-slate-200 rounded-2xl bg-slate-50 min-w-[120px]">
-              <UserAvatar
+            <div className="flex flex-col items-center gap-2 p-4 border border-slate-200 rounded-2xl bg-slate-50 min-w-[140px] text-center">
+              <EditableAvatar
                 name={newLearnerName || 'New Learner'}
                 avatarUrl={newLearnerAvatarUrl}
                 size="xl"
+                onSave={async (url) => {
+                  setNewLearnerAvatarUrl(url)
+                }}
               />
-              <label className="btn ghost cursor-pointer flex items-center gap-1.5 text-xs py-1 px-2.5">
-                <span>Upload</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="sr-only"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0]
-                    if (!file) return
-                    try {
-                      const dataUrl = await readImageAsDataUrl(file)
-                      setNewLearnerAvatarUrl(dataUrl)
-                    } catch (ex) {
-                      err(ex instanceof Error ? ex.message : 'Could not read image')
-                    }
-                  }}
-                />
-              </label>
-              {newLearnerAvatarUrl && (
-                <button
-                  type="button"
-                  className="text-[11px] text-red-600 hover:underline border-0 bg-transparent cursor-pointer font-medium"
-                  onClick={() => setNewLearnerAvatarUrl(null)}
-                >
-                  Remove
-                </button>
-              )}
+              <span className="text-[11px] text-slate-500 font-semibold mt-1">
+                Upload Avatar
+              </span>
+              <span className="text-[9px] text-slate-400">
+                Click camera to choose
+              </span>
             </div>
 
             <div className="form-grid teacher-class-form" style={{ marginTop: 0 }}>
@@ -421,9 +409,9 @@ export function TeacherClassesPage() {
                     {course.code}
                   </span>
                 )}
-                {course?.startsOn && (
+                {c.startsOn && (
                   <span className="badge text-[10px] bg-red-50 text-red-700 border border-red-100/50 px-1.5 py-0.5 rounded">
-                    Starts: {course.startsOn}
+                    Starts: {c.startsOn}
                   </span>
                 )}
                 <span className="badge bg-slate-200 text-slate-800 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
@@ -649,7 +637,7 @@ export function TeacherClassesPage() {
           <Panel
             icon={Plus}
             title="Create program (course)"
-            description="Label + start date + planned sessions (Day 1…N). Used on the learner tree."
+            description="Label course (e.g. ERE Level B) — used on the learner tree."
           >
             <div className="form-grid teacher-class-form">
               <label>
@@ -668,25 +656,6 @@ export function TeacherClassesPage() {
                   placeholder="ERE Level B"
                 />
               </label>
-              <label>
-                Start date
-                <input
-                  type="date"
-                  value={courseDraft.startsOn}
-                  onChange={(e) => setCourseDraft((c) => ({ ...c, startsOn: e.target.value }))}
-                />
-              </label>
-              <label>
-                Planned sessions
-                <input
-                  type="number"
-                  min={1}
-                  value={courseDraft.sessionCount}
-                  onChange={(e) =>
-                    setCourseDraft((c) => ({ ...c, sessionCount: Number(e.target.value) || 15 }))
-                  }
-                />
-              </label>
             </div>
             <button
               type="button"
@@ -696,16 +665,11 @@ export function TeacherClassesPage() {
                 const result = createCourse(roster, {
                   code: courseDraft.code,
                   name: courseDraft.name,
-                  startsOn: courseDraft.startsOn || null,
-                  schedule: defaultCourseSchedule({
-                    sessionCount: courseDraft.sessionCount,
-                    timeZone: 'Asia/Ho_Chi_Minh',
-                  }),
                 })
                 if (!result.ok) return err(result.error)
                 setRoster(result.state)
                 setDraft((d) => ({ ...d, courseId: result.value.id }))
-                setCourseDraft((c) => ({ ...c, code: '', name: '' }))
+                setCourseDraft({ code: '', name: '' })
                 ok(`Program ${result.value.code} created`)
               }}
             >
@@ -716,7 +680,7 @@ export function TeacherClassesPage() {
           <Panel
             icon={Plus}
             title="Create class"
-            description="The new class is assigned to your Teacher profile."
+            description="The new class is assigned to your Teacher profile, carrying its own start date and schedule."
           >
             <div className="form-grid teacher-class-form">
               <label>
@@ -726,6 +690,7 @@ export function TeacherClassesPage() {
                   onChange={(event) =>
                     setDraft((current) => ({ ...current, name: event.target.value }))
                   }
+                  placeholder="e.g. Class B-1"
                 />
               </label>
               <label>
@@ -754,6 +719,25 @@ export function TeacherClassesPage() {
                   }
                 />
               </label>
+              <label>
+                Start date
+                <input
+                  type="date"
+                  value={draft.startsOn}
+                  onChange={(e) => setDraft((c) => ({ ...c, startsOn: e.target.value }))}
+                />
+              </label>
+              <label>
+                Planned sessions
+                <input
+                  type="number"
+                  min={1}
+                  value={draft.sessionCount}
+                  onChange={(e) =>
+                    setDraft((c) => ({ ...c, sessionCount: Number(e.target.value) || 15 }))
+                  }
+                />
+              </label>
             </div>
             <button
               type="button"
@@ -765,6 +749,11 @@ export function TeacherClassesPage() {
                   name: draft.name,
                   teacherUserId: teacher.id,
                   capacity: draft.capacity,
+                  startsOn: draft.startsOn || null,
+                  schedule: defaultCourseSchedule({
+                    sessionCount: draft.sessionCount,
+                    timeZone: 'Asia/Ho_Chi_Minh',
+                  }),
                 })
                 if (!result.ok) return err(result.error)
                 setRoster(result.state)
@@ -813,6 +802,23 @@ export function TeacherClassesPage() {
                               onChange={(event) => setEditClassCapacity(Number(event.target.value))}
                             />
                           </label>
+                          <label>
+                            Start date
+                            <input
+                              type="date"
+                              value={editClassStartsOn}
+                              onChange={(event) => setEditClassStartsOn(event.target.value)}
+                            />
+                          </label>
+                          <label>
+                            Planned sessions
+                            <input
+                              type="number"
+                              min={1}
+                              value={editClassSessionCount}
+                              onChange={(event) => setEditClassSessionCount(Number(event.target.value) || 15)}
+                            />
+                          </label>
                         </div>
                       ) : (
                         <div>
@@ -820,6 +826,11 @@ export function TeacherClassesPage() {
                           <p>
                             {course?.code ?? 'Course'} · capacity {row.capacity} · {row.status}
                           </p>
+                          {row.startsOn && (
+                            <p className="meta mt-1">
+                              Starts: {row.startsOn} · {row.schedule?.sessionCount ?? '—'} session(s)
+                            </p>
+                          )}
                         </div>
                       )}
                       <div className="row-actions">
@@ -832,6 +843,11 @@ export function TeacherClassesPage() {
                                 const result = updateClass(roster, row.id, {
                                   name: editClassName,
                                   capacity: editClassCapacity,
+                                  startsOn: editClassStartsOn || null,
+                                  schedule: defaultCourseSchedule({
+                                    sessionCount: editClassSessionCount,
+                                    timeZone: 'Asia/Ho_Chi_Minh',
+                                  }),
                                 })
                                 if (!result.ok) return err(result.error)
                                 setRoster(result.state)
@@ -858,6 +874,8 @@ export function TeacherClassesPage() {
                                 setEditingClassId(row.id)
                                 setEditClassName(row.name)
                                 setEditClassCapacity(row.capacity)
+                                setEditClassStartsOn(row.startsOn ?? '')
+                                setEditClassSessionCount(row.schedule?.sessionCount ?? 15)
                               }}
                             >
                               <Pencil className="h-4 w-4" aria-hidden /> Edit

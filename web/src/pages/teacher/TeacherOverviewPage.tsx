@@ -56,7 +56,7 @@ export function TeacherOverviewPage() {
     (s) => s.classId === classRow?.id && s.status === 'open',
   )
   const plannedSessions =
-    course?.schedule?.sessionCount ??
+    classRow?.schedule?.sessionCount ??
     scheduling.scheduledSessions.filter(
       (s) => s.classId === classRow?.id && s.status !== 'cancelled' && s.status !== 'rescheduled',
     ).length ??
@@ -143,7 +143,7 @@ export function TeacherOverviewPage() {
         kicker={course?.code ?? 'Program'}
         title="Learner dashboard"
         subtitle={`${seats} learners · ${course?.name ?? classRow.name} · start ${
-          course?.startsOn ?? '—'
+          classRow?.startsOn ?? '—'
         } · ${taughtDays}/${plannedSessions || '—'} sessions${
           hasMultiple ? ` · ${options.length} classes` : ''
         }`}

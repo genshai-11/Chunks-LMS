@@ -1,6 +1,6 @@
 import { newId } from '../roster/seed'
 import { materializeCourseSchedule } from './recurrence'
-import type { Course } from '../roster/types'
+import type { Class } from '../roster/types'
 import { normalizeCourseSchedule } from '../roster/schedule'
 import type {
   AttendanceRecord,
@@ -136,20 +136,20 @@ export function createScheduledSession(
  * Materialize course auto-schedule into Scheduled Sessions for a class.
  * Skips dates that already have a scheduled (non-cancelled) session same day.
  */
-export function applyCourseScheduleToClass(
+export function applyClassScheduleToClass(
   state: SchedulingState,
   input: {
     classId: string
-    course: Course
+    classRow: Class
   },
 ): SchedulingResult<ScheduledSession[]> {
-  const { classId, course } = input
-  const schedule = normalizeCourseSchedule(course.schedule)
-  if (!course.startsOn || !schedule) {
-    return { ok: false, error: 'Course needs a start date and auto-schedule pattern' }
+  const { classId, classRow } = input
+  const schedule = normalizeCourseSchedule(classRow.schedule)
+  if (!classRow.startsOn || !schedule) {
+    return { ok: false, error: 'Class needs a start date and auto-schedule pattern' }
   }
 
-  const plan = materializeCourseSchedule(course.startsOn, schedule)
+  const plan = materializeCourseSchedule(classRow.startsOn, schedule)
 
   if (plan.occurrences.length === 0) {
     return { ok: false, error: 'No sessions generated from course schedule' }

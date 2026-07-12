@@ -70,8 +70,8 @@ export function LearnerProgressPage() {
           label="Buổi tracked"
           value={sessionsWithData.length}
           hint={
-            course.schedule
-              ? `of ${course.schedule.sessionCount} planned`
+            classRow?.schedule
+              ? `of ${classRow.schedule.sessionCount} planned`
               : 'with finalized results'
           }
         />
@@ -129,8 +129,8 @@ export function LearnerProgressPage() {
       <ProgressReportPanel
         title="Window report"
         courseId={course.id}
-        courseStart={course.startsOn ?? '2026-07-01'}
-        courseEnd={course.endsOn}
+        courseStart={classRow?.startsOn ?? '2026-07-01'}
+        courseEnd={classRow?.endsOn ?? null}
         ledger={ledger}
         users={roster.users}
         learnerUserId={learner.id}

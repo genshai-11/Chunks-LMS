@@ -37,8 +37,6 @@ describe('admin roster workflows', () => {
     const result = createCourse(seed, {
       code: 'ERE-Level-A',
       name: 'ERE Level A',
-      startsOn: '2026-07-01',
-      endsOn: '2026-12-31',
     })
     expect(result.ok).toBe(true)
     if (!result.ok) return

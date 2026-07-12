@@ -54,8 +54,8 @@ export function TeacherProgressPage() {
         <StatCard
           icon={ListOrdered}
           label="Planned buổi"
-          value={planned.length || course.schedule?.sessionCount || 0}
-          hint={course.schedule ? `${course.schedule.sessionCount} in plan` : 'scheduled'}
+          value={planned.length || classRow?.schedule?.sessionCount || 0}
+          hint={classRow?.schedule ? `${classRow.schedule.sessionCount} in plan` : 'scheduled'}
         />
         <StatCard
           icon={ChartColumn}
@@ -117,8 +117,8 @@ export function TeacherProgressPage() {
       <ProgressReportPanel
         title="Course progress"
         courseId={course.id}
-        courseStart={course.startsOn ?? '2026-07-01'}
-        courseEnd={course.endsOn}
+        courseStart={classRow?.startsOn ?? '2026-07-01'}
+        courseEnd={classRow?.endsOn ?? null}
         ledger={ledger}
         users={roster.users}
         learningSessions={classSessions.map((s) => ({

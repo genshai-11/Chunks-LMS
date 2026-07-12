@@ -26,11 +26,11 @@ export function LearnerAnalysisPage() {
         mode="learner"
         courseId={course.id}
         courseCode={course.code}
-        courseStart={course.startsOn ?? '2026-07-01'}
-        courseEnd={course.endsOn}
+        courseStart={classRow?.startsOn ?? '2026-07-01'}
+        courseEnd={classRow?.endsOn ?? null}
         classId={classRow?.id}
         className={classRow?.name}
-        totalDays={course.schedule?.sessionCount ?? null}
+        totalDays={classRow?.schedule?.sessionCount ?? null}
         ledger={ledger}
         users={roster.users}
         learnerUserId={learner.id}

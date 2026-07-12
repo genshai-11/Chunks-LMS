@@ -62,10 +62,6 @@ export type Course = {
   code: string
   name: string
   status: CourseStatus
-  startsOn: string | null
-  /** Auto-filled from start + schedule when using auto-schedule */
-  endsOn: string | null
-  schedule: CourseSchedule | null
 }
 
 export type Class = {
@@ -75,6 +71,10 @@ export type Class = {
   capacity: number
   teacherUserId: string
   status: ClassStatus
+  startsOn: string | null
+  /** Auto-filled from start + schedule when using auto-schedule */
+  endsOn: string | null
+  schedule: CourseSchedule | null
 }
 
 export type Enrollment = {

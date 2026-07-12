@@ -2054,7 +2054,7 @@
 
   /* Bottom dock — inline control panel inside stage */
   .observe-dock {
-    @apply mt-3 mx-auto flex w-full max-w-sm shrink-0 flex-col items-center gap-3;
+    @apply mt-3 mx-auto flex w-full max-w-lg shrink-0 flex-col items-center gap-3;
   }
 
   .observe-dock-lg .observe-dock-colors {
@@ -2062,7 +2062,7 @@
   }
 
   .observe-dock-colors {
-    @apply relative mx-auto flex w-fit flex-col items-center justify-center gap-3 rounded-[3rem] border-4 border-slate-600 bg-gradient-to-r from-slate-950 via-slate-800 to-slate-950 p-3 shadow-2xl ring-1 ring-black;
+    @apply relative mx-auto flex w-fit flex-row items-center justify-center gap-3 rounded-[3rem] border-4 border-slate-600 bg-gradient-to-r from-slate-950 via-slate-800 to-slate-950 p-3 shadow-2xl ring-1 ring-black;
     box-shadow:
       inset 0 0 0 2px rgb(255 255 255 / 0.08),
       inset 10px 0 18px rgb(255 255 255 / 0.025),

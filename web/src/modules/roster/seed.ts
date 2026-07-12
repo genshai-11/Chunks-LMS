@@ -81,16 +81,6 @@ export function createSeedRoster(): RosterState {
         code: 'ERE-Level-B',
         name: 'ERE Level B',
         status: 'active',
-        startsOn: '2026-07-01',
-        // Auto from Tue+Wed × 15 sessions starting 2026-07-01 (Wed)
-        endsOn: '2026-08-19',
-        schedule: defaultCourseSchedule({
-          weekdays: [2, 3], // Tue, Wed
-          startTime: '09:00',
-          durationMinutes: 60,
-          sessionCount: 15,
-          timeZone: 'Asia/Ho_Chi_Minh',
-        }),
       },
     ],
     classes: [
@@ -101,6 +91,16 @@ export function createSeedRoster(): RosterState {
         capacity: 3,
         teacherUserId: '22222222-2222-2222-2222-222222222202',
         status: 'active',
+        startsOn: '2026-07-01',
+        // Auto from Tue+Wed × 15 sessions starting 2026-07-01 (Wed)
+        endsOn: '2026-08-19',
+        schedule: defaultCourseSchedule({
+          weekdays: [2, 3], // Tue, Wed
+          startTime: '09:00',
+          durationMinutes: 60,
+          sessionCount: 15,
+          timeZone: 'Asia/Ho_Chi_Minh',
+        }),
       },
     ],
     enrollments: [

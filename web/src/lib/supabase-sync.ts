@@ -295,9 +295,6 @@ export async function loadWorkspaceFromSupabase(options?: {
       code: c.code as string,
       name: c.name as string,
       status: c.status as 'active' | 'archived',
-      startsOn: (c.starts_on as string | null) ?? null,
-      endsOn: (c.ends_on as string | null) ?? null,
-      schedule: asSchedule((c as { schedule?: unknown }).schedule),
     }))
 
     const classes = (classesRes.data ?? [])
@@ -309,6 +306,9 @@ export async function loadWorkspaceFromSupabase(options?: {
         capacity: cl.capacity as number,
         teacherUserId: cl.teacher_user_id as string,
         status: cl.status as 'active' | 'ended',
+        startsOn: (cl.starts_on as string | null) ?? null,
+        endsOn: (cl.ends_on as string | null) ?? null,
+        schedule: asSchedule((cl as { schedule?: unknown }).schedule),
       }))
 
     const classIds = new Set(classes.map((c) => c.id))
@@ -571,9 +571,6 @@ export async function saveWorkspaceToSupabase(
             code: c.code,
             name: c.name,
             status: c.status,
-            starts_on: c.startsOn,
-            ends_on: c.endsOn,
-            schedule: c.schedule,
           })),
           { onConflict: 'id' },
         )
@@ -606,6 +603,9 @@ export async function saveWorkspaceToSupabase(
             capacity: c.capacity,
             teacher_user_id: c.teacherUserId,
             status: c.status,
+            starts_on: c.startsOn,
+            ends_on: c.endsOn,
+            schedule: c.schedule,
           })),
           { onConflict: 'id' },
         )

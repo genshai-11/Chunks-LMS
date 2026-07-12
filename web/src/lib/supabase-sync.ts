@@ -7,7 +7,12 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { normalizeCourseSchedule } from '../modules/roster/schedule'
 import type { CourseSchedule, DomainUser, RosterState } from '../modules/roster/types'
 import { createEmptyRoster, isUuid, LOCAL_ORG_ID, newId } from '../modules/roster/seed'
-import type { SchedulingState } from '../modules/scheduling/types'
+import type { LearningSession, SchedulingState, SessionKind } from '../modules/scheduling/types'
+
+function parseSessionKind(value: string | null | undefined): SessionKind {
+  if (value === 'pretest' || value === 'posttest' || value === 'regular') return value
+  return 'regular'
+}
 import { emptySchedulingState } from '../modules/scheduling/session-lifecycle'
 import {
   protectedLearningSessionIds,
@@ -333,7 +338,7 @@ export async function loadWorkspaceFromSupabase(options?: {
             : null,
       }))
 
-    const learningSessions = (learningRes.data ?? [])
+    const learningSessions: LearningSession[] = (learningRes.data ?? [])
       .filter((s) => classIds.has(s.class_id as string))
       .map((s) => {
         const row = s as {
@@ -343,7 +348,6 @@ export async function loadWorkspaceFromSupabase(options?: {
           session_kind?: string | null
           participant_learner_ids?: string[] | null
         }
-        const kind = row.session_kind
         return {
           id: s.id as string,
           classId: s.class_id as string,
@@ -356,10 +360,7 @@ export async function loadWorkspaceFromSupabase(options?: {
           sessionNumber: typeof row.session_number === 'number' ? row.session_number : null,
           ownerUserId: (row.owner_user_id as string | null) ?? null,
           lockExpiresAt: (row.lock_expires_at as string | null) ?? null,
-          sessionKind:
-            kind === 'pretest' || kind === 'posttest' || kind === 'regular'
-              ? kind
-              : ('regular' as const),
+          sessionKind: parseSessionKind(row.session_kind),
           participantLearnerIds: Array.isArray(row.participant_learner_ids)
             ? row.participant_learner_ids
             : null,

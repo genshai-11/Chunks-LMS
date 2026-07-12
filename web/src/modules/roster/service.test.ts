@@ -23,6 +23,12 @@ import {
   learnerInviteMailto,
   formatClassInviteClipboard,
   isLearnerEmailTaken,
+  isEmailTaken,
+  addTeacherProfile,
+  mergeDuplicateAccountsByEmail,
+  listTeachers,
+  listTeachersRaw,
+  countDuplicateEmailGroups,
 } from './service'
 
 describe('admin roster workflows', () => {
@@ -85,7 +91,10 @@ describe('admin roster workflows', () => {
     const classId = state.classes[0]!.id
     expect(activeEnrollmentsForClass(state, classId)).toHaveLength(3)
 
-    const extra = addLearnerProfile(state, { displayName: 'Learner Four' })
+    const extra = addLearnerProfile(state, {
+      displayName: 'Learner Four',
+      email: 'l4@example.com',
+    })
     expect(extra.ok).toBe(true)
     if (!extra.ok) return
     state = extra.state
@@ -207,7 +216,10 @@ describe('admin roster workflows', () => {
     expect(deleteUserProfile(state, teacher.id).ok).toBe(false)
     expect(deleteUserProfile(state, learner.id).ok).toBe(false)
 
-    const orphan = addLearnerProfile(state, { displayName: 'Orphan' })
+    const orphan = addLearnerProfile(state, {
+      displayName: 'Orphan',
+      email: 'orphan@example.com',
+    })
     expect(orphan.ok).toBe(true)
     if (!orphan.ok) return
     const gone = deleteUserProfile(orphan.state, orphan.value.id)
@@ -239,7 +251,58 @@ describe('admin roster workflows', () => {
     })
     expect(dup.ok).toBe(false)
   })
+
+  it('rejects duplicate teacher email (case-insensitive) and requires email', () => {
+    const seed = createSeedRoster()
+    const teacher = seed.users.find((u) => u.roles.includes('teacher'))!
+    const noEmail = addTeacherProfile(seed, { displayName: 'No Mail' })
+    expect(noEmail.ok).toBe(false)
+
+    const dup = addTeacherProfile(seed, {
+      displayName: 'Clone',
+      email: teacher.email!.toUpperCase(),
+    })
+    expect(dup.ok).toBe(false)
+    expect(isEmailTaken(seed, teacher.email)).toBe(true)
+  })
+
+  it('merges duplicate accounts by email and reassigns class teacher', () => {
+    let state = createSeedRoster()
+    const teacher = state.users.find((u) => u.roles.includes('teacher'))!
+    const cloneId = 'dup-teacher-id'
+    state = {
+      ...state,
+      users: [
+        ...state.users,
+        {
+          id: cloneId,
+          displayName: teacher.displayName,
+          email: teacher.email,
+          avatarUrl: null,
+          roles: ['teacher'],
+          accountStatus: 'active',
+        },
+      ],
+      classes: state.classes.map((c, i) =>
+        i === 0 ? { ...c, teacherUserId: cloneId } : c,
+      ),
+    }
+    expect(listTeachersRaw(state).length).toBeGreaterThan(listTeachers(state).length)
+    expect(countDuplicateEmailGroups(state)).toBeGreaterThanOrEqual(1)
+
+    const merged = mergeDuplicateAccountsByEmail(state)
+    expect(merged.ok).toBe(true)
+    if (!merged.ok) return
+    expect(merged.value.removed).toBeGreaterThanOrEqual(1)
+    expect(listTeachersRaw(merged.state).filter((u) => normalizeEmail(u.email) === normalizeEmail(teacher.email)).length).toBe(1)
+    expect(merged.state.classes.every((c) => c.teacherUserId !== cloneId)).toBe(true)
+  })
 })
+
+function normalizeEmail(email: string | null | undefined): string | null {
+  const t = email?.trim().toLowerCase() ?? ''
+  return t || null
+}
 
 function addTeacher(state: ReturnType<typeof createSeedRoster>) {
   return {

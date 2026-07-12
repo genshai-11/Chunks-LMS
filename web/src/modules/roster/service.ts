@@ -20,10 +20,20 @@ export {
 } from './schedule'
 
 export function listTeachers(state: RosterState): DomainUser[] {
-  return state.users.filter((u) => u.roles.includes('teacher'))
+  return dedupeUsersByEmail(state.users.filter((u) => u.roles.includes('teacher')))
 }
 
 export function listLearners(state: RosterState): DomainUser[] {
+  return dedupeUsersByEmail(state.users.filter((u) => u.roles.includes('learner')))
+}
+
+/** Raw teachers without email dedupe (admin cleanup / diagnostics). */
+export function listTeachersRaw(state: RosterState): DomainUser[] {
+  return state.users.filter((u) => u.roles.includes('teacher'))
+}
+
+/** Raw learners without email dedupe. */
+export function listLearnersRaw(state: RosterState): DomainUser[] {
   return state.users.filter((u) => u.roles.includes('learner'))
 }
 
@@ -188,10 +198,25 @@ export function previewCourseSchedule(course: Pick<Course, 'startsOn' | 'schedul
   return materializeCourseSchedule(course.startsOn, schedule)
 }
 
-/** Normalize learner portal emails for uniqueness checks. */
+/** Normalize emails for uniqueness checks (case-insensitive). */
 export function normalizeLearnerEmail(email: string | null | undefined): string | null {
   const t = email?.trim().toLowerCase() ?? ''
   return t || null
+}
+
+export const normalizeEmail = normalizeLearnerEmail
+
+/** True if any other user already owns this email (any role). */
+export function isEmailTaken(
+  state: RosterState,
+  email: string | null | undefined,
+  exceptUserId?: string,
+): boolean {
+  const needle = normalizeEmail(email)
+  if (!needle) return false
+  return state.users.some(
+    (u) => u.id !== exceptUserId && normalizeEmail(u.email) === needle,
+  )
 }
 
 /** True if another learner already owns this email. */
@@ -208,6 +233,135 @@ export function isLearnerEmailTaken(
       u.id !== exceptUserId &&
       normalizeLearnerEmail(u.email) === needle,
   )
+}
+
+/** One row per email (or per id when email missing). Prefer active + multi-role. */
+export function dedupeUsersByEmail(users: DomainUser[]): DomainUser[] {
+  const byKey = new Map<string, DomainUser>()
+  for (const u of users) {
+    const key = normalizeEmail(u.email) ?? `id:${u.id}`
+    const prev = byKey.get(key)
+    if (!prev) {
+      byKey.set(key, u)
+      continue
+    }
+    byKey.set(key, pickPreferredUser(prev, u))
+  }
+  return [...byKey.values()].sort((a, b) =>
+    a.displayName.localeCompare(b.displayName, undefined, { sensitivity: 'base' }),
+  )
+}
+
+function pickPreferredUser(a: DomainUser, b: DomainUser): DomainUser {
+  const score = (u: DomainUser) =>
+    (u.accountStatus === 'active' ? 4 : 0) +
+    u.roles.length +
+    (u.avatarUrl ? 1 : 0) +
+    (u.displayName.trim().length > 0 ? 1 : 0)
+  return score(b) > score(a) ? b : a
+}
+
+/**
+ * Collapse duplicate accounts that share the same email.
+ * Reassigns class teacher + enrollments to the keeper, merges roles, drops extras.
+ */
+export function mergeDuplicateAccountsByEmail(
+  state: RosterState,
+): RosterResult<{ removed: number; groups: number }> {
+  const groups = new Map<string, DomainUser[]>()
+  for (const u of state.users) {
+    const key = normalizeEmail(u.email)
+    if (!key) continue
+    const list = groups.get(key) ?? []
+    list.push(u)
+    groups.set(key, list)
+  }
+
+  let users = [...state.users]
+  let classes = [...state.classes]
+  let enrollments = [...state.enrollments]
+  let removed = 0
+  let multiGroups = 0
+
+  for (const [, group] of groups) {
+    if (group.length < 2) continue
+    multiGroups += 1
+    const keeper = group.reduce(pickPreferredUser)
+    const dropIds = new Set(group.filter((u) => u.id !== keeper.id).map((u) => u.id))
+
+    // Merge roles + status onto keeper
+    const mergedRoles = [...new Set(group.flatMap((u) => u.roles))] as DomainUser['roles']
+    const anyActive = group.some((u) => (u.accountStatus ?? 'active') === 'active')
+    const avatarUrl = group.find((u) => u.avatarUrl)?.avatarUrl ?? keeper.avatarUrl
+    const displayName =
+      group.find((u) => u.displayName.trim())?.displayName ?? keeper.displayName
+
+    users = users.map((u) =>
+      u.id === keeper.id
+        ? {
+            ...u,
+            displayName,
+            avatarUrl,
+            roles: mergedRoles,
+            accountStatus: anyActive ? 'active' : 'inactive',
+          }
+        : u,
+    )
+
+    classes = classes.map((c) =>
+      dropIds.has(c.teacherUserId) ? { ...c, teacherUserId: keeper.id } : c,
+    )
+
+    // Move enrollments; collapse double-seat in same class
+    const nextEnrollments: typeof enrollments = []
+    const seatKey = new Set<string>()
+    for (const e of enrollments) {
+      const learnerId = dropIds.has(e.learnerUserId) ? keeper.id : e.learnerUserId
+      const key = `${e.classId}:${learnerId}`
+      if (seatKey.has(key)) {
+        // Keep active if either was active
+        const existing = nextEnrollments.find(
+          (x) => x.classId === e.classId && x.learnerUserId === learnerId,
+        )
+        if (existing && existing.status === 'ended' && e.status === 'active') {
+          existing.status = 'active'
+          existing.endedAt = null
+        }
+        continue
+      }
+      seatKey.add(key)
+      nextEnrollments.push(
+        learnerId === e.learnerUserId ? e : { ...e, learnerUserId: learnerId },
+      )
+    }
+    enrollments = nextEnrollments
+
+    users = users.filter((u) => !dropIds.has(u.id))
+    removed += dropIds.size
+  }
+
+  if (removed === 0) {
+    return { ok: true, value: { removed: 0, groups: 0 }, state }
+  }
+
+  return {
+    ok: true,
+    value: { removed, groups: multiGroups },
+    state: { ...state, users, classes, enrollments },
+  }
+}
+
+/** Count duplicate email groups (2+ users sharing one email). */
+export function countDuplicateEmailGroups(state: RosterState): number {
+  const counts = new Map<string, number>()
+  for (const u of state.users) {
+    const key = normalizeEmail(u.email)
+    if (!key) continue
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  let n = 0
+  for (const c of counts.values()) if (c > 1) n += 1
+  return n
 }
 
 /** Invite URL so a learner can open their portal by email. */
@@ -564,8 +718,9 @@ export function addLearnerProfile(
   if (!displayName) return { ok: false, error: 'Learner name is required' }
 
   const email = input.email?.trim() || null
-  if (email && isLearnerEmailTaken(state, email)) {
-    return { ok: false, error: 'A learner with this email already exists' }
+  if (!email) return { ok: false, error: 'Learner email is required' }
+  if (isEmailTaken(state, email)) {
+    return { ok: false, error: 'An account with this email already exists' }
   }
 
   const user: DomainUser = {
@@ -622,10 +777,16 @@ export function addTeacherProfile(
   const displayName = input.displayName.trim()
   if (!displayName) return { ok: false, error: 'Teacher name is required' }
 
+  const email = input.email?.trim() || null
+  if (!email) return { ok: false, error: 'Teacher email is required (matches Clerk sign-in)' }
+  if (isEmailTaken(state, email)) {
+    return { ok: false, error: 'An account with this email already exists' }
+  }
+
   const user: DomainUser = {
     id: newId('user'),
     displayName,
-    email: input.email?.trim() || null,
+    email,
     avatarUrl: input.avatarUrl ?? null,
     roles: ['teacher'],
     accountStatus: 'active',
@@ -657,12 +818,11 @@ export function updateUserProfile(
 
   const nextEmail =
     input.email !== undefined ? input.email?.trim() || null : user.email
-  if (
-    user.roles.includes('learner') &&
-    nextEmail &&
-    isLearnerEmailTaken(state, nextEmail, userId)
-  ) {
-    return { ok: false, error: 'A learner with this email already exists' }
+  if (!nextEmail && (user.roles.includes('learner') || user.roles.includes('teacher'))) {
+    return { ok: false, error: 'Email is required for teacher and learner accounts' }
+  }
+  if (nextEmail && isEmailTaken(state, nextEmail, userId)) {
+    return { ok: false, error: 'An account with this email already exists' }
   }
 
   const updated: DomainUser = {

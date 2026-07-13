@@ -90,6 +90,25 @@ function readSavedRailWidth(): number {
   return RAIL_DEFAULT
 }
 
+function formatFinishSummary(capture: CaptureSessionState, className: string | null, dayLabel: string): string {
+  const summary = sessionColorSummary(capture)
+  const unresolved = summary.byColor.open + summary.byColor.draft
+  return [
+    'Session finished',
+    '',
+    `${dayLabel}${className ? ` · ${className}` : ''}`,
+    `Learners: ${capture.learnerIds.length}`,
+    `Questions: ${capture.questions.length}`,
+    `Finalized: ${summary.done}/${summary.total}`,
+    `0 Red: ${summary.byColor.red}`,
+    `1 Yellow: ${summary.byColor.yellow}`,
+    `2 Green: ${summary.byColor.green}`,
+    `3 Purple: ${summary.byColor.purple}`,
+    `Max probe depth: ${summary.maxProbeDepth}`,
+    unresolved > 0 ? `Unresolved/draft auto-closed: ${unresolved}` : 'All captured attempts finalized.',
+  ].join('\n')
+}
+
 /**
  * Observe: left rail (avatar + collapsible map), big name, large bottom color dock,
  * happy/fight reaction flash. Phone-friendly. Rail is drag-resizable when open.
@@ -525,6 +544,7 @@ export function TeacherObservePage() {
         /* local persist still holds; backend may be offline */
       }
       flash('Session saved')
+      window.alert(formatFinishSummary(completedCapture, classRow?.name ?? null, dayLabel))
       navigate('/teacher/session')
     } finally {
       setFinishing(false)
@@ -540,6 +560,8 @@ export function TeacherObservePage() {
     syncNow,
     navigate,
     flash,
+    classRow?.name,
+    dayLabel,
   ])
 
   const finishSessionAndSave = useCallback(() => {

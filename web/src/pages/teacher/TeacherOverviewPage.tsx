@@ -295,7 +295,7 @@ export function TeacherOverviewPage() {
                 onAssignActiveClass={() => assignActiveClass(learner.id)}
                 onSelect={() => {
                   setActiveLearnerUserId(learner.id)
-                  if (learner.classIds[0]) setActiveClassId(learner.classIds[0])
+                  if (learner.preferredClassId) setActiveClassId(learner.preferredClassId)
                 }}
                 onCopied={(text) => ok(text)}
               />
@@ -372,7 +372,7 @@ export function TeacherOverviewPage() {
                           className="btn primary"
                           onClick={() => {
                             setActiveLearnerUserId(learner.id)
-                            if (learner.classIds[0]) setActiveClassId(learner.classIds[0])
+                            if (learner.preferredClassId) setActiveClassId(learner.preferredClassId)
                           }}
                         >
                           <Play className="h-4 w-4" aria-hidden />
@@ -424,6 +424,7 @@ function LearnerCard({
     rfcAvg: number | null
     classIds: string[]
     hasMatchingOpenSession: boolean
+    preferredClassId: string | null
   }
   selected: boolean
   openSession: boolean

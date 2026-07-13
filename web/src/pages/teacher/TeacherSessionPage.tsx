@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  CheckCircle2,
   ClipboardCheck,
   Eye,
   Gauge,
@@ -20,7 +19,6 @@ import { useFlash } from '../../hooks/useFlash'
 import {
   addSessionQuestion,
   createCaptureSession,
-  markSessionCompleted,
   sessionColorSummary,
 } from '../../modules/assessment/session-capture'
 import {
@@ -39,7 +37,6 @@ import {
 } from '../../modules/roster/service'
 import { subscribeToClassSnapshots } from '../../modules/realtime/snapshot-channel'
 import {
-  completeLearningSession,
   recordAttendance,
   startLearningSession,
 } from '../../modules/scheduling/session-lifecycle'
@@ -69,7 +66,6 @@ export function TeacherSessionPage() {
     setScheduling,
     capture,
     setCapture,
-    appendFinalizedFromCapture,
     metricSettings,
     syncNow,
   } = useAppState()
@@ -206,11 +202,6 @@ export function TeacherSessionPage() {
     metricSettings.defaultMaxProbeCount,
     setCapture,
   ])
-
-  function applyCapture(next: NonNullable<typeof capture>) {
-    setCapture(next)
-    appendFinalizedFromCapture(next)
-  }
 
   function toggleLearner(id: string) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
@@ -455,20 +446,6 @@ export function TeacherSessionPage() {
               <Eye className="h-4 w-4" aria-hidden />
               <span>{finalizedCount > 0 ? `Resume ${dayBadge}` : `Observe ${dayBadge}`}</span>
             </Link>
-            <button
-              type="button"
-              className="ghost"
-              onClick={() => {
-                const r = completeLearningSession(scheduling, openSession.id, sessionLearnerIds)
-                if (!r.ok) return err(r.error)
-                setScheduling(r.state)
-                applyCapture(markSessionCompleted(capture))
-                ok('Session completed')
-              }}
-            >
-              <CheckCircle2 className="h-4 w-4" aria-hidden />
-              <span>Complete</span>
-            </button>
           </div>
         }
       />

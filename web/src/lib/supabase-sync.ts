@@ -674,6 +674,7 @@ export async function saveWorkspaceToSupabase(
       }
 
       const scheduledRows = dedupeById(scheduling.scheduledSessions)
+      const scheduledIds = new Set(scheduledRows.map((s) => s.id))
       if (scheduledRows.length > 0) {
         const { error } = await sb.from('scheduled_sessions').upsert(
           scheduledRows.map((s) => ({
@@ -682,7 +683,7 @@ export async function saveWorkspaceToSupabase(
             planned_start: s.plannedStart,
             duration_minutes: s.durationMinutes,
             status: s.status,
-            rescheduled_from_id: s.rescheduledFromId,
+            rescheduled_from_id: s.rescheduledFromId && scheduledIds.has(s.rescheduledFromId) ? s.rescheduledFromId : null,
             session_number: s.sessionNumber,
           })),
           { onConflict: 'id' },
@@ -695,7 +696,7 @@ export async function saveWorkspaceToSupabase(
               planned_start: s.plannedStart,
               duration_minutes: s.durationMinutes,
               status: s.status,
-              rescheduled_from_id: s.rescheduledFromId,
+              rescheduled_from_id: s.rescheduledFromId && scheduledIds.has(s.rescheduledFromId) ? s.rescheduledFromId : null,
             })),
             { onConflict: 'id' },
           )

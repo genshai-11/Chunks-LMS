@@ -129,7 +129,7 @@ export function TeacherObservePage() {
   const [finishing, setFinishing] = useState(false)
   const [liveLoading, setLiveLoading] = useState(true)
   const [liveSaving, setLiveSaving] = useState(false)
-  const [showConfirmFinish, setShowConfirmFinish] = useState(false)
+  const [finishSummary, setFinishSummary] = useState<string | null>(null)
   /** Desktop: open by default. Phone: closed so stage + colors stay primary. */
   const [mapOpen, setMapOpen] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(min-width: 640px)').matches : true,
@@ -504,7 +504,7 @@ export function TeacherObservePage() {
    */
   const handleConfirmFinish = useCallback(async () => {
     if (!capture || !openSession || finishing) return
-    setShowConfirmFinish(false)
+    setFinishSummary(null)
     setFinishing(true)
     try {
       const learnerIds = capture.learnerIds
@@ -544,8 +544,7 @@ export function TeacherObservePage() {
         /* local persist still holds; backend may be offline */
       }
       flash('Session saved')
-      window.alert(formatFinishSummary(completedCapture, classRow?.name ?? null, dayLabel))
-      navigate('/teacher/session')
+      setFinishSummary(formatFinishSummary(completedCapture, classRow?.name ?? null, dayLabel))
     } finally {
       setFinishing(false)
     }
@@ -647,9 +646,6 @@ export function TeacherObservePage() {
     return () => window.removeEventListener('keydown', onKey)
   }, [navigate, prevCell, nextCell, recordColor, resolveProbe, probeOpen, capture, startFirst, finishSessionAndSave])
 
-  const openProbes = summary ? summary.byColor.open : 0
-  const drafts = summary ? summary.byColor.draft : 0
-
   if (!openSession) {
     return <Navigate to="/teacher/session" replace />
   }
@@ -717,17 +713,6 @@ export function TeacherObservePage() {
             title="Keys (?)"
           >
             <Keyboard aria-hidden strokeWidth={2.25} />
-          </button>
-          <button
-            type="button"
-            className="observe-nav-finish"
-            onClick={() => void finishSessionAndSave()}
-            disabled={finishing}
-            aria-label="Finish session and save"
-            title="Finish & save"
-          >
-            <CheckCircle2 aria-hidden strokeWidth={2.25} />
-            <span className="observe-nav-finish-label">{finishing ? 'Saving…' : 'Finish'}</span>
           </button>
         </div>
       </header>
@@ -1109,93 +1094,29 @@ export function TeacherObservePage() {
         </div>
       )}
 
-      {showConfirmFinish && (
+      {finishSummary && (
         <div className="observe-modal-container">
-          <div
-            className="observe-modal-backdrop"
-            onClick={() => setShowConfirmFinish(false)}
-            aria-hidden="true"
-          />
+          <div className="observe-modal-backdrop" aria-hidden="true" />
           <div
             className="observe-modal-card"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="modal-finish-title"
+            aria-labelledby="modal-finish-summary-title"
           >
             <div className="observe-modal-icon">
               <CheckCircle2 className="h-8 w-8 text-green-400" />
             </div>
-            <h2 id="modal-finish-title" className="observe-modal-title">
-              Finish Session?
+            <h2 id="modal-finish-summary-title" className="observe-modal-title">
+              Session Summary
             </h2>
-            <p className="observe-modal-desc">
-              Save and freeze the observation data for {dayBadge}. Once closed, this session cannot
-              be modified.
-            </p>
-            <div className="observe-modal-summary-box">
-              <div className="summary-row">
-                <span className="summary-label">Total Sentences</span>
-                <span className="summary-val font-mono">{qTotal}</span>
-              </div>
-              <div className="summary-divider" />
-              <div className="summary-row">
-                <span className="summary-label">Focus Coefficient (RFC)</span>
-                <span className="summary-val text-amber-300 font-mono font-bold">
-                  {done > 0 ? `${rfcPct}%` : '—'}
-                </span>
-              </div>
-              <div className="summary-divider" />
-              <div className="summary-colors-grid">
-                <div className="color-item">
-                  <span className="dot bg-red-500" />
-                  <span className="count">{summary ? summary.byColor.red : 0} Red</span>
-                </div>
-                <div className="color-item">
-                  <span className="dot bg-yellow-400" />
-                  <span className="count">{summary ? summary.byColor.yellow : 0} Yellow</span>
-                </div>
-                <div className="color-item">
-                  <span className="dot bg-green-500" />
-                  <span className="count">{summary ? summary.byColor.green : 0} Green</span>
-                </div>
-                <div className="color-item">
-                  <span className="dot bg-purple-500" />
-                  <span className="count">{summary ? summary.byColor.purple : 0} Purple</span>
-                </div>
-              </div>
-              <div className="summary-row footer-row">
-                <div className="footer-col">
-                  <span className="label">Open Probes</span>
-                  <span
-                    className={`val ${openProbes > 0 ? 'text-yellow-400 font-bold' : 'text-slate-400'}`}
-                  >
-                    {openProbes}
-                  </span>
-                </div>
-                <div className="footer-col">
-                  <span className="label">Drafts</span>
-                  <span
-                    className={`val ${drafts > 0 ? 'text-slate-200 font-bold' : 'text-slate-500'}`}
-                  >
-                    {drafts}
-                  </span>
-                </div>
-              </div>
-            </div>
+            <pre className="observe-modal-summary-text">{finishSummary}</pre>
             <div className="observe-modal-actions">
               <button
                 type="button"
-                className="observe-modal-btn observe-modal-cancel"
-                onClick={() => setShowConfirmFinish(false)}
-              >
-                Go Back
-              </button>
-              <button
-                type="button"
                 className="observe-modal-btn observe-modal-confirm"
-                onClick={() => void handleConfirmFinish()}
+                onClick={() => navigate('/teacher/session')}
               >
-                Confirm & Save
+                OK
               </button>
             </div>
           </div>

@@ -3507,6 +3507,10 @@
     @apply text-sm font-bold font-mono tracking-tight;
   }
 
+  .observe-modal-summary-text {
+    @apply max-h-[55dvh] overflow-auto whitespace-pre-wrap rounded-2xl border border-white/10 bg-slate-950/70 p-4 text-left font-mono text-sm leading-6 text-slate-100;
+  }
+
   .observe-modal-actions {
     @apply flex items-center gap-3 w-full mt-2;
   }

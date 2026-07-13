@@ -21,7 +21,7 @@ export type TeacherClassContext = {
 
 /** Active class for Teacher workspace (multi-class switcher). */
 export function useTeacherClassContext(): TeacherClassContext {
-  const { roster, activeClassId, setActiveClassId } = useAppState()
+  const { roster, scheduling, activeClassId, setActiveClassId } = useAppState()
   const staffSession = useStaffSession()
   const signedInTeacher = roster.users.find(
     (user) =>
@@ -37,19 +37,32 @@ export function useTeacherClassContext(): TeacherClassContext {
       : all.filter((row) => row.teacherUserId === signedInTeacher.id)
   }, [roster, staffSession, signedInTeacher])
   const options = useMemo(() => classes.map((row) => toClassOption(roster, row)), [classes, roster])
+  const preferredSessionClassId = useMemo(() => {
+    const classIds = new Set(classes.map((row) => row.id))
+    const open = scheduling.learningSessions.find(
+      (session) => session.status === 'open' && classIds.has(session.classId),
+    )
+    if (open) return open.classId
+    const latest = scheduling.learningSessions
+      .filter((session) => classIds.has(session.classId))
+      .slice()
+      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0]
+    return latest?.classId ?? null
+  }, [classes, scheduling.learningSessions])
+
   const classRow = useMemo(
-    () => resolveActiveClass(classes, activeClassId),
-    [classes, activeClassId],
+    () => resolveActiveClass(classes, activeClassId ?? preferredSessionClassId),
+    [classes, activeClassId, preferredSessionClassId],
   )
 
   useEffect(() => {
-    const resolved = resolveActiveClass(classes, activeClassId)
+    const resolved = resolveActiveClass(classes, activeClassId ?? preferredSessionClassId)
     if (resolved && resolved.id !== activeClassId) {
       setActiveClassId(resolved.id)
     } else if (!resolved && activeClassId) {
       setActiveClassId(null)
     }
-  }, [classes, activeClassId, setActiveClassId])
+  }, [classes, activeClassId, preferredSessionClassId, setActiveClassId])
 
   const option = classRow ? toClassOption(roster, classRow) : null
 

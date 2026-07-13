@@ -155,7 +155,6 @@ export async function ensureLearningSessionOnServer(
       started_at: fullRow.started_at,
       completed_at: fullRow.completed_at,
       max_probe_count: fullRow.max_probe_count,
-      session_number: fullRow.session_number,
     }
     const retry = await sb.from('learning_sessions').upsert(minimal, { onConflict: 'id' })
     if (retry.error) {

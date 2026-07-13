@@ -201,7 +201,7 @@ export function ChunkerPage() {
     if (saved) {
       if (andObserve) {
         setActiveClassId(selectedClass.id)
-        navigate('/teacher/observe')
+        navigate('/teacher/observe?from=chunker')
       } else {
         ok('Quick session started — staying on Chunker')
       }
@@ -374,7 +374,7 @@ export function ChunkerPage() {
                           <>
                             <button type="button" className="ghost" onClick={() => {
                               setActiveClassId(session.classId)
-                              navigate('/teacher/observe')
+                              navigate('/teacher/observe?from=chunker')
                             }}>
                               <Eye className="h-4 w-4" aria-hidden /> Observe
                             </button>

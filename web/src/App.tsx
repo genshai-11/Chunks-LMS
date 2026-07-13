@@ -64,11 +64,7 @@ export default function App() {
 
               <Route
                 path="/teacher/observe"
-                element={
-                  <StaffGate role="teacher">
-                    <TeacherObservePage />
-                  </StaffGate>
-                }
+                element={<TeacherObservePage />}
               />
 
               <Route

@@ -22,7 +22,7 @@ import {
   Sparkles,
   X,
 } from 'lucide-react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   advancePosition,
   currentAttempt,
@@ -115,6 +115,9 @@ function formatFinishSummary(capture: CaptureSessionState, className: string | n
  */
 export function TeacherObservePage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const fromChunker = searchParams.get('from') === 'chunker'
+  const exitPath = fromChunker ? '/chunker' : '/teacher/session'
   const {
     roster,
     capture,
@@ -544,7 +547,7 @@ export function TeacherObservePage() {
       }
       flash('Session saved')
       setFinishSummary(null)
-      navigate('/teacher/session')
+      navigate(exitPath)
     } finally {
       setFinishing(false)
     }
@@ -558,6 +561,7 @@ export function TeacherObservePage() {
     appendFinalizedFromCapture,
     syncNow,
     navigate,
+    exitPath,
     flash,
   ])
 
@@ -575,7 +579,7 @@ export function TeacherObservePage() {
       if (k === 'escape') {
         e.preventDefault()
         if (finishSummary) setFinishSummary(null)
-        else navigate('/teacher/session')
+        else navigate(exitPath)
         return
       }
       if (finishSummary) {
@@ -647,10 +651,10 @@ export function TeacherObservePage() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [navigate, prevCell, nextCell, recordColor, resolveProbe, probeOpen, capture, startFirst, finishSessionAndSave, finishSummary])
+  }, [navigate, exitPath, prevCell, nextCell, recordColor, resolveProbe, probeOpen, capture, startFirst, finishSessionAndSave, finishSummary])
 
   if (!openSession) {
-    return <Navigate to="/teacher/session" replace />
+    return <Navigate to={exitPath} replace />
   }
 
   if (liveLoading || !capture || capture.learningSessionId !== openSession.id) {
@@ -662,7 +666,7 @@ export function TeacherObservePage() {
   }
 
   if (capture.sessionStatus !== 'open') {
-    return <Navigate to="/teacher/session" replace />
+    return <Navigate to={exitPath} replace />
   }
 
   return (
@@ -674,7 +678,7 @@ export function TeacherObservePage() {
       aria-label={`${dayLabel} · Focus and Awareness observation`}
     >
       <header className="observe-bar observe-bar-slim">
-        <Link to="/teacher/session" className="observe-nav-exit" aria-label="Exit observe">
+        <Link to={exitPath} className="observe-nav-exit" aria-label="Exit observe">
           <X aria-hidden strokeWidth={2.5} />
         </Link>
         <div className="observe-bar-center">

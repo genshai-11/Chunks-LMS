@@ -631,13 +631,44 @@ export async function saveWorkspaceToSupabase(
       const keepIds = new Set(roster.users.map((u) => u.id))
       const { data: existingMembers } = await sb
         .from('organization_memberships')
-        .select('id, user_id')
+        .select('id, user_id, role')
         .eq('organization_id', orgId)
-      const orphanMemberIds = (existingMembers ?? [])
+      
+      const orphanMembers = existingMembers ?? []
+      const orphanMemberIds = orphanMembers
         .filter((m) => !keepIds.has(m.user_id as string))
         .map((m) => m.id as string)
       if (orphanMemberIds.length > 0) {
         await sb.from('organization_memberships').delete().in('id', orphanMemberIds)
+      }
+
+      // Delete learners and their associated data (enrollments, attendance, attempts) when prune is true
+      if (prune) {
+        const toDeleteUserIds = orphanMembers
+          .filter((m) => m.role === 'learner' && !keepIds.has(m.user_id as string))
+          .map((m) => m.user_id as string)
+
+        if (toDeleteUserIds.length > 0) {
+          // Check if any of these users still have memberships in other organizations
+          const { data: otherMemberships } = await sb
+            .from('organization_memberships')
+            .select('user_id')
+            .in('user_id', toDeleteUserIds)
+            .neq('organization_id', orgId)
+          const otherMemberUserIds = new Set((otherMemberships ?? []).map((m) => m.user_id as string))
+          const pureDeleteUserIds = toDeleteUserIds.filter((id) => !otherMemberUserIds.has(id))
+
+          if (pureDeleteUserIds.length > 0) {
+            // Delete enrollments
+            await sb.from('enrollments').delete().in('learner_user_id', pureDeleteUserIds)
+            // Delete attendance
+            await sb.from('attendance_records').delete().in('learner_user_id', pureDeleteUserIds)
+            // Delete assessment attempts (cascades to snapshots, events)
+            await sb.from('assessment_attempts').delete().in('learner_user_id', pureDeleteUserIds)
+            // Delete the users
+            await sb.from('users').delete().in('id', pureDeleteUserIds)
+          }
+        }
       }
     }
 
@@ -816,16 +847,7 @@ export async function saveWorkspaceToSupabase(
             protectedIds,
           )
           if (toDelete.length > 0) {
-            // Extra guard: never delete if assessment attempts exist
-            const { data: withAttempts } = await sb
-              .from('assessment_attempts')
-              .select('learning_session_id')
-              .in('learning_session_id', toDelete)
-            const blocked = new Set(
-              (withAttempts ?? []).map((r) => r.learning_session_id as string),
-            )
-            const safe = toDelete.filter((id) => !blocked.has(id))
-            if (safe.length > 0) await sb.from('learning_sessions').delete().in('id', safe)
+            await sb.from('learning_sessions').delete().in('id', toDelete)
           }
         }
       }

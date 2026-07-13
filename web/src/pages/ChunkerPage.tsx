@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   BarChart3,
   BookOpen,
   CheckCircle2,
   ClipboardList,
   Edit3,
+  Eye,
   Play,
   RefreshCcw,
   Save,
@@ -71,7 +73,9 @@ export function ChunkerPage() {
     reloadFromSupabase,
     backendStatus,
     backendError,
+    setActiveClassId,
   } = useAppState()
+  const navigate = useNavigate()
   const { message, error, ok, err } = useFlash()
   const [selectedLearnerId, setSelectedLearnerId] = useState<string | null>(null)
   const [draftName, setDraftName] = useState('')
@@ -171,7 +175,7 @@ export function ChunkerPage() {
     await persist(result.state, scheduling)
   }
 
-  async function quickStartSession() {
+  async function quickStartSession(andObserve = false) {
     if (!effectiveLearnerId || !selectedClass) return err('Select learner and class first')
     let nextRoster = roster
     if (!roster.enrollments.some((row) => row.classId === selectedClass.id && row.learnerUserId === effectiveLearnerId && row.status === 'active')) {
@@ -193,8 +197,15 @@ export function ChunkerPage() {
       status: 'present',
     })
     const nextScheduling = present.ok ? present.state : started.state
-    await persist(nextRoster, nextScheduling)
-    ok('Quick session started — staying on Chunker')
+    const saved = await persist(nextRoster, nextScheduling)
+    if (saved) {
+      if (andObserve) {
+        setActiveClassId(selectedClass.id)
+        navigate('/teacher/observe')
+      } else {
+        ok('Quick session started — staying on Chunker')
+      }
+    }
   }
 
   async function completeSession(sessionId: string) {
@@ -318,7 +329,10 @@ export function ChunkerPage() {
                 <button type="button" className="ghost" onClick={() => void assignSelectedClass()} disabled={saving || !selectedClass}>
                   <BookOpen className="h-4 w-4" aria-hidden /> Assign class
                 </button>
-                <button type="button" className="primary" onClick={() => void quickStartSession()} disabled={saving || !selectedClass}>
+                <button type="button" className="primary" onClick={() => void quickStartSession(true)} disabled={saving || !selectedClass}>
+                  <Play className="h-4 w-4" aria-hidden /> Start & Observe
+                </button>
+                <button type="button" className="primary" onClick={() => void quickStartSession(false)} disabled={saving || !selectedClass}>
                   <Play className="h-4 w-4" aria-hidden /> Start quick session
                 </button>
                 <button type="button" className="ghost danger" onClick={() => void removeLearner()} disabled={saving}>
@@ -357,9 +371,17 @@ export function ChunkerPage() {
                     <td>
                       <div className="btn-row my-0">
                         {session.status === 'open' ? (
-                          <button type="button" className="primary" onClick={() => void completeSession(session.id)}>
-                            <CheckCircle2 className="h-4 w-4" aria-hidden /> Complete
-                          </button>
+                          <>
+                            <button type="button" className="ghost" onClick={() => {
+                              setActiveClassId(session.classId)
+                              navigate('/teacher/observe')
+                            }}>
+                              <Eye className="h-4 w-4" aria-hidden /> Observe
+                            </button>
+                            <button type="button" className="primary" onClick={() => void completeSession(session.id)}>
+                              <CheckCircle2 className="h-4 w-4" aria-hidden /> Complete
+                            </button>
+                          </>
                         ) : null}
                         <button type="button" className="ghost danger" onClick={() => void deleteSession(session.id)}>
                           <Trash2 className="h-4 w-4" aria-hidden /> Delete

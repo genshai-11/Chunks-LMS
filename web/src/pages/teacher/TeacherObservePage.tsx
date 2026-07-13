@@ -504,7 +504,6 @@ export function TeacherObservePage() {
    */
   const handleConfirmFinish = useCallback(async () => {
     if (!capture || !openSession || finishing) return
-    setFinishSummary(null)
     setFinishing(true)
     try {
       const learnerIds = capture.learnerIds
@@ -544,7 +543,8 @@ export function TeacherObservePage() {
         /* local persist still holds; backend may be offline */
       }
       flash('Session saved')
-      setFinishSummary(formatFinishSummary(completedCapture, classRow?.name ?? null, dayLabel))
+      setFinishSummary(null)
+      navigate('/teacher/session')
     } finally {
       setFinishing(false)
     }
@@ -559,14 +559,12 @@ export function TeacherObservePage() {
     syncNow,
     navigate,
     flash,
-    classRow?.name,
-    dayLabel,
   ])
 
   const finishSessionAndSave = useCallback(() => {
     if (!capture || !openSession || finishing) return
-    void handleConfirmFinish()
-  }, [capture, openSession, finishing, handleConfirmFinish])
+    setFinishSummary(formatFinishSummary(capture, classRow?.name ?? null, dayLabel))
+  }, [capture, openSession, finishing, classRow?.name, dayLabel])
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -576,7 +574,12 @@ export function TeacherObservePage() {
       const k = e.key.toLowerCase()
       if (k === 'escape') {
         e.preventDefault()
-        navigate('/teacher/session')
+        if (finishSummary) setFinishSummary(null)
+        else navigate('/teacher/session')
+        return
+      }
+      if (finishSummary) {
+        e.preventDefault()
         return
       }
       if (k === '?' || (e.shiftKey && k === '/')) {
@@ -644,7 +647,7 @@ export function TeacherObservePage() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [navigate, prevCell, nextCell, recordColor, resolveProbe, probeOpen, capture, startFirst, finishSessionAndSave])
+  }, [navigate, prevCell, nextCell, recordColor, resolveProbe, probeOpen, capture, startFirst, finishSessionAndSave, finishSummary])
 
   if (!openSession) {
     return <Navigate to="/teacher/session" replace />
@@ -1109,14 +1112,26 @@ export function TeacherObservePage() {
             <h2 id="modal-finish-summary-title" className="observe-modal-title">
               Session Summary
             </h2>
+            <p className="observe-modal-desc">
+              Review this session summary. Save & Finish will close this day permanently, then the next visit starts a new day.
+            </p>
             <pre className="observe-modal-summary-text">{finishSummary}</pre>
             <div className="observe-modal-actions">
               <button
                 type="button"
-                className="observe-modal-btn observe-modal-confirm"
-                onClick={() => navigate('/teacher/session')}
+                className="observe-modal-btn observe-modal-cancel"
+                onClick={() => setFinishSummary(null)}
+                disabled={finishing}
               >
-                OK
+                Review More
+              </button>
+              <button
+                type="button"
+                className="observe-modal-btn observe-modal-confirm"
+                onClick={() => void handleConfirmFinish()}
+                disabled={finishing}
+              >
+                {finishing ? 'Saving…' : 'Save & Finish'}
               </button>
             </div>
           </div>

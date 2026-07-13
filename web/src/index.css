@@ -1391,6 +1391,14 @@
     @apply cursor-wait opacity-60;
   }
 
+  .observe-finish-fab {
+    @apply fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-[80] inline-flex items-center justify-center gap-2 rounded-2xl border-0 bg-gradient-to-r from-green-600 to-emerald-600! px-5 py-3 text-sm font-black uppercase tracking-wide text-white! shadow-2xl shadow-green-950/30 active:scale-95 disabled:pointer-events-none disabled:cursor-wait disabled:opacity-60 sm:bottom-5 sm:right-5;
+  }
+
+  .observe-finish-fab svg {
+    @apply h-5 w-5 text-white;
+  }
+
   .observe-bar-center {
     @apply flex min-w-0 flex-1 items-center justify-center gap-1.5 text-xs font-medium text-slate-400 sm:text-sm;
   }

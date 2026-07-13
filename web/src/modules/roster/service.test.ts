@@ -230,7 +230,7 @@ describe('admin roster workflows', () => {
     expect(full.ok).toBe(false)
   })
 
-  it('updates people and blocks deleting linked users', () => {
+  it('updates people, blocks deleting linked teachers, and hard-deletes learners', () => {
     let state = createSeedRoster()
     const teacher = state.users.find((u) => u.roles.includes('teacher'))!
     const learner = state.users.find((u) => u.roles.includes('learner'))!
@@ -245,16 +245,9 @@ describe('admin roster workflows', () => {
     const hidden = deleteUserProfile(state, learner.id)
     expect(hidden.ok).toBe(true)
     if (!hidden.ok) return
-    expect(hidden.state.users.find((u) => u.id === learner.id)?.accountStatus).toBe('inactive')
+    expect(hidden.state.users.some((u) => u.id === learner.id)).toBe(false)
     expect(listActiveLearners(hidden.state).some((u) => u.id === learner.id)).toBe(false)
-    expect(hidden.state.enrollments.filter((e) => e.learnerUserId === learner.id)).not.toHaveLength(
-      0,
-    )
-    expect(
-      hidden.state.enrollments
-        .filter((e) => e.learnerUserId === learner.id)
-        .every((e) => e.status === 'ended'),
-    ).toBe(true)
+    expect(hidden.state.enrollments.filter((e) => e.learnerUserId === learner.id)).toHaveLength(0)
 
     const orphan = addLearnerProfile(state, {
       displayName: 'Orphan',

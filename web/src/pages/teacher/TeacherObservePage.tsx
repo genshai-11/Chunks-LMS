@@ -563,6 +563,11 @@ export function TeacherObservePage() {
         setShowKeys((v) => !v)
         return
       }
+      if (k === 'f' && !probeOpen) {
+        e.preventDefault()
+        finishSessionAndSave()
+        return
+      }
       if (k === 'h' || k === 'm') {
         e.preventDefault()
         setMapOpen((v) => !v)
@@ -618,7 +623,7 @@ export function TeacherObservePage() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [navigate, prevCell, nextCell, recordColor, resolveProbe, probeOpen, capture, startFirst])
+  }, [navigate, prevCell, nextCell, recordColor, resolveProbe, probeOpen, capture, startFirst, finishSessionAndSave])
 
   const openProbes = summary ? summary.byColor.open : 0
   const drafts = summary ? summary.byColor.draft : 0
@@ -704,6 +709,18 @@ export function TeacherObservePage() {
           </button>
         </div>
       </header>
+
+      <button
+        type="button"
+        className="observe-finish-fab"
+        onClick={() => void finishSessionAndSave()}
+        disabled={finishing}
+        aria-label="Finish session and save"
+        title="Finish & save (F)"
+      >
+        <CheckCircle2 aria-hidden strokeWidth={2.25} />
+        <span>{finishing ? 'Saving…' : 'Finish'}</span>
+      </button>
 
       {/* Desktop left rail (resizable). Phone uses bottom map sheet instead. */}
       {capture.questions.length > 0 && !isPhone ? (

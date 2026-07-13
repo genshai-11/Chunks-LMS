@@ -1,11 +1,11 @@
-import { BookOpen, ChartColumn, Gauge, GraduationCap, LayoutDashboard, Link2, RotateCcw, Users } from 'lucide-react'
+import { BookOpen, ChartColumn, Gauge, GraduationCap, LayoutDashboard, Link2, RotateCcw, Trash2, Users } from 'lucide-react'
 import { PageHeader } from '../../components/PageHeader'
 import { NavTile, Panel, StatCard } from '../../components/ui'
 import { listLearners, listTeachers } from '../../modules/roster/service'
 import { useAppState } from '../../state/useAppState'
 
 export function AdminOverviewPage() {
-  const { roster, ledger, resetAll, metricSettings } = useAppState()
+  const { roster, ledger, resetAll, deleteAllLearningData, metricSettings, backendStatus } = useAppState()
   const teachers = listTeachers(roster)
   const learners = listLearners(roster)
   const activeTeachers = teachers.filter((u) => (u.accountStatus ?? 'active') === 'active').length
@@ -23,17 +23,34 @@ export function AdminOverviewPage() {
         title="Admin workspace"
         subtitle="Manage accounts, courses, classes, and the metric catalog. Teachers only assign class labels and run live sessions."
         actions={
-          <button
-            type="button"
-            className="ghost"
-            onClick={() => {
-              if (!window.confirm('Clear all local data?')) return
-              resetAll()
-            }}
-          >
-            <RotateCcw className="h-4 w-4" aria-hidden />
-            <span>Clear data</span>
-          </button>
+          <div className="page-actions">
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => {
+                if (!window.confirm('Clear local cache only? Cloud data may reload later.')) return
+                resetAll()
+              }}
+            >
+              <RotateCcw className="h-4 w-4" aria-hidden />
+              <span>Clear local</span>
+            </button>
+            <button
+              type="button"
+              className="danger"
+              disabled={backendStatus === 'syncing'}
+              onClick={async () => {
+                const phrase = window.prompt(
+                  'This permanently deletes ALL old learning data, learners, classes, courses, sessions, attendance, and assessment history from cloud + this browser. Staff accounts are kept. Type DELETE to confirm.',
+                )
+                if (phrase !== 'DELETE') return
+                await deleteAllLearningData()
+              }}
+            >
+              <Trash2 className="h-4 w-4" aria-hidden />
+              <span>{backendStatus === 'syncing' ? 'Deleting…' : 'Delete ALL old data'}</span>
+            </button>
+          </div>
         }
       />
 

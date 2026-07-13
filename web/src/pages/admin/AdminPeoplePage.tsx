@@ -490,7 +490,7 @@ export function AdminPeoplePage() {
                               const r = deleteUserProfile(roster, u.id)
                               if (!r.ok) return err(r.error)
                               setRoster(r.state)
-                              void syncNow({ roster: r.state })
+                              void syncNow({ roster: r.state, pruneMissing: true })
                               ok(`${u.displayName} deleted`)
                             }}
                           >

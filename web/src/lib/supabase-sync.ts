@@ -32,6 +32,87 @@ export type SyncResult = { ok: true; source: 'supabase' | 'empty' } | { ok: fals
 
 export type VerifySyncResult = { ok: true } | { ok: false; error: string }
 
+export async function deleteWorkspaceLearningDataFromSupabase(
+  organizationId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const sb = db()
+  if (!sb) return { ok: false, error: 'Supabase not configured' }
+
+  const fail = (scope: string, error: { message?: string } | null) =>
+    error ? ({ ok: false as const, error: `${scope}: ${error.message ?? 'unknown error'}` }) : null
+
+  const courses = await sb.from('courses').select('id').eq('organization_id', organizationId)
+  if (courses.error) return { ok: false, error: `courses: ${courses.error.message}` }
+  const courseIds = (courses.data ?? []).map((row) => row.id as string)
+
+  const classes = courseIds.length
+    ? await sb.from('classes').select('id').in('course_id', courseIds)
+    : { data: [], error: null }
+  if (classes.error) return { ok: false, error: `classes: ${classes.error.message}` }
+  const classIds = (classes.data ?? []).map((row) => row.id as string)
+
+  const learnerMemberships = await sb
+    .from('organization_memberships')
+    .select('user_id')
+    .eq('organization_id', organizationId)
+    .eq('role', 'learner')
+  if (learnerMemberships.error) {
+    return { ok: false, error: `learner memberships: ${learnerMemberships.error.message}` }
+  }
+  const learnerUserIds = (learnerMemberships.data ?? []).map((row) => row.user_id as string)
+
+  if (classIds.length > 0) {
+    const learning = await sb.from('learning_sessions').select('id').in('class_id', classIds)
+    if (learning.error) return { ok: false, error: `learning sessions: ${learning.error.message}` }
+    const learningIds = (learning.data ?? []).map((row) => row.id as string)
+
+    if (learningIds.length > 0) {
+      const attendance = await sb.from('attendance_records').delete().in('learning_session_id', learningIds)
+      const attendanceError = fail('attendance', attendance.error)
+      if (attendanceError) return attendanceError
+
+      // Deleting learning_sessions cascades session questions, attempts, snapshots, and events.
+      const learningDelete = await sb.from('learning_sessions').delete().in('id', learningIds)
+      const learningDeleteError = fail('learning sessions', learningDelete.error)
+      if (learningDeleteError) return learningDeleteError
+    }
+
+    const scheduled = await sb.from('scheduled_sessions').delete().in('class_id', classIds)
+    const scheduledError = fail('scheduled sessions', scheduled.error)
+    if (scheduledError) return scheduledError
+
+    const enrollments = await sb.from('enrollments').delete().in('class_id', classIds)
+    const enrollmentError = fail('enrollments', enrollments.error)
+    if (enrollmentError) return enrollmentError
+
+    const classDelete = await sb.from('classes').delete().in('id', classIds)
+    const classDeleteError = fail('classes', classDelete.error)
+    if (classDeleteError) return classDeleteError
+  }
+
+  if (courseIds.length > 0) {
+    const courseDelete = await sb.from('courses').delete().in('id', courseIds)
+    const courseDeleteError = fail('courses', courseDelete.error)
+    if (courseDeleteError) return courseDeleteError
+  }
+
+  if (learnerUserIds.length > 0) {
+    const membershipDelete = await sb
+      .from('organization_memberships')
+      .delete()
+      .eq('organization_id', organizationId)
+      .eq('role', 'learner')
+    const membershipDeleteError = fail('learner memberships', membershipDelete.error)
+    if (membershipDeleteError) return membershipDeleteError
+
+    const userDelete = await sb.from('users').delete().in('id', learnerUserIds)
+    const userDeleteError = fail('learner users', userDelete.error)
+    if (userDeleteError) return userDeleteError
+  }
+
+  return { ok: true }
+}
+
 export type ClerkWorkspaceIdentity = {
   clerkUserId: string
   email: string | null

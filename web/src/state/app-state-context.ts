@@ -29,6 +29,8 @@ export type AppStateValue = {
   ) => { ok: true } | { ok: false; error: string }
   /** Clear all local data (empty org) and push empty to cloud on next sync */
   resetAll: () => void
+  /** Permanently delete old learning data + learners from cloud and local state; preserves staff accounts. */
+  deleteAllLearningData: () => Promise<boolean>
   backendStatus: BackendStatus
   backendError: string | null
   lastSyncedAt: string | null
@@ -40,6 +42,7 @@ export type AppStateValue = {
   syncNow: (override?: {
     roster?: RosterState
     scheduling?: SchedulingState
+    pruneMissing?: boolean
   }) => Promise<boolean>
   reloadFromSupabase: () => Promise<void>
   supabaseEnabled: boolean

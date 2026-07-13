@@ -7,6 +7,7 @@ import type { RosterState } from '../modules/roster/types'
 import { emptySchedulingState } from '../modules/scheduling/session-lifecycle'
 import type { SchedulingState } from '../modules/scheduling/types'
 import {
+  deleteWorkspaceLearningDataFromSupabase,
   ensureClerkWorkspace,
   isSupabaseConfigured,
   loadWorkspaceFromSupabase,
@@ -403,8 +404,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     clearPersistedAppState()
     saveActiveLearnerId(null)
     setActiveLearnerUserIdState(null)
-    allowEmptyWipeOnce.current = true
-    skipNextSync.current = false
+    allowEmptyWipeOnce.current = false
+    skipNextSync.current = true
     setRoster(createEmptyRoster())
     setScheduling(emptySchedulingState())
     setCapture(null)
@@ -413,8 +414,58 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setMetricSettingsState(createDefaultMetricSettings())
   }, [])
 
+  const deleteAllLearningData = useCallback(async () => {
+    if (!isSupabaseConfigured()) {
+      setBackendStatus('offline')
+      setBackendError('Supabase not configured')
+      return false
+    }
+    if (!staffSession.authBypass && !staffSession.signedIn) {
+      setBackendError('Sign in as staff to delete workspace data')
+      return false
+    }
+    if (!staffSession.authBypass && !staffSession.staffRoles.includes('admin')) {
+      setBackendError('Admin role required to delete workspace data')
+      return false
+    }
+
+    setBackendStatus('syncing')
+    const stableRoster = ensureStableOrg(roster)
+    const orgId = stableRoster.organization.id
+    const result = await deleteWorkspaceLearningDataFromSupabase(orgId)
+    if (!result.ok) {
+      setBackendStatus('error')
+      setBackendError(syncPhaseError('write', result.error))
+      return false
+    }
+
+    clearPersistedAppState()
+    saveActiveLearnerId(null)
+    saveActiveClassId(null)
+    saveActiveLearnerClassId(null)
+    setActiveLearnerUserIdState(null)
+    setActiveClassIdState(null)
+    setActiveLearnerClassIdState(null)
+    skipNextSync.current = false
+    allowEmptyWipeOnce.current = false
+
+    const staffUsers = stableRoster.users.filter((user) =>
+      user.roles.some((role) => role === 'admin' || role === 'teacher'),
+    )
+    setRoster({ ...createEmptyRoster(), organization: stableRoster.organization, users: staffUsers })
+    setScheduling(emptySchedulingState())
+    setCapture(null)
+    setLedger([])
+    setAuditLog([])
+    setMetricSettingsState(createDefaultMetricSettings())
+    setBackendStatus('online')
+    setBackendError(null)
+    setLastSyncedAt(new Date().toISOString())
+    return true
+  }, [roster, staffSession.authBypass, staffSession.signedIn, staffSession.staffRoles])
+
   const syncNow = useCallback(
-    async (override?: { roster?: RosterState; scheduling?: SchedulingState }) => {
+    async (override?: { roster?: RosterState; scheduling?: SchedulingState; pruneMissing?: boolean }) => {
       if (!isSupabaseConfigured()) {
         setBackendStatus('offline')
         return false
@@ -444,6 +495,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       const result = await saveWorkspaceToSupabase(normalized, {
         allowEmptyWipe: allowEmptyWipeOnce.current,
+        pruneMissing: override?.pruneMissing,
       })
       allowEmptyWipeOnce.current = false
       if (result.ok) {
@@ -564,6 +616,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       appendFinalizedFromCapture,
       correctResult,
       resetAll,
+      deleteAllLearningData,
       backendStatus,
       backendError,
       lastSyncedAt,
@@ -588,6 +641,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       appendFinalizedFromCapture,
       correctResult,
       resetAll,
+      deleteAllLearningData,
       backendStatus,
       backendError,
       lastSyncedAt,

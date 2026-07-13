@@ -866,21 +866,14 @@ export function deleteUserProfile(
   if (state.classes.some((c) => c.teacherUserId === userId && c.status === 'active')) {
     return { ok: false, error: 'Cannot delete teacher assigned to an active class' }
   }
-  if (user.roles.includes('learner') && state.enrollments.some((e) => e.learnerUserId === userId)) {
-    const now = new Date().toISOString()
+  if (user.roles.includes('learner')) {
     return {
       ok: true,
       value: { id: userId },
       state: {
         ...state,
-        users: state.users.map((u) =>
-          u.id === userId ? { ...u, accountStatus: 'inactive' as const } : u,
-        ),
-        enrollments: state.enrollments.map((e) =>
-          e.learnerUserId === userId && e.status === 'active'
-            ? { ...e, status: 'ended' as const, endedAt: now }
-            : e,
-        ),
+        users: state.users.filter((u) => u.id !== userId),
+        enrollments: state.enrollments.filter((e) => e.learnerUserId !== userId),
       },
     }
   }

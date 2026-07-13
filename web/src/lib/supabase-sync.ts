@@ -660,54 +660,57 @@ export async function saveWorkspaceToSupabase(
     // 7) Scheduled sessions — upsert; optional prune
     {
       const classIds = roster.classes.map((c) => c.id)
+      const classIdSet = new Set(classIds)
+      const scheduledRows = dedupeById(scheduling.scheduledSessions).filter((s) =>
+        classIdSet.has(s.classId),
+      )
+      const scheduledIds = new Set(scheduledRows.map((s) => s.id))
+
       if (prune && classIds.length > 0) {
         const { data: existing } = await sb
           .from('scheduled_sessions')
           .select('id')
           .in('class_id', classIds)
         const toDelete = prunableIds(
-          scheduling.scheduledSessions.map((s) => s.id),
+          scheduledRows.map((s) => s.id),
           (existing ?? []).map((s) => s.id as string),
           new Set(),
         )
         if (toDelete.length > 0) await sb.from('scheduled_sessions').delete().in('id', toDelete)
       }
 
-      const scheduledRows = dedupeById(scheduling.scheduledSessions)
-      const scheduledIds = new Set(scheduledRows.map((s) => s.id))
       if (scheduledRows.length > 0) {
-        // Two-phase write: never include self-referential rescheduled_from_id in the bulk upsert.
-        // PostgREST can reject the whole request with 409 if the referenced row is not already
-        // visible remotely, even when both rows are in the same local payload.
+        // Keep POST minimal to avoid PostgREST 409s from optional columns/FKs. Optional fields are
+        // updated after rows exist. This also drops orphan schedules whose class no longer exists.
         const baseRows = scheduledRows.map((s) => ({
           id: s.id,
           class_id: s.classId,
           planned_start: s.plannedStart,
           duration_minutes: s.durationMinutes,
           status: s.status,
-          rescheduled_from_id: null as string | null,
-          session_number: s.sessionNumber,
         }))
         const { error } = await sb.from('scheduled_sessions').upsert(baseRows, { onConflict: 'id' })
-        if (error) {
-          const { error: e2 } = await sb.from('scheduled_sessions').upsert(
-            baseRows.map(({ session_number: _sessionNumber, ...row }) => row),
-            { onConflict: 'id' },
-          )
-          if (e2) return { ok: false, error: `scheduled: ${e2.message}` }
-        }
+        if (error) return { ok: false, error: `scheduled: ${error.message}` }
 
         for (const row of scheduledRows) {
-          const rescheduledFromId =
-            row.rescheduledFromId && scheduledIds.has(row.rescheduledFromId)
-              ? row.rescheduledFromId
-              : null
-          if (!rescheduledFromId) continue
-          const { error: refError } = await sb
+          const patch: { session_number?: number | null; rescheduled_from_id?: string | null } = {
+            session_number: row.sessionNumber,
+            rescheduled_from_id:
+              row.rescheduledFromId && scheduledIds.has(row.rescheduledFromId)
+                ? row.rescheduledFromId
+                : null,
+          }
+          const { error: patchError } = await sb
             .from('scheduled_sessions')
-            .update({ rescheduled_from_id: rescheduledFromId })
+            .update(patch)
             .eq('id', row.id)
-          if (refError) return { ok: false, error: `scheduled refs: ${refError.message}` }
+          if (patchError) {
+            const { error: fallbackError } = await sb
+              .from('scheduled_sessions')
+              .update({ rescheduled_from_id: patch.rescheduled_from_id })
+              .eq('id', row.id)
+            if (fallbackError) return { ok: false, error: `scheduled refs: ${fallbackError.message}` }
+          }
         }
       }
     }

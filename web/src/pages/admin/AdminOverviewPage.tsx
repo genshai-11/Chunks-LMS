@@ -1,4 +1,4 @@
-import { ChartColumn, Gauge, LayoutDashboard, Link2, RotateCcw, Users } from 'lucide-react'
+import { BookOpen, ChartColumn, Gauge, GraduationCap, LayoutDashboard, Link2, RotateCcw, Users } from 'lucide-react'
 import { PageHeader } from '../../components/PageHeader'
 import { NavTile, Panel, StatCard } from '../../components/ui'
 import { listLearners, listTeachers } from '../../modules/roster/service'
@@ -20,8 +20,8 @@ export function AdminOverviewPage() {
       <PageHeader
         icon={LayoutDashboard}
         kicker="Admin"
-        title="Accounts & metrics"
-        subtitle="Manage teacher/learner accounts and which metrics appear on Analysis charts. Courses and live sessions are owned by Teacher."
+        title="Admin workspace"
+        subtitle="Manage accounts, courses, classes, and the metric catalog. Teachers only assign class labels and run live sessions."
         actions={
           <button
             type="button"
@@ -73,7 +73,7 @@ export function AdminOverviewPage() {
       <Panel
         icon={LayoutDashboard}
         title="Do next"
-        description="Admin scope: accounts + metric catalog only."
+        description="Admin owns Programs/Courses and Classes; Teacher only uses assigned class labels."
       >
         <div className="list-cards">
           <NavTile
@@ -84,8 +84,22 @@ export function AdminOverviewPage() {
             icon={Users}
           />
           <NavTile
-            to="/admin/metrics"
+            to="/admin/courses"
             step="2"
+            title="Courses"
+            description="Create and edit program/course templates."
+            icon={BookOpen}
+          />
+          <NavTile
+            to="/admin/classes"
+            step="3"
+            title="Classes"
+            description="Create class labels, assign teacher, start date, capacity, and session plan."
+            icon={GraduationCap}
+          />
+          <NavTile
+            to="/admin/metrics"
+            step="4"
             title="Metrics"
             description="Enable RFC, RAC, n count / n depth max / n depth avg for charts."
             icon={Gauge}

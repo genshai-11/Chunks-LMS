@@ -544,8 +544,8 @@ export function TeacherObservePage() {
 
   const finishSessionAndSave = useCallback(() => {
     if (!capture || !openSession || finishing) return
-    setShowConfirmFinish(true)
-  }, [capture, openSession, finishing])
+    void handleConfirmFinish()
+  }, [capture, openSession, finishing, handleConfirmFinish])
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {

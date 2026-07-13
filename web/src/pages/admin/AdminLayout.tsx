@@ -1,6 +1,8 @@
 import {
+  BookOpen,
   ChartColumn,
   Gauge,
+  GraduationCap,
   LayoutDashboard,
   ShieldCheck,
   Users,
@@ -8,10 +10,11 @@ import {
 import { RoleWorkspace } from '../../components/RoleWorkspace'
 import { useAppState } from '../../state/useAppState'
 
-/** Admin owns accounts + metrics only; courses/classes live under Teacher. */
 const ITEMS = [
   { to: '/admin', label: 'Home', icon: LayoutDashboard, end: true },
   { to: '/admin/people', label: 'Accounts', icon: Users },
+  { to: '/admin/courses', label: 'Courses', icon: BookOpen },
+  { to: '/admin/classes', label: 'Classes', icon: GraduationCap },
   { to: '/admin/metrics', label: 'Metrics', icon: Gauge },
   { to: '/admin/analysis', label: 'Analysis', icon: ChartColumn },
   { to: '/admin/integrity', label: 'Integrity', icon: ShieldCheck },

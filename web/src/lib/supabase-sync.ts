@@ -676,31 +676,38 @@ export async function saveWorkspaceToSupabase(
       const scheduledRows = dedupeById(scheduling.scheduledSessions)
       const scheduledIds = new Set(scheduledRows.map((s) => s.id))
       if (scheduledRows.length > 0) {
-        const { error } = await sb.from('scheduled_sessions').upsert(
-          scheduledRows.map((s) => ({
-            id: s.id,
-            class_id: s.classId,
-            planned_start: s.plannedStart,
-            duration_minutes: s.durationMinutes,
-            status: s.status,
-            rescheduled_from_id: s.rescheduledFromId && scheduledIds.has(s.rescheduledFromId) ? s.rescheduledFromId : null,
-            session_number: s.sessionNumber,
-          })),
-          { onConflict: 'id' },
-        )
+        // Two-phase write: never include self-referential rescheduled_from_id in the bulk upsert.
+        // PostgREST can reject the whole request with 409 if the referenced row is not already
+        // visible remotely, even when both rows are in the same local payload.
+        const baseRows = scheduledRows.map((s) => ({
+          id: s.id,
+          class_id: s.classId,
+          planned_start: s.plannedStart,
+          duration_minutes: s.durationMinutes,
+          status: s.status,
+          rescheduled_from_id: null as string | null,
+          session_number: s.sessionNumber,
+        }))
+        const { error } = await sb.from('scheduled_sessions').upsert(baseRows, { onConflict: 'id' })
         if (error) {
           const { error: e2 } = await sb.from('scheduled_sessions').upsert(
-            scheduledRows.map((s) => ({
-              id: s.id,
-              class_id: s.classId,
-              planned_start: s.plannedStart,
-              duration_minutes: s.durationMinutes,
-              status: s.status,
-              rescheduled_from_id: s.rescheduledFromId && scheduledIds.has(s.rescheduledFromId) ? s.rescheduledFromId : null,
-            })),
+            baseRows.map(({ session_number: _sessionNumber, ...row }) => row),
             { onConflict: 'id' },
           )
           if (e2) return { ok: false, error: `scheduled: ${e2.message}` }
+        }
+
+        for (const row of scheduledRows) {
+          const rescheduledFromId =
+            row.rescheduledFromId && scheduledIds.has(row.rescheduledFromId)
+              ? row.rescheduledFromId
+              : null
+          if (!rescheduledFromId) continue
+          const { error: refError } = await sb
+            .from('scheduled_sessions')
+            .update({ rescheduled_from_id: rescheduledFromId })
+            .eq('id', row.id)
+          if (refError) return { ok: false, error: `scheduled refs: ${refError.message}` }
         }
       }
     }

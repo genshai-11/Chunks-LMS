@@ -32,6 +32,77 @@ export type SyncResult = { ok: true; source: 'supabase' | 'empty' } | { ok: fals
 
 export type VerifySyncResult = { ok: true } | { ok: false; error: string }
 
+type DeleteFail = { ok: false; error: string }
+
+function failDelete(scope: string, error: { message?: string } | null): DeleteFail | null {
+  return error ? { ok: false, error: `${scope}: ${error.message ?? 'unknown error'}` } : null
+}
+
+async function deleteAttemptsForLearners(
+  sb: SupabaseClient,
+  learnerUserIds: string[],
+): Promise<DeleteFail | null> {
+  if (learnerUserIds.length === 0) return null
+  const attemptDelete = await sb.from('assessment_attempts').delete().in('learner_user_id', learnerUserIds)
+  return failDelete('assessment attempts', attemptDelete.error)
+}
+
+async function deleteAttemptsForLearningSessions(
+  sb: SupabaseClient,
+  learningSessionIds: string[],
+): Promise<DeleteFail | null> {
+  if (learningSessionIds.length === 0) return null
+  const attemptDelete = await sb
+    .from('assessment_attempts')
+    .delete()
+    .in('learning_session_id', learningSessionIds)
+  return failDelete('assessment attempts', attemptDelete.error)
+}
+
+async function pruneLearnerSessionRows(
+  sb: SupabaseClient,
+  learnerUserIds: string[],
+): Promise<DeleteFail | null> {
+  if (learnerUserIds.length === 0) return null
+  const sessions = await sb.from('learning_sessions').select('id, participant_learner_ids')
+  if (sessions.error) return { ok: false, error: `learning sessions lookup: ${sessions.error.message}` }
+
+  const deleteIds: string[] = []
+  const updates: Array<{ id: string; participant_learner_ids: string[] }> = []
+  const learnerSet = new Set(learnerUserIds)
+  for (const row of sessions.data ?? []) {
+    const participants = Array.isArray(row.participant_learner_ids)
+      ? (row.participant_learner_ids as string[])
+      : []
+    if (!participants.some((id) => learnerSet.has(id))) continue
+    const next = participants.filter((id) => !learnerSet.has(id))
+    if (next.length === 0) deleteIds.push(row.id as string)
+    else updates.push({ id: row.id as string, participant_learner_ids: next })
+  }
+
+  if (deleteIds.length > 0) {
+    const attemptError = await deleteAttemptsForLearningSessions(sb, deleteIds)
+    if (attemptError) return attemptError
+    const attendanceDelete = await sb.from('attendance_records').delete().in('learning_session_id', deleteIds)
+    const attendanceError = failDelete('attendance', attendanceDelete.error)
+    if (attendanceError) return attendanceError
+    const sessionDelete = await sb.from('learning_sessions').delete().in('id', deleteIds)
+    const sessionError = failDelete('learning sessions', sessionDelete.error)
+    if (sessionError) return sessionError
+  }
+
+  for (const update of updates) {
+    const patched = await sb
+      .from('learning_sessions')
+      .update({ participant_learner_ids: update.participant_learner_ids })
+      .eq('id', update.id)
+    const patchError = failDelete('learning session participants', patched.error)
+    if (patchError) return patchError
+  }
+
+  return null
+}
+
 export async function deleteWorkspaceLearningDataFromSupabase(
   organizationId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -67,11 +138,14 @@ export async function deleteWorkspaceLearningDataFromSupabase(
     const learningIds = (learning.data ?? []).map((row) => row.id as string)
 
     if (learningIds.length > 0) {
+      const attemptError = await deleteAttemptsForLearningSessions(sb, learningIds)
+      if (attemptError) return attemptError
+
       const attendance = await sb.from('attendance_records').delete().in('learning_session_id', learningIds)
       const attendanceError = fail('attendance', attendance.error)
       if (attendanceError) return attendanceError
 
-      // Deleting learning_sessions cascades session questions, attempts, snapshots, and events.
+      // Deleting learning_sessions cascades remaining session questions, attempts, snapshots, and events.
       const learningDelete = await sb.from('learning_sessions').delete().in('id', learningIds)
       const learningDeleteError = fail('learning sessions', learningDelete.error)
       if (learningDeleteError) return learningDeleteError
@@ -659,14 +733,23 @@ export async function saveWorkspaceToSupabase(
           const pureDeleteUserIds = toDeleteUserIds.filter((id) => !otherMemberUserIds.has(id))
 
           if (pureDeleteUserIds.length > 0) {
-            // Delete enrollments
-            await sb.from('enrollments').delete().in('learner_user_id', pureDeleteUserIds)
-            // Delete attendance
-            await sb.from('attendance_records').delete().in('learner_user_id', pureDeleteUserIds)
-            // Delete assessment attempts (cascades to snapshots, events)
-            await sb.from('assessment_attempts').delete().in('learner_user_id', pureDeleteUserIds)
-            // Delete the users
-            await sb.from('users').delete().in('id', pureDeleteUserIds)
+            const sessionError = await pruneLearnerSessionRows(sb, pureDeleteUserIds)
+            if (sessionError) return sessionError
+
+            const enrollmentDelete = await sb.from('enrollments').delete().in('learner_user_id', pureDeleteUserIds)
+            const enrollmentError = failDelete('enrollments', enrollmentDelete.error)
+            if (enrollmentError) return enrollmentError
+
+            const attendanceDelete = await sb.from('attendance_records').delete().in('learner_user_id', pureDeleteUserIds)
+            const attendanceError = failDelete('attendance', attendanceDelete.error)
+            if (attendanceError) return attendanceError
+
+            const attemptError = await deleteAttemptsForLearners(sb, pureDeleteUserIds)
+            if (attemptError) return attemptError
+
+            const userDelete = await sb.from('users').delete().in('id', pureDeleteUserIds)
+            const userError = failDelete('users', userDelete.error)
+            if (userError) return userError
           }
         }
       }

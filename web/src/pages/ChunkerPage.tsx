@@ -156,11 +156,15 @@ export function ChunkerPage() {
     const nextScheduling: SchedulingState = {
       ...scheduling,
       attendance: scheduling.attendance.filter((row) => row.learnerUserId !== selectedLearner.id),
-      learningSessions: scheduling.learningSessions.map((session) =>
-        session.participantLearnerIds?.includes(selectedLearner.id)
-          ? { ...session, participantLearnerIds: session.participantLearnerIds.filter((id) => id !== selectedLearner.id) }
-          : session,
-      ),
+      learningSessions: scheduling.learningSessions
+        .map((session) => {
+          if (!session.participantLearnerIds?.includes(selectedLearner.id)) return session
+          const nextParticipants = session.participantLearnerIds.filter((id) => id !== selectedLearner.id)
+          return nextParticipants.length > 0
+            ? { ...session, participantLearnerIds: nextParticipants }
+            : null
+        })
+        .filter((session): session is SchedulingState['learningSessions'][number] => Boolean(session)),
     }
     const nextLedger = ledger.filter((row) => row.learnerUserId !== selectedLearner.id)
     setSelectedLearnerId(null)

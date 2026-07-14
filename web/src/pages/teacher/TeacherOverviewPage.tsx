@@ -57,6 +57,7 @@ export function TeacherOverviewPage() {
     capture,
     setCapture,
     ledger,
+    setLedger,
     metricSettings,
     activeLearnerUserId,
     setActiveLearnerUserId,
@@ -189,12 +190,27 @@ export function TeacherOverviewPage() {
     if (!window.confirm(`Delete learner ${learnerName}? This removes their class labels. Historical reports stay in the ledger.`)) return
     const result = deleteUserProfile(roster, learnerId)
     if (!result.ok) return err(result.error)
-    const cleanup = closeOrphanOpenSessions(result.state, scheduling)
+    const withoutLearnerSessions = {
+      ...scheduling,
+      attendance: scheduling.attendance.filter((row) => row.learnerUserId !== learnerId),
+      learningSessions: scheduling.learningSessions
+        .map((session) => {
+          if (!session.participantLearnerIds?.includes(learnerId)) return session
+          const nextParticipants = session.participantLearnerIds.filter((id) => id !== learnerId)
+          return nextParticipants.length > 0
+            ? { ...session, participantLearnerIds: nextParticipants }
+            : null
+        })
+        .filter((session): session is (typeof scheduling.learningSessions)[number] => Boolean(session)),
+    }
+    const cleanup = closeOrphanOpenSessions(result.state, withoutLearnerSessions)
     setRoster(result.state)
-    if (cleanup.changed) setScheduling(cleanup.state)
+    setScheduling(cleanup.state)
+    setLedger(ledger.filter((row) => row.learnerUserId !== learnerId))
+    if (capture?.learnerIds.includes(learnerId)) setCapture(null)
     if (activeLearnerUserId === learnerId) setActiveLearnerUserId(null)
     await syncNow({ roster: result.state, scheduling: cleanup.state, pruneMissing: true })
-    ok(cleanup.changed ? 'Learner deleted and stale live session closed' : 'Learner deleted')
+    ok('Learner and learner data deleted')
   }
 
   async function assignActiveClass(learnerId: string) {

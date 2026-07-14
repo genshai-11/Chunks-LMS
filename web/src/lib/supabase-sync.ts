@@ -647,8 +647,9 @@ export async function saveWorkspaceToSupabase(
 
       const compactAvatar = (url: string | null) => {
         if (!url) return null
-        // Huge data-URLs blow PostgREST payloads → 400
-        if (url.startsWith('data:') && url.length > 40_000) return null
+        // Uploaded avatars are compressed client-side. Keep a hard cap so an accidental
+        // raw base64 photo cannot break workspace sync payloads.
+        if (url.startsWith('data:') && url.length > 100_000) return null
         return url
       }
 

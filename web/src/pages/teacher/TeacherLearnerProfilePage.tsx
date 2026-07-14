@@ -6,6 +6,7 @@ import { PageHeader } from '../../components/PageHeader'
 import { UserAvatar } from '../../components/UserAvatar'
 import { EmptyState, Panel, StatCard } from '../../components/ui'
 import { useFlash } from '../../hooks/useFlash'
+import { readImageAsDataUrl } from '../../lib/readImageFile'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import { updateUserProfile } from '../../modules/roster/service'
 import {
@@ -106,11 +107,13 @@ export function TeacherLearnerProfilePage() {
     setColumns((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
-  function changeImage(file: File | null) {
+  async function changeImage(file: File | null) {
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => setAvatarUrl(String(reader.result ?? ''))
-    reader.readAsDataURL(file)
+    try {
+      setAvatarUrl(await readImageAsDataUrl(file))
+    } catch (caught) {
+      err(caught instanceof Error ? caught.message : 'Could not read image')
+    }
   }
 
   return (

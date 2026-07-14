@@ -22,6 +22,7 @@ import { UserAvatar } from '../../components/UserAvatar'
 import { EmptyState, Panel, StatCard } from '../../components/ui'
 import { useFlash } from '../../hooks/useFlash'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
+import { readImageAsDataUrl } from '../../lib/readImageFile'
 import {
   addLearnerProfile,
   deleteUserProfile,
@@ -142,11 +143,13 @@ export function TeacherOverviewPage() {
   const selectedLearner =
     learners.find((learner) => learner.id === activeLearnerUserId) ?? learners[0] ?? null
 
-  function setImageFromFile(file: File | null, setter: (value: string) => void) {
+  async function setImageFromFile(file: File | null, setter: (value: string) => void) {
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => setter(String(reader.result ?? ''))
-    reader.readAsDataURL(file)
+    try {
+      setter(await readImageAsDataUrl(file))
+    } catch (caught) {
+      err(caught instanceof Error ? caught.message : 'Could not read image')
+    }
   }
 
   async function addLearner() {

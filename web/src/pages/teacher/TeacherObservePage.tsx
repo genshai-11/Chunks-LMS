@@ -124,6 +124,7 @@ export function TeacherObservePage() {
     appendFinalizedFromCapture,
     scheduling,
     setScheduling,
+    activeLearnerUserId,
     syncNow,
   } = useAppState()
   const [toast, setToast] = useState<string | null>(null)
@@ -233,28 +234,36 @@ export function TeacherObservePage() {
     // Push open day to server (best-effort) so RPC can work when online
     void ensureLearningSessionOnServer(openSession)
 
-    // Prefer existing capture board as fallback so cloud empty/errors don't wipe local work
+    // Prefer existing capture board only when it belongs to the same live session and same learners.
+    // Never reuse a richer board from another learner/session — that opens Observe on the wrong learner.
     const existing = captureRef.current
+    const compatibleExisting =
+      existing &&
+      existing.learningSessionId === openSession.id &&
+      existing.learnerIds.length === learnerIds.length &&
+      learnerIds.every((id) => existing.learnerIds.includes(id))
+        ? existing
+        : null
     const result = await loadLiveCapture({
       learningSessionId: openSession.id,
       teacherUserId: teacher.id,
       learnerIds,
       sessionStatus: openSession.status,
       maxProbeCount: openSession.maxProbeCount,
-      fallback: existing,
+      fallback: compatibleExisting,
     })
     if (result.ok) {
-      // Don't overwrite a richer local board with an empty cloud board
+      // Don't overwrite a richer compatible local board with an empty cloud board
       if (
-        existing &&
-        existing.questions.length > 0 &&
-        result.data.questions.length < existing.questions.length
+        compatibleExisting &&
+        compatibleExisting.questions.length > 0 &&
+        result.data.questions.length < compatibleExisting.questions.length
       ) {
         setLiveLoading(false)
         return
       }
       setCapture(result.data)
-    } else if (!existing) {
+    } else if (!compatibleExisting) {
       const { createCaptureSession } = await import('../../modules/assessment/session-capture')
       setCapture(
         createCaptureSession({
@@ -309,6 +318,18 @@ export function TeacherObservePage() {
     : null
   const dayLabel = sessionLabel(dayNumber, openSession?.startedAt, totalDays)
   const dayBadge = sessionDayBadge(dayNumber, totalDays)
+  const openParticipants = openSession?.participantLearnerIds?.length
+    ? openSession.participantLearnerIds
+    : activeLearnerIds
+  const activeLearnerMismatch = Boolean(
+    activeLearnerUserId && openSession && !openParticipants.includes(activeLearnerUserId),
+  )
+  const activeLearnerName = activeLearnerUserId
+    ? roster.users.find((user) => user.id === activeLearnerUserId)?.displayName ?? activeLearnerUserId.slice(0, 6)
+    : null
+  const openLearnerNames = openParticipants
+    .map((id) => roster.users.find((user) => user.id === id)?.displayName ?? id.slice(0, 6))
+    .join(', ')
 
   // Keep browser URL in sync: /teacher/observe#day-3
   useEffect(() => {
@@ -633,6 +654,26 @@ export function TeacherObservePage() {
 
   if (!openSession) {
     return <Navigate to={exitPath} replace />
+  }
+
+  if (activeLearnerMismatch) {
+    return (
+      <div className="observe-root flex items-center justify-center">
+        <div className="observe-modal-card" role="alert">
+          <h2 className="observe-modal-title">Wrong live session</h2>
+          <p className="observe-modal-desc">
+            {activeLearnerName} is selected, but the open live session is for{' '}
+            {openLearnerNames || 'another learner'}. Finish that live session before starting a new
+            one.
+          </p>
+          <div className="observe-modal-actions">
+            <button type="button" className="observe-modal-btn observe-modal-confirm" onClick={() => navigate('/teacher')}>
+              Back to learners
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (liveLoading || !capture || capture.learningSessionId !== openSession.id) {

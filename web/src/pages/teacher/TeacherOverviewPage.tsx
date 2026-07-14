@@ -208,12 +208,36 @@ export function TeacherOverviewPage() {
       (session) => session.classId === preferredClassId && session.status === 'open',
     )
     if (open) {
-      const includesLearner = open.participantLearnerIds?.length
-        ? open.participantLearnerIds.includes(learnerId)
-        : true
-      if (!includesLearner) return err('Finish the current class session before starting a new one')
+      const participants = open.participantLearnerIds?.length ? open.participantLearnerIds : []
+      const includesLearner = participants.length === 0 || participants.includes(learnerId)
+      if (!includesLearner) {
+        const names = participants
+          .map((id) => roster.users.find((user) => user.id === id)?.displayName ?? id.slice(0, 6))
+          .join(', ')
+        return err(
+          `A live session is already open for ${names || 'another learner'}. Finish it before starting ${
+            roster.users.find((user) => user.id === learnerId)?.displayName ?? 'this learner'
+          }.`,
+        )
+      }
       setActiveLearnerUserId(learnerId)
       setActiveClassId(preferredClassId)
+      if (
+        !capture ||
+        capture.learningSessionId !== open.id ||
+        (participants.length > 0 &&
+          (capture.learnerIds.length !== participants.length ||
+            participants.some((id) => !capture.learnerIds.includes(id))))
+      ) {
+        setCapture(
+          createCaptureSession({
+            learningSessionId: open.id,
+            teacherUserId: teacher.id,
+            learnerIds: participants.length ? participants : [learnerId],
+            maxProbeCount: open.maxProbeCount ?? metricSettings.defaultMaxProbeCount,
+          }),
+        )
+      }
       navigate('/teacher/observe')
       return
     }

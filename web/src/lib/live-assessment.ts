@@ -175,9 +175,17 @@ export async function loadLiveCapture(input: {
   /** Keep existing local board when cloud is empty/unavailable */
   fallback?: CaptureSessionState | null
 }): Promise<Result<CaptureSessionState>> {
+  const compatibleFallback =
+    input.fallback &&
+    input.fallback.learningSessionId === input.learningSessionId &&
+    input.fallback.learnerIds.length === input.learnerIds.length &&
+    input.learnerIds.every((id) => input.fallback?.learnerIds.includes(id))
+      ? input.fallback
+      : null
+
   const sb = client()
   if (!sb) {
-    if (input.fallback) return { ok: true, data: input.fallback }
+    if (compatibleFallback) return { ok: true, data: compatibleFallback }
     return { ok: false, error: 'Supabase is not configured' }
   }
 
@@ -192,7 +200,7 @@ export async function loadLiveCapture(input: {
 
   // Cloud read failed → keep local board
   if (questionsResult.error || attemptsResult.error) {
-    if (input.fallback) return { ok: true, data: input.fallback }
+    if (compatibleFallback) return { ok: true, data: compatibleFallback }
     return {
       ok: false,
       error: questionsResult.error?.message ?? attemptsResult.error?.message ?? 'load failed',
@@ -203,8 +211,8 @@ export async function loadLiveCapture(input: {
   const dbAttempts = (attemptsResult.data ?? []) as DbAttempt[]
 
   // Cloud empty but we already have local questions → keep local (local-first)
-  if (dbQuestions.length === 0 && input.fallback && input.fallback.questions.length > 0) {
-    return { ok: true, data: input.fallback }
+  if (dbQuestions.length === 0 && compatibleFallback && compatibleFallback.questions.length > 0) {
+    return { ok: true, data: compatibleFallback }
   }
 
   const attemptIds = dbAttempts.map((attempt) => attempt.id)
@@ -215,7 +223,7 @@ export async function loadLiveCapture(input: {
       .select('*')
       .in('attempt_id', attemptIds)
     if (snapshotResult.error) {
-      if (input.fallback) return { ok: true, data: input.fallback }
+      if (compatibleFallback) return { ok: true, data: compatibleFallback }
       return { ok: false, error: snapshotResult.error.message }
     }
     snapshots = (snapshotResult.data ?? []) as DbSnapshot[]
@@ -245,11 +253,8 @@ export async function loadLiveCapture(input: {
   })
 
   // Prefer richer board (local vs cloud)
-  if (
-    input.fallback &&
-    input.fallback.questions.length > questions.length
-  ) {
-    return { ok: true, data: input.fallback }
+  if (compatibleFallback && compatibleFallback.questions.length > questions.length) {
+    return { ok: true, data: compatibleFallback }
   }
 
   return {
@@ -263,7 +268,7 @@ export async function loadLiveCapture(input: {
       attempts,
       maxProbeCount: input.maxProbeCount,
       position: {
-        mode: input.mode ?? input.fallback?.position.mode ?? 'question_first',
+        mode: input.mode ?? compatibleFallback?.position.mode ?? 'question_first',
         questionIndex: Math.max(0, questions.length - 1),
         learnerIndex:
           questions.length > 0

@@ -161,7 +161,7 @@ export function TeacherSessionPage() {
     return () => sub.unsubscribe()
   }, [classRow, teacherActor, roster.organization.id, sessionLearnerIds])
 
-  // Resume capture board if learning session is still open but capture was lost
+  // Restore capture board if learning session is still open but capture was lost
   useEffect(() => {
     if (!openSession || !teacher) return
     if (

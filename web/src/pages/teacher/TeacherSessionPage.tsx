@@ -427,7 +427,7 @@ export function TeacherSessionPage() {
           <div className="page-actions">
             <Link to={observeTo} className="btn primary">
               <Eye className="h-4 w-4" aria-hidden />
-              <span>{finalizedCount > 0 ? `Resume ${dayBadge}` : `Observe ${dayBadge}`}</span>
+              <span>{finalizedCount > 0 ? `Open ${dayBadge}` : `Observe ${dayBadge}`}</span>
             </Link>
           </div>
         }
@@ -516,14 +516,14 @@ export function TeacherSessionPage() {
           <div className="observe-entry-info">
             <Info className="observe-entry-icon" aria-hidden />
             <p className="observe-entry-copy">
-              Leave this page anytime — use <strong>Resume live</strong> to continue. Observation is
+              Leave this page anytime — use <strong>Open live</strong> to continue. Observation is
               full-screen. Use learner-first mode to walk each learner’s questions in turn.
             </p>
           </div>
           <div className="btn-row">
             <Link to={observeTo} className="btn primary observe-entry-cta">
               <Eye className="h-4 w-4" aria-hidden />
-              <span>{finalizedCount > 0 ? `Resume ${dayBadge}` : `Enter ${dayBadge}`}</span>
+              <span>{finalizedCount > 0 ? `Open ${dayBadge}` : `Enter ${dayBadge}`}</span>
             </Link>
             <button
               type="button"

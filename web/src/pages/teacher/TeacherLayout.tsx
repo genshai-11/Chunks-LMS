@@ -33,7 +33,7 @@ export function TeacherLayout() {
   )
 
   const items = ITEMS.map((item) =>
-    item.to === '/teacher/session' && liveOpen ? { ...item, label: 'Live · resume' } : item,
+    item.to === '/teacher/session' && liveOpen ? { ...item, label: 'Live · open' } : item,
   )
 
   return (

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, BarChart3, Eye, EyeOff, Play, Save, UserRound } from 'lucide-react'
+import { ArrowLeft, BarChart3, Eye, EyeOff, ImagePlus, Play, Save, UserRound } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Flash } from '../../components/Flash'
 import { PageHeader } from '../../components/PageHeader'
@@ -50,13 +50,15 @@ export function TeacherLearnerProfilePage() {
   const learner = roster.users.find((u) => u.id === learnerId)
   const [name, setName] = useState(learner?.displayName ?? '')
   const [email, setEmail] = useState(learner?.email ?? '')
+  const [avatarUrl, setAvatarUrl] = useState(learner?.avatarUrl ?? '')
   const [showTable, setShowTable] = useState(true)
   const [columns, setColumns] = useState(DEFAULT_COLUMNS)
 
   useEffect(() => {
     setName(learner?.displayName ?? '')
     setEmail(learner?.email ?? '')
-  }, [learner?.displayName, learner?.email, learner?.id])
+    setAvatarUrl(learner?.avatarUrl ?? '')
+  }, [learner?.displayName, learner?.email, learner?.avatarUrl, learner?.id])
 
   const rows = useMemo(
     () =>
@@ -92,6 +94,7 @@ export function TeacherLearnerProfilePage() {
     const result = updateUserProfile(roster, learner.id, {
       displayName: name,
       email,
+      avatarUrl,
     })
     if (!result.ok) return err(result.error)
     setRoster(result.state)
@@ -101,6 +104,13 @@ export function TeacherLearnerProfilePage() {
 
   function toggleColumn(key: ColumnKey) {
     setColumns((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  function changeImage(file: File | null) {
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => setAvatarUrl(String(reader.result ?? ''))
+    reader.readAsDataURL(file)
   }
 
   return (
@@ -136,7 +146,29 @@ export function TeacherLearnerProfilePage() {
           description="Teacher can update learner name/email."
         >
           <div className="teacher-profile-card">
-            <UserAvatar name={learner.displayName} avatarUrl={learner.avatarUrl} size="xl" />
+            <UserAvatar name={learner.displayName} avatarUrl={avatarUrl || learner.avatarUrl} size="xl" />
+            <label>
+              Change image
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(event) => changeImage(event.target.files?.[0] ?? null)}
+              />
+            </label>
+            <label>
+              Image URL
+              <input
+                value={avatarUrl}
+                onChange={(event) => setAvatarUrl(event.target.value)}
+                placeholder="https://... or upload image"
+              />
+            </label>
+            {avatarUrl ? (
+              <button type="button" className="ghost" onClick={() => setAvatarUrl('')}>
+                <ImagePlus className="h-4 w-4" aria-hidden />
+                Remove image
+              </button>
+            ) : null}
             <label>
               Name
               <input value={name} onChange={(event) => setName(event.target.value)} />

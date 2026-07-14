@@ -9,7 +9,9 @@ import {
   List,
   Play,
   Radio,
+  Save,
   School,
+  Trash2,
   UserPlus,
   Users,
 } from 'lucide-react'
@@ -22,10 +24,12 @@ import { useFlash } from '../../hooks/useFlash'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import {
   addLearnerProfile,
+  deleteUserProfile,
   enrollLearner,
   formatClassInviteClipboard,
   learnerInviteUrl,
   listActiveLearners,
+  updateUserProfile,
 } from '../../modules/roster/service'
 import {
   formatPercent,
@@ -38,6 +42,7 @@ import { startLearningSession } from '../../modules/scheduling/session-lifecycle
 import { useAppState } from '../../state/useAppState'
 
 type ViewMode = 'grid' | 'list'
+type LearnerTab = 'overview' | 'manage'
 
 export function TeacherOverviewPage() {
   const {
@@ -57,9 +62,15 @@ export function TeacherOverviewPage() {
   const { options, classRow, course, teacher, seats, hasMultiple } = useTeacherClassContext()
   const navigate = useNavigate()
   const { message, error, ok, err } = useFlash()
+  const [activeTab, setActiveTab] = useState<LearnerTab>('overview')
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [newName, setNewName] = useState('')
   const [newEmail, setNewEmail] = useState('')
+  const [newAvatarUrl, setNewAvatarUrl] = useState('')
+  const [editingLearnerId, setEditingLearnerId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editEmail, setEditEmail] = useState('')
+  const [editAvatarUrl, setEditAvatarUrl] = useState('')
   const [startingLearnerId, setStartingLearnerId] = useState<string | null>(null)
 
   const openSession = scheduling.learningSessions.find(
@@ -126,18 +137,58 @@ export function TeacherOverviewPage() {
   const selectedLearner =
     learners.find((learner) => learner.id === activeLearnerUserId) ?? learners[0] ?? null
 
+  function setImageFromFile(file: File | null, setter: (value: string) => void) {
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => setter(String(reader.result ?? ''))
+    reader.readAsDataURL(file)
+  }
+
   async function addLearner() {
     const result = addLearnerProfile(roster, {
       displayName: newName,
       email: newEmail,
+      avatarUrl: newAvatarUrl,
     })
     if (!result.ok) return err(result.error)
     setRoster(result.state)
     setActiveLearnerUserId(result.value.id)
     setNewName('')
     setNewEmail('')
+    setNewAvatarUrl('')
     await syncNow({ roster: result.state })
     ok(`Added ${result.value.displayName}. Assign a class label when ready.`)
+  }
+
+  function startEditLearner(learner: (typeof learners)[number]) {
+    setEditingLearnerId(learner.id)
+    setEditName(learner.name)
+    setEditEmail(learner.email ?? '')
+    setEditAvatarUrl(learner.avatarUrl ?? '')
+  }
+
+  async function saveEditedLearner() {
+    if (!editingLearnerId) return
+    const result = updateUserProfile(roster, editingLearnerId, {
+      displayName: editName,
+      email: editEmail,
+      avatarUrl: editAvatarUrl,
+    })
+    if (!result.ok) return err(result.error)
+    setRoster(result.state)
+    await syncNow({ roster: result.state })
+    setEditingLearnerId(null)
+    ok('Learner updated')
+  }
+
+  async function removeLearner(learnerId: string, learnerName: string) {
+    if (!window.confirm(`Delete learner ${learnerName}? This removes their class labels. Historical reports stay in the ledger.`)) return
+    const result = deleteUserProfile(roster, learnerId)
+    if (!result.ok) return err(result.error)
+    setRoster(result.state)
+    if (activeLearnerUserId === learnerId) setActiveLearnerUserId(null)
+    await syncNow({ roster: result.state, pruneMissing: true })
+    ok('Learner deleted')
   }
 
   async function assignActiveClass(learnerId: string) {
@@ -243,22 +294,40 @@ export function TeacherOverviewPage() {
           <div className="page-actions">
             <button
               type="button"
-              className={viewMode === 'grid' ? 'active' : 'ghost'}
-              onClick={() => setViewMode('grid')}
-              title="Grid card view"
+              className={activeTab === 'overview' ? 'active' : 'ghost'}
+              onClick={() => setActiveTab('overview')}
             >
-              <LayoutGrid className="h-4 w-4" aria-hidden />
-              <span>Grid</span>
+              Learners
             </button>
             <button
               type="button"
-              className={viewMode === 'list' ? 'active' : 'ghost'}
-              onClick={() => setViewMode('list')}
-              title="Compact list view"
+              className={activeTab === 'manage' ? 'active' : 'ghost'}
+              onClick={() => setActiveTab('manage')}
             >
-              <List className="h-4 w-4" aria-hidden />
-              <span>List</span>
+              Quản lí learner
             </button>
+            {activeTab === 'overview' ? (
+              <>
+                <button
+                  type="button"
+                  className={viewMode === 'grid' ? 'active' : 'ghost'}
+                  onClick={() => setViewMode('grid')}
+                  title="Grid card view"
+                >
+                  <LayoutGrid className="h-4 w-4" aria-hidden />
+                  <span>Grid</span>
+                </button>
+                <button
+                  type="button"
+                  className={viewMode === 'list' ? 'active' : 'ghost'}
+                  onClick={() => setViewMode('list')}
+                  title="Compact list view"
+                >
+                  <List className="h-4 w-4" aria-hidden />
+                  <span>List</span>
+                </button>
+              </>
+            ) : null}
           </div>
         }
       />
@@ -285,35 +354,54 @@ export function TeacherOverviewPage() {
         />
       </div>
 
-      <Panel
-        icon={UserPlus}
-        title="Add learner"
-        description="Create the learner profile first. Assign a class label later when needed."
-      >
-        <div className="teacher-add-learner">
-          <label>
-            Learner name
-            <input
-              value={newName}
-              onChange={(event) => setNewName(event.target.value)}
-              placeholder="Nguyen An"
-            />
-          </label>
-          <label>
-            Email
-            <input
-              value={newEmail}
-              onChange={(event) => setNewEmail(event.target.value)}
-              placeholder="learner@example.com"
-            />
-          </label>
-          <button type="button" className="primary" onClick={addLearner}>
-            <UserPlus className="h-4 w-4" aria-hidden />
-            Add learner
-          </button>
-        </div>
-      </Panel>
+      {activeTab === 'manage' ? (
+        <Panel
+          icon={UserPlus}
+          title="Add learner"
+          description="Create learner profile, optional image, then assign a class label."
+        >
+          <div className="teacher-add-learner">
+            <label>
+              Learner name
+              <input
+                value={newName}
+                onChange={(event) => setNewName(event.target.value)}
+                placeholder="Nguyen An"
+              />
+            </label>
+            <label>
+              Email
+              <input
+                value={newEmail}
+                onChange={(event) => setNewEmail(event.target.value)}
+                placeholder="learner@example.com"
+              />
+            </label>
+            <label>
+              Image
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(event) => setImageFromFile(event.target.files?.[0] ?? null, setNewAvatarUrl)}
+              />
+            </label>
+            <label>
+              Image URL
+              <input
+                value={newAvatarUrl}
+                onChange={(event) => setNewAvatarUrl(event.target.value)}
+                placeholder="https://..."
+              />
+            </label>
+            <button type="button" className="primary" onClick={addLearner}>
+              <UserPlus className="h-4 w-4" aria-hidden />
+              Add learner
+            </button>
+          </div>
+        </Panel>
+      ) : null}
 
+      {activeTab === 'overview' ? (
       <Panel
         icon={Users}
         title="Learners"
@@ -442,7 +530,7 @@ export function TeacherOverviewPage() {
                             }}
                           >
                             <Play className="h-4 w-4" aria-hidden />
-                            Resume
+                            Open live
                           </Link>
                         ) : (
                           <button
@@ -464,6 +552,114 @@ export function TeacherOverviewPage() {
           </div>
         )}
       </Panel>
+      ) : null}
+
+      {activeTab === 'manage' ? (
+        <Panel
+          icon={Users}
+          title="Quản lí learner"
+          description="Thêm, xóa, sửa learner profile và ảnh đại diện."
+        >
+          {learners.length === 0 ? (
+            <EmptyState icon={Users} title="No learners yet" description="Add the first learner above." />
+          ) : (
+            <div className="table-wrap learner-list-table">
+              <table aria-label="Manage learners">
+                <thead>
+                  <tr>
+                    <th scope="col">Learner</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Email</th>
+                    <th scope="col">Image</th>
+                    <th scope="col">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {learners.map((learner) => {
+                    const editing = editingLearnerId === learner.id
+                    return (
+                      <tr key={learner.id}>
+                        <td>
+                          <UserAvatar
+                            name={editing ? editName || learner.name : learner.name}
+                            avatarUrl={editing ? editAvatarUrl || null : learner.avatarUrl}
+                            size="sm"
+                          />
+                        </td>
+                        <td>
+                          {editing ? (
+                            <input value={editName} onChange={(event) => setEditName(event.target.value)} />
+                          ) : (
+                            <strong>{learner.name}</strong>
+                          )}
+                        </td>
+                        <td>
+                          {editing ? (
+                            <input value={editEmail} onChange={(event) => setEditEmail(event.target.value)} />
+                          ) : (
+                            learner.email ?? 'No email'
+                          )}
+                        </td>
+                        <td>
+                          {editing ? (
+                            <div className="btn-row my-0">
+                              <input
+                                value={editAvatarUrl}
+                                onChange={(event) => setEditAvatarUrl(event.target.value)}
+                                placeholder="Image URL"
+                              />
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(event) =>
+                                  setImageFromFile(event.target.files?.[0] ?? null, setEditAvatarUrl)
+                                }
+                              />
+                            </div>
+                          ) : learner.avatarUrl ? (
+                            <span className="badge">Custom</span>
+                          ) : (
+                            <span className="meta">Default</span>
+                          )}
+                        </td>
+                        <td>
+                          <div className="btn-row my-0">
+                            {editing ? (
+                              <>
+                                <button type="button" className="primary" onClick={saveEditedLearner}>
+                                  <Save className="h-4 w-4" aria-hidden />
+                                  Save
+                                </button>
+                                <button type="button" className="ghost" onClick={() => setEditingLearnerId(null)}>
+                                  Cancel
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button type="button" className="ghost" onClick={() => startEditLearner(learner)}>
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  className="ghost"
+                                  onClick={() => void removeLearner(learner.id, learner.name)}
+                                >
+                                  <Trash2 className="h-4 w-4" aria-hidden />
+                                  Delete
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Panel>
+      ) : null}
 
       {capture?.sessionStatus === 'open' ? (
         <p className="meta">
@@ -555,7 +751,7 @@ function LearnerCard({
         {openSession ? (
           <Link to="/teacher/observe" className="btn primary" onClick={onSelect}>
             <Play className="h-4 w-4" aria-hidden />
-            Resume
+            Open live
           </Link>
         ) : (
           <button

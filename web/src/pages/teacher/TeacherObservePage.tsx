@@ -42,10 +42,7 @@ import {
   sessionDayHash,
   sessionLabel,
 } from '../../modules/reporting/session-series'
-import {
-  completeLearningSession,
-  recordAttendance,
-} from '../../modules/scheduling/session-lifecycle'
+import { completeLearningSession } from '../../modules/scheduling/session-lifecycle'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import { useAppState } from '../../state/useAppState'
 import {
@@ -105,7 +102,9 @@ function formatFinishSummary(capture: CaptureSessionState, className: string | n
     `2 Green: ${summary.byColor.green}`,
     `3 Purple: ${summary.byColor.purple}`,
     `Max probe depth: ${summary.maxProbeDepth}`,
-    unresolved > 0 ? `Unresolved/draft auto-closed: ${unresolved}` : 'All captured attempts finalized.',
+    unresolved > 0
+      ? `Left unfinalized when session closed: ${unresolved}`
+      : 'All captured attempts finalized.',
   ].join('\n')
 }
 
@@ -500,37 +499,16 @@ export function TeacherObservePage() {
 
   /**
    * Finish live session + persist:
-   * - marks missing attendance as present (required by completeLearningSession)
-   * - sets learning session completedAt
+   * - sets learning session completedAt so it cannot be resumed
    * - freezes capture (sessionStatus completed)
+   * - persists the completed scheduling snapshot explicitly (avoids stale React state)
    * - ledger already has finalized results via appendFinalizedFromCapture
    */
   const handleConfirmFinish = useCallback(async () => {
     if (!capture || !openSession || finishing) return
     setFinishing(true)
     try {
-      const learnerIds = capture.learnerIds
-      let sched = scheduling
-      // Ensure every rostered learner has attendance so complete can succeed
-      for (const learnerId of learnerIds) {
-        const has = sched.attendance.some(
-          (a) => a.learningSessionId === openSession.id && a.learnerUserId === learnerId,
-        )
-        if (!has) {
-          const att = recordAttendance(sched, {
-            learningSessionId: openSession.id,
-            learnerUserId: learnerId,
-            status: 'present',
-          })
-          if (!att.ok) {
-            flash(att.error)
-            return
-          }
-          sched = att.state
-        }
-      }
-
-      const done = completeLearningSession(sched, openSession.id, learnerIds)
+      const done = completeLearningSession(scheduling, openSession.id, capture.learnerIds)
       if (!done.ok) {
         flash(done.error)
         return
@@ -541,7 +519,7 @@ export function TeacherObservePage() {
       setCapture(completedCapture)
       appendFinalizedFromCapture(completedCapture)
       try {
-        await syncNow()
+        await syncNow({ scheduling: done.state })
       } catch {
         /* local persist still holds; backend may be offline */
       }

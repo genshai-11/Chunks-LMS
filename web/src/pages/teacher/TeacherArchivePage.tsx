@@ -63,8 +63,7 @@ export function TeacherArchivePage() {
                     >
                       <strong>{day.dayLabel}</strong>
                       <span className="meta">
-                        {day.learningSession.status} · {day.resultCount} results · att{' '}
-                        {day.attendancePresent}/{day.attendanceTotal || '—'}
+                        {day.learningSession.status} · {day.resultCount} finalized results
                       </span>
                       <span className="meta font-mono">
                         {new Date(day.learningSession.startedAt).toLocaleString()}

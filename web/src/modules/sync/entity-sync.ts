@@ -44,7 +44,7 @@ export function dedupeById<T extends { id: string }>(rows: T[]): T[] {
 /**
  * Merge remote scheduling into local so another browser's open session is not lost.
  * Remote open sessions win for the same class if local lacks them.
- * Local attendance/sessions are kept when IDs match (local status wins if both completed).
+ * Local sessions are kept when IDs match; completed is terminal and cannot be reopened by stale remote data.
  */
 export function mergeScheduling(local: SchedulingState, remote: SchedulingState): SchedulingState {
   const schedById = new Map(local.scheduledSessions.map((s) => [s.id, s]))
@@ -59,10 +59,8 @@ export function mergeScheduling(local: SchedulingState, remote: SchedulingState)
       lsById.set(s.id, s)
       continue
     }
-    // Prefer open remote if local completed wrongly, else keep local
-    if (s.status === 'open' && existing.status === 'completed') {
-      lsById.set(s.id, s)
-    } else if (s.status === 'open' && existing.status === 'open') {
+    // Completion is terminal. A stale remote open snapshot must never make Finish resumable again.
+    if (s.status === 'open' && existing.status === 'open') {
       // Prefer fresher lock / owner from remote if local has no owner
       if (!existing.ownerUserId && s.ownerUserId) lsById.set(s.id, { ...existing, ...s })
     }
@@ -70,7 +68,7 @@ export function mergeScheduling(local: SchedulingState, remote: SchedulingState)
 
   // Remote open session for a class: ensure present if local has none open for that class
   for (const s of remote.learningSessions) {
-    if (s.status !== 'open') continue
+    if (s.status !== 'open' || lsById.has(s.id)) continue
     const localOpen = [...lsById.values()].find(
       (x) => x.classId === s.classId && x.status === 'open',
     )

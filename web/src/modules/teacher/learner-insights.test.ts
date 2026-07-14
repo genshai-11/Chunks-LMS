@@ -37,6 +37,21 @@ const scheduling: SchedulingState = {
       sessionKind: 'regular',
       participantLearnerIds: ['learner-1'],
     },
+    {
+      id: 's3',
+      classId: 'class-1',
+      scheduledSessionId: null,
+      status: 'completed',
+      plannedQuestionCount: null,
+      startedAt: '2026-07-12T00:00:00.000Z',
+      completedAt: '2026-07-12T01:00:00.000Z',
+      maxProbeCount: 99,
+      sessionNumber: 3,
+      ownerUserId: 'teacher-1',
+      lockExpiresAt: null,
+      sessionKind: 'regular',
+      participantLearnerIds: ['learner-2'],
+    },
   ],
 }
 
@@ -66,6 +81,7 @@ describe('learner insights', () => {
       ledger: [row('s1', 'red'), row('s1', 'yellow'), row('s1', 'green'), row('s2', 'purple')],
     })
 
+    expect(rows).toHaveLength(2)
     expect(rows[0]).toMatchObject({ learningSessionId: 's2', purple: 1, total: 1, rfc: 0 })
     expect(rows[1]).toMatchObject({
       learningSessionId: 's1',
@@ -75,6 +91,17 @@ describe('learner insights', () => {
       total: 3,
     })
     expect(formatPercent(rows[1].rfc)).toBe('67%')
+  })
+
+  it('excludes class sessions without finalized observations for this learner', () => {
+    const rows = summarizeLearnerSessions({
+      scheduling,
+      learnerUserId: 'learner-1',
+      classId: 'class-1',
+      ledger: [row('s1', 'green')],
+    })
+
+    expect(rows.map((session) => session.learningSessionId)).toEqual(['s1'])
   })
 
   it('computes min max avg RFC from sessions with data', () => {

@@ -448,25 +448,13 @@ export function recordAttendance(
 export function completeLearningSession(
   state: SchedulingState,
   learningSessionId: string,
-  expectedLearnerIds: string[],
+  _participantLearnerIds: string[],
   at = new Date().toISOString(),
 ): SchedulingResult<LearningSession> {
   const session = state.learningSessions.find((s) => s.id === learningSessionId)
   if (!session) return { ok: false, error: 'Learning Session not found' }
   if (session.status === 'completed') {
     return { ok: false, error: 'Session already completed' }
-  }
-
-  for (const learnerId of expectedLearnerIds) {
-    const has = state.attendance.some(
-      (a) => a.learningSessionId === learningSessionId && a.learnerUserId === learnerId,
-    )
-    if (!has) {
-      return {
-        ok: false,
-        error: `Missing attendance for learner ${learnerId}`,
-      }
-    }
   }
 
   const completed: LearningSession = {

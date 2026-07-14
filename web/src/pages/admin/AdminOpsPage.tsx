@@ -1,19 +1,8 @@
 import { useMemo } from 'react'
-import {
-  Activity,
-  CalendarClock,
-  ClipboardCheck,
-  LayoutDashboard,
-  Radio,
-  TriangleAlert,
-} from 'lucide-react'
+import { Activity, CalendarClock, LayoutDashboard, Radio, TriangleAlert } from 'lucide-react'
 import { PageHeader } from '../../components/PageHeader'
 import { EmptyState, Panel, StatCard } from '../../components/ui'
-import {
-  buildScheduledToday,
-  buildSessionOpsBoard,
-  classAttendanceSummary,
-} from '../../modules/ops/board'
+import { buildScheduledToday, buildSessionOpsBoard } from '../../modules/ops/board'
 import { useAppState } from '../../state/useAppState'
 
 export function AdminOpsPage() {
@@ -43,22 +32,13 @@ export function AdminOpsPage() {
   const openProbes = allOpen.reduce((n, r) => n + r.openProbes, 0)
   const unfinished = allOpen.reduce((n, r) => n + r.unfinishedDrafts, 0)
 
-  const classSummaries = useMemo(() => {
-    return roster.classes
-      .filter((c) => c.status === 'active')
-      .map((c) => ({
-        classRow: c,
-        ...classAttendanceSummary(roster, scheduling, c.id),
-      }))
-  }, [roster, scheduling])
-
   return (
     <>
       <PageHeader
         icon={LayoutDashboard}
         kicker="Admin"
         title="Ops board"
-        subtitle="Today’s sessions, automatic attendance completion, open capture risk."
+        subtitle="Today’s sessions and open capture risk."
       />
 
       <div className="stat-grid">
@@ -98,7 +78,7 @@ export function AdminOpsPage() {
                 <tr>
                   <th>Class</th>
                   <th>Day</th>
-                  <th>Attendance</th>
+                  <th>Class learners</th>
                   <th>Results</th>
                   <th>Risk</th>
                   <th>Started</th>
@@ -114,10 +94,7 @@ export function AdminOpsPage() {
                     <td className="font-mono text-xs">
                       {row.sessionNumber != null ? `Day ${row.sessionNumber}` : '—'}
                     </td>
-                    <td>
-                      {row.attendanceMarked}/{row.seats}
-                      {row.attendanceRate != null ? ` (${row.attendanceRate}%)` : ''}
-                    </td>
+                    <td>{row.seats}</td>
                     <td>{row.resultCount}</td>
                     <td>
                       {row.openProbes > 0 || row.unfinishedDrafts > 0 ? (
@@ -162,43 +139,6 @@ export function AdminOpsPage() {
               </li>
             ))}
           </ul>
-        )}
-      </Panel>
-
-      <Panel
-        icon={ClipboardCheck}
-        title="Attendance by class"
-        description="Average mark rate across learning sessions."
-      >
-        {classSummaries.length === 0 ? (
-          <EmptyState icon={ClipboardCheck} title="No active classes" />
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Class</th>
-                  <th>Sessions</th>
-                  <th>Avg attendance</th>
-                  <th>Fully marked</th>
-                </tr>
-              </thead>
-              <tbody>
-                {classSummaries.map((c) => (
-                  <tr key={c.classRow.id}>
-                    <td>
-                      <span className="font-medium text-slate-800">{c.classRow.name}</span>
-                    </td>
-                    <td>{c.sessions}</td>
-                    <td>{c.avgRate != null ? `${c.avgRate}%` : '—'}</td>
-                    <td>
-                      {c.fullyMarked}/{c.sessions}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         )}
       </Panel>
     </>

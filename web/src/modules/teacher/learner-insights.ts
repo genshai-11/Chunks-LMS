@@ -25,19 +25,26 @@ export function summarizeLearnerSessions(input: {
   learnerUserId: string
   classId?: string
 }): LearnerSessionSummary[] {
-  const sessions = input.scheduling.learningSessions.filter(
-    (s) => !input.classId || s.classId === input.classId,
+  const learnerRecords = input.ledger.filter(
+    (record) => record.learnerUserId === input.learnerUserId,
   )
-  const byId = new Map(sessions.map((s) => [s.id, s]))
-  const ids = new Set(sessions.map((s) => s.id))
+  const sessionIdsWithFinalizedObservations = new Set(
+    learnerRecords.map((record) => record.learningSessionId),
+  )
+  const sessions = input.scheduling.learningSessions.filter(
+    (session) =>
+      (!input.classId || session.classId === input.classId) &&
+      sessionIdsWithFinalizedObservations.has(session.id),
+  )
+  const byId = new Map(sessions.map((session) => [session.id, session]))
+  const ids = new Set(sessions.map((session) => session.id))
   const rows = new Map<string, LearnerSessionSummary>()
 
   for (const session of sessions) {
     rows.set(session.id, emptyRow(session))
   }
 
-  for (const record of input.ledger) {
-    if (record.learnerUserId !== input.learnerUserId) continue
+  for (const record of learnerRecords) {
     if (!ids.has(record.learningSessionId)) continue
     const session = byId.get(record.learningSessionId)
     if (!session) continue

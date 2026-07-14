@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  ClipboardCheck,
   Eye,
   Gauge,
   Info,
@@ -36,11 +35,8 @@ import {
   listActiveLearners,
 } from '../../modules/roster/service'
 import { subscribeToClassSnapshots } from '../../modules/realtime/snapshot-channel'
-import {
-  recordAttendance,
-  startLearningSession,
-} from '../../modules/scheduling/session-lifecycle'
-import type { AttendanceStatus, SessionKind } from '../../modules/scheduling/types'
+import { startLearningSession } from '../../modules/scheduling/session-lifecycle'
+import type { SessionKind } from '../../modules/scheduling/types'
 import {
   resolveSessionDayNumber,
   sessionDayBadge,
@@ -49,8 +45,6 @@ import {
 } from '../../modules/reporting/session-series'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import { useAppState } from '../../state/useAppState'
-
-const ATTENDANCE: AttendanceStatus[] = ['present', 'late', 'absent', 'excused']
 
 const SESSION_KINDS: { id: SessionKind; label: string; hint: string }[] = [
   { id: 'regular', label: 'Regular day', hint: 'Normal teaching day' },
@@ -127,14 +121,6 @@ export function TeacherSessionPage() {
   const observeTo =
     dayNumber != null ? `/teacher/observe${sessionDayHash(dayNumber)}` : '/teacher/observe'
   const learnerCount = sessionLearnerIds.length
-  const presentCount = openSession
-    ? scheduling.attendance.filter(
-        (a) =>
-          a.learningSessionId === openSession.id &&
-          sessionLearnerIds.includes(a.learnerUserId) &&
-          (a.status === 'present' || a.status === 'late'),
-      ).length
-    : 0
   const captureSummary = capture ? sessionColorSummary(capture) : null
   const probeAgg = capture
     ? aggregateProbeMetrics(
@@ -230,16 +216,7 @@ export function TeacherSessionPage() {
       participantLearnerIds: selectedIds,
     })
     if (!r.ok) return err(r.error)
-    // Mark selected as present by default
-    let sched = r.state
-    for (const lid of selectedIds) {
-      const att = recordAttendance(sched, {
-        learningSessionId: r.value.id,
-        learnerUserId: lid,
-        status: 'present',
-      })
-      if (att.ok) sched = att.state
-    }
+    const sched = r.state
     setScheduling(sched)
     setCapture(
       createCaptureSession({
@@ -459,12 +436,6 @@ export function TeacherSessionPage() {
           hint="Selected for this capture"
         />
         <StatCard
-          icon={ClipboardCheck}
-          label="Present / late"
-          value={`${presentCount} / ${learnerCount}`}
-          hint="Marked for this live day"
-        />
-        <StatCard
           icon={Gauge}
           label={PROBE_METRIC_LABELS.nCount}
           value={probeAgg?.nCount ?? 0}
@@ -531,73 +502,8 @@ export function TeacherSessionPage() {
       </Panel>
 
       <Panel
-        icon={ClipboardCheck}
-        title="1. Attendance"
-        description={`${learnerCount} learner${learnerCount === 1 ? '' : 's'} in this session.`}
-      >
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Learner</th>
-                <th scope="col">Status</th>
-                <th scope="col">Set</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sessionLearnerIds.map((learnerId) => {
-                const user = roster.users.find((u) => u.id === learnerId)
-                const record = scheduling.attendance.find(
-                  (a) => a.learningSessionId === openSession.id && a.learnerUserId === learnerId,
-                )
-                return (
-                  <tr key={learnerId}>
-                    <td className="font-medium text-slate-800">
-                      <span className="cell-with-avatar">
-                        <UserAvatar
-                          name={user?.displayName ?? learnerId}
-                          avatarUrl={user?.avatarUrl}
-                          size="sm"
-                        />
-                        <span>{user?.displayName ?? learnerId}</span>
-                      </span>
-                    </td>
-                    <td>
-                      <span className="badge">{record?.status ?? '—'}</span>
-                    </td>
-                    <td>
-                      <div className="btn-row my-0">
-                        {ATTENDANCE.map((status) => (
-                          <button
-                            key={status}
-                            type="button"
-                            className={record?.status === status ? 'active' : 'ghost'}
-                            onClick={() => {
-                              const r = recordAttendance(scheduling, {
-                                learningSessionId: openSession.id,
-                                learnerUserId: learnerId,
-                                status,
-                              })
-                              if (!r.ok) return err(r.error)
-                              setScheduling(r.state)
-                            }}
-                          >
-                            {status}
-                          </button>
-                        ))}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </Panel>
-
-      <Panel
         icon={Eye}
-        title="2. Observe Focus / Awareness"
+        title="Observe Focus / Awareness"
         description="Full-screen focus mode — switch learner-first for column-style tracking per HV."
       >
         <div className="observe-entry">

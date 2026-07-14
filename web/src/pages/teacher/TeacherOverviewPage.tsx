@@ -13,7 +13,7 @@ import {
   UserPlus,
   Users,
 } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Flash } from '../../components/Flash'
 import { PageHeader } from '../../components/PageHeader'
 import { UserAvatar } from '../../components/UserAvatar'
@@ -32,6 +32,8 @@ import {
   learnerRfcStats,
   summarizeLearnerSessions,
 } from '../../modules/teacher/learner-insights'
+import { createCaptureSession } from '../../modules/assessment/session-capture'
+import { startLearningSession } from '../../modules/scheduling/session-lifecycle'
 import { useAppState } from '../../state/useAppState'
 
 type ViewMode = 'grid' | 'list'
@@ -41,18 +43,23 @@ export function TeacherOverviewPage() {
     roster,
     setRoster,
     scheduling,
+    setScheduling,
     capture,
+    setCapture,
     ledger,
+    metricSettings,
     activeLearnerUserId,
     setActiveLearnerUserId,
     setActiveClassId,
     syncNow,
   } = useAppState()
   const { options, classRow, course, teacher, seats, hasMultiple } = useTeacherClassContext()
+  const navigate = useNavigate()
   const { message, error, ok, err } = useFlash()
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [newName, setNewName] = useState('')
   const [newEmail, setNewEmail] = useState('')
+  const [startingLearnerId, setStartingLearnerId] = useState<string | null>(null)
 
   const openSession = scheduling.learningSessions.find(
     (s) => s.classId === classRow?.id && s.status === 'open',
@@ -76,7 +83,9 @@ export function TeacherOverviewPage() {
         (session) =>
           session.status === 'open' &&
           activeEnrollmentRows.some((enrollment) => enrollment.classId === session.classId) &&
-          Boolean(session.participantLearnerIds?.includes(user.id)),
+          (session.participantLearnerIds?.length
+            ? session.participantLearnerIds.includes(user.id)
+            : true),
       )
       const assignedToActiveClass = classRow
         ? activeEnrollmentRows.some((e) => e.classId === classRow.id)
@@ -137,6 +146,58 @@ export function TeacherOverviewPage() {
     setRoster(result.state)
     await syncNow({ roster: result.state })
     ok('Class label assigned')
+  }
+
+  async function startFastSession(learnerId: string, preferredClassId: string | null) {
+    if (!preferredClassId || !teacher) {
+      return err('Assign this learner to a class before starting a session')
+    }
+    const open = scheduling.learningSessions.find(
+      (session) => session.classId === preferredClassId && session.status === 'open',
+    )
+    if (open) {
+      const includesLearner = open.participantLearnerIds?.length
+        ? open.participantLearnerIds.includes(learnerId)
+        : true
+      if (!includesLearner) return err('Finish the current class session before starting a new one')
+      setActiveLearnerUserId(learnerId)
+      setActiveClassId(preferredClassId)
+      navigate('/teacher/observe')
+      return
+    }
+
+    setStartingLearnerId(learnerId)
+    try {
+      const maxProbeCount = metricSettings.defaultMaxProbeCount
+      const started = startLearningSession(scheduling, {
+        classId: preferredClassId,
+        maxProbeCount,
+        ownerUserId: teacher.id,
+        sessionKind: 'regular',
+        participantLearnerIds: [learnerId],
+      })
+      if (!started.ok) return err(started.error)
+
+      const nextCapture = createCaptureSession({
+        learningSessionId: started.value.id,
+        teacherUserId: teacher.id,
+        learnerIds: [learnerId],
+        maxProbeCount,
+      })
+      setActiveLearnerUserId(learnerId)
+      setActiveClassId(preferredClassId)
+      setScheduling(started.state)
+      setCapture(nextCapture)
+
+      const { ensureLearningSessionOnServer } = await import('../../lib/live-assessment')
+      await Promise.all([
+        ensureLearningSessionOnServer(started.value),
+        syncNow({ scheduling: started.state }),
+      ])
+      navigate('/teacher/observe')
+    } finally {
+      setStartingLearnerId(null)
+    }
   }
 
   if (!teacher) {
@@ -290,6 +351,7 @@ export function TeacherOverviewPage() {
                 learner={learner}
                 selected={selectedLearner?.id === learner.id}
                 openSession={learner.hasMatchingOpenSession}
+                starting={startingLearnerId === learner.id}
                 activeClassName={classRow?.name ?? null}
                 canAssignActiveClass={Boolean(classRow) && !learner.assignedToActiveClass}
                 onAssignActiveClass={() => assignActiveClass(learner.id)}
@@ -297,6 +359,7 @@ export function TeacherOverviewPage() {
                   setActiveLearnerUserId(learner.id)
                   if (learner.preferredClassId) setActiveClassId(learner.preferredClassId)
                 }}
+                onStart={() => void startFastSession(learner.id, learner.preferredClassId)}
                 onCopied={(text) => ok(text)}
               />
             ))}
@@ -367,17 +430,29 @@ export function TeacherOverviewPage() {
                             Assign {classRow.name}
                           </button>
                         ) : null}
-                        <Link
-                          to={`/teacher/session?learner=${encodeURIComponent(learner.id)}`}
-                          className="btn primary"
-                          onClick={() => {
-                            setActiveLearnerUserId(learner.id)
-                            if (learner.preferredClassId) setActiveClassId(learner.preferredClassId)
-                          }}
-                        >
-                          <Play className="h-4 w-4" aria-hidden />
-                          Start
-                        </Link>
+                        {learner.hasMatchingOpenSession ? (
+                          <Link
+                            to="/teacher/observe"
+                            className="btn primary"
+                            onClick={() => {
+                              setActiveLearnerUserId(learner.id)
+                              if (learner.preferredClassId) setActiveClassId(learner.preferredClassId)
+                            }}
+                          >
+                            <Play className="h-4 w-4" aria-hidden />
+                            Resume
+                          </Link>
+                        ) : (
+                          <button
+                            type="button"
+                            className="primary"
+                            onClick={() => void startFastSession(learner.id, learner.preferredClassId)}
+                            disabled={startingLearnerId === learner.id || !learner.preferredClassId}
+                          >
+                            <Play className="h-4 w-4" aria-hidden />
+                            {startingLearnerId === learner.id ? 'Starting…' : 'Start now'}
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -405,10 +480,12 @@ function LearnerCard({
   learner,
   selected,
   openSession,
+  starting,
   activeClassName,
   canAssignActiveClass,
   onAssignActiveClass,
   onSelect,
+  onStart,
   onCopied,
 }: {
   learner: {
@@ -428,10 +505,12 @@ function LearnerCard({
   }
   selected: boolean
   openSession: boolean
+  starting: boolean
   activeClassName: string | null
   canAssignActiveClass: boolean
   onAssignActiveClass: () => void
   onSelect: () => void
+  onStart: () => void
   onCopied: (message: string) => void
 }) {
   return (
@@ -471,14 +550,22 @@ function LearnerCard({
           <Eye className="h-4 w-4" aria-hidden />
           Profile
         </Link>
-        <Link
-          to={`/teacher/session?learner=${encodeURIComponent(learner.id)}`}
-          className="btn primary"
-          onClick={onSelect}
-        >
-          <Play className="h-4 w-4" aria-hidden />
-          {openSession ? 'Resume' : 'Start'}
-        </Link>
+        {openSession ? (
+          <Link to="/teacher/observe" className="btn primary" onClick={onSelect}>
+            <Play className="h-4 w-4" aria-hidden />
+            Resume
+          </Link>
+        ) : (
+          <button
+            type="button"
+            className="primary"
+            onClick={onStart}
+            disabled={starting || !learner.preferredClassId}
+          >
+            <Play className="h-4 w-4" aria-hidden />
+            {starting ? 'Starting…' : 'Start now'}
+          </button>
+        )}
         {learner.invite ? (
           <button
             type="button"

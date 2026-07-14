@@ -68,43 +68,25 @@ describe('session lifecycle and attendance', () => {
     expect(secondOpen.ok).toBe(false)
   })
 
-  it('requires attendance for all expected learners before completion', () => {
-    let state = emptySchedulingState()
-    const started = startLearningSession(state, { classId })
+  it('completes from the participant list without separate attendance records', () => {
+    const started = startLearningSession(emptySchedulingState(), {
+      classId,
+      participantLearnerIds: learners,
+    })
     if (!started.ok) throw new Error(started.error)
-    state = started.state
 
-    const incomplete = completeLearningSession(state, started.value.id, learners)
-    expect(incomplete.ok).toBe(false)
-
-    for (const learnerId of learners) {
-      const att = recordAttendance(state, {
-        learningSessionId: started.value.id,
-        learnerUserId: learnerId,
-        status: 'present',
-      })
-      if (!att.ok) throw new Error(att.error)
-      state = att.state
-    }
-
-    const done = completeLearningSession(state, started.value.id, learners)
+    const done = completeLearningSession(started.state, started.value.id, learners)
     expect(done.ok).toBe(true)
     if (!done.ok) return
     expect(done.value.status).toBe('completed')
+    expect(done.value.completedAt).toBeTruthy()
 
-    const after = recordAttendance(state, {
-      learningSessionId: started.value.id,
-      learnerUserId: learners[0]!,
-      status: 'late',
-    })
-    // state still open until we use done.state
     const afterDone = recordAttendance(done.state, {
       learningSessionId: started.value.id,
       learnerUserId: learners[0]!,
       status: 'late',
     })
     expect(afterDone.ok).toBe(false)
-    expect(after.ok).toBe(true)
   })
 
   it('cancels and reschedules without deleting original history', () => {

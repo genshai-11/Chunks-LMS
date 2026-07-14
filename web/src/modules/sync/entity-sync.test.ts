@@ -73,6 +73,33 @@ describe('mergeScheduling', () => {
     expect(merged.learningSessions[0]!.id).toBe('r1')
   })
 
+  it('does not reopen a locally completed session from stale remote data', () => {
+    const local: SchedulingState = {
+      scheduledSessions: [],
+      learningSessions: [
+        ls({
+          id: 'same-session',
+          classId: 'c1',
+          status: 'completed',
+          completedAt: '2026-07-11T11:00:00.000Z',
+        }),
+      ],
+      attendance: [],
+    }
+    const remote: SchedulingState = {
+      scheduledSessions: [],
+      learningSessions: [
+        ls({ id: 'same-session', classId: 'c1', status: 'open', ownerUserId: 'teacher-1' }),
+      ],
+      attendance: [],
+    }
+
+    const merged = mergeScheduling(local, remote)
+
+    expect(merged.learningSessions).toHaveLength(1)
+    expect(merged.learningSessions[0]?.status).toBe('completed')
+  })
+
   it('keeps local completed and adds remote-only scheduled', () => {
     const local: SchedulingState = {
       scheduledSessions: [],

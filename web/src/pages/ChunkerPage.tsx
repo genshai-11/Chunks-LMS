@@ -28,7 +28,6 @@ import {
 } from '../modules/roster/service'
 import {
   completeLearningSession,
-  recordAttendance,
   startLearningSession,
 } from '../modules/scheduling/session-lifecycle'
 import { formatPercent, learnerRfcStats, summarizeLearnerSessions } from '../modules/teacher/learner-insights'
@@ -100,8 +99,8 @@ export function ChunkerPage() {
         .filter((session) => {
           const participants = session.participantLearnerIds
           if (participants?.length) return participants.includes(effectiveLearnerId)
-          return scheduling.attendance.some(
-            (attendance) => attendance.learningSessionId === session.id && attendance.learnerUserId === effectiveLearnerId,
+          return ledger.some(
+            (record) => record.learningSessionId === session.id && record.learnerUserId === effectiveLearnerId,
           )
         })
         .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
@@ -191,13 +190,7 @@ export function ChunkerPage() {
       sessionKind: 'regular',
     })
     if (!started.ok) return err(started.error)
-    const present = recordAttendance(started.state, {
-      learningSessionId: started.value.id,
-      learnerUserId: effectiveLearnerId,
-      status: 'present',
-    })
-    const nextScheduling = present.ok ? present.state : started.state
-    const saved = await persist(nextRoster, nextScheduling)
+    const saved = await persist(nextRoster, started.state)
     if (saved) {
       if (andObserve) {
         setActiveClassId(selectedClass.id)

@@ -35,6 +35,7 @@ import {
   listActiveLearners,
 } from '../../modules/roster/service'
 import { subscribeToClassSnapshots } from '../../modules/realtime/snapshot-channel'
+import { closeOrphanOpenSessions } from '../../modules/scheduling/orphan-sessions'
 import { startLearningSession } from '../../modules/scheduling/session-lifecycle'
 import type { SessionKind } from '../../modules/scheduling/types'
 import {
@@ -91,6 +92,14 @@ export function TeacherSessionPage() {
 
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [sessionKind, setSessionKind] = useState<SessionKind>('regular')
+
+  useEffect(() => {
+    if (!classRow) return
+    const cleanup = closeOrphanOpenSessions(roster, scheduling)
+    if (!cleanup.changed) return
+    setScheduling(cleanup.state)
+    void syncNow({ scheduling: cleanup.state })
+  }, [classRow, roster, scheduling, setScheduling, syncNow])
 
   // Default multi-select: preselect query learner, else all enrolled
   useEffect(() => {

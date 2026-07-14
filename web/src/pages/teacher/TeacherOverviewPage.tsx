@@ -38,6 +38,10 @@ import {
   summarizeLearnerSessions,
 } from '../../modules/teacher/learner-insights'
 import { createCaptureSession } from '../../modules/assessment/session-capture'
+import {
+  closeOrphanOpenSessions,
+  openSessionParticipantNames,
+} from '../../modules/scheduling/orphan-sessions'
 import { startLearningSession } from '../../modules/scheduling/session-lifecycle'
 import { useAppState } from '../../state/useAppState'
 
@@ -185,10 +189,12 @@ export function TeacherOverviewPage() {
     if (!window.confirm(`Delete learner ${learnerName}? This removes their class labels. Historical reports stay in the ledger.`)) return
     const result = deleteUserProfile(roster, learnerId)
     if (!result.ok) return err(result.error)
+    const cleanup = closeOrphanOpenSessions(result.state, scheduling)
     setRoster(result.state)
+    if (cleanup.changed) setScheduling(cleanup.state)
     if (activeLearnerUserId === learnerId) setActiveLearnerUserId(null)
-    await syncNow({ roster: result.state, pruneMissing: true })
-    ok('Learner deleted')
+    await syncNow({ roster: result.state, scheduling: cleanup.state, pruneMissing: true })
+    ok(cleanup.changed ? 'Learner deleted and stale live session closed' : 'Learner deleted')
   }
 
   async function assignActiveClass(learnerId: string) {
@@ -204,16 +210,25 @@ export function TeacherOverviewPage() {
     if (!preferredClassId || !teacher) {
       return err('Assign this learner to a class before starting a session')
     }
-    const open = scheduling.learningSessions.find(
+
+    let effectiveScheduling = scheduling
+    const cleanup = closeOrphanOpenSessions(roster, effectiveScheduling)
+    if (cleanup.changed) {
+      effectiveScheduling = cleanup.state
+      setScheduling(cleanup.state)
+      await syncNow({ scheduling: cleanup.state })
+      ok(`Closed ${cleanup.closed.length} stale live session(s). Start again when ready.`)
+    }
+
+    const open = effectiveScheduling.learningSessions.find(
       (session) => session.classId === preferredClassId && session.status === 'open',
     )
     if (open) {
       const participants = open.participantLearnerIds?.length ? open.participantLearnerIds : []
       const includesLearner = participants.length === 0 || participants.includes(learnerId)
       if (!includesLearner) {
-        const names = participants
-          .map((id) => roster.users.find((user) => user.id === id)?.displayName ?? id.slice(0, 6))
-          .join(', ')
+        const participantInfo = openSessionParticipantNames(roster, open)
+        const names = participantInfo.names.join(', ')
         return err(
           `A live session is already open for ${names || 'another learner'}. Finish it before starting ${
             roster.users.find((user) => user.id === learnerId)?.displayName ?? 'this learner'
@@ -245,13 +260,17 @@ export function TeacherOverviewPage() {
     setStartingLearnerId(learnerId)
     try {
       const maxProbeCount = metricSettings.defaultMaxProbeCount
-      const started = startLearningSession(scheduling, {
+      const started = startLearningSession(effectiveScheduling, {
         classId: preferredClassId,
         maxProbeCount,
         ownerUserId: teacher.id,
         sessionKind: 'regular',
         participantLearnerIds: [learnerId],
-        sessionNumber: nextLearnerSessionNumber({ ledger, scheduling, learnerUserId: learnerId }),
+        sessionNumber: nextLearnerSessionNumber({
+          ledger,
+          scheduling: effectiveScheduling,
+          learnerUserId: learnerId,
+        }),
       })
       if (!started.ok) return err(started.error)
 

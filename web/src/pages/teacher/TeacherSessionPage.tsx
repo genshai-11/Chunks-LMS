@@ -44,6 +44,7 @@ import {
   sessionLabel,
 } from '../../modules/reporting/session-series'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
+import { nextLearnerSessionNumber } from '../../modules/teacher/learner-insights'
 import { useAppState } from '../../state/useAppState'
 
 const SESSION_KINDS: { id: SessionKind; label: string; hint: string }[] = [
@@ -60,6 +61,7 @@ export function TeacherSessionPage() {
     setScheduling,
     capture,
     setCapture,
+    ledger,
     metricSettings,
     syncNow,
   } = useAppState()
@@ -214,6 +216,10 @@ export function TeacherSessionPage() {
       ownerUserId: teacher.id,
       sessionKind,
       participantLearnerIds: selectedIds,
+      sessionNumber:
+        selectedIds.length === 1
+          ? nextLearnerSessionNumber({ ledger, scheduling, learnerUserId: selectedIds[0]! })
+          : undefined,
     })
     if (!r.ok) return err(r.error)
     const sched = r.state

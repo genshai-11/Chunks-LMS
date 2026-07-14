@@ -303,6 +303,8 @@ export function startLearningSession(
     ownerUserId?: string | null
     lockTtlMs?: number
     sessionKind?: import('./types').SessionKind
+    /** Explicit display ordinal for learner-first single sessions. Defaults to next class day. */
+    sessionNumber?: number | null
     /** Subset of class learners for this capture; null = all enrolled at start */
     participantLearnerIds?: string[] | null
   },
@@ -333,7 +335,7 @@ export function startLearningSession(
 
   // Teaching Day N is sequential for live work: after Day 1, next live is Day 2 —
   // never "max planned course slots + 1" (that produced Day 16 with a 15-day plan).
-  const sessionNumber = nextTeachingDayNumber(state, input.classId)
+  const sessionNumber = input.sessionNumber ?? nextTeachingDayNumber(state, input.classId)
 
   const ownerUserId = input.ownerUserId ?? null
   const ttl = input.lockTtlMs ?? 5 * 60 * 1000

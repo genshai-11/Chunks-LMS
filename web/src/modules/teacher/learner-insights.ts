@@ -55,7 +55,7 @@ export function summarizeLearnerSessions(input: {
     rows.set(record.learningSessionId, row)
   }
 
-  return Array.from(rows.values())
+  const chronological = Array.from(rows.values())
     .map((row) => {
       const redYellow = row.red + row.yellow
       const score = COLORS.reduce((sum, color) => sum + row[color] * COLOR_SCORE[color], 0)
@@ -65,7 +65,27 @@ export function summarizeLearnerSessions(input: {
         scoreAvg: row.total === 0 ? null : score / row.total,
       }
     })
+    .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime())
+
+  return chronological
+    .map((row, index) => ({ ...row, label: `Session ${index + 1}` }))
     .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
+}
+
+export function nextLearnerSessionNumber(input: {
+  ledger: ResultRecord[]
+  scheduling: SchedulingState
+  learnerUserId: string
+}): number {
+  const ids = new Set<string>()
+  for (const record of input.ledger) {
+    if (record.learnerUserId === input.learnerUserId) ids.add(record.learningSessionId)
+  }
+  for (const session of input.scheduling.learningSessions) {
+    if (session.status !== 'open') continue
+    if (session.participantLearnerIds?.includes(input.learnerUserId)) ids.add(session.id)
+  }
+  return ids.size + 1
 }
 
 export function learnerRfcStats(rows: LearnerSessionSummary[]) {

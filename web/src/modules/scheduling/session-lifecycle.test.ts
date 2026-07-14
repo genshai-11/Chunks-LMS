@@ -68,6 +68,18 @@ describe('session lifecycle and attendance', () => {
     expect(secondOpen.ok).toBe(false)
   })
 
+  it('accepts an explicit learner-history display session number', () => {
+    const started = startLearningSession(emptySchedulingState(), {
+      classId,
+      participantLearnerIds: ['learner-1'],
+      sessionNumber: 4,
+    })
+
+    expect(started.ok).toBe(true)
+    if (!started.ok) return
+    expect(started.value.sessionNumber).toBe(4)
+  })
+
   it('completes from the participant list without separate attendance records', () => {
     const started = startLearningSession(emptySchedulingState(), {
       classId,

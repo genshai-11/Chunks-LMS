@@ -30,6 +30,7 @@ import {
 import {
   formatPercent,
   learnerRfcStats,
+  nextLearnerSessionNumber,
   summarizeLearnerSessions,
 } from '../../modules/teacher/learner-insights'
 import { createCaptureSession } from '../../modules/assessment/session-capture'
@@ -175,6 +176,7 @@ export function TeacherOverviewPage() {
         ownerUserId: teacher.id,
         sessionKind: 'regular',
         participantLearnerIds: [learnerId],
+        sessionNumber: nextLearnerSessionNumber({ ledger, scheduling, learnerUserId: learnerId }),
       })
       if (!started.ok) return err(started.error)
 

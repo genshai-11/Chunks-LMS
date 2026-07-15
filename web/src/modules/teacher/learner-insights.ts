@@ -78,19 +78,22 @@ export function nextLearnerSessionNumber(input: {
   ledger: ResultRecord[]
   scheduling: SchedulingState
   learnerUserId: string
+  classId?: string
   enrollments?: { classId: string; learnerUserId: string; status: string }[]
 }): number {
   const ids = new Set<string>()
   const effective = effectiveResults(input.ledger)
+
   for (const record of effective) {
-    if (record.learnerUserId === input.learnerUserId) ids.add(record.learningSessionId)
+    if (record.learnerUserId === input.learnerUserId) {
+      ids.add(record.learningSessionId)
+    }
   }
+
   for (const session of input.scheduling.learningSessions) {
-    // Session numbering belongs to the selected learner, not only to rows that
-    // already produced finalized ledger data. This prevents Day N from falling
-    // back to an old learner when a completed session has sparse/missing cloud
-    // attempts or when a live session has not finalized any rows yet.
     if (session.status !== 'open' && session.status !== 'completed') continue
+    if (input.classId && session.classId !== input.classId) continue
+
     if (session.participantLearnerIds?.includes(input.learnerUserId)) {
       ids.add(session.id)
     } else if (!session.participantLearnerIds || session.participantLearnerIds.length === 0) {
@@ -102,6 +105,41 @@ export function nextLearnerSessionNumber(input: {
       }
     }
   }
+
+  return ids.size + 1
+}
+
+export function learnerCurrentSessionNumber(input: {
+  ledger: ResultRecord[]
+  scheduling: SchedulingState
+  learnerUserId: string
+  classId?: string
+}): number {
+  const ids = new Set<string>()
+  const effective = effectiveResults(input.ledger)
+
+  for (const record of effective) {
+    if (record.learnerUserId === input.learnerUserId) {
+      ids.add(record.learningSessionId)
+    }
+  }
+
+  for (const session of input.scheduling.learningSessions) {
+    if (session.status !== 'completed') continue
+    if (input.classId && session.classId !== input.classId) continue
+
+    if (session.participantLearnerIds?.includes(input.learnerUserId)) {
+      ids.add(session.id)
+    } else if (!session.participantLearnerIds || session.participantLearnerIds.length === 0) {
+      const hasResults = effective.some(
+        (r) => r.learningSessionId === session.id && r.learnerUserId === input.learnerUserId
+      )
+      if (hasResults) {
+        ids.add(session.id)
+      }
+    }
+  }
+
   return ids.size + 1
 }
 

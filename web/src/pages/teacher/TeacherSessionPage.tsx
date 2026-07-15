@@ -234,6 +234,7 @@ export function TeacherSessionPage() {
         scheduling,
         learnerUserId: id,
         enrollments: roster.enrollments,
+        classId: classRow.id,
       }),
     )
     const sessionNumber = nextNums.length > 0 ? Math.max(...nextNums) : undefined

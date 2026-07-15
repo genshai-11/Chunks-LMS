@@ -44,6 +44,7 @@ import {
   sessionLabel,
 } from '../../modules/reporting/session-series'
 import { completeLearningSession } from '../../modules/scheduling/session-lifecycle'
+import { learnerCurrentSessionNumber } from '../../modules/teacher/learner-insights'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import { useAppState } from '../../state/useAppState'
 import {
@@ -139,6 +140,7 @@ export function TeacherObservePage() {
   const exitPath = fromChunker ? '/chunker' : '/teacher/session'
   const {
     roster,
+    ledger,
     capture,
     setCapture,
     appendFinalizedFromCapture,
@@ -351,8 +353,18 @@ export function TeacherObservePage() {
         learningSessions: scheduling.learningSessions,
       })
     : null
-  const dayLabel = sessionLabel(dayNumber, openSession?.startedAt, totalDays)
-  const dayBadge = sessionDayBadge(dayNumber, totalDays)
+
+  const targetDayNumber = activeLearnerUserId
+    ? learnerCurrentSessionNumber({
+        ledger,
+        scheduling,
+        learnerUserId: activeLearnerUserId,
+        classId: classRow?.id,
+      })
+    : dayNumber
+
+  const dayLabel = sessionLabel(targetDayNumber, openSession?.startedAt, totalDays)
+  const dayBadge = sessionDayBadge(targetDayNumber, totalDays)
   const openParticipants = openSession?.participantLearnerIds?.length
     ? openSession.participantLearnerIds
     : activeLearnerIds
@@ -369,13 +381,13 @@ export function TeacherObservePage() {
 
   // Keep browser URL in sync: /teacher/observe#day-3
   useEffect(() => {
-    if (dayNumber == null) return
-    const hash = sessionDayHash(dayNumber)
+    if (targetDayNumber == null) return
+    const hash = sessionDayHash(targetDayNumber)
     if (window.location.hash !== hash) {
       window.history.replaceState(null, '', `${window.location.pathname}${hash}`)
     }
     document.title = `${dayBadge} · Observe · Chunks LMS`
-  }, [dayNumber, dayBadge])
+  }, [targetDayNumber, dayBadge])
 
   const qNum = capture ? capture.position.questionIndex + 1 : 0
   const qTotal = capture?.questions.length ?? 0
@@ -950,6 +962,12 @@ export function TeacherObservePage() {
     ).length
     const learnerRfc = learnerDone > 0 ? Math.round((learnerRy / learnerDone) * 100) : 0
     const active = activeSplitLearnerId === learnerId
+    const paneLearnerDayNumber = learnerCurrentSessionNumber({
+      ledger,
+      scheduling,
+      learnerUserId: learnerId,
+      classId: classRow?.id,
+    })
 
     return (
       <section
@@ -981,8 +999,11 @@ export function TeacherObservePage() {
         </div>
 
         <div className="observe-stage-hero observe-split-hero">
-          <h2 className="observe-learner observe-learner-solo observe-split-name">
-            {user?.displayName ?? 'Learner'}
+          <h2 className="observe-learner observe-learner-solo observe-split-name flex items-center justify-center gap-2">
+            <span>{user?.displayName ?? 'Learner'}</span>
+            <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full font-mono font-bold">
+              Day {paneLearnerDayNumber}
+            </span>
           </h2>
           <div className="observe-meta-row">
             <span className="observe-learner-rfc" title="Learner RFC in this session">

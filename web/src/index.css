@@ -1709,7 +1709,9 @@
 
   /* Split Pane overrides to make colors dock compact */
   .observe-split-pane .observe-dock {
-    @apply mt-2 gap-2 max-w-[8rem] !important;
+    margin-top: 0.5rem !important;
+    gap: 0.5rem !important;
+    max-width: 8rem !important;
   }
 
   .observe-split-pane .observe-dock-colors {
@@ -1717,11 +1719,26 @@
   }
 
   .observe-split-pane .observe-dock-color {
-    @apply h-14 w-14 border-2 p-1 sm:h-16 sm:w-16 !important;
+    height: 3.5rem !important;
+    width: 3.5rem !important;
+    @apply border-2 p-1;
+  }
+
+  @media (min-width: 640px) {
+    .observe-split-pane .observe-dock-color {
+      height: 4rem !important;
+      width: 4rem !important;
+    }
   }
 
   .observe-split-pane .observe-dock-num {
-    @apply text-base sm:text-lg !important;
+    font-size: 1rem !important;
+  }
+
+  @media (min-width: 640px) {
+    .observe-split-pane .observe-dock-num {
+      font-size: 1.125rem !important;
+    }
   }
 
   .observe-split-pane .observe-dock-probe {
@@ -1729,11 +1746,20 @@
   }
 
   .observe-split-pane .observe-dock-probe-btn {
-    @apply h-14 w-14 border-2 p-1 text-[10px] sm:h-16 sm:w-16 !important;
+    height: 3.5rem !important;
+    width: 3.5rem !important;
+    @apply border-2 p-1 text-[10px];
+  }
+
+  @media (min-width: 640px) {
+    .observe-split-pane .observe-dock-probe-btn {
+      height: 4rem !important;
+      width: 4rem !important;
+    }
   }
 
   .observe-split-pane .observe-dock-probe-btn kbd {
-    @apply hidden!;
+    display: none !important;
   }
 
 
@@ -2326,7 +2352,7 @@
   }
 
   .observe-dock-num {
-    @apply font-display text-2xl sm:text-3.5xl font-black leading-none tabular-nums tracking-tight opacity-95;
+    @apply font-display text-2xl sm:text-4xl font-black leading-none tabular-nums tracking-tight opacity-95;
   }
 
   .observe-dock-probe {

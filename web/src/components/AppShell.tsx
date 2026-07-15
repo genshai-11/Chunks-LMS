@@ -96,7 +96,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const showStaffNav = session.authBypass || (session.signedIn && session.isStaff)
 
   return (
-    <div className="shell">
+    <div className={`shell ${showStaffNav ? 'has-bottom-nav' : ''}`}>
       <header className="topbar">
         <NavLink to="/" className="topbar-brand" end aria-label="Chunks LMS home">
           <img
@@ -145,6 +145,33 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
       {children}
+
+      {showStaffNav && (
+        <nav className="mobile-bottom-nav md:hidden" aria-label="Workspaces Mobile">
+          {staffLinks.map((r) => {
+            const Icon = r.icon
+            return (
+              <NavLink
+                key={r.to}
+                to={r.to}
+                className={({ isActive }) => `mobile-bottom-tab${isActive ? ' is-active' : ''}`}
+              >
+                <Icon className="h-5 w-5" aria-hidden strokeWidth={2} />
+                <span className="mobile-bottom-label">{r.label}</span>
+              </NavLink>
+            )
+          })}
+          <NavLink
+            to="/access"
+            className={({ isActive }) =>
+              `mobile-bottom-tab${isActive || pathname.startsWith('/learner') ? ' is-active' : ''}`
+            }
+          >
+            <GraduationCap className="h-5 w-5" aria-hidden strokeWidth={2} />
+            <span className="mobile-bottom-label">Portal</span>
+          </NavLink>
+        </nav>
+      )}
     </div>
   )
 }

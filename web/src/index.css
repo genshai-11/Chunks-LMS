@@ -3776,3 +3776,26 @@
     grid-template-columns: 1fr;
   }
 }
+
+@layer components {
+  /* ——— Mobile bottom navigation ——— */
+  .shell.has-bottom-nav {
+    @apply pb-16 md:pb-0;
+  }
+
+  .mobile-bottom-nav {
+    @apply fixed bottom-0 left-0 right-0 z-40 flex h-16 items-center justify-around border-t border-slate-200/80 bg-white/95 pb-safe shadow-[0_-4px_12px_rgba(0,0,0,0.03)] backdrop-blur-lg;
+  }
+
+  .mobile-bottom-tab {
+    @apply flex flex-col items-center justify-center gap-1 flex-1 h-full text-slate-400 transition-all hover:text-slate-600;
+  }
+
+  .mobile-bottom-tab.is-active {
+    @apply text-red-600;
+  }
+
+  .mobile-bottom-label {
+    @apply text-[10px] font-semibold tracking-wide;
+  }
+}

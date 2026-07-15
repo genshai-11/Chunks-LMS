@@ -723,7 +723,7 @@
   }
 
   .user-avatar-sm {
-    @apply h-7 w-7 text-[9px];
+    @apply h-14 w-14 text-sm;
   }
 
   .user-avatar-md {
@@ -1760,7 +1760,24 @@
   }
 
   .observe-split-tools {
-    @apply mt-3 max-w-[13rem] justify-center gap-3;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    max-w-none !important;
+    margin-top: 0.75rem !important;
+    gap: 0.75rem !important;
+    width: auto !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  .observe-split-tools .observe-dock-q {
+    @apply text-xs bg-white/5 px-2 py-0.5 rounded text-slate-300 font-mono font-bold tracking-wider;
+  }
+
+  .observe-split-tools .observe-meta-muted {
+    @apply text-[10px] text-slate-500 font-medium tracking-wider uppercase;
   }
 
   .observe-stage-hero {
@@ -2306,11 +2323,19 @@
   }
 
   .observe-dock-tools {
-    @apply mt-6 mx-auto flex w-full max-w-[15rem] items-center justify-between gap-4 rounded-full border border-white/10 bg-slate-900/80 p-2 px-3 shadow-lg;
+    @apply mt-5 mx-auto flex items-center justify-between w-full max-w-[10.5rem] rounded-full border border-white/5 bg-slate-950/40 p-1 shadow-lg backdrop-blur-md transition-all duration-300 hover:border-white/10;
   }
 
   .observe-tool {
-    @apply border-0 bg-transparent! shadow-none min-h-0 inline-flex h-9 min-w-11 items-center justify-center gap-1 rounded-lg px-2 text-[11px] font-semibold text-slate-400 hover:bg-white/5 hover:text-slate-200 disabled:opacity-30;
+    @apply border-0 bg-transparent! shadow-none shrink-0 w-8 h-8 rounded-full flex items-center justify-center p-0 text-slate-400 hover:text-white hover:bg-white/5 active:scale-95 transition-all duration-200 disabled:opacity-20 disabled:pointer-events-none;
+  }
+
+  .observe-tool-text {
+    @apply hidden!;
+  }
+
+  .observe-dock-q {
+    @apply font-mono text-xs font-bold text-slate-300 tracking-wider;
   }
 
   /*
@@ -2438,19 +2463,19 @@
     }
 
     .observe-dock-tools {
-      @apply mt-5 mx-auto flex w-full max-w-[12rem] items-center justify-between gap-3 rounded-full border border-white/10 bg-slate-900/85 p-1.5 px-3.5 shadow-md;
+      @apply max-w-[10.5rem] bg-slate-950/40 border-white/5;
     }
 
     .observe-tool {
-      @apply h-10 min-w-12;
+      @apply h-8 w-8 min-w-0;
     }
 
     .observe-tool-text {
-      @apply inline text-[11px];
+      @apply hidden!;
     }
 
     .observe-dock-q {
-      @apply text-sm text-slate-300;
+      @apply text-xs;
     }
 
     .observe-empty {

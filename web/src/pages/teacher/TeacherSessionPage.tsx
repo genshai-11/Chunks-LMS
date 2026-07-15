@@ -65,6 +65,7 @@ export function TeacherSessionPage() {
     ledger,
     metricSettings,
     syncNow,
+    setActiveLearnerUserId,
   } = useAppState()
   const { message, error, ok, err } = useFlash()
   const { classRow, teacher } = useTeacherClassContext()
@@ -201,7 +202,15 @@ export function TeacherSessionPage() {
   ])
 
   function toggleLearner(id: string) {
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+    setSelectedIds((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((x) => x !== id)
+      }
+      if (prev.length >= 2) {
+        return prev
+      }
+      return [...prev, id]
+    })
   }
 
   async function startLiveNow() {
@@ -241,6 +250,9 @@ export function TeacherSessionPage() {
         maxProbeCount: maxProbe,
       }),
     )
+    if (selectedIds.length > 0) {
+      setActiveLearnerUserId(selectedIds[0]!)
+    }
     // Best-effort cloud push (full workspace + dedicated session upsert).
     // Observe works local-first even if this fails.
     const { ensureLearningSessionOnServer } = await import('../../lib/live-assessment')
@@ -324,7 +336,12 @@ export function TeacherSessionPage() {
                 return (
                   <li key={id}>
                     <label className="person-row-check">
-                      <input type="checkbox" checked={checked} onChange={() => toggleLearner(id)} />
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={!checked && selectedIds.length >= 2}
+                        onChange={() => toggleLearner(id)}
+                      />
                       <UserAvatar
                         name={user?.displayName ?? id}
                         avatarUrl={user?.avatarUrl}

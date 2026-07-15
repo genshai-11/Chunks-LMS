@@ -552,3 +552,58 @@ export function replaceLiveAttempt(
     attempts: capture.attempts.map((current) => (current.id === attempt.id ? attempt : current)),
   }
 }
+
+export async function syncCaptureSessionToServer(
+  capture: CaptureSessionState,
+): Promise<Result<true>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+
+  try {
+    if (capture.questions.length === 0) return { ok: true, data: true }
+
+    const dbQuestions: DbQuestion[] = capture.questions.map((q) => ({
+      id: q.id,
+      learning_session_id: q.learningSessionId,
+      sequence_number: q.sequenceNumber,
+      external_ref: q.externalRef,
+    }))
+
+    const dbAttempts: DbAttempt[] = capture.attempts.map((a) => ({
+      id: a.id,
+      learning_session_id: a.learningSessionId,
+      session_question_id: a.sessionQuestionId,
+      learner_user_id: a.learnerUserId,
+      teacher_user_id: a.teacherUserId,
+    }))
+
+    const dbSnapshots: DbSnapshot[] = capture.attempts.map((a) => ({
+      attempt_id: a.id,
+      status: a.snapshot.status,
+      provisional_color: a.snapshot.provisionalColor,
+      effective_color: a.snapshot.effectiveColor,
+      effective_score: a.snapshot.effectiveScore,
+      probe_count: a.snapshot.probeCount,
+      max_probe_count: a.snapshot.maxProbeCount,
+      entered_probe_flow: a.snapshot.enteredProbeFlow,
+      finalized_at: a.snapshot.finalizedAt,
+      updated_at: new Date().toISOString(),
+    }))
+
+    // 1. Upsert questions
+    const qRes = await sb.from('session_questions').upsert(dbQuestions, { onConflict: 'id' })
+    if (qRes.error) return { ok: false, error: `session_questions sync: ${qRes.error.message}` }
+
+    // 2. Upsert attempts
+    const aRes = await sb.from('assessment_attempts').upsert(dbAttempts, { onConflict: 'id' })
+    if (aRes.error) return { ok: false, error: `assessment_attempts sync: ${aRes.error.message}` }
+
+    // 3. Upsert snapshots
+    const sRes = await sb.from('assessment_attempt_snapshots').upsert(dbSnapshots, { onConflict: 'attempt_id' })
+    if (sRes.error) return { ok: false, error: `assessment_attempt_snapshots sync: ${sRes.error.message}` }
+
+    return { ok: true, data: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'capture sync failed' }
+  }
+}

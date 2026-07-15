@@ -164,6 +164,7 @@ export function TeacherObservePage() {
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 639px)').matches : false,
   )
   const [activeSplitLearnerId, setActiveSplitLearnerId] = useState<string | null>(null)
+  const [showHeatmapPopupLearnerId, setShowHeatmapPopupLearnerId] = useState<string | null>(null)
   const railWidthRef = useRef(railWidth)
   const captureRef = useRef(capture)
   const liveRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -706,6 +707,8 @@ export function TeacherObservePage() {
       setCapture(completedCapture)
       appendFinalizedFromCapture(completedCapture)
       try {
+        const { syncCaptureSessionToServer } = await import('../../lib/live-assessment')
+        await syncCaptureSessionToServer(completedCapture)
         await syncNow({ scheduling: done.state })
       } catch {
         /* local persist still holds; backend may be offline */
@@ -926,7 +929,6 @@ export function TeacherObservePage() {
     const paneAttempt = currentAttemptForLearner(capture, learnerId)
     const user = roster.users.find((u) => u.id === learnerId)
     const learnerQuestions = capture.questions.filter((q) => q.assignedLearnerUserId === learnerId)
-    const learnerQuestionIds = new Set(learnerQuestions.map((q) => q.id))
     const learnerAttempts = capture.attempts.filter((a) => a.learnerUserId === learnerId)
     const paneProbeOpen =
       paneAttempt?.snapshot.status === 'probe_open' ||
@@ -947,17 +949,6 @@ export function TeacherObservePage() {
       (a) => a.snapshot.effectiveColor === 'red' || a.snapshot.effectiveColor === 'yellow',
     ).length
     const learnerRfc = learnerDone > 0 ? Math.round((learnerRy / learnerDone) * 100) : 0
-    const learnerCapture: CaptureSessionState = {
-      ...capture,
-      learnerIds: [learnerId],
-      questions: learnerQuestions,
-      attempts: capture.attempts.filter((a) => learnerQuestionIds.has(a.sessionQuestionId)),
-      position: {
-        ...capture.position,
-        questionIndex: learnerQuestionIndex,
-        learnerIndex: 0,
-      },
-    }
     const active = activeSplitLearnerId === learnerId
 
     return (
@@ -967,14 +958,29 @@ export function TeacherObservePage() {
         aria-label={`Observe ${user?.displayName ?? learnerId}`}
         onPointerDown={() => setActiveSplitLearnerId(learnerId)}
       >
+        <div className="absolute top-3 left-3 z-10">
+          <UserAvatar
+            name={user?.displayName ?? 'Learner'}
+            avatarUrl={user?.avatarUrl}
+            size="sm"
+          />
+        </div>
+
+        <div className="absolute top-3 right-3 z-10">
+          <button
+            type="button"
+            className="btn ghost sm p-2 rounded-full hover:bg-white/10 text-white/70 hover:text-white transition"
+            title="View Heatmap"
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowHeatmapPopupLearnerId(learnerId)
+            }}
+          >
+            <LayoutGrid className="h-5 w-5" aria-hidden />
+          </button>
+        </div>
+
         <div className="observe-stage-hero observe-split-hero">
-          <div className="observe-phone-avatar" aria-hidden={false}>
-            <UserAvatar
-              name={user?.displayName ?? 'Learner'}
-              avatarUrl={user?.avatarUrl}
-              size="md"
-            />
-          </div>
           <h2 className="observe-learner observe-learner-solo observe-split-name">
             {user?.displayName ?? 'Learner'}
           </h2>
@@ -996,21 +1002,6 @@ export function TeacherObservePage() {
 
         {paneAttempt ? (
           <>
-            <div className="observe-split-map">
-              <ObserveHeatmap
-                capture={learnerCapture}
-                currentQuestionIndex={learnerQuestionIndex}
-                learnerName={learnerName}
-                onSelectQuestion={(i) => {
-                  const q = learnerQuestions[i]
-                  if (!q) return
-                  const originalIndex = capture.questions.findIndex((x) => x.id === q.id)
-                  setActiveSplitLearnerId(learnerId)
-                  setCapture(jumpToQuestion(capture, originalIndex))
-                }}
-                layout="row"
-              />
-            </div>
             <div
               className={`observe-dock observe-dock-lg${reaction ? ` is-glowing is-${reaction.color}` : ''}`}
             >
@@ -1509,6 +1500,84 @@ export function TeacherObservePage() {
       {toast && (
         <div className="observe-toast" role="status">
           {toast}
+        </div>
+      )}
+
+      {showHeatmapPopupLearnerId && (
+        <div className="observe-modal-container" style={{ zIndex: 100 }}>
+          <div className="observe-modal-backdrop" aria-hidden="true" onClick={() => setShowHeatmapPopupLearnerId(null)} />
+          <div
+            className="observe-modal-card"
+            style={{ maxWidth: '500px', width: '100%' }}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="flex items-center justify-between mb-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+              <h3 className="text-lg font-bold text-white flex items-center gap-2 m-0">
+                <LayoutGrid className="h-5 w-5 text-indigo-400" />
+                Heatmap: {
+                  roster.users.find(u => u.id === showHeatmapPopupLearnerId)?.displayName ?? 'Learner'
+                }
+              </h3>
+              <button
+                type="button"
+                className="text-white/60 hover:text-white p-1 rounded-lg hover:bg-white/5 transition border-0 bg-transparent cursor-pointer"
+                onClick={() => setShowHeatmapPopupLearnerId(null)}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="py-2 overflow-y-auto" style={{ maxHeight: '60vh' }}>
+              {(() => {
+                const learnerId = showHeatmapPopupLearnerId
+                const learnerQuestions = capture.questions.filter((q) => q.assignedLearnerUserId === learnerId)
+                const learnerQuestionIds = new Set(learnerQuestions.map((q) => q.id))
+                const paneAttempt = currentAttemptForLearner(capture, learnerId)
+                const learnerQuestionIndex = paneAttempt
+                  ? Math.max(
+                      0,
+                      learnerQuestions.findIndex((q) => q.id === paneAttempt.sessionQuestionId),
+                    )
+                  : 0
+                const learnerCapture: CaptureSessionState = {
+                  ...capture,
+                  learnerIds: [learnerId],
+                  questions: learnerQuestions,
+                  attempts: capture.attempts.filter((a) => learnerQuestionIds.has(a.sessionQuestionId)),
+                  position: {
+                    ...capture.position,
+                    questionIndex: learnerQuestionIndex,
+                    learnerIndex: 0,
+                  },
+                }
+                return (
+                  <ObserveHeatmap
+                    capture={learnerCapture}
+                    currentQuestionIndex={learnerQuestionIndex}
+                    learnerName={learnerName}
+                    onSelectQuestion={(i) => {
+                      const q = learnerQuestions[i]
+                      if (!q) return
+                      const originalIndex = capture.questions.findIndex((x) => x.id === q.id)
+                      setActiveSplitLearnerId(learnerId)
+                      setCapture(jumpToQuestion(capture, originalIndex))
+                      setShowHeatmapPopupLearnerId(null)
+                    }}
+                    layout="row"
+                  />
+                )
+              })()}
+            </div>
+            <div className="flex justify-end mt-4 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+              <button
+                type="button"
+                className="btn secondary px-4 py-2"
+                onClick={() => setShowHeatmapPopupLearnerId(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -1,6 +1,7 @@
 import type { ResultRecord } from '../reporting/progress'
 import { COLOR_SCORE, type ResultColor } from '../result-lifecycle/types'
 import type { LearningSession, SchedulingState } from '../scheduling/types'
+import { effectiveResults } from '../ops/effective-results'
 
 export type LearnerSessionSummary = {
   learningSessionId: string
@@ -25,7 +26,8 @@ export function summarizeLearnerSessions(input: {
   learnerUserId: string
   classId?: string
 }): LearnerSessionSummary[] {
-  const learnerRecords = input.ledger.filter(
+  const effective = effectiveResults(input.ledger)
+  const learnerRecords = effective.filter(
     (record) => record.learnerUserId === input.learnerUserId,
   )
   const sessionIdsWithFinalizedObservations = new Set(
@@ -76,14 +78,33 @@ export function nextLearnerSessionNumber(input: {
   ledger: ResultRecord[]
   scheduling: SchedulingState
   learnerUserId: string
+  enrollments?: { classId: string; learnerUserId: string; status: string }[]
 }): number {
   const ids = new Set<string>()
-  for (const record of input.ledger) {
+  const effective = effectiveResults(input.ledger)
+  for (const record of effective) {
     if (record.learnerUserId === input.learnerUserId) ids.add(record.learningSessionId)
   }
   for (const session of input.scheduling.learningSessions) {
-    if (session.status !== 'open') continue
-    if (session.participantLearnerIds?.includes(input.learnerUserId)) ids.add(session.id)
+    // Session numbering belongs to the selected learner, not only to rows that
+    // already produced finalized ledger data. This prevents Day N from falling
+    // back to an old learner when a completed session has sparse/missing cloud
+    // attempts or when a live session has not finalized any rows yet.
+    if (session.status !== 'open' && session.status !== 'completed') continue
+    if (session.participantLearnerIds?.includes(input.learnerUserId)) {
+      ids.add(session.id)
+    } else if (!session.participantLearnerIds || session.participantLearnerIds.length === 0) {
+      if (input.enrollments) {
+        const isEnrolled = input.enrollments.some(
+          (e) => e.classId === session.classId && e.learnerUserId === input.learnerUserId && e.status === 'active'
+        )
+        if (isEnrolled) {
+          ids.add(session.id)
+        }
+      } else {
+        ids.add(session.id)
+      }
+    }
   }
   return ids.size + 1
 }

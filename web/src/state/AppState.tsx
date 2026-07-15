@@ -41,9 +41,14 @@ function ledgerFromCapture(
   capture: CaptureSessionState,
   roster: RosterState,
   existing: ResultRecord[],
+  scheduling: SchedulingState,
 ): ResultRecord[] {
+  const session = scheduling.learningSessions.find((s) => s.id === capture.learningSessionId)
+  const classId = session?.classId
   const klass =
-    roster.classes.find((c) => c.teacherUserId === capture.teacherUserId) ?? roster.classes[0]
+    roster.classes.find((c) => c.id === classId) ??
+    roster.classes.find((c) => c.teacherUserId === capture.teacherUserId) ??
+    roster.classes[0]
   const course = roster.courses.find((c) => c.id === klass?.courseId) ?? roster.courses[0]
   if (!klass || !course) return existing
 
@@ -562,7 +567,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const appendFinalizedFromCapture = useCallback(
     (nextCapture: CaptureSessionState) => {
       setLedger((prev) => {
-        const next = ledgerFromCapture(nextCapture, roster, prev)
+        const next = ledgerFromCapture(nextCapture, roster, prev, scheduling)
         const events = auditFromNewResults(
           roster.organization.id,
           prev,
@@ -575,7 +580,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         return next
       })
     },
-    [roster],
+    [roster, scheduling],
   )
 
   const correctResult = useCallback(

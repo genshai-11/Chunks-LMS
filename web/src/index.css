@@ -1764,7 +1764,7 @@
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
-    max-w-none !important;
+    max-width: none !important;
     margin-top: 0.75rem !important;
     gap: 0.75rem !important;
     width: auto !important;

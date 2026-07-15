@@ -94,14 +94,10 @@ export function nextLearnerSessionNumber(input: {
     if (session.participantLearnerIds?.includes(input.learnerUserId)) {
       ids.add(session.id)
     } else if (!session.participantLearnerIds || session.participantLearnerIds.length === 0) {
-      if (input.enrollments) {
-        const isEnrolled = input.enrollments.some(
-          (e) => e.classId === session.classId && e.learnerUserId === input.learnerUserId && e.status === 'active'
-        )
-        if (isEnrolled) {
-          ids.add(session.id)
-        }
-      } else {
+      const hasResults = effective.some(
+        (r) => r.learningSessionId === session.id && r.learnerUserId === input.learnerUserId
+      )
+      if (hasResults) {
         ids.add(session.id)
       }
     }

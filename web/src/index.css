@@ -1707,43 +1707,7 @@
     }
   }
 
-  /* Split Pane overrides to make colors dock horizontal and fit screen height */
-  .observe-split-pane .observe-dock {
-    @apply mt-2 gap-1.5 max-w-full;
-  }
 
-  .observe-split-pane .observe-dock-colors {
-    @apply flex-row gap-2 rounded-[2rem] p-2;
-  }
-
-  .observe-split-pane .observe-dock-probe {
-    @apply flex-row gap-2 rounded-[2rem] p-2;
-  }
-
-  .observe-split-pane .observe-dock-color {
-    @apply h-12 w-12 border-2 p-1 text-[10px] sm:h-14 sm:w-14;
-    box-shadow: none;
-  }
-
-  .observe-split-pane .observe-dock-label {
-    @apply hidden!;
-  }
-
-  .observe-split-pane .observe-dock-num {
-    @apply text-xs font-bold mt-0;
-  }
-
-  .observe-split-pane .observe-dock-probe-btn {
-    @apply h-12 w-12 border-2 p-1 text-[9px] sm:h-14 sm:w-14;
-  }
-
-  .observe-split-pane .observe-dock-tools {
-    @apply mt-2 py-0.5 max-w-[10rem] gap-2;
-  }
-
-  .observe-split-pane .observe-tool {
-    @apply h-7 min-w-8;
-  }
 
   /* Heatmap row layout inside the popup modal */
   .observe-heat.layout-row {

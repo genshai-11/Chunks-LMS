@@ -1075,7 +1075,6 @@ export function TeacherObservePage() {
                 <span className="observe-dock-q" aria-live="polite">
                   Q{learnerQuestionIndex + 1}/{Math.max(learnerQuestions.length, 1)}
                 </span>
-                <span className="observe-meta-muted">Tab switches pane</span>
               </div>
             </div>
           </>

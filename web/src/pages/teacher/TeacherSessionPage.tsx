@@ -7,6 +7,7 @@ import {
   Play,
   Plus,
   Radio,
+  Trash2,
   Users,
 } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -211,6 +212,39 @@ export function TeacherSessionPage() {
       }
       return [...prev, id]
     })
+  }
+
+  async function deleteActiveSession() {
+    if (!openSession) return
+    if (
+      !window.confirm(
+        'Are you sure you want to cancel and delete this active session? All progress in this session will be lost.'
+      )
+    ) {
+      return
+    }
+
+    try {
+      const supabase = getSupabase()
+      if (supabase) {
+        const { error: dbErr } = await supabase
+          .from('learning_sessions')
+          .delete()
+          .eq('id', openSession.id)
+        if (dbErr) {
+          err(`Database error: ${dbErr.message}`)
+          return
+        }
+      }
+
+      const nextSessions = scheduling.learningSessions.filter((s) => s.id !== openSession.id)
+      const nextState = { ...scheduling, learningSessions: nextSessions }
+      setScheduling(nextState)
+      setCapture(null)
+      ok('Active session cancelled and deleted')
+    } catch (e: any) {
+      err(e.message || 'Failed to delete session')
+    }
   }
 
   async function startLiveNow() {
@@ -458,11 +492,19 @@ export function TeacherSessionPage() {
             : ''
         } · ${learnerCount} learner(s)`}
         actions={
-          <div className="page-actions">
+          <div className="page-actions flex items-center gap-2">
             <Link to={observeTo} className="btn primary">
               <Eye className="h-4 w-4" aria-hidden />
               <span>{finalizedCount > 0 ? `Open ${dayBadge}` : `Observe ${dayBadge}`}</span>
             </Link>
+            <button
+              type="button"
+              className="btn ghost text-red-400 hover:text-red-300 hover:bg-red-500/10 px-3 py-1.5 rounded flex items-center gap-1.5"
+              onClick={deleteActiveSession}
+            >
+              <Trash2 className="h-4 w-4" aria-hidden />
+              <span>Cancel Session</span>
+            </button>
           </div>
         }
       />
@@ -554,11 +596,19 @@ export function TeacherSessionPage() {
               full-screen. Use learner-first mode to walk each learner’s questions in turn.
             </p>
           </div>
-          <div className="btn-row">
+          <div className="btn-row flex items-center gap-2">
             <Link to={observeTo} className="btn primary observe-entry-cta">
               <Eye className="h-4 w-4" aria-hidden />
               <span>{finalizedCount > 0 ? `Open ${dayBadge}` : `Enter ${dayBadge}`}</span>
             </Link>
+            <button
+              type="button"
+              className="btn ghost text-red-400 hover:text-red-300 hover:bg-red-500/10 px-3 py-1.5 rounded flex items-center gap-1.5"
+              onClick={deleteActiveSession}
+            >
+              <Trash2 className="h-4 w-4" aria-hidden />
+              <span>Cancel Session</span>
+            </button>
             <button
               type="button"
               className="ghost"

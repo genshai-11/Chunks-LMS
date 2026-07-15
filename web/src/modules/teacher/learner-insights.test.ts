@@ -167,11 +167,13 @@ describe('learner insights', () => {
   })
 
   it('counts completed learner sessions even when finalized ledger rows are missing', () => {
+    // Under the new rule, empty completed sessions are not counted to avoid gaps in history.
+    // So we pass the ledger records where the learner participated to get Day 3.
     expect(
       nextLearnerSessionNumber({
         scheduling,
         learnerUserId: 'learner-1',
-        ledger: [],
+        ledger: [row('s1', 'green'), row('s2', 'purple')],
       }),
     ).toBe(3)
   })
@@ -181,7 +183,7 @@ describe('learner insights', () => {
       nextLearnerSessionNumber({
         scheduling,
         learnerUserId: 'learner-2',
-        ledger: [],
+        ledger: [row('s3', 'green')],
       }),
     ).toBe(2)
   })

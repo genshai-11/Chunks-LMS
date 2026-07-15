@@ -70,6 +70,7 @@ type Props = {
    */
   metricSettings?: MetricSettingsState
   onDeleteSession?: (sessionId: string) => void
+  onEditSessionNumber?: (sessionId: string, sessionNumber: number) => void
 }
 
 /** Time scope: keep simple — course total, one day, or custom range */
@@ -154,6 +155,7 @@ export function ProgressAnalysisView({
   emptyHint,
   metricSettings,
   onDeleteSession,
+  onEditSessionNumber,
 }: Props) {
   const [kind, setKind] = useState<ReportWindowKind>('course')
   const [customStart, setCustomStart] = useState(courseStart.slice(0, 10) || '2026-07-01')
@@ -1061,6 +1063,28 @@ export function ProgressAnalysisView({
                             >
                               Open
                             </button>
+                            {mode === 'teacher' && onEditSessionNumber && (
+                              <button
+                                type="button"
+                                className="ghost text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 px-2 py-1 rounded"
+                                onClick={() => {
+                                  const newNumStr = globalThis.prompt(
+                                    `Enter new session day number for "${sessionLabel(p.sessionNumber, p.startedAt, totalDays)}":`,
+                                    String(p.sessionNumber ?? '')
+                                  )
+                                  if (newNumStr != null) {
+                                    const newNum = parseInt(newNumStr, 10)
+                                    if (!isNaN(newNum) && newNum > 0) {
+                                      onEditSessionNumber(p.learningSessionId, newNum)
+                                    } else {
+                                      globalThis.alert('Invalid session number. Must be a positive integer.')
+                                    }
+                                  }
+                                }}
+                              >
+                                Edit Day
+                              </button>
+                            )}
                             {mode === 'teacher' && onDeleteSession && (
                               <button
                                 type="button"

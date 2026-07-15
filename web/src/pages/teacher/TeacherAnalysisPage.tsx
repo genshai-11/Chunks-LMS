@@ -49,6 +49,29 @@ export function TeacherAnalysisPage() {
     }
   }
 
+  const editSessionNumber = async (sessionId: string, sessionNumber: number) => {
+    const nextScheduling = {
+      ...scheduling,
+      learningSessions: scheduling.learningSessions.map((s) =>
+        s.id === sessionId ? { ...s, sessionNumber } : s
+      ),
+    }
+
+    setScheduling(nextScheduling)
+
+    try {
+      const sb = getSupabase()
+      if (sb) {
+        await (sb.from('learning_sessions') as any)
+          .update({ session_number: sessionNumber })
+          .eq('id', sessionId)
+      }
+      await syncNow({ scheduling: nextScheduling })
+    } catch (e) {
+      console.warn('Session update sync failed:', e)
+    }
+  }
+
   const learners = classRow
     ? activeEnrollmentsForClass(roster, classRow.id)
         .map((e) => roster.users.find((u) => u.id === e.learnerUserId))
@@ -104,6 +127,7 @@ export function TeacherAnalysisPage() {
         metricSettings={metricSettings}
         learnerUserId={activeLearnerUserId ?? undefined}
         onDeleteSession={deleteSession}
+        onEditSessionNumber={editSessionNumber}
       />
     </>
   )

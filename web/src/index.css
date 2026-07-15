@@ -1694,6 +1694,50 @@
     @apply py-2;
   }
 
+  .observe-split {
+    @apply grid h-full w-full min-h-0 flex-1 gap-2 p-2;
+  }
+
+  .observe-split.is-landscape {
+    @apply grid-cols-2;
+  }
+
+  .observe-split.is-portrait {
+    @apply grid-rows-2;
+  }
+
+  .observe-split-pane {
+    @apply relative flex min-h-0 flex-col items-center justify-center overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] px-2 py-3 text-center shadow-2xl transition;
+  }
+
+  .observe-split-pane.is-active {
+    @apply border-indigo-300/70 bg-indigo-500/10 ring-2 ring-indigo-300/40;
+  }
+
+  .observe-split-hero {
+    @apply max-w-sm -translate-y-0 gap-1;
+  }
+
+  .observe-split-name {
+    @apply max-w-full text-[clamp(1.2rem,4vw,2.35rem)];
+  }
+
+  .observe-split-map {
+    @apply mb-2 w-full max-w-md px-1;
+  }
+
+  .observe-split-map .observe-heat-summary {
+    @apply mb-1 flex justify-center gap-2 text-[10px];
+  }
+
+  .observe-split-map .observe-heat-grid {
+    @apply flex max-h-14 flex-wrap justify-center gap-1 overflow-y-auto;
+  }
+
+  .observe-split-tools {
+    @apply mt-3 max-w-[13rem] justify-center gap-3;
+  }
+
   .observe-stage-hero {
     @apply flex w-full max-w-lg -translate-y-3 flex-col items-center gap-1 px-2;
   }
@@ -3695,7 +3739,10 @@
   background: rgb(255 255 255 / 0.86);
   padding: 0.75rem;
   text-align: left;
-  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
 }
 
 .chunker-learner-row:hover,
@@ -3780,11 +3827,19 @@
 @layer components {
   /* ——— Mobile bottom navigation ——— */
   .shell.has-bottom-nav {
-    @apply pb-16 md:pb-0;
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+  }
+
+  @media (min-width: 768px) {
+    .shell.has-bottom-nav {
+      padding-bottom: 0;
+    }
   }
 
   .mobile-bottom-nav {
-    @apply fixed bottom-0 left-0 right-0 z-40 flex h-16 items-center justify-around border-t border-slate-200/80 bg-white/95 pb-safe shadow-[0_-4px_12px_rgba(0,0,0,0.03)] backdrop-blur-lg;
+    @apply fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-slate-200/80 bg-white/95 shadow-[0_-4px_12px_rgba(0,0,0,0.03)] backdrop-blur-lg;
+    height: calc(4rem + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
   .mobile-bottom-tab {

@@ -412,6 +412,16 @@ export function TeacherObservePage() {
     if (color === 'purple') {
       triggerConfetti()
     }
+
+    try {
+      const audio = new Audio(`/audio/${color}.wav`)
+      void audio.play().catch((err) => {
+        console.warn('[observe] audio play failed:', err)
+      })
+    } catch (e) {
+      console.warn('[observe] audio init failed:', e)
+    }
+
     window.setTimeout(() => setReaction((current) => (current?.id === id ? null : current)), 1200)
   }, [])
 

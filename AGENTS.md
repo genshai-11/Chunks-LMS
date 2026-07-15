@@ -108,6 +108,16 @@ Session **ceiling** (`maxProbeCount`) is not “n depth max”.
 
 **V1 “100%” definition:** Admin provisions accounts + metrics; teachers own learners/sessions/capture; learners open **email invite links** and see only own progress from **finalized real data**; multi-class teacher works; hosted course without data loss.
 
+## Release controls and deployment gates
+
+- **Never trigger CD/production deploy without explicit user confirmation in the current turn.** This includes `git push` to `main` / `master`, Vercel production deploys, Firebase/Hosting deploys, Functions deploys, or any command documented to trigger production CD.
+- **CI green is required before asking for production deploy approval.** If full CI cannot run, report exactly which checks passed/failed and do not deploy.
+- **Always identify deployment impact before pushing.** Read `.github/workflows/` or the relevant deploy docs first, then state whether the next command triggers preview, production, DB migration only, or no deploy.
+- **Use preview/canary first when available.** Push feature branches or PRs for preview validation before production unless Lucy explicitly says to skip preview.
+- **Commit and tag before production-impacting actions.** Keep rollback instructions and verify the restore path for Hosting/Functions/DB changes.
+- **Supabase migrations are production-impacting.** Run dry-run/list checks first, then ask before applying to a linked remote project unless Lucy has already explicitly approved that exact migration in the current turn.
+- **Do not treat “continue” as deploy approval.** Ask a yes/no confirmation before any production-triggering action.
+
 ## Engineering constraints
 
 - Preserve immutable assessment, probe, finalization, and correction history.

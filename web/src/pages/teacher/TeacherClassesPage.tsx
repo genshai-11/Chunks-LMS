@@ -144,11 +144,10 @@ export function TeacherClassesPage() {
   const handleAddLearner = async () => {
     if (!enrollClassId) return err('Select a class first')
     if (!newLearnerName.trim()) return err('Learner name required')
-    if (!newLearnerEmail.trim()) return err('Email required for learner invite')
 
     const result = createLearnerAndEnroll(roster, enrollClassId, {
       displayName: newLearnerName,
-      email: newLearnerEmail.trim(),
+      email: newLearnerEmail.trim() || null,
       avatarUrl: newLearnerAvatarUrl,
     })
 

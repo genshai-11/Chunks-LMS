@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, BarChart3, Eye, EyeOff, ImagePlus, Play, Save, UserRound } from 'lucide-react'
+import { ArrowLeft, BarChart3, Eye, EyeOff, ImagePlus, Play, Save, UserRound, Pencil, X, Mail, School } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Flash } from '../../components/Flash'
 import { PageHeader } from '../../components/PageHeader'
@@ -8,7 +8,7 @@ import { EmptyState, Panel, StatCard } from '../../components/ui'
 import { useFlash } from '../../hooks/useFlash'
 import { readImageAsDataUrl } from '../../lib/readImageFile'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
-import { updateUserProfile } from '../../modules/roster/service'
+import { updateUserProfile, endEnrollment, enrollLearner } from '../../modules/roster/service'
 import {
   formatPercent,
   learnerRfcStats,
@@ -54,6 +54,26 @@ export function TeacherLearnerProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState(learner?.avatarUrl ?? '')
   const [showTable, setShowTable] = useState(true)
   const [columns, setColumns] = useState(DEFAULT_COLUMNS)
+  const [isEditing, setIsEditing] = useState(false)
+
+  const enrollment = useMemo(() => {
+    if (!learner) return null
+    return roster.enrollments.find((e) => e.learnerUserId === learner.id && e.status === 'active')
+  }, [roster.enrollments, learner])
+
+  const currentClass = useMemo(() => {
+    return enrollment ? roster.classes.find((c) => c.id === enrollment.classId) : null
+  }, [enrollment, roster.classes])
+
+  const activeClasses = useMemo(() => {
+    return roster.classes.filter((c) => c.status === 'active')
+  }, [roster.classes])
+
+  const [selectedClassId, setSelectedClassId] = useState('')
+
+  useEffect(() => {
+    setSelectedClassId(currentClass?.id ?? '')
+  }, [currentClass?.id])
 
   useEffect(() => {
     setName(learner?.displayName ?? '')
@@ -92,15 +112,42 @@ export function TeacherLearnerProfilePage() {
 
   async function saveProfile() {
     if (!learner) return
-    const result = updateUserProfile(roster, learner.id, {
+    let nextRoster = roster
+
+    // 1. Reassign class if changed
+    if (selectedClassId !== (currentClass?.id ?? '')) {
+      if (enrollment) {
+        const ended = endEnrollment(nextRoster, enrollment.id)
+        if (!ended.ok) return err(ended.error)
+        nextRoster = ended.state
+      }
+      if (selectedClassId) {
+        const enrolled = enrollLearner(nextRoster, selectedClassId, learner.id)
+        if (!enrolled.ok) return err(enrolled.error)
+        nextRoster = enrolled.state
+      }
+    }
+
+    // 2. Update profile details
+    const result = updateUserProfile(nextRoster, learner.id, {
       displayName: name,
-      email,
+      email: email.trim() || null,
       avatarUrl,
     })
     if (!result.ok) return err(result.error)
+
     setRoster(result.state)
     await syncNow({ roster: result.state })
-    ok('Learner profile saved')
+    ok('Learner profile saved successfully')
+    setIsEditing(false)
+  }
+
+  function cancelEdit() {
+    setName(learner?.displayName ?? '')
+    setEmail(learner?.email ?? '')
+    setAvatarUrl(learner?.avatarUrl ?? '')
+    setSelectedClassId(currentClass?.id ?? '')
+    setIsEditing(false)
   }
 
   function toggleColumn(key: ColumnKey) {
@@ -146,44 +193,121 @@ export function TeacherLearnerProfilePage() {
         <Panel
           icon={UserRound}
           title="Profile"
-          description="Teacher can update learner name/email."
+          description="View and manage learner's profile details."
         >
-          <div className="teacher-profile-card">
-            <UserAvatar name={learner.displayName} avatarUrl={avatarUrl || learner.avatarUrl} size="xl" />
-            <label>
-              Change image
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(event) => changeImage(event.target.files?.[0] ?? null)}
-              />
-            </label>
-            <label>
-              Image URL
-              <input
-                value={avatarUrl}
-                onChange={(event) => setAvatarUrl(event.target.value)}
-                placeholder="https://... or upload image"
-              />
-            </label>
-            {avatarUrl ? (
-              <button type="button" className="ghost" onClick={() => setAvatarUrl('')}>
-                <ImagePlus className="h-4 w-4" aria-hidden />
-                Remove image
-              </button>
-            ) : null}
-            <label>
-              Name
-              <input value={name} onChange={(event) => setName(event.target.value)} />
-            </label>
-            <label>
-              Email
-              <input value={email} onChange={(event) => setEmail(event.target.value)} />
-            </label>
-            <button type="button" className="primary" onClick={saveProfile}>
-              <Save className="h-4 w-4" aria-hidden />
-              Save profile
-            </button>
+          <div className="panel-body-inner">
+            {!isEditing ? (
+              <div className="flex flex-col items-center text-center gap-4 py-2">
+                <div className="relative group">
+                  <UserAvatar name={learner.displayName} avatarUrl={avatarUrl || learner.avatarUrl} size="xl" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-slate-100 flex items-center justify-center gap-2">
+                    {learner.displayName}
+                  </h3>
+                  <p className="text-sm text-slate-400 mt-1 flex items-center justify-center gap-1.5">
+                    <Mail className="h-3.5 w-3.5" aria-hidden />
+                    <span>{learner.email || <em className="text-slate-500">No email set</em>}</span>
+                  </p>
+                  <div className="mt-3 flex items-center justify-center gap-2">
+                    <span className="flex items-center gap-1 bg-indigo-500/10 text-indigo-300 font-semibold border border-indigo-500/20 px-2.5 py-1 rounded-md text-xs">
+                      <School className="h-3.5 w-3.5" aria-hidden />
+                      Class: {currentClass?.name || 'Unassigned'}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn ghost mt-2 border border-slate-700/50 hover:bg-slate-800"
+                  onClick={() => setIsEditing(true)}
+                >
+                  <Pencil className="h-4 w-4" aria-hidden />
+                  <span>Edit Profile</span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col sm:flex-row items-center gap-4 pb-2 border-b border-white/5">
+                  <UserAvatar name={learner.displayName} avatarUrl={avatarUrl || learner.avatarUrl} size="lg" />
+                  <div className="flex-1 w-full flex flex-col gap-2">
+                    <label className="flex items-center justify-center gap-2 cursor-pointer bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-700 transition-colors">
+                      <ImagePlus className="h-3.5 w-3.5" aria-hidden />
+                      <span>Upload Avatar</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(event) => changeImage(event.target.files?.[0] ?? null)}
+                      />
+                    </label>
+                    <label className="text-xs">
+                      Image URL (Optional)
+                      <input
+                        className="w-full text-xs mt-1"
+                        value={avatarUrl}
+                        onChange={(event) => setAvatarUrl(event.target.value)}
+                        placeholder="https://... or upload image"
+                      />
+                    </label>
+                    {avatarUrl ? (
+                      <button
+                        type="button"
+                        className="ghost text-xs text-red-400 hover:text-red-300 flex items-center gap-1 self-start p-0 border-0 bg-transparent cursor-pointer"
+                        onClick={() => setAvatarUrl('')}
+                      >
+                        Remove image
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <label>
+                    Display Name
+                    <input
+                      className="w-full mt-1"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Email Address (Optional)
+                    <input
+                      className="w-full mt-1"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      placeholder="e.g. learner@example.com"
+                    />
+                  </label>
+                  <label>
+                    Assign to Classroom
+                    <select
+                      className="w-full mt-1"
+                      value={selectedClassId}
+                      onChange={(e) => setSelectedClassId(e.target.value)}
+                    >
+                      <option value="">No Class (Unassign)</option>
+                      {activeClasses.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5">
+                  <button type="button" className="primary flex-1" onClick={saveProfile}>
+                    <Save className="h-4 w-4" aria-hidden />
+                    <span>Save Changes</span>
+                  </button>
+                  <button type="button" className="ghost flex-1 border border-slate-700/50" onClick={cancelEdit}>
+                    <X className="h-4 w-4" />
+                    <span>Cancel</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </Panel>
 

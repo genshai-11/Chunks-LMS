@@ -757,18 +757,20 @@ export function ProgressAnalysisView({
             <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
               Probe metrics (from finalized ledger)
             </h3>
-            <p className="analysis-plain-hint" style={{ marginBottom: 12 }}>
-              <strong>n count</strong> = times teacher selected Green (2).{' '}
-              <strong>n depth</strong> = probe steps on one question (Pass/Continue).{' '}
-              Peak example: Green + Pass×8 + Done → n depth 9. Values below use real observations
-              only.
-            </p>
             <div className="stat-grid" style={{ marginBottom: 24 }}>
               <div
                 className="stat-card"
                 title="Number of finalized attempts where teacher selected Green (2) and entered probe"
               >
-                <p className="stat-label">n count</p>
+                <p className="stat-label flex items-center gap-1">
+                  <span>n count</span>
+                  <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
+                    <Info className="h-3.5 w-3.5" />
+                    <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
+                      <strong>n count</strong> = number of times the teacher selected Green (2). Values use real observations only.
+                    </span>
+                  </span>
+                </p>
                 <p className="stat-value">{probeStats.count}</p>
                 <p className="meta">Green (2) entries · sample={total}</p>
               </div>
@@ -776,7 +778,15 @@ export function ProgressAnalysisView({
                 className="stat-card"
                 title="Mean probeCount among probed attempts"
               >
-                <p className="stat-label">n depth avg</p>
+                <p className="stat-label flex items-center gap-1">
+                  <span>n depth avg</span>
+                  <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
+                    <Info className="h-3.5 w-3.5" />
+                    <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
+                      <strong>n depth avg</strong> = mean probe steps on probed questions (Pass/Continue). Peak example: Green + Pass×8 + Done → n depth 9.
+                    </span>
+                  </span>
+                </p>
                 <p className="stat-value">
                   {probeStats.count > 0 ? probeStats.avg.toFixed(1) : '—'}
                 </p>
@@ -786,7 +796,15 @@ export function ProgressAnalysisView({
                 className="stat-card"
                 title="Max probeCount among probed attempts (observed peak, not session ceiling)"
               >
-                <p className="stat-label">n depth max</p>
+                <p className="stat-label flex items-center gap-1">
+                  <span>n depth max</span>
+                  <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
+                    <Info className="h-3.5 w-3.5" />
+                    <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
+                      <strong>n depth max</strong> = maximum observed probe steps on one question. Peak example: Green + Pass×8 + Done → n depth 9.
+                    </span>
+                  </span>
+                </p>
                 <p className="stat-value">{probeStats.count > 0 ? probeStats.max : '—'}</p>
                 <p className="meta">Peak observed depth</p>
               </div>

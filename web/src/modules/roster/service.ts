@@ -700,8 +700,7 @@ export function addLearnerProfile(
   if (!displayName) return { ok: false, error: 'Learner name is required' }
 
   const email = input.email?.trim() || null
-  if (!email) return { ok: false, error: 'Learner email is required' }
-  if (isEmailTaken(state, email)) {
+  if (email && isEmailTaken(state, email)) {
     return { ok: false, error: 'An account with this email already exists' }
   }
 
@@ -809,8 +808,8 @@ export function updateUserProfile(
   if (!displayName) return { ok: false, error: 'Name is required' }
 
   const nextEmail = input.email !== undefined ? input.email?.trim() || null : user.email
-  if (!nextEmail && (user.roles.includes('learner') || user.roles.includes('teacher'))) {
-    return { ok: false, error: 'Email is required for teacher and learner accounts' }
+  if (!nextEmail && user.roles.includes('teacher')) {
+    return { ok: false, error: 'Email is required for teacher accounts' }
   }
   if (nextEmail && isEmailTaken(state, nextEmail, userId)) {
     return { ok: false, error: 'An account with this email already exists' }

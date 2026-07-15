@@ -228,16 +228,23 @@ export function TeacherSessionPage() {
     if (rosterForSession !== roster) setRoster(rosterForSession)
 
     const maxProbe = metricSettings.defaultMaxProbeCount
+    const nextNums = selectedIds.map((id) =>
+      nextLearnerSessionNumber({
+        ledger,
+        scheduling,
+        learnerUserId: id,
+        enrollments: roster.enrollments,
+      }),
+    )
+    const sessionNumber = nextNums.length > 0 ? Math.max(...nextNums) : undefined
+
     const r = startLearningSession(scheduling, {
       classId: classRow.id,
       maxProbeCount: maxProbe,
       ownerUserId: teacher.id,
       sessionKind,
       participantLearnerIds: selectedIds,
-      sessionNumber:
-        selectedIds.length === 1
-          ? nextLearnerSessionNumber({ ledger, scheduling, learnerUserId: selectedIds[0]! })
-          : undefined,
+      sessionNumber,
     })
     if (!r.ok) return err(r.error)
     const sched = r.state

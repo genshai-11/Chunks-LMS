@@ -4,10 +4,50 @@ import { ProgressAnalysisView } from '../../components/ProgressAnalysisView'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import { activeEnrollmentsForClass } from '../../modules/roster/service'
 import { useAppState } from '../../state/useAppState'
+import { getSupabase } from '../../lib/supabase'
 
 export function TeacherAnalysisPage() {
-  const { roster, scheduling, ledger, metricSettings, activeLearnerUserId } = useAppState()
+  const {
+    roster,
+    scheduling,
+    setScheduling,
+    ledger,
+    setLedger,
+    syncNow,
+    metricSettings,
+    activeLearnerUserId,
+  } = useAppState()
   const { classRow, course } = useTeacherClassContext()
+
+  const deleteSession = async (sessionId: string) => {
+    if (
+      !window.confirm(
+        'Are you sure you want to delete this live session? All question captures and attendance for this session will be permanently deleted.',
+      )
+    ) {
+      return
+    }
+
+    const nextScheduling = {
+      ...scheduling,
+      learningSessions: scheduling.learningSessions.filter((s) => s.id !== sessionId),
+      attendance: scheduling.attendance.filter((a) => a.learningSessionId !== sessionId),
+    }
+    const nextLedger = ledger.filter((r) => r.learningSessionId !== sessionId)
+
+    setScheduling(nextScheduling)
+    setLedger(nextLedger)
+
+    try {
+      const sb = getSupabase()
+      if (sb) {
+        await sb.from('learning_sessions').delete().eq('id', sessionId)
+      }
+      await syncNow({ scheduling: nextScheduling, pruneMissing: true })
+    } catch (e) {
+      console.warn('Session delete sync failed:', e)
+    }
+  }
 
   const learners = classRow
     ? activeEnrollmentsForClass(roster, classRow.id)
@@ -63,6 +103,7 @@ export function TeacherAnalysisPage() {
         emptyHint="Start a live session and finalize Focus / Awareness colors to populate this report."
         metricSettings={metricSettings}
         learnerUserId={activeLearnerUserId ?? undefined}
+        onDeleteSession={deleteSession}
       />
     </>
   )

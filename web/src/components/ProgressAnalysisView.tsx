@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import {
   Activity,
   CalendarDays,
@@ -69,6 +69,7 @@ type Props = {
    * Full metric catalog lives on Admin → Metrics, not here.
    */
   metricSettings?: MetricSettingsState
+  onDeleteSession?: (sessionId: string) => void
 }
 
 /** Time scope: keep simple — course total, one day, or custom range */
@@ -152,6 +153,7 @@ export function ProgressAnalysisView({
   learningSessions = [],
   emptyHint,
   metricSettings,
+  onDeleteSession,
 }: Props) {
   const [kind, setKind] = useState<ReportWindowKind>('course')
   const [customStart, setCustomStart] = useState(courseStart.slice(0, 10) || '2026-07-01')
@@ -159,7 +161,16 @@ export function ProgressAnalysisView({
     (courseEnd ?? '2026-12-31').toString().slice(0, 10),
   )
   const [sessionId, setSessionId] = useState(learningSessions[0]?.id ?? '')
-  const [selectedLearner, setSelectedLearner] = useState(learnerUserId ?? '')
+  const [selectedLearnerIds, setSelectedLearnerIds] = useState<string[]>(
+    learnerUserId ? [learnerUserId] : [],
+  )
+  const [whoOpen, setWhoOpen] = useState(false)
+  const [columnsPanelOpen, setColumnsPanelOpen] = useState(false)
+  
+  useEffect(() => {
+    setSelectedLearnerIds(learnerUserId ? [learnerUserId] : [])
+  }, [learnerUserId])
+
   const [tab, setTab] = useState<
     'overview' | 'charts' | 'sessions' | 'learners' | 'history'
   >('overview')
@@ -219,16 +230,16 @@ export function ProgressAnalysisView({
     return ledger.filter((r) => r.courseId === courseId && r.classId === classId)
   }, [ledger, courseId, classId])
 
-  const focusLearnerId = mode === 'learner' ? learnerUserId : selectedLearner || undefined
+  const focusLearnerId = mode === 'learner' ? learnerUserId : (selectedLearnerIds.length === 1 ? selectedLearnerIds[0] : undefined)
   const focusLearner = focusLearnerId
     ? users.find((u) => u.id === focusLearnerId)
     : undefined
 
   const courseReport = useMemo(() => {
     if (!window || mode === 'learner' || focusLearnerId) return null
-    const learnerIds = learners.map((u) => u.id)
+    const learnerIds = selectedLearnerIds.length > 0 ? selectedLearnerIds : learners.map((u) => u.id)
     return buildCourseProgressReport(scopedLedger, courseId, window, { learnerIds })
-  }, [window, mode, focusLearnerId, scopedLedger, courseId, learners])
+  }, [window, mode, focusLearnerId, scopedLedger, courseId, learners, selectedLearnerIds])
 
   const learnerReport = useMemo(() => {
     if (!window || !focusLearnerId) return null
@@ -242,12 +253,16 @@ export function ProgressAnalysisView({
 
   const windowRecords = useMemo(() => {
     if (!window) return []
-    return filterResults(scopedLedger, window, {
+    const records = filterResults(scopedLedger, window, {
       courseId,
       classId,
       learnerUserId: focusLearnerId,
     })
-  }, [window, scopedLedger, courseId, classId, focusLearnerId])
+    if (selectedLearnerIds.length > 1) {
+      return records.filter((r) => selectedLearnerIds.includes(r.learnerUserId))
+    }
+    return records
+  }, [window, scopedLedger, courseId, classId, focusLearnerId, selectedLearnerIds])
 
   const counts = colorCounts(windowRecords)
   const total = windowRecords.length
@@ -324,7 +339,9 @@ export function ProgressAnalysisView({
   /** Per-day series for class or focused learner — all enabled metrics from real ledger */
   const sessionSeries = useMemo(() => {
     return buildSessionMetricSeries({
-      ledger: scopedLedger,
+      ledger: selectedLearnerIds.length > 0
+        ? scopedLedger.filter((r) => selectedLearnerIds.includes(r.learnerUserId))
+        : scopedLedger,
       learningSessions: orderedSessions.map((s) => ({
         id: s.id,
         classId: classId ?? '',
@@ -345,7 +362,7 @@ export function ProgressAnalysisView({
       learnerUserId: focusLearnerId,
       metricKeys: dayMetricOptions,
     })
-  }, [scopedLedger, orderedSessions, courseId, classId, focusLearnerId, dayMetricOptions])
+  }, [scopedLedger, orderedSessions, courseId, classId, focusLearnerId, dayMetricOptions, selectedLearnerIds])
 
   function metricLabel(key: MetricKey): string {
     return metricSettings?.metrics.find((m) => m.key === key)?.label ?? key
@@ -445,24 +462,75 @@ export function ProgressAnalysisView({
                 <Users className="h-3.5 w-3.5" aria-hidden />
                 Who
               </span>
-              <label className="analysis-select-wrap">
-                <span className="sr-only">Learner</span>
-                <select
-                  className="analysis-select"
-                  value={selectedLearner}
-                  onChange={(e) => {
-                    setSelectedLearner(e.target.value)
-                    if (e.target.value) setTab('overview')
-                  }}
+              <div className="relative">
+                <button
+                  type="button"
+                  className="analysis-select flex items-center justify-between gap-2 text-left w-full min-w-[140px] px-3 py-1.5 rounded-lg border border-white/10 bg-slate-900 text-xs text-white cursor-pointer"
+                  onClick={() => setWhoOpen((o) => !o)}
                 >
-                  <option value="">Whole class</option>
-                  {learners.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.displayName}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  <span className="truncate">
+                    {selectedLearnerIds.length === 0
+                      ? 'Whole class'
+                      : selectedLearnerIds.length === 1
+                        ? (learners.find((u) => u.id === selectedLearnerIds[0])?.displayName ?? '1 Learner')
+                        : `${selectedLearnerIds.length} learners`}
+                  </span>
+                  <ChevronRight className={`h-3 w-3 transform transition-transform shrink-0 ${whoOpen ? 'rotate-90' : ''}`} />
+                </button>
+                {whoOpen && (
+                  <>
+                    <div className="fixed inset-0 z-30" onClick={() => setWhoOpen(false)} />
+                    <div className="absolute left-0 mt-1 z-40 w-56 rounded-xl border border-white/10 bg-slate-900 p-2 shadow-2xl">
+                      <div className="flex items-center justify-between border-b border-white/5 pb-1.5 mb-1.5 px-2">
+                        <button
+                          type="button"
+                          className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold border-0 bg-transparent cursor-pointer"
+                          onClick={() => {
+                            setSelectedLearnerIds([])
+                            setWhoOpen(false)
+                          }}
+                        >
+                          Clear (Whole class)
+                        </button>
+                        <button
+                          type="button"
+                          className="text-[10px] text-slate-400 hover:text-white font-semibold border-0 bg-transparent cursor-pointer"
+                          onClick={() => setWhoOpen(false)}
+                        >
+                          Done
+                        </button>
+                      </div>
+                      <div className="max-h-60 overflow-y-auto flex flex-col gap-0.5 hide-scrollbar">
+                        {learners.map((u) => {
+                          const checked = selectedLearnerIds.includes(u.id)
+                          return (
+                            <label
+                              key={u.id}
+                              className="flex items-center gap-2 px-2 py-1 hover:bg-white/5 rounded-lg cursor-pointer text-xs text-slate-300 hover:text-white"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                className="rounded bg-slate-950 border-white/10 text-indigo-500 cursor-pointer"
+                                onChange={() => {
+                                  setSelectedLearnerIds((prev) => {
+                                    const next = prev.includes(u.id)
+                                      ? prev.filter((id) => id !== u.id)
+                                      : [...prev, u.id]
+                                    if (next.length > 0) setTab('overview')
+                                    return next
+                                  })
+                                }}
+                              />
+                              <span className="truncate">{u.displayName}</span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           ) : null}
         </div>
@@ -521,7 +589,13 @@ export function ProgressAnalysisView({
         <p className="analysis-filter-meta">
           {courseCode}
           {className ? ` · ${className}` : ''}
-          {focusLearner ? ` · ${focusLearner.displayName}` : mode === 'teacher' ? ' · class' : ''}
+          {selectedLearnerIds.length > 0
+            ? selectedLearnerIds.length === 1
+              ? ` · ${focusLearner?.displayName}`
+              : ` · ${selectedLearnerIds.length} learners`
+            : mode === 'teacher'
+              ? ' · class'
+              : ''}
           {kind === 'session' ? ` · ${selectedSessionLabel}` : window ? ` · ${window.label}` : ''}
           {' · '}
           <strong>{total} finalized</strong>
@@ -530,7 +604,51 @@ export function ProgressAnalysisView({
       </section>
 
       {/* Focused learner strip */}
-      {focusLearner ? (
+      {selectedLearnerIds.length > 1 ? (
+        <div className="analysis-person-strip flex items-center justify-between gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl">
+          <div className="flex items-center gap-3">
+            <div className="flex -space-x-2 overflow-hidden py-1">
+              {selectedLearnerIds.slice(0, 3).map((id) => {
+                const u = learners.find((x) => x.id === id)
+                return (
+                  <UserAvatar
+                    key={id}
+                    name={u?.displayName ?? ''}
+                    avatarUrl={u?.avatarUrl}
+                    size="sm"
+                    className="ring-2 ring-slate-950"
+                  />
+                )
+              })}
+              {selectedLearnerIds.length > 3 && (
+                <div className="flex items-center justify-center h-8 w-8 rounded-full bg-slate-800 text-[10px] font-bold text-white ring-2 ring-slate-950">
+                  +{selectedLearnerIds.length - 3}
+                </div>
+              )}
+            </div>
+            <div className="analysis-person-copy">
+              <p className="analysis-person-name text-sm font-bold text-white">
+                {selectedLearnerIds.length} Learners Selected
+              </p>
+              <p className="meta text-xs text-slate-400">
+                {selectedLearnerIds
+                  .map((id) => learners.find((x) => x.id === id)?.displayName)
+                  .filter(Boolean)
+                  .join(', ')}
+              </p>
+            </div>
+          </div>
+          {mode === 'teacher' ? (
+            <button
+              type="button"
+              className="ghost analysis-person-clear"
+              onClick={() => setSelectedLearnerIds([])}
+            >
+              Class view
+            </button>
+          ) : null}
+        </div>
+      ) : focusLearner ? (
         <div className="analysis-person-strip">
           <UserAvatar
             name={focusLearner.displayName}
@@ -547,7 +665,7 @@ export function ProgressAnalysisView({
             <button
               type="button"
               className="ghost analysis-person-clear"
-              onClick={() => setSelectedLearner('')}
+              onClick={() => setSelectedLearnerIds([])}
             >
               Class view
             </button>
@@ -827,23 +945,40 @@ export function ProgressAnalysisView({
             <strong>RFC</strong> = (Red+Yellow) / sample that day. <strong>Δ RFC</strong> = change
             vs previous day (negative pp = less struggle = improvement).
           </p>
-          <div className="analysis-chip-row" style={{ marginBottom: 12 }} role="group" aria-label="Day table columns">
-            <span className="analysis-filter-label">Columns</span>
-            {dayMetricOptions.map((key) => {
-              const on = visibleDayColumns.includes(key)
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  className={`analysis-chip${on ? ' is-active' : ''}`}
-                  aria-pressed={on}
-                  title={metricSettings?.metrics.find((m) => m.key === key)?.definition ?? key}
-                  onClick={() => toggleDayColumn(key)}
-                >
-                  {metricLabel(key)}
-                </button>
-              )
-            })}
+          <div className="analysis-columns-selector mb-3 border border-white/5 bg-white/[0.02] rounded-xl p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                <CalendarDays className="h-3.5 w-3.5 text-indigo-400" />
+                Table Columns ({visibleDayColumns.length} active)
+              </span>
+              <button
+                type="button"
+                className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold border-0 bg-transparent cursor-pointer flex items-center gap-0.5"
+                onClick={() => setColumnsPanelOpen(!columnsPanelOpen)}
+              >
+                {columnsPanelOpen ? 'Hide columns config' : 'Show columns config'}
+                <ChevronRight className={`h-3 w-3 transform transition-transform ${columnsPanelOpen ? 'rotate-90' : ''}`} />
+              </button>
+            </div>
+            {columnsPanelOpen && (
+              <div className="mt-2.5 pt-2.5 border-t border-white/5 flex flex-wrap gap-1.5">
+                {dayMetricOptions.map((key) => {
+                  const on = visibleDayColumns.includes(key)
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      className={`analysis-chip${on ? ' is-active' : ''} text-[10px] py-1 px-2.5 cursor-pointer`}
+                      aria-pressed={on}
+                      title={metricSettings?.metrics.find((m) => m.key === key)?.definition ?? key}
+                      onClick={() => toggleDayColumn(key)}
+                    >
+                      {metricLabel(key)}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
           {sessionSeries.length === 0 ? (
             <p className="empty-state">No session results yet.</p>
@@ -914,17 +1049,28 @@ export function ProgressAnalysisView({
                           </td>
                         ) : null}
                         <td>
-                          <button
-                            type="button"
-                            className="ghost"
-                            onClick={() => {
-                              setKind('session')
-                              setSessionId(p.learningSessionId)
-                              setTab('overview')
-                            }}
-                          >
-                            Open
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              className="ghost"
+                              onClick={() => {
+                                setKind('session')
+                                setSessionId(p.learningSessionId)
+                                setTab('overview')
+                              }}
+                            >
+                              Open
+                            </button>
+                            {mode === 'teacher' && onDeleteSession && (
+                              <button
+                                type="button"
+                                className="ghost text-red-400 hover:text-red-300 hover:bg-red-500/10 px-2 py-1 rounded"
+                                onClick={() => onDeleteSession(p.learningSessionId)}
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     )
@@ -989,7 +1135,7 @@ export function ProgressAnalysisView({
                           type="button"
                           className="primary"
                           onClick={() => {
-                            setSelectedLearner(row.learnerUserId)
+                            setSelectedLearnerIds([row.learnerUserId])
                             setTab('overview')
                           }}
                         >
@@ -1035,7 +1181,7 @@ export function ProgressAnalysisView({
                               type="button"
                               className="ghost cell-with-avatar"
                               onClick={() => {
-                                setSelectedLearner(r.learnerUserId)
+                                setSelectedLearnerIds([r.learnerUserId])
                                 setTab('overview')
                               }}
                             >

@@ -1266,7 +1266,7 @@ export function TeacherObservePage() {
       {/* Center: name + fixed color dock (phone-first stack) */}
       <main className="observe-stage observe-stage-tight">
         {splitMode && capture.questions.length > 0 ? (
-          <div className={`observe-split${isPhone ? ' is-portrait' : ' is-landscape'}`}>
+          <div className="observe-split">
             {capture.learnerIds.map(renderLearnerPane)}
           </div>
         ) : capture.questions.length === 0 ? (
@@ -1527,7 +1527,7 @@ export function TeacherObservePage() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="py-2 overflow-y-auto" style={{ maxHeight: '60vh' }}>
+            <div className="py-2 overflow-y-auto hide-scrollbar" style={{ maxHeight: '60vh' }}>
               {(() => {
                 const learnerId = showHeatmapPopupLearnerId
                 const learnerQuestions = capture.questions.filter((q) => q.assignedLearnerUserId === learnerId)

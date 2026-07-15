@@ -3,6 +3,7 @@ import {
   Activity,
   CalendarDays,
   ChevronRight,
+  Info,
   TrendingDown,
   TrendingUp,
   Users,
@@ -694,18 +695,17 @@ export function ProgressAnalysisView({
       {/* ——— Overview ——— */}
       {tab === 'overview' && (
         <div className="analysis-tab-body">
-          <p className="analysis-plain-hint">
-            <strong>Struggle (RFC)</strong> = (Red + Yellow) ÷ finalized sample in the{' '}
-            <em>current filter</em> (course / one day / date range × class or one learner). Source:
-            assessment ledger only — no mock.
-            {' · '}
-            <strong>RAC</strong> = (Green + Purple) ÷ sample. Lower RFC is better.
-          </p>
-
           <div className="stat-grid analysis-kpis">
             <div className={`stat-card analysis-kpi-rfc${rfcTone === 'up' ? ' is-good' : rfcTone === 'down' ? ' is-warn' : ''}`}>
-              <p className="stat-label">
-                <Activity className="inline h-3.5 w-3.5" aria-hidden /> Struggle (RFC)
+              <p className="stat-label flex items-center gap-1">
+                <Activity className="h-3.5 w-3.5" aria-hidden />
+                <span>Struggle (RFC)</span>
+                <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
+                  <Info className="h-3.5 w-3.5" />
+                  <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
+                    <strong>Struggle (RFC)</strong> = (Red + Yellow) ÷ finalized sample. Lower RFC is better. Source: assessment ledger only (no mock).
+                  </span>
+                </span>
               </p>
               <p className="stat-value">{rfc ? formatMetricValue(rfc) : '—'}</p>
               <p className={`analysis-delta is-${rfcTone}`}>
@@ -719,7 +719,15 @@ export function ProgressAnalysisView({
               </p>
             </div>
             <div className={`stat-card analysis-kpi-rac${racTone === 'up' ? ' is-good' : racTone === 'down' ? ' is-warn' : ''}`}>
-              <p className="stat-label">Success (RAC)</p>
+              <p className="stat-label flex items-center gap-1">
+                <span>Success (RAC)</span>
+                <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
+                  <Info className="h-3.5 w-3.5" />
+                  <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
+                    <strong>Success (RAC)</strong> = (Green + Purple) ÷ sample. Higher RAC is better.
+                  </span>
+                </span>
+              </p>
               <p className="stat-value">{rac ? formatMetricValue(rac) : '—'}</p>
               <p className={`analysis-delta is-${racTone}`}>
                 {racTone === 'up' ? (
@@ -945,16 +953,19 @@ export function ProgressAnalysisView({
       {/* ——— By day (session series + Δ RFC) ——— */}
       {tab === 'sessions' && (
         <div className="analysis-tab-body">
-          <p className="analysis-plain-hint">
-            Each row is one live day from the <strong>finalized ledger</strong> (not mock).{' '}
-            <strong>RFC</strong> = (Red+Yellow) / sample that day. <strong>Δ RFC</strong> = change
-            vs previous day (negative pp = less struggle = improvement).
-          </p>
           <div className="analysis-columns-selector mb-3 border border-white/5 bg-white/[0.02] rounded-xl p-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                 <CalendarDays className="h-3.5 w-3.5 text-indigo-400" />
-                Table Columns ({visibleDayColumns.length} active)
+                <span>Table Columns ({visibleDayColumns.length} active)</span>
+                <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
+                  <Info className="h-3.5 w-3.5" />
+                  <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
+                    Each row is one live day from the <strong>finalized ledger</strong> (no mock).
+                    <br />
+                    <strong>RFC</strong> = (Red+Yellow) / sample. <strong>Δ RFC</strong> = change vs previous day (negative pp = improvement).
+                  </span>
+                </span>
               </span>
               <button
                 type="button"

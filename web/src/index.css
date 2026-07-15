@@ -2499,7 +2499,7 @@
     }
 
     .observe-dock-color {
-      @apply h-14 min-h-0 w-14 min-w-0 rounded-full border-[3px] border-slate-950 p-1 text-white;
+      @apply h-20 min-h-0 w-20 min-w-0 rounded-full border-[3px] border-slate-950 p-1 text-white;
     }
 
     .observe-dock-label {
@@ -2507,14 +2507,14 @@
     }
 
     .observe-dock-probe-btn {
-      @apply flex h-14 min-h-14 w-14 min-w-14 flex-col items-center justify-center rounded-full border-2 border-slate-500 bg-slate-800 p-1 text-[9px] text-slate-100;
+      @apply flex h-[4.25rem] min-h-[4.25rem] w-[4.25rem] min-w-[4.25rem] flex-col items-center justify-center rounded-full border-2 border-slate-500 bg-slate-800 p-1.5 text-xs text-slate-100;
       box-shadow:
         inset 0 2px 5px rgb(255 255 255 / 0.08),
         0 6px 14px rgb(0 0 0 / 0.3);
     }
 
     .observe-dock-num {
-      @apply text-base!;
+      @apply text-2xl!;
     }
 
     .observe-dock-probe-btn kbd {
@@ -2568,6 +2568,10 @@
 
   /* Short landscape phones: keep dock usable, shrink hero */
   @media (max-height: 500px) and (orientation: landscape) {
+    .observe-bar.observe-bar-slim {
+      display: none !important;
+    }
+
     .observe-stage,
     .observe-stage-tight {
       @apply flex-row justify-center items-center gap-8 py-2 px-4 overflow-hidden;

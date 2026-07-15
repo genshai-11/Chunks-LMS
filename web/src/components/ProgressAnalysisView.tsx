@@ -168,6 +168,9 @@ export function ProgressAnalysisView({
   )
   const [whoOpen, setWhoOpen] = useState(false)
   const [columnsPanelOpen, setColumnsPanelOpen] = useState(false)
+  const [deleteSessionIdConfirm, setDeleteSessionIdConfirm] = useState<string | null>(null)
+  const [editSessionId, setEditSessionId] = useState<string | null>(null)
+  const [editSessionNumberInput, setEditSessionNumberInput] = useState<string>('')
   
   useEffect(() => {
     setSelectedLearnerIds(learnerUserId ? [learnerUserId] : [])
@@ -1063,23 +1066,13 @@ export function ProgressAnalysisView({
                             >
                               Open
                             </button>
-                            {mode === 'teacher' && onEditSessionNumber && (
+                             {mode === 'teacher' && onEditSessionNumber && (
                               <button
                                 type="button"
                                 className="ghost text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 px-2 py-1 rounded"
                                 onClick={() => {
-                                  const newNumStr = globalThis.prompt(
-                                    `Enter new session day number for "${sessionLabel(p.sessionNumber, p.startedAt, totalDays)}":`,
-                                    String(p.sessionNumber ?? '')
-                                  )
-                                  if (newNumStr != null) {
-                                    const newNum = parseInt(newNumStr, 10)
-                                    if (!isNaN(newNum) && newNum > 0) {
-                                      onEditSessionNumber(p.learningSessionId, newNum)
-                                    } else {
-                                      globalThis.alert('Invalid session number. Must be a positive integer.')
-                                    }
-                                  }
+                                  setEditSessionId(p.learningSessionId)
+                                  setEditSessionNumberInput(String(p.sessionNumber ?? ''))
                                 }}
                               >
                                 Edit Day
@@ -1089,7 +1082,7 @@ export function ProgressAnalysisView({
                               <button
                                 type="button"
                                 className="ghost text-red-400 hover:text-red-300 hover:bg-red-500/10 px-2 py-1 rounded"
-                                onClick={() => onDeleteSession(p.learningSessionId)}
+                                onClick={() => setDeleteSessionIdConfirm(p.learningSessionId)}
                               >
                                 Delete
                               </button>
@@ -1230,6 +1223,86 @@ export function ProgressAnalysisView({
                 </tbody>
               </table>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Custom Delete Confirmation Modal */}
+      {deleteSessionIdConfirm && (
+        <div className="observe-modal-container">
+          <div className="observe-modal-backdrop" onClick={() => setDeleteSessionIdConfirm(null)} />
+          <div className="observe-modal-card text-left max-w-md p-6 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl relative z-50">
+            <h3 className="text-lg font-bold text-white mb-2">Delete Live Session?</h3>
+            <p className="text-sm text-slate-300 mb-6">
+              Are you sure you want to delete this live session? All question captures and attendance for this session will be permanently deleted from the database.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                className="btn secondary px-4 py-2 text-xs font-semibold rounded-lg"
+                onClick={() => setDeleteSessionIdConfirm(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn primary bg-red-600 hover:bg-red-500 text-white px-4 py-2 text-xs font-semibold rounded-lg shadow-lg hover:shadow-red-500/20"
+                onClick={() => {
+                  if (onDeleteSession) onDeleteSession(deleteSessionIdConfirm)
+                  setDeleteSessionIdConfirm(null)
+                }}
+              >
+                Yes, Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Edit Session Number Modal */}
+      {editSessionId && (
+        <div className="observe-modal-container">
+          <div className="observe-modal-backdrop" onClick={() => setEditSessionId(null)} />
+          <div className="observe-modal-card text-left max-w-sm p-6 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl relative z-50">
+            <h3 className="text-lg font-bold text-white mb-2">Edit Session Day</h3>
+            <p className="text-xs text-slate-400 mb-4">
+              Enter the correct day number sequence for this session record.
+            </p>
+            <div className="mb-6">
+              <input
+                type="number"
+                min="1"
+                required
+                className="w-full text-center bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-2xl font-black text-white focus:outline-none focus:border-indigo-500 font-mono tracking-wider"
+                value={editSessionNumberInput}
+                onChange={(e) => setEditSessionNumberInput(e.target.value)}
+                placeholder="Day Number"
+              />
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                className="btn secondary px-4 py-2 text-xs font-semibold rounded-lg"
+                onClick={() => setEditSessionId(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn primary bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 text-xs font-semibold rounded-lg shadow-lg"
+                onClick={() => {
+                  const newNum = parseInt(editSessionNumberInput, 10)
+                  if (!isNaN(newNum) && newNum > 0) {
+                    if (onEditSessionNumber) onEditSessionNumber(editSessionId, newNum)
+                    setEditSessionId(null)
+                  } else {
+                    alert('Invalid session number. Must be a positive integer.')
+                  }
+                }}
+              >
+                Save Changes
+              </button>
+            </div>
           </div>
         </div>
       )}

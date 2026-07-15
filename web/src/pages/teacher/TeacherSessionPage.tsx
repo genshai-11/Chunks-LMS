@@ -89,8 +89,10 @@ export function TeacherSessionPage() {
     if (openSession?.participantLearnerIds?.length) {
       return openSession.participantLearnerIds.filter((id) => activeLearnerIds.includes(id))
     }
-    return activeLearnerIds
+    return []
   }, [openSession, activeLearnerIds])
+
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
 
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [sessionKind, setSessionKind] = useState<SessionKind>('regular')
@@ -214,16 +216,12 @@ export function TeacherSessionPage() {
     })
   }
 
-  async function deleteActiveSession() {
-    if (!openSession) return
-    if (
-      !window.confirm(
-        'Are you sure you want to cancel and delete this active session? All progress in this session will be lost.'
-      )
-    ) {
-      return
-    }
+  function deleteActiveSession() {
+    setShowCancelConfirm(true)
+  }
 
+  async function handleConfirmCancelActiveSession() {
+    if (!openSession) return
     try {
       const supabase = getSupabase()
       if (supabase) {
@@ -244,6 +242,8 @@ export function TeacherSessionPage() {
       ok('Active session cancelled and deleted')
     } catch (e: any) {
       err(e.message || 'Failed to delete session')
+    } finally {
+      setShowCancelConfirm(false)
     }
   }
 
@@ -687,6 +687,35 @@ export function TeacherSessionPage() {
           </div>
         )}
       </Panel>
+
+      {/* Custom Cancel Active Session Modal */}
+      {showCancelConfirm && (
+        <div className="observe-modal-container">
+          <div className="observe-modal-backdrop" onClick={() => setShowCancelConfirm(false)} />
+          <div className="observe-modal-card text-left max-w-md p-6 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl relative z-50">
+            <h3 className="text-lg font-bold text-white mb-2">Cancel Active Session?</h3>
+            <p className="text-sm text-slate-300 mb-6">
+              Are you sure you want to cancel and delete this active session? All progress captured in this session will be permanently lost.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                className="btn secondary px-4 py-2 text-xs font-semibold rounded-lg"
+                onClick={() => setShowCancelConfirm(false)}
+              >
+                Keep Session
+              </button>
+              <button
+                type="button"
+                className="btn primary bg-red-600 hover:bg-red-500 text-white px-4 py-2 text-xs font-semibold rounded-lg shadow-lg hover:shadow-red-500/20"
+                onClick={() => void handleConfirmCancelActiveSession()}
+              >
+                Cancel Session
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

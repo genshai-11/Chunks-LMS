@@ -364,6 +364,25 @@ export function TeacherObservePage() {
     : dayNumber
 
   const dayLabel = sessionLabel(targetDayNumber, openSession?.startedAt, totalDays)
+  const finishMetrics = useMemo(() => {
+    if (!capture) return null
+    const summary = sessionColorSummary(capture)
+    const unresolved = summary.byColor.open + summary.byColor.draft
+    return {
+      className: classRow?.name ?? 'Class',
+      dayLabel,
+      learnerCount: capture.learnerIds.length,
+      questionCount: capture.questions.length,
+      done: summary.done,
+      total: summary.total,
+      red: summary.byColor.red,
+      yellow: summary.byColor.yellow,
+      green: summary.byColor.green,
+      purple: summary.byColor.purple,
+      maxProbeDepth: summary.maxProbeDepth,
+      unresolved,
+    }
+  }, [capture, classRow?.name, dayLabel])
   const dayBadge = sessionDayBadge(targetDayNumber, totalDays)
   const openParticipants = openSession?.participantLearnerIds?.length
     ? openSession.participantLearnerIds
@@ -725,9 +744,9 @@ export function TeacherObservePage() {
       } catch {
         /* local persist still holds; backend may be offline */
       }
-      flash('Session saved')
+      flash('Lưu kết quả học tập thành công!')
       setFinishSummary(null)
-      navigate(exitPath)
+      navigate('/teacher/analysis')
     } finally {
       setFinishing(false)
     }
@@ -1110,7 +1129,7 @@ export function TeacherObservePage() {
         </Link>
         <div className="observe-bar-center">
           <span className="observe-day-badge" title={dayLabel}>
-            {dayNumber ? `Day ${dayNumber}` : 'Day —'}
+            {targetDayNumber ? `Day ${targetDayNumber}` : 'Day —'}
           </span>
           {qTotal > 0 ? (
             <>
@@ -1620,7 +1639,74 @@ export function TeacherObservePage() {
               Review this session summary. Save & Finish will close this day permanently, then the
               next visit starts a new day.
             </p>
-            <pre className="observe-modal-summary-text">{finishSummary}</pre>
+            {finishMetrics && (
+              <div className="w-full flex flex-col gap-4 text-left my-4 bg-slate-900/50 p-4 rounded-xl border border-white/5">
+                <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                  <span className="text-sm font-semibold text-slate-200">{finishMetrics.dayLabel}</span>
+                  <span className="text-[11px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded font-mono font-bold uppercase">{finishMetrics.className}</span>
+                </div>
+                
+                {/* 3 KPIs */}
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-slate-950/40 p-2.5 rounded-lg border border-white/5">
+                    <p className="text-[10px] text-slate-400 uppercase font-medium">Learners</p>
+                    <p className="text-lg font-bold text-white mt-0.5">{finishMetrics.learnerCount}</p>
+                  </div>
+                  <div className="bg-slate-950/40 p-2.5 rounded-lg border border-white/5">
+                    <p className="text-[10px] text-slate-400 uppercase font-medium">Questions</p>
+                    <p className="text-lg font-bold text-white mt-0.5">{finishMetrics.questionCount}</p>
+                  </div>
+                  <div className="bg-slate-950/40 p-2.5 rounded-lg border border-white/5">
+                    <p className="text-[10px] text-slate-400 uppercase font-medium">Finalized</p>
+                    <p className="text-lg font-bold text-emerald-400 mt-0.5">{finishMetrics.done}/{finishMetrics.total}</p>
+                  </div>
+                </div>
+
+                {/* Color distribution bar */}
+                <div>
+                  <p className="text-[10px] text-slate-400 uppercase font-medium mb-1.5">Color Distribution</p>
+                  <div className="h-3 w-full rounded-full bg-slate-950 overflow-hidden flex">
+                    {finishMetrics.red > 0 && <div className="h-full bg-red-500" style={{ width: `${(finishMetrics.red / Math.max(finishMetrics.done, 1)) * 100}%` }} />}
+                    {finishMetrics.yellow > 0 && <div className="h-full bg-yellow-400" style={{ width: `${(finishMetrics.yellow / Math.max(finishMetrics.done, 1)) * 100}%` }} />}
+                    {finishMetrics.green > 0 && <div className="h-full bg-emerald-500" style={{ width: `${(finishMetrics.green / Math.max(finishMetrics.done, 1)) * 100}%` }} />}
+                    {finishMetrics.purple > 0 && <div className="h-full bg-fuchsia-500" style={{ width: `${(finishMetrics.purple / Math.max(finishMetrics.done, 1)) * 100}%` }} />}
+                  </div>
+                  <div className="grid grid-cols-4 gap-1.5 mt-2.5 text-center text-[10px]">
+                    <div className="bg-red-500/10 text-red-400 border border-red-500/20 py-1 rounded font-bold">
+                      Red: {finishMetrics.red}
+                    </div>
+                    <div className="bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 py-1 rounded font-bold">
+                      Yellow: {finishMetrics.yellow}
+                    </div>
+                    <div className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 py-1 rounded font-bold">
+                      Green: {finishMetrics.green}
+                    </div>
+                    <div className="bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20 py-1 rounded font-bold">
+                      Purple: {finishMetrics.purple}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Additional metrics */}
+                <div className="flex justify-between items-center text-xs pt-1 border-t border-white/5">
+                  <span className="text-slate-400">Peak probe depth:</span>
+                  <span className="font-mono font-bold text-white">n={finishMetrics.maxProbeDepth}</span>
+                </div>
+
+                {/* Unresolved / status info */}
+                <div className="mt-1">
+                  {finishMetrics.unresolved > 0 ? (
+                    <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-lg p-2 text-[11px] font-medium">
+                      ⚠️ Left unfinalized when session closed: {finishMetrics.unresolved}
+                    </div>
+                  ) : (
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg p-2 text-[11px] font-medium text-center">
+                      ✓ All captured attempts finalized.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             <div className="observe-modal-actions">
               <button
                 type="button"

@@ -25,6 +25,7 @@ import {
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   advancePosition,
+  createCaptureSession,
   currentAttempt,
   jumpToQuestion,
   markSessionCompleted,
@@ -54,6 +55,7 @@ import {
   resolveLiveProbe,
 } from '../../lib/live-assessment'
 import { getSupabase } from '../../lib/supabase'
+import { triggerConfetti } from '../../lib/confetti'
 
 const COLORS: { key: ResultColor; label: string; shortcut: string }[] = [
   { key: 'red', label: 'Red', shortcut: '0' },
@@ -87,7 +89,11 @@ function readSavedRailWidth(): number {
   return RAIL_DEFAULT
 }
 
-function formatFinishSummary(capture: CaptureSessionState, className: string | null, dayLabel: string): string {
+function formatFinishSummary(
+  capture: CaptureSessionState,
+  className: string | null,
+  dayLabel: string,
+): string {
   const summary = sessionColorSummary(capture)
   const unresolved = summary.byColor.open + summary.byColor.draft
   return [
@@ -106,6 +112,20 @@ function formatFinishSummary(capture: CaptureSessionState, className: string | n
       ? `Left unfinalized when session closed: ${unresolved}`
       : 'All captured attempts finalized.',
   ].join('\n')
+}
+
+function currentAttemptForLearner(capture: CaptureSessionState, learnerUserId: string) {
+  const attempts = capture.attempts.filter((a) => a.learnerUserId === learnerUserId)
+  return (
+    attempts.find(
+      (a) =>
+        a.snapshot.status === 'draft' ||
+        a.snapshot.status === 'probe_open' ||
+        a.snapshot.status === 'resolution_required',
+    ) ??
+    attempts.at(-1) ??
+    null
+  )
 }
 
 /**
@@ -143,8 +163,10 @@ export function TeacherObservePage() {
   const [isPhone, setIsPhone] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 639px)').matches : false,
   )
+  const [activeSplitLearnerId, setActiveSplitLearnerId] = useState<string | null>(null)
   const railWidthRef = useRef(railWidth)
   const captureRef = useRef(capture)
+  const liveRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
     captureRef.current = capture
   }, [capture])
@@ -226,10 +248,9 @@ export function TeacherObservePage() {
       setLiveLoading(false)
       return
     }
-    const learnerIds =
-      openSession.participantLearnerIds?.length
-        ? openSession.participantLearnerIds
-        : activeLearnerIds
+    const learnerIds = openSession.participantLearnerIds?.length
+      ? openSession.participantLearnerIds
+      : activeLearnerIds
 
     // Push open day to server (best-effort) so RPC can work when online
     void ensureLearningSessionOnServer(openSession)
@@ -244,37 +265,46 @@ export function TeacherObservePage() {
       learnerIds.every((id) => existing.learnerIds.includes(id))
         ? existing
         : null
+    const localFallback =
+      compatibleExisting ??
+      createCaptureSession({
+        learningSessionId: openSession.id,
+        teacherUserId: teacher.id,
+        learnerIds,
+        maxProbeCount: openSession.maxProbeCount,
+      })
+
+    // Render immediately. Supabase can reconcile in the background, but Day 1 Observe
+    // must never stay on a blank loading screen while the network/database warms up.
+    if (!compatibleExisting) setCapture(localFallback)
+    setLiveLoading(false)
+
     const result = await loadLiveCapture({
       learningSessionId: openSession.id,
       teacherUserId: teacher.id,
       learnerIds,
       sessionStatus: openSession.status,
       maxProbeCount: openSession.maxProbeCount,
-      fallback: compatibleExisting,
+      fallback: localFallback,
     })
-    if (result.ok) {
-      // Don't overwrite a richer compatible local board with an empty cloud board
-      if (
-        compatibleExisting &&
-        compatibleExisting.questions.length > 0 &&
-        result.data.questions.length < compatibleExisting.questions.length
-      ) {
-        setLiveLoading(false)
-        return
-      }
-      setCapture(result.data)
-    } else if (!compatibleExisting) {
-      const { createCaptureSession } = await import('../../modules/assessment/session-capture')
-      setCapture(
-        createCaptureSession({
-          learningSessionId: openSession.id,
-          teacherUserId: teacher.id,
-          learnerIds,
-          maxProbeCount: openSession.maxProbeCount,
-        }),
-      )
+    if (!result.ok) return
+
+    // Don't overwrite a richer compatible local board with an empty/older cloud board.
+    const latest = captureRef.current
+    const latestCompatible =
+      latest &&
+      latest.learningSessionId === openSession.id &&
+      latest.learnerIds.length === learnerIds.length &&
+      learnerIds.every((id) => latest.learnerIds.includes(id))
+        ? latest
+        : localFallback
+    if (
+      latestCompatible.questions.length > 0 &&
+      result.data.questions.length < latestCompatible.questions.length
+    ) {
+      return
     }
-    setLiveLoading(false)
+    setCapture(result.data)
   }, [openSession, teacher, activeLearnerIds, setCapture])
 
   useEffect(() => {
@@ -289,10 +319,14 @@ export function TeacherObservePage() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'assessment_attempt_snapshots' },
-        () => void refreshLiveCapture(),
+        () => {
+          if (liveRefreshTimer.current) clearTimeout(liveRefreshTimer.current)
+          liveRefreshTimer.current = window.setTimeout(() => void refreshLiveCapture(), 150)
+        },
       )
       .subscribe()
     return () => {
+      if (liveRefreshTimer.current) clearTimeout(liveRefreshTimer.current)
       void supabase.removeChannel(channel)
     }
   }, [openSession, refreshLiveCapture])
@@ -325,7 +359,8 @@ export function TeacherObservePage() {
     activeLearnerUserId && openSession && !openParticipants.includes(activeLearnerUserId),
   )
   const activeLearnerName = activeLearnerUserId
-    ? roster.users.find((user) => user.id === activeLearnerUserId)?.displayName ?? activeLearnerUserId.slice(0, 6)
+    ? (roster.users.find((user) => user.id === activeLearnerUserId)?.displayName ??
+      activeLearnerUserId.slice(0, 6))
     : null
   const openLearnerNames = openParticipants
     .map((id) => roster.users.find((user) => user.id === id)?.displayName ?? id.slice(0, 6))
@@ -352,11 +387,19 @@ export function TeacherObservePage() {
   const ry = summary ? summary.byColor.red + summary.byColor.yellow : 0
   const done = summary ? summary.done : 0
   const rfcPct = done > 0 ? Math.round((ry / done) * 100) : 0
+  const splitMode = capture?.learnerIds.length === 2
 
   const learnerName = useCallback(
     (id: string) => roster.users.find((u) => u.id === id)?.displayName ?? id.slice(0, 6),
     [roster.users],
   )
+
+  useEffect(() => {
+    if (!capture || capture.learnerIds.length !== 2) return
+    if (!activeSplitLearnerId || !capture.learnerIds.includes(activeSplitLearnerId)) {
+      setActiveSplitLearnerId(capture.learnerIds[0] ?? null)
+    }
+  }, [capture, activeSplitLearnerId])
 
   const flash = useCallback((msg: string) => {
     setToast(msg)
@@ -366,6 +409,9 @@ export function TeacherObservePage() {
   const playReaction = useCallback((color: ResultColor) => {
     const id = Date.now()
     setReaction({ kind: reactionFor(color), color, id })
+    if (color === 'purple') {
+      triggerConfetti()
+    }
     window.setTimeout(() => setReaction((current) => (current?.id === id ? null : current)), 1200)
   }, [])
 
@@ -472,6 +518,110 @@ export function TeacherObservePage() {
     ],
   )
 
+  const advanceLearnerPane = useCallback(
+    async (state: CaptureSessionState, learnerUserId: string): Promise<CaptureSessionState> => {
+      const created = await createLiveQuestion({
+        capture: state,
+        openSession: openSession ?? null,
+        learnerUserId,
+      })
+      if (!created.ok) {
+        flash(created.error)
+        return state
+      }
+      return created.data
+    },
+    [flash, openSession],
+  )
+
+  const recordColorForLearner = useCallback(
+    async (learnerUserId: string, color: ResultColor) => {
+      if (!capture || liveSaving) return
+      const learnerAttempt = currentAttemptForLearner(capture, learnerUserId)
+      if (!learnerAttempt) return
+      const wasFinal =
+        learnerAttempt.snapshot.status === 'finalized' ||
+        learnerAttempt.snapshot.status === 'corrected'
+      setLiveSaving(true)
+      try {
+        const result = await recordLiveColor(learnerAttempt, color)
+        if (!result.ok) {
+          flash(result.error)
+          return
+        }
+        let next = replaceLiveAttempt(capture, result.data)
+        setCapture(next)
+        appendFinalizedFromCapture(next)
+        if (
+          result.data.snapshot.status === 'finalized' ||
+          result.data.snapshot.status === 'corrected'
+        ) {
+          playReaction(color)
+          if (!wasFinal) {
+            next = await advanceLearnerPane(next, learnerUserId)
+            setCapture(next)
+            appendFinalizedFromCapture(next)
+          }
+          flash(color)
+        }
+      } finally {
+        setLiveSaving(false)
+      }
+    },
+    [
+      capture,
+      liveSaving,
+      setCapture,
+      appendFinalizedFromCapture,
+      playReaction,
+      advanceLearnerPane,
+      flash,
+    ],
+  )
+
+  const resolveProbeForLearner = useCallback(
+    async (learnerUserId: string, outcome: 'fail' | 'continue' | 'done') => {
+      if (!capture || liveSaving) return
+      const learnerAttempt = currentAttemptForLearner(capture, learnerUserId)
+      if (!learnerAttempt) return
+      setLiveSaving(true)
+      try {
+        const result = await resolveLiveProbe(learnerAttempt, outcome)
+        if (!result.ok) {
+          flash(result.error)
+          return
+        }
+        let next = replaceLiveAttempt(capture, result.data)
+        setCapture(next)
+        appendFinalizedFromCapture(next)
+        if (
+          result.data.snapshot.status === 'finalized' ||
+          result.data.snapshot.status === 'corrected'
+        ) {
+          const color: ResultColor = outcome === 'fail' ? 'yellow' : 'green'
+          playReaction(color)
+          next = await advanceLearnerPane(next, learnerUserId)
+          setCapture(next)
+          appendFinalizedFromCapture(next)
+          flash(color)
+        } else if (outcome === 'continue') {
+          flash(`n=${result.data.snapshot.probeCount}`)
+        }
+      } finally {
+        setLiveSaving(false)
+      }
+    },
+    [
+      capture,
+      liveSaving,
+      setCapture,
+      appendFinalizedFromCapture,
+      playReaction,
+      advanceLearnerPane,
+      flash,
+    ],
+  )
+
   const startFirst = useCallback(async () => {
     if (!capture || liveSaving) return
     setLiveSaving(true)
@@ -483,16 +633,22 @@ export function TeacherObservePage() {
           console.warn('[observe] session push:', ensured.error)
         }
       }
-      const result = await createLiveQuestion({
-        capture,
-        openSession: openSession ?? null,
-      })
-      if (!result.ok) {
-        flash(result.error)
-        return
+      const firstLearners = capture.learnerIds.length === 2 ? capture.learnerIds : [null]
+      let next = capture
+      for (const learnerUserId of firstLearners) {
+        const result = await createLiveQuestion({
+          capture: next,
+          openSession: openSession ?? null,
+          learnerUserId,
+        })
+        if (!result.ok) {
+          flash(result.error)
+          return
+        }
+        next = result.data
       }
-      setCapture(result.data)
-      flash('Q1 ready')
+      setCapture(next)
+      flash(capture.learnerIds.length === 2 ? '2 learners ready' : 'Q1 ready')
     } finally {
       setLiveSaving(false)
     }
@@ -590,7 +746,14 @@ export function TeacherObservePage() {
         setShowKeys((v) => !v)
         return
       }
-      if (k === 'f' && !probeOpen) {
+      const splitLearnerId = splitMode ? activeSplitLearnerId : null
+      const splitAttempt =
+        splitLearnerId && capture ? currentAttemptForLearner(capture, splitLearnerId) : null
+      const splitProbeOpen = Boolean(
+        splitAttempt?.snapshot.status === 'probe_open' ||
+        splitAttempt?.snapshot.status === 'resolution_required',
+      )
+      if (k === 'f' && !(splitMode ? splitProbeOpen : probeOpen)) {
         e.preventDefault()
         finishSessionAndSave()
         return
@@ -613,6 +776,47 @@ export function TeacherObservePage() {
       if (k === 'n' && capture?.questions.length === 0) {
         e.preventDefault()
         startFirst()
+        return
+      }
+      if (splitMode && splitLearnerId) {
+        if (k === 'tab') {
+          e.preventDefault()
+          const [a, b] = capture?.learnerIds ?? []
+          setActiveSplitLearnerId(splitLearnerId === a ? (b ?? a ?? null) : (a ?? null))
+          return
+        }
+        if (k === '0') {
+          e.preventDefault()
+          recordColorForLearner(splitLearnerId, 'red')
+          return
+        }
+        if (k === '1') {
+          e.preventDefault()
+          recordColorForLearner(splitLearnerId, 'yellow')
+          return
+        }
+        if (k === '2') {
+          e.preventDefault()
+          recordColorForLearner(splitLearnerId, 'green')
+          return
+        }
+        if (k === '3') {
+          e.preventDefault()
+          recordColorForLearner(splitLearnerId, 'purple')
+          return
+        }
+        if (splitProbeOpen) {
+          if (k === 'f') {
+            e.preventDefault()
+            resolveProbeForLearner(splitLearnerId, 'fail')
+          } else if (k === 'p' || k === 'c') {
+            e.preventDefault()
+            resolveProbeForLearner(splitLearnerId, 'continue')
+          } else if (k === 'd' || k === 'enter') {
+            e.preventDefault()
+            resolveProbeForLearner(splitLearnerId, 'done')
+          }
+        }
         return
       }
       if (k === '0') {
@@ -650,7 +854,23 @@ export function TeacherObservePage() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [navigate, exitPath, prevCell, nextCell, recordColor, resolveProbe, probeOpen, capture, startFirst, finishSessionAndSave, finishSummary])
+  }, [
+    navigate,
+    exitPath,
+    prevCell,
+    nextCell,
+    recordColor,
+    resolveProbe,
+    probeOpen,
+    capture,
+    startFirst,
+    finishSessionAndSave,
+    finishSummary,
+    splitMode,
+    activeSplitLearnerId,
+    recordColorForLearner,
+    resolveProbeForLearner,
+  ])
 
   if (!openSession) {
     return <Navigate to={exitPath} replace />
@@ -667,7 +887,11 @@ export function TeacherObservePage() {
             one.
           </p>
           <div className="observe-modal-actions">
-            <button type="button" className="observe-modal-btn observe-modal-confirm" onClick={() => navigate('/teacher')}>
+            <button
+              type="button"
+              className="observe-modal-btn observe-modal-confirm"
+              onClick={() => navigate('/teacher')}
+            >
               Back to learners
             </button>
           </div>
@@ -686,6 +910,169 @@ export function TeacherObservePage() {
 
   if (capture.sessionStatus !== 'open') {
     return <Navigate to={exitPath} replace />
+  }
+
+  const renderLearnerPane = (learnerId: string) => {
+    const paneAttempt = currentAttemptForLearner(capture, learnerId)
+    const user = roster.users.find((u) => u.id === learnerId)
+    const learnerQuestions = capture.questions.filter((q) => q.assignedLearnerUserId === learnerId)
+    const learnerQuestionIds = new Set(learnerQuestions.map((q) => q.id))
+    const learnerAttempts = capture.attempts.filter((a) => a.learnerUserId === learnerId)
+    const paneProbeOpen =
+      paneAttempt?.snapshot.status === 'probe_open' ||
+      paneAttempt?.snapshot.status === 'resolution_required'
+    const paneFinalized =
+      paneAttempt?.snapshot.status === 'finalized' || paneAttempt?.snapshot.status === 'corrected'
+    const paneProbeDepth = paneAttempt?.snapshot.probeCount ?? 0
+    const learnerQuestionIndex = paneAttempt
+      ? Math.max(
+          0,
+          learnerQuestions.findIndex((q) => q.id === paneAttempt.sessionQuestionId),
+        )
+      : 0
+    const learnerDone = learnerAttempts.filter(
+      (a) => a.snapshot.status === 'finalized' || a.snapshot.status === 'corrected',
+    ).length
+    const learnerRy = learnerAttempts.filter(
+      (a) => a.snapshot.effectiveColor === 'red' || a.snapshot.effectiveColor === 'yellow',
+    ).length
+    const learnerRfc = learnerDone > 0 ? Math.round((learnerRy / learnerDone) * 100) : 0
+    const learnerCapture: CaptureSessionState = {
+      ...capture,
+      learnerIds: [learnerId],
+      questions: learnerQuestions,
+      attempts: capture.attempts.filter((a) => learnerQuestionIds.has(a.sessionQuestionId)),
+      position: {
+        ...capture.position,
+        questionIndex: learnerQuestionIndex,
+        learnerIndex: 0,
+      },
+    }
+    const active = activeSplitLearnerId === learnerId
+
+    return (
+      <section
+        key={learnerId}
+        className={`observe-split-pane${active ? ' is-active' : ''}`}
+        aria-label={`Observe ${user?.displayName ?? learnerId}`}
+        onPointerDown={() => setActiveSplitLearnerId(learnerId)}
+      >
+        <div className="observe-stage-hero observe-split-hero">
+          <div className="observe-phone-avatar" aria-hidden={false}>
+            <UserAvatar
+              name={user?.displayName ?? 'Learner'}
+              avatarUrl={user?.avatarUrl}
+              size="md"
+            />
+          </div>
+          <h2 className="observe-learner observe-learner-solo observe-split-name">
+            {user?.displayName ?? 'Learner'}
+          </h2>
+          <div className="observe-meta-row">
+            <span className="observe-learner-rfc" title="Learner RFC in this session">
+              <Activity className="h-3.5 w-3.5" aria-hidden />
+              RFC {learnerDone ? `${learnerRfc}%` : '—'}
+            </span>
+            <span className="observe-meta-muted">
+              {learnerDone}/{Math.max(learnerAttempts.length, 1)} done
+            </span>
+          </div>
+          {paneProbeOpen ? (
+            <p className="observe-depth-inline" title="n = how deep after Green (Continue).">
+              n=<strong>{paneProbeDepth}</strong>
+            </p>
+          ) : null}
+        </div>
+
+        {paneAttempt ? (
+          <>
+            <div className="observe-split-map">
+              <ObserveHeatmap
+                capture={learnerCapture}
+                currentQuestionIndex={learnerQuestionIndex}
+                learnerName={learnerName}
+                onSelectQuestion={(i) => {
+                  const q = learnerQuestions[i]
+                  if (!q) return
+                  const originalIndex = capture.questions.findIndex((x) => x.id === q.id)
+                  setActiveSplitLearnerId(learnerId)
+                  setCapture(jumpToQuestion(capture, originalIndex))
+                }}
+                layout="row"
+              />
+            </div>
+            <div
+              className={`observe-dock observe-dock-lg${reaction ? ` is-glowing is-${reaction.color}` : ''}`}
+            >
+              {paneProbeOpen ? (
+                <div
+                  className="observe-dock-probe"
+                  role="group"
+                  aria-label={`Resolve probe for ${user?.displayName ?? 'learner'}`}
+                >
+                  {PROBE_ACTIONS.map((action) => (
+                    <button
+                      key={action.outcome}
+                      type="button"
+                      className={`observe-dock-probe-btn ${action.className}`}
+                      onClick={() => resolveProbeForLearner(learnerId, action.outcome)}
+                      disabled={liveSaving}
+                      aria-label={`${action.label} probe`}
+                    >
+                      <span>{action.label}</span>
+                      <kbd>{action.shortcut}</kbd>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div
+                  className="observe-dock-colors"
+                  role="group"
+                  aria-label={`Result color for ${user?.displayName ?? 'learner'}`}
+                >
+                  {COLORS.map((c) => (
+                    <button
+                      key={c.key}
+                      type="button"
+                      className={`observe-dock-color is-${c.key}${
+                        paneFinalized && paneAttempt.snapshot.effectiveColor === c.key
+                          ? ' is-selected'
+                          : ''
+                      }`}
+                      onClick={() => recordColorForLearner(learnerId, c.key)}
+                      disabled={liveSaving}
+                      aria-label={c.label}
+                    >
+                      <span className="observe-dock-num">{c.shortcut}</span>
+                      <span className="observe-dock-label">{c.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="observe-dock-tools observe-split-tools">
+                <span className="observe-dock-q" aria-live="polite">
+                  Q{learnerQuestionIndex + 1}/{Math.max(learnerQuestions.length, 1)}
+                </span>
+                <span className="observe-meta-muted">Tab switches pane</span>
+              </div>
+            </div>
+          </>
+        ) : (
+          <button
+            type="button"
+            className="observe-cta"
+            disabled={liveSaving}
+            onClick={() => {
+              setActiveSplitLearnerId(learnerId)
+              void advanceLearnerPane(capture, learnerId).then(setCapture)
+            }}
+          >
+            <Plus className="h-5 w-5" aria-hidden />
+            Start {user?.displayName ?? 'learner'}
+          </button>
+        )}
+      </section>
+    )
   }
 
   return (
@@ -756,7 +1143,7 @@ export function TeacherObservePage() {
       </button>
 
       {/* Desktop left rail (resizable). Phone uses bottom map sheet instead. */}
-      {capture.questions.length > 0 && !isPhone ? (
+      {capture.questions.length > 0 && !isPhone && !splitMode ? (
         <aside
           className={`observe-rail ${mapOpen ? 'is-open' : 'is-closed'} ${railSizeClass}${
             resizing ? ' is-resizing' : ''
@@ -877,7 +1264,11 @@ export function TeacherObservePage() {
 
       {/* Center: name + fixed color dock (phone-first stack) */}
       <main className="observe-stage observe-stage-tight">
-        {capture.questions.length === 0 ? (
+        {splitMode && capture.questions.length > 0 ? (
+          <div className={`observe-split${isPhone ? ' is-portrait' : ' is-landscape'}`}>
+            {capture.learnerIds.map(renderLearnerPane)}
+          </div>
+        ) : capture.questions.length === 0 ? (
           <div className="observe-empty">
             <p className="observe-day-empty">{dayLabel}</p>
             <p className="observe-empty-title">Observe</p>
@@ -932,27 +1323,18 @@ export function TeacherObservePage() {
                 </div>
               </div>
               {probeOpen ? (
-                <p
-                  className="observe-depth-inline"
-                  title="n = how deep after Green (Continue)."
-                >
+                <p className="observe-depth-inline" title="n = how deep after Green (Continue).">
                   n=<strong>{probeDepth}</strong>
                 </p>
               ) : null}
             </div>
 
             {reaction && reaction.kind === 'happy' ? (
-              <div
-                key={reaction.id}
-                className="observe-react observe-react-happy"
-                aria-hidden
-              >
+              <div key={reaction.id} className="observe-react observe-react-happy" aria-hidden>
                 <span className="observe-react-symbol">
                   <Check aria-hidden />
                 </span>
-                <span className="observe-react-label">
-                  Tập trung tốt!
-                </span>
+                <span className="observe-react-label">Tập trung tốt!</span>
                 <Sparkles className="observe-react-sparkles" aria-hidden />
                 <span className="observe-react-burst" />
               </div>
@@ -1136,7 +1518,8 @@ export function TeacherObservePage() {
               Session Summary
             </h2>
             <p className="observe-modal-desc">
-              Review this session summary. Save & Finish will close this day permanently, then the next visit starts a new day.
+              Review this session summary. Save & Finish will close this day permanently, then the
+              next visit starts a new day.
             </p>
             <pre className="observe-modal-summary-text">{finishSummary}</pre>
             <div className="observe-modal-actions">

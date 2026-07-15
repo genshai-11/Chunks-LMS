@@ -14,11 +14,15 @@ import {
   type SessionQuestion,
 } from '../modules/assessment/session-capture'
 import type { CaptureMode } from '../modules/assessment/capture-mode'
-import { applyLifecycleCommand } from '../modules/result-lifecycle/state-machine'
+import {
+  applyLifecycleCommand,
+  createDraftSnapshot,
+} from '../modules/result-lifecycle/state-machine'
 import type { AssessmentSnapshot, ResultColor } from '../modules/result-lifecycle/types'
 import type { RosterState } from '../modules/roster/types'
 import type { ResultRecord } from '../modules/reporting/progress'
 import type { LearningSession } from '../modules/scheduling/types'
+import { newId } from '../modules/roster/seed'
 import { getSupabase } from './supabase'
 
 type DbSnapshot = {
@@ -47,6 +51,11 @@ type DbAttempt = {
   session_question_id: string
   learner_user_id: string
   teacher_user_id: string
+}
+
+type DbCreateQuestionAttemptResponse = {
+  question: DbQuestion
+  attempt: DbAttempt
 }
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: string }
@@ -82,10 +91,43 @@ function attemptFromDb(row: DbAttempt, snapshot: DbSnapshot): AssessmentAttempt 
 function localAddQuestion(
   capture: CaptureSessionState,
   externalRef?: string | null,
+  learnerUserId?: string | null,
 ): Result<CaptureSessionState> {
-  const r = addSessionQuestion(capture, { externalRef: externalRef ?? null })
-  if (!r.ok) return { ok: false, error: r.error }
-  return { ok: true, data: r.state }
+  if (!learnerUserId) {
+    const r = addSessionQuestion(capture, { externalRef: externalRef ?? null })
+    if (!r.ok) return { ok: false, error: r.error }
+    return { ok: true, data: r.state }
+  }
+  if (capture.sessionStatus === 'completed') {
+    return { ok: false, error: 'Cannot add questions to a completed Learning Session' }
+  }
+  const learnerIndex = capture.learnerIds.indexOf(learnerUserId)
+  if (learnerIndex < 0) return { ok: false, error: 'Learner is not in this live session' }
+  const questionIndex = capture.questions.length
+  const question: SessionQuestion = {
+    id: newId('q'),
+    learningSessionId: capture.learningSessionId,
+    sequenceNumber: questionIndex + 1,
+    externalRef: externalRef ?? null,
+    assignedLearnerUserId: learnerUserId,
+  }
+  const attempt: AssessmentAttempt = {
+    id: newId('att'),
+    learningSessionId: capture.learningSessionId,
+    sessionQuestionId: question.id,
+    learnerUserId,
+    teacherUserId: capture.teacherUserId,
+    snapshot: createDraftSnapshot(capture.maxProbeCount),
+  }
+  return {
+    ok: true,
+    data: {
+      ...capture,
+      questions: [...capture.questions, question],
+      attempts: [...capture.attempts, attempt],
+      position: { ...capture.position, questionIndex, learnerIndex },
+    },
+  }
 }
 
 function localMutateAttempt(
@@ -282,62 +324,87 @@ export async function loadLiveCapture(input: {
 export async function createLiveQuestion(input: {
   capture: CaptureSessionState
   externalRef?: string | null
-  /** Open learning session — required to push session row before RPC */
+  /** Open learning session — used only as retry context when the RPC says the session is missing. */
   openSession?: LearningSession | null
+  /** Explicit learner target for split-screen observe. Defaults to round-robin. */
+  learnerUserId?: string | null
 }): Promise<Result<CaptureSessionState>> {
   if (input.capture.learnerIds.length === 0) return { ok: false, error: 'No active learners' }
 
   const sb = client()
 
   // No supabase → pure local
-  if (!sb) return localAddQuestion(input.capture, input.externalRef)
+  if (!sb) return localAddQuestion(input.capture, input.externalRef, input.learnerUserId)
 
-  // Best-effort: ensure open day exists on server
+  const learnerIndex = input.learnerUserId
+    ? Math.max(0, input.capture.learnerIds.indexOf(input.learnerUserId))
+    : input.capture.questions.length % input.capture.learnerIds.length
+  const learnerUserId = input.learnerUserId ?? input.capture.learnerIds[learnerIndex]!
+  if (!input.capture.learnerIds.includes(learnerUserId)) {
+    return { ok: false, error: 'Learner is not in this live session' }
+  }
+
+  async function callCreateRpc(): Promise<Result<CaptureSessionState>> {
+    const result = await sb.rpc('create_session_question_attempt', {
+      p_learning_session_id: input.capture.learningSessionId,
+      p_teacher_user_id: input.capture.teacherUserId,
+      p_learner_user_id: learnerUserId,
+      p_external_ref: input.externalRef ?? null,
+    })
+
+    if (result.error) return { ok: false, error: result.error.message }
+
+    const row = result.data as DbCreateQuestionAttemptResponse
+    const question: SessionQuestion = {
+      id: row.question.id,
+      learningSessionId: row.question.learning_session_id,
+      sequenceNumber: row.question.sequence_number,
+      externalRef: row.question.external_ref,
+      assignedLearnerUserId: row.attempt.learner_user_id,
+    }
+    const attempt: AssessmentAttempt = {
+      id: row.attempt.id,
+      learningSessionId: row.attempt.learning_session_id,
+      sessionQuestionId: row.attempt.session_question_id,
+      learnerUserId: row.attempt.learner_user_id,
+      teacherUserId: row.attempt.teacher_user_id,
+      // The insert trigger creates the same draft snapshot server-side. Avoid a reload round-trip.
+      snapshot: createDraftSnapshot(input.capture.maxProbeCount),
+    }
+
+    return {
+      ok: true,
+      data: {
+        ...input.capture,
+        questions: [...input.capture.questions, question],
+        attempts: [...input.capture.attempts, attempt],
+        position: {
+          ...input.capture.position,
+          questionIndex: input.capture.questions.length,
+          learnerIndex,
+        },
+      },
+    }
+  }
+
+  const created = await callCreateRpc()
+  if (created.ok) return created
+
+  // Retry once after ensuring the open learning session exists. This keeps the normal path to one RPC.
   if (input.openSession) {
     const ensured = await ensureLearningSessionOnServer(input.openSession)
-    if (!ensured.ok) {
-      // Still observe locally
+    if (ensured.ok) {
+      const retried = await callCreateRpc()
+      if (retried.ok) return retried
+      console.warn('[live] create_session_question_attempt:', retried.error)
+    } else {
       console.warn('[live] ensure session:', ensured.error)
-      return localAddQuestion(input.capture, input.externalRef)
     }
   } else {
-    // Try soft check; if missing, local
-    const remote = await sb
-      .from('learning_sessions')
-      .select('id, status')
-      .eq('id', input.capture.learningSessionId)
-      .maybeSingle()
-    if (remote.error || !remote.data || remote.data.status !== 'open') {
-      return localAddQuestion(input.capture, input.externalRef)
-    }
+    console.warn('[live] create_session_question_attempt:', created.error)
   }
 
-  const learnerIndex = input.capture.questions.length % input.capture.learnerIds.length
-  const learnerUserId = input.capture.learnerIds[learnerIndex]!
-  const result = await sb.rpc('create_session_question_attempt', {
-    p_learning_session_id: input.capture.learningSessionId,
-    p_teacher_user_id: input.capture.teacherUserId,
-    p_learner_user_id: learnerUserId,
-    p_external_ref: input.externalRef ?? null,
-  })
-
-  if (result.error) {
-    console.warn('[live] create_session_question_attempt:', result.error.message)
-    return localAddQuestion(input.capture, input.externalRef)
-  }
-
-  // Reload cloud board; if empty, keep local add
-  const local = localAddQuestion(input.capture, input.externalRef)
-  const loaded = await loadLiveCapture({
-    learningSessionId: input.capture.learningSessionId,
-    teacherUserId: input.capture.teacherUserId,
-    learnerIds: input.capture.learnerIds,
-    sessionStatus: input.capture.sessionStatus,
-    maxProbeCount: input.capture.maxProbeCount,
-    mode: input.capture.position.mode,
-    fallback: local.ok ? local.data : input.capture,
-  })
-  return loaded
+  return localAddQuestion(input.capture, input.externalRef, input.learnerUserId)
 }
 
 async function mutateSnapshot(
@@ -373,7 +440,13 @@ export async function recordLiveColor(
         p_reason: 'Changed during live observation',
         p_actor_user_id: attempt.teacherUserId,
       },
-      { type: 'correct', color, reason: 'Changed during observation', at, actorId: attempt.teacherUserId },
+      {
+        type: 'correct',
+        color,
+        reason: 'Changed during observation',
+        at,
+        actorId: attempt.teacherUserId,
+      },
     )
   }
   return mutateSnapshot(
@@ -410,7 +483,13 @@ export async function loadLiveLedger(roster: RosterState): Promise<Result<Result
   if (!sb) return { ok: false, error: 'Supabase is not configured' }
   const classBySession = new Map<string, { classId: string; courseId: string }>()
   const classById = new Map(roster.classes.map((row) => [row.id, row]))
-  const sessionsResult = await sb.from('learning_sessions').select('id,class_id')
+  const classIds = roster.classes.map((row) => row.id)
+  if (classIds.length === 0) return { ok: true, data: [] }
+
+  const sessionsResult = await sb
+    .from('learning_sessions')
+    .select('id,class_id')
+    .in('class_id', classIds)
   if (sessionsResult.error) return { ok: false, error: sessionsResult.error.message }
   for (const session of sessionsResult.data ?? []) {
     const klass = classById.get(session.class_id as string)
@@ -422,7 +501,7 @@ export async function loadLiveLedger(roster: RosterState): Promise<Result<Result
 
   const attemptsResult = await sb
     .from('assessment_attempts')
-    .select('*')
+    .select('id,learning_session_id,session_question_id,learner_user_id,teacher_user_id')
     .in('learning_session_id', sessionIds)
   if (attemptsResult.error) return { ok: false, error: attemptsResult.error.message }
   const attempts = (attemptsResult.data ?? []) as DbAttempt[]
@@ -430,7 +509,9 @@ export async function loadLiveLedger(roster: RosterState): Promise<Result<Result
 
   const snapshotsResult = await sb
     .from('assessment_attempt_snapshots')
-    .select('*')
+    .select(
+      'attempt_id,status,provisional_color,effective_color,effective_score,probe_count,max_probe_count,entered_probe_flow,finalized_at,updated_at',
+    )
     .in(
       'attempt_id',
       attempts.map((row) => row.id),

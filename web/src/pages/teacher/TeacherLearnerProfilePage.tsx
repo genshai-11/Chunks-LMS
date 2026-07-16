@@ -46,7 +46,7 @@ export function TeacherLearnerProfilePage() {
   const { learnerId } = useParams()
   const navigate = useNavigate()
   const { roster, scheduling, ledger, setRoster, syncNow, setActiveLearnerUserId } = useAppState()
-  const { classRow, course } = useTeacherClassContext()
+  const { course } = useTeacherClassContext()
   const { message, error, ok, err } = useFlash()
   const learner = roster.users.find((u) => u.id === learnerId)
   const [name, setName] = useState(learner?.displayName ?? '')
@@ -88,10 +88,9 @@ export function TeacherLearnerProfilePage() {
             ledger,
             scheduling,
             learnerUserId: learnerId,
-            classId: classRow?.id,
           })
         : [],
-    [classRow?.id, learnerId, ledger, scheduling],
+    [learnerId, ledger, scheduling],
   )
   const stats = learnerRfcStats(rows)
 
@@ -202,15 +201,15 @@ export function TeacherLearnerProfilePage() {
                   <UserAvatar name={learner.displayName} avatarUrl={avatarUrl || learner.avatarUrl} size="xl" />
                 </div>
                 <div className="flex-1 w-full flex flex-col items-center sm:items-start">
-                  <h3 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+                  <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                     {learner.displayName}
                   </h3>
-                  <p className="text-sm text-slate-400 mt-1 flex items-center gap-1.5">
+                  <p className="text-sm text-slate-600 mt-1 flex items-center gap-1.5">
                     <Mail className="h-3.5 w-3.5" aria-hidden />
-                    <span>{learner.email || <em className="text-slate-500">No email set</em>}</span>
+                    <span>{learner.email || <em className="text-slate-400">No email set</em>}</span>
                   </p>
                   <div className="mt-3 flex items-center gap-2">
-                    <span className="flex items-center gap-1 bg-indigo-500/10 text-indigo-300 font-semibold border border-indigo-500/20 px-2.5 py-1 rounded-md text-xs">
+                    <span className="flex items-center gap-1 bg-indigo-50 text-indigo-700 font-semibold border border-indigo-100 px-2.5 py-1 rounded-md text-xs">
                       <School className="h-3.5 w-3.5" aria-hidden />
                       Class: {currentClass?.name || 'Unassigned'}
                     </span>

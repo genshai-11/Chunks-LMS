@@ -8,6 +8,7 @@ import {
   TrendingUp,
   Users,
 } from 'lucide-react'
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import {
   buildCourseProgressReport,
   buildLearnerProgressReport,
@@ -274,11 +275,17 @@ export function ProgressAnalysisView({
   const total = windowRecords.length
   const maxBar = Math.max(1, ...Object.values(counts))
 
+  const pieData = useMemo(() => {
+    return [
+      { name: 'Red', value: counts.red, color: '#ef4444' },
+      { name: 'Yellow', value: counts.yellow, color: '#eab308' },
+      { name: 'Green', value: counts.green, color: '#22c55e' },
+      { name: 'Purple', value: counts.purple, color: '#a855f7' },
+    ].filter((d) => d.value > 0)
+  }, [counts])
+
   const rfc = comparison ? pickMetric(comparison.current, 'rfc', metricSettings) : null
   const rac = comparison ? pickMetric(comparison.current, 'rac', metricSettings) : null
-  const avg = comparison
-    ? pickMetric(comparison.current, 'average_performance', metricSettings)
-    : null
 
   const rfcDelta = comparison?.deltas.rfc
   const racDelta = comparison?.deltas.rac
@@ -740,11 +747,6 @@ export function ProgressAnalysisView({
               </p>
             </div>
             <div className="stat-card">
-              <p className="stat-label">Avg score</p>
-              <p className="stat-value">{avg ? formatMetricValue(avg) : '—'}</p>
-              <p className="meta">0–3 scale · {total} samples</p>
-            </div>
-            <div className="stat-card">
               <p className="stat-label">Results</p>
               <p className="stat-value">{total}</p>
               <p className="meta">
@@ -864,23 +866,46 @@ export function ProgressAnalysisView({
                 {total === 0 ? (
                   <p className="meta">No data in this filter.</p>
                 ) : (
-                  <div className="dist-bars">
-                    {(['red', 'yellow', 'green', 'purple'] as ResultColor[]).map((color) => {
-                      const n = counts[color]
-                      const p = pct(n, total)
-                      const width = `${Math.max(n ? 8 : 0, (n / Math.max(maxBar, 1)) * 100)}%`
-                      return (
-                        <div key={color} className="dist-row">
-                          <span className={`capture-dot ${color}`}>{color}</span>
-                          <div className="dist-track">
-                            <div className={`dist-fill dist-${color}`} style={{ width }} />
+                  <div className="flex flex-col sm:flex-row gap-6 items-center w-full">
+                    <div className="dist-bars flex-1 w-full">
+                      {(['red', 'yellow', 'green', 'purple'] as ResultColor[]).map((color) => {
+                        const n = counts[color]
+                        const p = pct(n, total)
+                        const width = `${Math.max(n ? 8 : 0, (n / Math.max(maxBar, 1)) * 100)}%`
+                        return (
+                          <div key={color} className="dist-row">
+                            <span className={`capture-dot ${color}`}>{color}</span>
+                            <div className="dist-track">
+                              <div className={`dist-fill dist-${color}`} style={{ width }} />
+                            </div>
+                            <span className="dist-count">
+                              {n} · {p}%
+                            </span>
                           </div>
-                          <span className="dist-count">
-                            {n} · {p}%
-                          </span>
-                        </div>
-                      )
-                    })}
+                        )
+                      })}
+                    </div>
+                    {pieData.length > 0 && (
+                      <div className="flex-shrink-0" style={{ width: 140, height: 140 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={pieData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={30}
+                              outerRadius={55}
+                              paddingAngle={3}
+                              dataKey="value"
+                            >
+                              {pieData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

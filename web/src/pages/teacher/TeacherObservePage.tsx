@@ -354,14 +354,16 @@ export function TeacherObservePage() {
       })
     : null
 
-  const targetDayNumber = activeLearnerUserId
-    ? learnerCurrentSessionNumber({
-        ledger,
-        scheduling,
-        learnerUserId: activeLearnerUserId,
-        classId: classRow?.id,
-      })
-    : dayNumber
+  const targetDayNumber = openSession
+    ? (openSession.sessionNumber ?? dayNumber)
+    : (activeLearnerUserId
+        ? learnerCurrentSessionNumber({
+            ledger,
+            scheduling,
+            learnerUserId: activeLearnerUserId,
+            classId: classRow?.id,
+          })
+        : dayNumber)
 
   const dayLabel = sessionLabel(targetDayNumber, openSession?.startedAt, totalDays)
   const finishMetrics = useMemo(() => {

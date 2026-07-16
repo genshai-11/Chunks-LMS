@@ -61,12 +61,17 @@ export function TeacherArchivePage() {
                       className={`archive-day-btn${active ? ' is-active' : ''}`}
                       onClick={() => setSelectedId(day.learningSession.id)}
                     >
-                      <strong>{day.dayLabel}</strong>
-                      <span className="meta">
-                        {day.learningSession.status} · {day.resultCount} finalized results
+                      <div className="flex items-center justify-between w-full">
+                        <strong className="text-sm font-bold text-slate-800">{day.dayLabel}</strong>
+                        <span className={`badge text-[9px] px-2 py-0.5 rounded-full font-semibold uppercase ${day.learningSession.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-amber-50 text-amber-700 border border-amber-100'}`}>
+                          {day.learningSession.status}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-slate-500 font-medium">
+                        {day.resultCount} finalized results
                       </span>
-                      <span className="meta font-mono">
-                        {new Date(day.learningSession.startedAt).toLocaleString()}
+                      <span className="text-[10px] text-slate-400 font-mono mt-0.5">
+                        {new Date(day.learningSession.startedAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} · {new Date(day.learningSession.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </button>
                   </li>
@@ -97,11 +102,16 @@ export function TeacherArchivePage() {
                       cell.color ?? 'none'
                     }`}
                   >
-                    <span className="archive-heat-q">Q{cell.sequenceHint}</span>
+                    <div className="flex items-center justify-between">
+                      <span className="archive-heat-q">Q{cell.sequenceHint}</span>
+                      <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: cell.color === 'red' ? '#ef4444' : cell.color === 'yellow' ? '#eab308' : cell.color === 'green' ? '#22c55e' : cell.color === 'purple' ? '#a855f7' : '#cbd5e1' }} />
+                    </div>
                     <span className="archive-heat-name">
-                      {(names.get(cell.learnerUserId) ?? '?').split(' ')[0]}
+                      {names.get(cell.learnerUserId) ?? 'Learner'}
                     </span>
-                    <span className="archive-heat-color">{cell.color ?? '—'}</span>
+                    <span className="archive-heat-color" style={{ color: cell.color === 'red' ? '#ef4444' : cell.color === 'yellow' ? '#ca8a04' : cell.color === 'green' ? '#16a34a' : cell.color === 'purple' ? '#9333ea' : '#64748b' }}>
+                      {cell.color ?? 'empty'}
+                    </span>
                   </div>
                 ))}
               </div>

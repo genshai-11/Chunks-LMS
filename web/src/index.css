@@ -972,45 +972,48 @@
   }
 
   .archive-layout {
-    @apply grid gap-4 lg:grid-cols-[minmax(0,16rem)_1fr];
+    @apply grid gap-6 lg:grid-cols-[minmax(0,18rem)_1fr];
   }
 
   .archive-day-btn {
-    @apply w-full text-left rounded-xl border border-slate-200 bg-white px-3 py-2.5 mb-2
-      hover:border-slate-300 transition-colors cursor-pointer flex flex-col gap-0.5;
+    @apply w-full text-left rounded-xl border border-slate-200/80 bg-white px-4 py-3.5 mb-2.5
+      hover:border-slate-300 hover:bg-slate-50/30 transition-all cursor-pointer flex flex-col gap-1 shadow-3xs;
   }
   .archive-day-btn.is-active {
-    @apply border-slate-900 ring-1 ring-slate-900/10;
+    @apply border-indigo-600 bg-indigo-50/5 ring-2 ring-indigo-600/10;
   }
 
   .archive-heat {
-    @apply grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2;
+    @apply grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3;
   }
 
   .archive-heat-cell {
-    @apply rounded-xl border border-slate-200 p-3 flex flex-col gap-1 text-xs;
+    @apply rounded-xl border border-slate-200 bg-white p-3.5 flex flex-col gap-1 text-xs shadow-3xs transition-all hover:shadow-2xs;
   }
   .archive-heat-cell.is-red {
-    @apply bg-red-50 border-red-100;
+    @apply border-l-4 border-l-red-500 border-slate-200/80 bg-red-50/20;
   }
   .archive-heat-cell.is-yellow {
-    @apply bg-yellow-50 border-yellow-100;
+    @apply border-l-4 border-l-yellow-500 border-slate-200/80 bg-yellow-50/20;
   }
   .archive-heat-cell.is-green {
-    @apply bg-green-50 border-green-100;
+    @apply border-l-4 border-l-green-500 border-slate-200/80 bg-green-50/20;
   }
   .archive-heat-cell.is-purple {
-    @apply bg-purple-50 border-purple-100;
+    @apply border-l-4 border-l-purple-500 border-slate-200/80 bg-purple-50/20;
+  }
+  .archive-heat-cell.is-empty {
+    @apply border-l-4 border-l-slate-300 border-slate-200/80 bg-slate-50/50;
   }
 
   .archive-heat-q {
-    @apply font-mono text-[10px] font-bold text-slate-400 uppercase;
+    @apply font-mono text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5;
   }
   .archive-heat-name {
-    @apply font-semibold text-slate-800;
+    @apply font-bold text-slate-800 text-sm;
   }
   .archive-heat-color {
-    @apply font-mono text-[11px] uppercase font-bold text-slate-600;
+    @apply inline-flex items-center gap-1.5 font-sans text-[11px] uppercase font-bold text-slate-600;
   }
 
   .class-students-full {
@@ -2603,7 +2606,7 @@
     }
 
     .observe-dock-colors {
-      @apply flex-col gap-1.5 p-1.5 rounded-[2rem] border-2 border-slate-600 bg-gradient-to-b from-slate-950 to-slate-800;
+      @apply flex-row gap-1.5 p-1.5 rounded-[2rem] border-2 border-slate-600 bg-gradient-to-r from-slate-950 to-slate-800;
     }
 
     .observe-dock-color {
@@ -2616,7 +2619,7 @@
     }
 
     .observe-dock-probe {
-      @apply flex-col gap-1.5 p-1.5 rounded-[2rem] border-2 border-slate-600 bg-slate-950/95;
+      @apply flex-row gap-1.5 p-1.5 rounded-[2rem] border-2 border-slate-600 bg-slate-950/95;
     }
 
     .observe-dock-tools {
@@ -3309,7 +3312,7 @@
   }
 
   .column-toggle-row button {
-    @apply px-3 py-1.5 text-xs;
+    @apply px-2.5 py-0.5 text-[11px] rounded-full border border-slate-200/60 transition-all font-semibold;
   }
 
   .learner-session-table-wrap table,

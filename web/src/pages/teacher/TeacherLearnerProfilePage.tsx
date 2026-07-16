@@ -197,33 +197,33 @@ export function TeacherLearnerProfilePage() {
         >
           <div className="panel-body-inner">
             {!isEditing ? (
-              <div className="flex flex-col items-center text-center gap-4 py-2">
-                <div className="relative group">
+              <div className="flex flex-col sm:flex-row items-center text-left gap-6 py-2 w-full">
+                <div className="relative group flex-shrink-0">
                   <UserAvatar name={learner.displayName} avatarUrl={avatarUrl || learner.avatarUrl} size="xl" />
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-slate-100 flex items-center justify-center gap-2">
+                <div className="flex-1 w-full flex flex-col items-center sm:items-start">
+                  <h3 className="text-xl font-bold text-slate-100 flex items-center gap-2">
                     {learner.displayName}
                   </h3>
-                  <p className="text-sm text-slate-400 mt-1 flex items-center justify-center gap-1.5">
+                  <p className="text-sm text-slate-400 mt-1 flex items-center gap-1.5">
                     <Mail className="h-3.5 w-3.5" aria-hidden />
                     <span>{learner.email || <em className="text-slate-500">No email set</em>}</span>
                   </p>
-                  <div className="mt-3 flex items-center justify-center gap-2">
+                  <div className="mt-3 flex items-center gap-2">
                     <span className="flex items-center gap-1 bg-indigo-500/10 text-indigo-300 font-semibold border border-indigo-500/20 px-2.5 py-1 rounded-md text-xs">
                       <School className="h-3.5 w-3.5" aria-hidden />
                       Class: {currentClass?.name || 'Unassigned'}
                     </span>
                   </div>
+                  <button
+                    type="button"
+                    className="btn ghost mt-4 border border-slate-700/50 hover:bg-slate-800"
+                    onClick={() => setIsEditing(true)}
+                  >
+                    <Pencil className="h-4 w-4" aria-hidden />
+                    <span>Edit Profile</span>
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  className="btn ghost mt-2 border border-slate-700/50 hover:bg-slate-800"
-                  onClick={() => setIsEditing(true)}
-                >
-                  <Pencil className="h-4 w-4" aria-hidden />
-                  <span>Edit Profile</span>
-                </button>
               </div>
             ) : (
               <div className="flex flex-col gap-4">

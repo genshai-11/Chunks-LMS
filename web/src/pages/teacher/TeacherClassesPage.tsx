@@ -18,6 +18,7 @@ import { UserAvatar } from '../../components/UserAvatar'
 import { EditableAvatar } from '../../components/EditableAvatar'
 import { EmptyState, Panel } from '../../components/ui'
 import { useFlash } from '../../hooks/useFlash'
+import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import {
   createLearnerAndEnroll,
   endEnrollment,
@@ -49,8 +50,9 @@ export function TeacherClassesPage() {
 
   const { message, error, ok, err } = useFlash()
 
-  // Class category filtering state
-  const [selectedClassId, setSelectedClassId] = useState<string>('all')
+  // Class category filtering state linked to global context
+  const { activeClassId, setActiveClassId: setGlobalActiveClassId, selectedClassIds } = useTeacherClassContext()
+  const selectedClassId = activeClassId || 'all'
 
   // Add learner states
   const [isAddingLearner, setIsAddingLearner] = useState(false)
@@ -81,8 +83,8 @@ export function TeacherClassesPage() {
   // Filter enrollments by selected category tab
   const filteredEnrollments = useMemo(() => {
     if (selectedClassId === 'all') return enrollments
-    return enrollments.filter((e) => e.classId === selectedClassId)
-  }, [enrollments, selectedClassId])
+    return enrollments.filter((e) => selectedClassIds.includes(e.classId))
+  }, [enrollments, selectedClassId, selectedClassIds])
 
   // Find unique active learner profiles
   const enrolledLearnerIds = useMemo(() => {
@@ -124,7 +126,7 @@ export function TeacherClassesPage() {
 
   // Default class to enroll in when adding a new learner
   useEffect(() => {
-    if (selectedClassId !== 'all') {
+    if (selectedClassId !== 'all' && !selectedClassId.includes(',')) {
       setEnrollClassId(selectedClassId)
     } else if (activeClassRows.length > 0) {
       setEnrollClassId(activeClassRows[0].id)
@@ -326,7 +328,7 @@ export function TeacherClassesPage() {
           <button
             type="button"
             className={`btn ${selectedClassId === 'all' ? 'primary' : 'ghost'}`}
-            onClick={() => setSelectedClassId('all')}
+            onClick={() => setGlobalActiveClassId('all')}
           >
             All active ({learners.length})
           </button>
@@ -340,7 +342,7 @@ export function TeacherClassesPage() {
                 key={c.id}
                 type="button"
                 className={`btn ${selectedClassId === c.id ? 'primary' : 'ghost'}`}
-                onClick={() => setSelectedClassId(c.id)}
+                onClick={() => setGlobalActiveClassId(c.id)}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
               >
                 <span>{c.name}</span>
@@ -369,7 +371,10 @@ export function TeacherClassesPage() {
         title={
           selectedClassId === 'all'
             ? 'All Enrolled Learners'
-            : `Class Roster: ${activeClassRows.find((c) => c.id === selectedClassId)?.name ?? ''}`
+            : `Class Roster: ${activeClassRows
+                .filter((c) => selectedClassIds.includes(c.id))
+                .map((c) => c.name)
+                .join(', ')}`
         }
         description="Grid view of active learners, showing course enrollments, total completed teaching sessions, and average RFC scores."
       >
@@ -470,8 +475,8 @@ export function TeacherClassesPage() {
                     className="btn primary flex-1 flex justify-center gap-1.5 text-xs py-1.5"
                     onClick={() => {
                       const preferredClassId =
-                        selectedClassId !== 'all' && learner.classes.some((cls) => cls.id === selectedClassId)
-                          ? selectedClassId
+                        selectedClassId !== 'all' && learner.classes.some((cls) => selectedClassIds.includes(cls.id))
+                          ? selectedClassIds.find((cid) => learner.classes.some((cls) => cls.id === cid)) || learner.classes[0]?.id || ''
                           : learner.classes[0]?.id || ''
                       setActiveLearnerUserId(learner.id)
                       setActiveClassId(preferredClassId)

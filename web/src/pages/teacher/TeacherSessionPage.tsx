@@ -359,20 +359,20 @@ export function TeacherSessionPage() {
             </div>
           }
         >
-          {activeLearnerIds.length === 0 ? (
+          {enrolledIds.length === 0 ? (
             <EmptyState
               icon={Users}
-              title="No learners yet"
-              description="Create learner profiles from Teacher → Learners first."
+              title="No learners seated"
+              description="Seat learners in this class under Teacher → Classes first."
               action={
-                <Link to="/teacher" className="btn ghost">
-                  Learners
+                <Link to="/teacher/classes" className="btn ghost">
+                  Manage Roster
                 </Link>
               }
             />
           ) : (
             <ul className="person-list">
-              {activeLearnerIds.map((id) => {
+              {enrolledIds.map((id) => {
                 const user = roster.users.find((u) => u.id === id)
                 const checked = selectedIds.includes(id)
                 return (
@@ -392,10 +392,7 @@ export function TeacherSessionPage() {
                       <span>
                         <strong>{user?.displayName ?? id}</strong>
                         <span className="meta" style={{ display: 'block', margin: 0 }}>
-                          {user?.email ?? 'No email'} ·{' '}
-                          {enrolledIds.includes(id)
-                            ? 'Class assigned'
-                            : 'Will assign class on start'}
+                          {user?.email ?? 'No email'}
                         </span>
                       </span>
                     </label>

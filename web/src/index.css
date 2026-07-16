@@ -1333,7 +1333,7 @@
   }
 
   .observe-header-toggle {
-    @apply fixed left-2 top-[max(0.5rem,env(safe-area-inset-top))] z-[85] h-10 w-10 rounded-full border border-white/10 bg-slate-950/70! shadow-xl backdrop-blur-md;
+    @apply fixed left-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-[85] h-10 w-10 rounded-full border border-white/10 bg-slate-950/70! shadow-xl backdrop-blur-md sm:bottom-5 sm:left-5;
   }
 
   .observe-header-toggle svg {

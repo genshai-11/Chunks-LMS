@@ -11,8 +11,10 @@ import {
   Activity,
   Check,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   GripVertical,
   Keyboard,
   LayoutGrid,
@@ -150,6 +152,8 @@ export function TeacherObservePage() {
     syncNow,
   } = useAppState()
   const [toast, setToast] = useState<string | null>(null)
+  const [showHeader, setShowHeader] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 768 : true)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success'>('idle')
   const [showKeys, setShowKeys] = useState(false)
   const [finishing, setFinishing] = useState(false)
   const [liveLoading, setLiveLoading] = useState(true)
@@ -385,6 +389,14 @@ export function TeacherObservePage() {
       unresolved,
     }
   }, [capture, classRow?.name, dayLabel])
+  const finishButtonLabel =
+    saveStatus === 'success' ? 'Saved!' : saveStatus === 'saving' || finishing ? 'Saving…' : 'Finish'
+  const confirmFinishLabel =
+    saveStatus === 'success'
+      ? 'Saved!'
+      : saveStatus === 'saving' || finishing
+        ? 'Saving…'
+        : 'Save & Finish'
   const dayBadge = sessionDayBadge(targetDayNumber, totalDays)
   const openParticipants = openSession?.participantLearnerIds?.length
     ? openSession.participantLearnerIds
@@ -728,10 +740,12 @@ export function TeacherObservePage() {
   const handleConfirmFinish = useCallback(async () => {
     if (!capture || !openSession || finishing) return
     setFinishing(true)
+    setSaveStatus('saving')
     try {
       const done = completeLearningSession(scheduling, openSession.id, capture.learnerIds)
       if (!done.ok) {
         flash(done.error)
+        setSaveStatus('idle')
         return
       }
 
@@ -746,9 +760,12 @@ export function TeacherObservePage() {
       } catch {
         /* local persist still holds; backend may be offline */
       }
-      flash('Lưu kết quả học tập thành công!')
+      setSaveStatus('success')
+      await new Promise((resolve) => window.setTimeout(resolve, 1500))
       setFinishSummary(null)
       navigate('/teacher/analysis')
+    } catch {
+      setSaveStatus('idle')
     } finally {
       setFinishing(false)
     }
@@ -1121,11 +1138,11 @@ export function TeacherObservePage() {
     <div
       className={`observe-root${reaction ? ` is-react-${reaction.kind} is-react-${reaction.color}` : ''}${
         isPhone ? ' is-phone' : ''
-      }${mapOpen ? ' is-map-open' : ''}`}
+      }${mapOpen ? ' is-map-open' : ''}${showHeader ? '' : ' is-header-hidden'}`}
       role="application"
       aria-label={`${dayLabel} · Focus and Awareness observation`}
     >
-      <header className="observe-bar observe-bar-slim">
+      <header className={`observe-bar observe-bar-slim${showHeader ? '' : ' is-hidden'}`}>
         <Link to={exitPath} className="observe-nav-exit" aria-label="Exit observe">
           <X aria-hidden strokeWidth={2.5} />
         </Link>
@@ -1174,6 +1191,21 @@ export function TeacherObservePage() {
 
       <button
         type="button"
+        className="observe-nav-btn observe-header-toggle"
+        onClick={() => setShowHeader((value) => !value)}
+        aria-pressed={showHeader}
+        aria-label={showHeader ? 'Hide observe header' : 'Show observe header'}
+        title={showHeader ? 'Hide header' : 'Show header'}
+      >
+        {showHeader ? (
+          <ChevronUp aria-hidden strokeWidth={2.25} />
+        ) : (
+          <ChevronDown aria-hidden strokeWidth={2.25} />
+        )}
+      </button>
+
+      <button
+        type="button"
         className="observe-finish-fab"
         onClick={() => void finishSessionAndSave()}
         disabled={finishing}
@@ -1181,7 +1213,7 @@ export function TeacherObservePage() {
         title="Finish & save (F)"
       >
         <CheckCircle2 aria-hidden strokeWidth={2.25} />
-        <span>{finishing ? 'Saving…' : 'Finish'}</span>
+        <span>{finishButtonLabel}</span>
       </button>
 
       {/* Desktop left rail (resizable). Phone uses bottom map sheet instead. */}
@@ -1724,7 +1756,7 @@ export function TeacherObservePage() {
                 onClick={() => void handleConfirmFinish()}
                 disabled={finishing}
               >
-                {finishing ? 'Saving…' : 'Save & Finish'}
+                {confirmFinishLabel}
               </button>
             </div>
           </div>

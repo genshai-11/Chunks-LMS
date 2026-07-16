@@ -64,6 +64,43 @@ function client() {
   return getSupabase() as any
 }
 
+export const SUPABASE_IN_FILTER_BATCH_SIZE = 100
+
+export function chunkForSupabaseInFilter<T>(
+  values: readonly T[],
+  batchSize = SUPABASE_IN_FILTER_BATCH_SIZE,
+): T[][] {
+  const uniqueValues = [...new Set(values)]
+  const chunks: T[][] = []
+  for (let i = 0; i < uniqueValues.length; i += batchSize) {
+    chunks.push(uniqueValues.slice(i, i + batchSize))
+  }
+  return chunks
+}
+
+export async function selectInBatches<T>(
+  sb: any,
+  options: {
+    table: string
+    select: string
+    column: string
+    values: readonly string[]
+    batchSize?: number
+    apply?: (query: any) => any
+  },
+): Promise<Result<T[]>> {
+  const batches = chunkForSupabaseInFilter(options.values, options.batchSize)
+  const rows: T[] = []
+  for (const batch of batches) {
+    let query = sb.from(options.table).select(options.select).in(options.column, batch)
+    query = options.apply ? options.apply(query) : query
+    const result = await query
+    if (result.error) return { ok: false, error: result.error.message }
+    rows.push(...((result.data ?? []) as T[]))
+  }
+  return { ok: true, data: rows }
+}
+
 function snapshotFromDb(row: DbSnapshot): AssessmentSnapshot {
   return {
     status: row.status,
@@ -260,15 +297,17 @@ export async function loadLiveCapture(input: {
   const attemptIds = dbAttempts.map((attempt) => attempt.id)
   let snapshots: DbSnapshot[] = []
   if (attemptIds.length > 0) {
-    const snapshotResult = await sb
-      .from('assessment_attempt_snapshots')
-      .select('*')
-      .in('attempt_id', attemptIds)
-    if (snapshotResult.error) {
+    const snapshotResult = await selectInBatches<DbSnapshot>(sb, {
+      table: 'assessment_attempt_snapshots',
+      select: '*',
+      column: 'attempt_id',
+      values: attemptIds,
+    })
+    if (!snapshotResult.ok) {
       if (compatibleFallback) return { ok: true, data: compatibleFallback }
-      return { ok: false, error: snapshotResult.error.message }
+      return snapshotResult
     }
-    snapshots = (snapshotResult.data ?? []) as DbSnapshot[]
+    snapshots = snapshotResult.data
   }
 
   const snapshotByAttempt = new Map(snapshots.map((snapshot) => [snapshot.attempt_id, snapshot]))
@@ -486,12 +525,14 @@ export async function loadLiveLedger(roster: RosterState): Promise<Result<Result
   const classIds = roster.classes.map((row) => row.id)
   if (classIds.length === 0) return { ok: true, data: [] }
 
-  const sessionsResult = await sb
-    .from('learning_sessions')
-    .select('id,class_id')
-    .in('class_id', classIds)
-  if (sessionsResult.error) return { ok: false, error: sessionsResult.error.message }
-  for (const session of sessionsResult.data ?? []) {
+  const sessionsResult = await selectInBatches<{ id: string; class_id: string }>(sb, {
+    table: 'learning_sessions',
+    select: 'id,class_id',
+    column: 'class_id',
+    values: classIds,
+  })
+  if (!sessionsResult.ok) return sessionsResult
+  for (const session of sessionsResult.data) {
     const klass = classById.get(session.class_id as string)
     if (klass)
       classBySession.set(session.id as string, { classId: klass.id, courseId: klass.courseId })
@@ -499,26 +540,26 @@ export async function loadLiveLedger(roster: RosterState): Promise<Result<Result
   const sessionIds = [...classBySession.keys()]
   if (sessionIds.length === 0) return { ok: true, data: [] }
 
-  const attemptsResult = await sb
-    .from('assessment_attempts')
-    .select('id,learning_session_id,session_question_id,learner_user_id,teacher_user_id')
-    .in('learning_session_id', sessionIds)
-  if (attemptsResult.error) return { ok: false, error: attemptsResult.error.message }
-  const attempts = (attemptsResult.data ?? []) as DbAttempt[]
+  const attemptsResult = await selectInBatches<DbAttempt>(sb, {
+    table: 'assessment_attempts',
+    select: 'id,learning_session_id,session_question_id,learner_user_id,teacher_user_id',
+    column: 'learning_session_id',
+    values: sessionIds,
+  })
+  if (!attemptsResult.ok) return attemptsResult
+  const attempts = attemptsResult.data
   if (attempts.length === 0) return { ok: true, data: [] }
 
-  const snapshotsResult = await sb
-    .from('assessment_attempt_snapshots')
-    .select(
+  const snapshotsResult = await selectInBatches<DbSnapshot>(sb, {
+    table: 'assessment_attempt_snapshots',
+    select:
       'attempt_id,status,provisional_color,effective_color,effective_score,probe_count,max_probe_count,entered_probe_flow,finalized_at,updated_at',
-    )
-    .in(
-      'attempt_id',
-      attempts.map((row) => row.id),
-    )
-    .in('status', ['finalized', 'corrected'])
-  if (snapshotsResult.error) return { ok: false, error: snapshotsResult.error.message }
-  const snapshots = (snapshotsResult.data ?? []) as DbSnapshot[]
+    column: 'attempt_id',
+    values: attempts.map((row) => row.id),
+    apply: (query) => query.in('status', ['finalized', 'corrected']),
+  })
+  if (!snapshotsResult.ok) return snapshotsResult
+  const snapshots = snapshotsResult.data
   const attemptById = new Map(attempts.map((row) => [row.id, row]))
   const rows: ResultRecord[] = []
   for (const snapshot of snapshots) {

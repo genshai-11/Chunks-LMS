@@ -397,6 +397,10 @@ export function TeacherObservePage() {
       : saveStatus === 'saving' || finishing
         ? 'Saving…'
         : 'Save & Finish'
+  useEffect(() => {
+    if (isPhone && (capture?.questions.length ?? 0) > 0) setShowHeader(false)
+  }, [isPhone, capture?.questions.length])
+
   const dayBadge = sessionDayBadge(targetDayNumber, totalDays)
   const openParticipants = openSession?.participantLearnerIds?.length
     ? openSession.participantLearnerIds

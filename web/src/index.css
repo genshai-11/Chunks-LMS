@@ -921,7 +921,7 @@
   }
 
   .mobile-class-context {
-    @apply px-3 pt-2 sm:hidden;
+    @apply px-3 pt-2 lg:hidden;
   }
 
   .attendance-matrix-wrap {

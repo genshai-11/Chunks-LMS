@@ -35,9 +35,9 @@ import type { DomainUser } from '../../modules/roster/types'
 import { useAppState } from '../../state/useAppState'
 
 type Tab = 'teachers' | 'learners'
-type Draft = { displayName: string; email: string; avatarUrl?: string }
+type Draft = { displayName: string; email: string; avatarUrl?: string; allowMultiClass?: boolean }
 
-const emptyDraft = (): Draft => ({ displayName: '', email: '', avatarUrl: '' })
+const emptyDraft = (): Draft => ({ displayName: '', email: '', avatarUrl: '', allowMultiClass: false })
 
 function invitationUrl(user: DomainUser): string {
   const origin = window.location.origin
@@ -96,6 +96,7 @@ export function AdminPeoplePage() {
         displayName: draft.displayName,
         email: draft.email.trim(),
         avatarUrl: draft.avatarUrl || null,
+        allowMultiClass: draft.allowMultiClass,
       })
       if (!r.ok) return err(r.error)
       setRoster(r.state)
@@ -111,6 +112,7 @@ export function AdminPeoplePage() {
       displayName: editDraft.displayName,
       email: editDraft.email || null,
       avatarUrl: editDraft.avatarUrl || null,
+      allowMultiClass: editDraft.allowMultiClass,
     })
     if (!r.ok) return err(r.error)
     setRoster(r.state)
@@ -230,6 +232,16 @@ export function AdminPeoplePage() {
                 placeholder={tab === 'learners' ? 'learner@school.edu' : 'teacher@school.edu'}
               />
             </label>
+            {tab === 'learners' && (
+              <label className="flex items-center gap-2 mt-2 select-none cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={draft.allowMultiClass ?? false}
+                  onChange={(e) => setDraft((d) => ({ ...d, allowMultiClass: e.target.checked }))}
+                />
+                <span className="text-xs text-slate-600 font-medium">Allow multi-class (Cho phép học nhiều lớp)</span>
+              </label>
+            )}
             <div className="avatar-field">
               <UserAvatar
                 name={draft.displayName || 'User'}
@@ -333,6 +345,18 @@ export function AdminPeoplePage() {
                             aria-label="Email"
                             placeholder="Email"
                           />
+                          {tab === 'learners' && (
+                            <label className="flex items-center gap-1.5 text-xs text-slate-600 select-none cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={editDraft.allowMultiClass ?? false}
+                                onChange={(e) =>
+                                  setEditDraft((d) => ({ ...d, allowMultiClass: e.target.checked }))
+                                }
+                              />
+                              <span>Multi-class</span>
+                            </label>
+                          )}
                           <div className="flex items-center gap-2">
                             <UserAvatar
                               name={editDraft.displayName || 'User'}
@@ -408,7 +432,14 @@ export function AdminPeoplePage() {
                         <span className="cell-with-avatar">
                           <UserAvatar name={u.displayName} avatarUrl={u.avatarUrl} size="sm" />
                           <span>
-                            <strong className="accounts-name">{u.displayName}</strong>
+                            <strong className="accounts-name">
+                              {u.displayName}
+                              {u.allowMultiClass && (
+                                <span className="ml-2 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 rounded">
+                                  Multi-class
+                                </span>
+                              )}
+                            </strong>
                             <span className="accounts-email">{u.email ?? '—'}</span>
                           </span>
                         </span>
@@ -476,6 +507,7 @@ export function AdminPeoplePage() {
                                 displayName: u.displayName,
                                 email: u.email ?? '',
                                 avatarUrl: u.avatarUrl ?? '',
+                                allowMultiClass: u.allowMultiClass ?? false,
                               })
                             }}
                           >

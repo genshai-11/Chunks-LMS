@@ -65,7 +65,7 @@ export function TeacherOverviewPage() {
     setActiveClassId,
     syncNow,
   } = useAppState()
-  const { options, classRow, course, teacher, seats, hasMultiple } = useTeacherClassContext()
+  const { options, classRow, course, teacher, seats, hasMultiple, selectedClassIds, mode } = useTeacherClassContext()
   const navigate = useNavigate()
   const { message, error, ok, err } = useFlash()
   const [activeTab, setActiveTab] = useState<LearnerTab>('overview')
@@ -79,21 +79,27 @@ export function TeacherOverviewPage() {
   const [editAvatarUrl, setEditAvatarUrl] = useState('')
   const [startingLearnerId, setStartingLearnerId] = useState<string | null>(null)
 
+  const selectedOptions = options.filter((o) => selectedClassIds.includes(o.classRow.id))
+  const totalSeats = selectedOptions.reduce((sum, o) => sum + o.seats, 0)
+
   const openSession = scheduling.learningSessions.find(
-    (s) => s.classId === classRow?.id && s.status === 'open',
+    (s) => selectedClassIds.includes(s.classId) && s.status === 'open',
   )
-  const plannedSessions =
-    classRow?.schedule?.sessionCount ??
-    scheduling.scheduledSessions.filter(
-      (s) => s.classId === classRow?.id && s.status !== 'cancelled' && s.status !== 'rescheduled',
-    ).length ??
-    0
+  const plannedSessions = selectedClassIds.reduce((sum, cid) => {
+    const crow = options.find((o) => o.classRow.id === cid)?.classRow
+    const count = crow?.schedule?.sessionCount ??
+      scheduling.scheduledSessions.filter(
+        (s) => s.classId === cid && s.status !== 'cancelled' && s.status !== 'rescheduled',
+      ).length ?? 0
+    return sum + count
+  }, 0)
   const taughtDays = scheduling.learningSessions.filter(
-    (s) => s.classId === classRow?.id && (s.status === 'completed' || s.status === 'open'),
+    (s) => selectedClassIds.includes(s.classId) && (s.status === 'completed' || s.status === 'open'),
   ).length
 
   const learners = useMemo(() => {
-    return listActiveLearners(roster).map((user) => {
+    const activeLearners = listActiveLearners(roster)
+    const mapped = activeLearners.map((user) => {
       const activeEnrollmentRows = roster.enrollments.filter(
         (e) => e.learnerUserId === user.id && e.status === 'active',
       )
@@ -105,14 +111,20 @@ export function TeacherOverviewPage() {
             ? session.participantLearnerIds.includes(user.id)
             : true),
       )
+      const assignedToSelectedClasses = selectedClassIds.some((cid) =>
+        activeEnrollmentRows.some((e) => e.classId === cid)
+      )
       const assignedToActiveClass = classRow
         ? activeEnrollmentRows.some((e) => e.classId === classRow.id)
-        : false
-      const sessionRows = summarizeLearnerSessions({
+        : assignedToSelectedClasses
+      const allSessionRows = summarizeLearnerSessions({
         ledger,
         scheduling,
         learnerUserId: user.id,
-        classId: classRow?.id,
+      })
+      const sessionRows = allSessionRows.filter((row) => {
+        const session = scheduling.learningSessions.find((s) => s.id === row.learningSessionId)
+        return session && selectedClassIds.includes(session.classId)
       })
       const rfcStats = learnerRfcStats(sessionRows)
       return {
@@ -124,12 +136,14 @@ export function TeacherOverviewPage() {
         accountStatus: user.accountStatus ?? 'active',
         classIds: activeEnrollmentRows.map((e) => e.classId),
         assignedToActiveClass,
+        assignedToSelectedClasses,
         sessions: rfcStats.count,
         finalized: sessionRows.reduce((sum, row) => sum + row.total, 0),
         hasMatchingOpenSession: Boolean(matchingOpenSession),
         preferredClassId:
           matchingOpenSession?.classId ??
-          (assignedToActiveClass ? classRow?.id : null) ??
+          (classRow && assignedToActiveClass ? classRow?.id : null) ??
+          activeEnrollmentRows.find((e) => selectedClassIds.includes(e.classId))?.classId ??
           activeEnrollmentRows[0]?.classId ??
           null,
         rfcMin: rfcStats.min,
@@ -137,7 +151,10 @@ export function TeacherOverviewPage() {
         rfcAvg: rfcStats.avg,
       }
     })
-  }, [classRow, ledger, roster, scheduling])
+
+    if (selectedClassIds.length === 0) return []
+    return mapped.filter((learner) => learner.assignedToSelectedClasses)
+  }, [classRow, ledger, roster, scheduling, selectedClassIds])
 
   const inviteReady = learners.filter((learner) => learner.invite).length
   const selectedLearner =
@@ -348,6 +365,10 @@ export function TeacherOverviewPage() {
         subtitle={`${learners.length} learners · ${
           classRow
             ? `${course?.name ?? classRow.name} · ${seats} in class`
+            : mode === 'all'
+            ? `All classes · ${totalSeats} total learners`
+            : selectedClassIds.length > 0
+            ? `${selectedClassIds.length} classes · ${totalSeats} total learners`
             : 'no class label selected yet'
         } · ${taughtDays}/${plannedSessions || '—'} sessions${
           hasMultiple ? ` · ${options.length} classes` : ''

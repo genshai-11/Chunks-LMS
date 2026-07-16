@@ -487,6 +487,7 @@ export async function loadWorkspaceFromSupabase(options?: {
             (u as { account_status?: string | null }).account_status === 'inactive'
               ? ('inactive' as const)
               : ('active' as const),
+          allowMultiClass: Boolean((u as { allow_multi_class?: boolean | null }).allow_multi_class),
         }
       })
 
@@ -672,6 +673,7 @@ export async function saveWorkspaceToSupabase(
       const withStatus = baseRows.map((row, i) => ({
         ...row,
         account_status: roster.users[i]!.accountStatus ?? 'active',
+        allow_multi_class: roster.users[i]!.allowMultiClass ?? false,
       }))
 
       let { error } = await sb.from('users').upsert(withStatus, { onConflict: 'id' })

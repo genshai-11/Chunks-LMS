@@ -626,6 +626,16 @@ export function enrollLearner(
     return { ok: false, error: 'Learner is already enrolled' }
   }
 
+  const otherActive = state.enrollments.filter(
+    (e) => e.learnerUserId === learnerUserId && e.classId !== classId && e.status === 'active',
+  )
+  if (otherActive.length > 0 && !learner.allowMultiClass) {
+    return {
+      ok: false,
+      error: 'Learner is already enrolled in another active class. Enable multi-class in Admin settings if needed.',
+    }
+  }
+
   const activeCount = activeEnrollmentsForClass(state, classId).length
   const capacityCheck = canEnroll(activeCount, klass.capacity)
   if (!capacityCheck.ok) return { ok: false, error: capacityCheck.error }
@@ -694,7 +704,7 @@ export function endEnrollment(
 
 export function addLearnerProfile(
   state: RosterState,
-  input: { displayName: string; email?: string | null; avatarUrl?: string | null },
+  input: { displayName: string; email?: string | null; avatarUrl?: string | null; allowMultiClass?: boolean },
 ): RosterResult<DomainUser> {
   const displayName = input.displayName.trim()
   if (!displayName) return { ok: false, error: 'Learner name is required' }
@@ -711,6 +721,7 @@ export function addLearnerProfile(
     avatarUrl: input.avatarUrl ?? null,
     roles: ['learner'],
     accountStatus: 'active',
+    allowMultiClass: input.allowMultiClass ?? false,
   }
 
   return {
@@ -799,6 +810,7 @@ export function updateUserProfile(
     email?: string | null
     avatarUrl?: string | null
     accountStatus?: DomainUser['accountStatus']
+    allowMultiClass?: boolean
   },
 ): RosterResult<DomainUser> {
   const user = state.users.find((u) => u.id === userId)
@@ -821,6 +833,7 @@ export function updateUserProfile(
     email: nextEmail,
     avatarUrl: input.avatarUrl !== undefined ? input.avatarUrl || null : user.avatarUrl,
     accountStatus: input.accountStatus ?? user.accountStatus ?? 'active',
+    allowMultiClass: input.allowMultiClass !== undefined ? input.allowMultiClass : (user.allowMultiClass ?? false),
   }
 
   return {

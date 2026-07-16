@@ -18,7 +18,7 @@ const ITEMS = [
 export function TeacherLayout() {
   const { roster, setRoster, syncNow, scheduling, capture } = useAppState()
   const staffSession = useStaffSession()
-  const { options, classRow, seats, activeClassId, setActiveClassId } = useTeacherClassContext()
+  const { options, classRow, seats, activeClassId, setActiveClassId, selectedClassIds, mode } = useTeacherClassContext()
 
   const currentUser = roster.users.find(
     (user) =>
@@ -36,14 +36,23 @@ export function TeacherLayout() {
     item.to === '/teacher/session' && liveOpen ? { ...item, label: 'Live · open' } : item,
   )
 
+  const selectedOptions = options.filter((o) => selectedClassIds.includes(o.classRow.id))
+  const totalSeats = selectedOptions.reduce((sum, o) => sum + o.seats, 0)
+  const totalCapacity = selectedOptions.reduce((sum, o) => sum + o.classRow.capacity, 0)
+
+  let subtitle = 'No class assigned'
+  if (mode === 'all') {
+    subtitle = `All classes · ${totalSeats} learners · cap ${totalCapacity}`
+  } else if (mode === 'multi') {
+    subtitle = `${selectedOptions.length} classes · ${totalSeats} learners · cap ${totalCapacity}`
+  } else if (classRow) {
+    subtitle = `${seats} learners · cap ${classRow.capacity}${liveOpen ? ' · LIVE' : ''}`
+  }
+
   return (
     <RoleWorkspace
       title="Teaching"
-      subtitle={
-        classRow
-          ? `${seats} learners · cap ${classRow.capacity}${liveOpen ? ' · LIVE' : ''}`
-          : 'No class assigned'
-      }
+      subtitle={subtitle}
       leading={
         currentUser ? (
           <EditableAvatar

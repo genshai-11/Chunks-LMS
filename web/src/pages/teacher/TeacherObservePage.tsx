@@ -1018,12 +1018,35 @@ export function TeacherObservePage() {
         aria-label={`Observe ${user?.displayName ?? learnerId}`}
         onPointerDown={() => setActiveSplitLearnerId(learnerId)}
       >
-        <div className="absolute top-3 left-3 z-10">
+        <div className="observe-split-head">
           <UserAvatar
             name={user?.displayName ?? 'Learner'}
             avatarUrl={user?.avatarUrl}
             size="sm"
           />
+
+          <div className="observe-stage-hero observe-split-hero">
+            <h2 className="observe-learner observe-learner-solo observe-split-name flex items-center justify-center gap-2">
+              <span>{user?.displayName ?? 'Learner'}</span>
+              <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full font-mono font-bold">
+                Day {paneLearnerDayNumber}
+              </span>
+            </h2>
+            <div className="observe-meta-row">
+              <span className="observe-learner-rfc" title="Learner RFC in this session">
+                <Activity className="h-3.5 w-3.5" aria-hidden />
+                RFC {learnerDone ? `${learnerRfc}%` : '—'}
+              </span>
+              <span className="observe-meta-muted">
+                {learnerDone}/{Math.max(learnerAttempts.length, 1)} done
+              </span>
+            </div>
+            {paneProbeOpen ? (
+              <p className="observe-depth-inline" title="n = how deep after Green (Continue).">
+                n=<strong>{paneProbeDepth}</strong>
+              </p>
+            ) : null}
+          </div>
         </div>
 
         <div className="absolute top-3 right-3 z-10">
@@ -1040,28 +1063,6 @@ export function TeacherObservePage() {
           </button>
         </div>
 
-        <div className="observe-stage-hero observe-split-hero">
-          <h2 className="observe-learner observe-learner-solo observe-split-name flex items-center justify-center gap-2">
-            <span>{user?.displayName ?? 'Learner'}</span>
-            <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full font-mono font-bold">
-              Day {paneLearnerDayNumber}
-            </span>
-          </h2>
-          <div className="observe-meta-row">
-            <span className="observe-learner-rfc" title="Learner RFC in this session">
-              <Activity className="h-3.5 w-3.5" aria-hidden />
-              RFC {learnerDone ? `${learnerRfc}%` : '—'}
-            </span>
-            <span className="observe-meta-muted">
-              {learnerDone}/{Math.max(learnerAttempts.length, 1)} done
-            </span>
-          </div>
-          {paneProbeOpen ? (
-            <p className="observe-depth-inline" title="n = how deep after Green (Continue).">
-              n=<strong>{paneProbeDepth}</strong>
-            </p>
-          ) : null}
-        </div>
 
         {paneAttempt ? (
           <>

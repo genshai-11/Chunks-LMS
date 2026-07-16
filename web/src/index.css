@@ -1810,6 +1810,14 @@
     overflow: visible;
   }
 
+  .observe-split-head {
+    @apply flex w-full min-w-0 items-center justify-center gap-3 px-2 pr-11;
+  }
+
+  .observe-split-head .user-avatar {
+    @apply shrink-0;
+  }
+
   .observe-split-hero {
     @apply max-w-sm -translate-y-0 gap-1;
   }
@@ -2474,35 +2482,33 @@
 
     .observe-stage,
     .observe-stage-tight {
-      @apply flex min-h-0 flex-1 flex-col items-center justify-start gap-4 overflow-y-auto px-3 py-3;
+      @apply flex min-h-0 flex-1 flex-col items-center justify-center gap-2 overflow-hidden px-2 py-2;
     }
 
     .observe-root.is-header-hidden .observe-stage,
     .observe-root.is-header-hidden .observe-stage-tight {
-      @apply pt-2;
+      @apply pt-1;
     }
 
     .observe-split {
-      @apply h-auto min-h-full flex-none overflow-visible pb-24;
-      grid-template-rows: none;
-      grid-auto-rows: minmax(28rem, max-content);
+      @apply h-full min-h-0 flex-1 overflow-hidden gap-1.5 p-1.5 pb-16;
+      grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
     }
 
     .observe-split-pane {
-      @apply min-h-[28rem] justify-start overflow-visible px-2 pb-4 pt-12;
+      @apply min-h-0 justify-between overflow-hidden rounded-2xl px-2 pb-2 pt-3;
     }
 
-    .observe-split-pane .observe-dock,
-    .observe-split-pane .observe-dock-lg {
-      @apply flex-col;
+    .observe-split-pane.is-active {
+      overflow: hidden;
     }
 
-    .observe-split-hero {
-      @apply max-w-[13rem] gap-1 px-1;
+    .observe-split-head {
+      @apply justify-start gap-2 px-1 pr-10;
     }
 
-    .observe-split-name {
-      @apply text-lg leading-tight;
+    .observe-split-head .user-avatar {
+      @apply !h-11 !w-11 border-2 border-slate-950 bg-[#121214] !text-xs font-bold shadow-xl;
     }
 
     .observe-stage-hero {
@@ -2527,6 +2533,31 @@
 
     .observe-depth-inline {
       @apply text-xs;
+    }
+
+    .observe-split-hero {
+      @apply max-w-none -translate-y-0 flex-1 items-start justify-center gap-0 px-0 text-left;
+    }
+
+    .observe-split-name {
+      @apply justify-start text-xl leading-none;
+      max-width: calc(100vw - 8.25rem);
+    }
+
+    .observe-split-hero .observe-meta-row {
+      @apply mt-1 justify-start gap-1.5;
+    }
+
+    .observe-split-hero .observe-learner-rfc {
+      @apply px-2 py-0.5 text-[10px];
+    }
+
+    .observe-split-hero .observe-meta-muted {
+      @apply text-xs;
+    }
+
+    .observe-split-tools {
+      margin-top: 0.25rem !important;
     }
 
     .observe-dock,
@@ -2563,6 +2594,30 @@
 
     .observe-dock-probe-btn kbd {
       @apply hidden!;
+    }
+
+    .observe-split-pane .observe-dock,
+    .observe-split-pane .observe-dock-lg {
+      @apply flex-col gap-1;
+      margin-top: 0.25rem !important;
+      max-width: 5rem !important;
+    }
+
+    .observe-split-pane .observe-dock-colors,
+    .observe-split-pane .observe-dock-probe {
+      @apply flex-col gap-1.5 rounded-[2rem] border-2 p-1.5;
+    }
+
+    .observe-split-pane .observe-dock-color,
+    .observe-split-pane .observe-dock-probe-btn {
+      height: clamp(2.55rem, 6.5dvh, 3.3rem) !important;
+      min-height: clamp(2.55rem, 6.5dvh, 3.3rem) !important;
+      width: clamp(2.55rem, 6.5dvh, 3.3rem) !important;
+      min-width: clamp(2.55rem, 6.5dvh, 3.3rem) !important;
+    }
+
+    .observe-split-pane .observe-dock-num {
+      font-size: clamp(0.95rem, 2.8dvh, 1.25rem) !important;
     }
 
     .observe-dock-tools {
@@ -2661,6 +2716,11 @@
 
     .observe-dock-probe {
       @apply flex-row gap-1.5 p-1.5 rounded-[2rem] border-2 border-slate-600 bg-slate-950/95;
+    }
+
+    .observe-split-pane .observe-dock-colors,
+    .observe-split-pane .observe-dock-probe {
+      @apply flex-col;
     }
 
     .observe-dock-tools {

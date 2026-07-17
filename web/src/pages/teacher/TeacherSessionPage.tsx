@@ -38,7 +38,10 @@ import {
 import { subscribeToClassSnapshots } from '../../modules/realtime/snapshot-channel'
 import { closeOrphanOpenSessions } from '../../modules/scheduling/orphan-sessions'
 import { startLearningSession } from '../../modules/scheduling/session-lifecycle'
-import type { SessionKind } from '../../modules/scheduling/types'
+import type { PromptLanguage, SessionFormat, SessionKind } from '../../modules/scheduling/types'
+import type { LiveTestBlock, LiveTestResource } from '../../modules/assessment/live-test'
+import { blockSummary } from '../../modules/assessment/live-test'
+import { listLiveTestBlocks, listLiveTestResources } from '../../lib/live-test-resources'
 import {
   resolveSessionDayNumber,
   sessionDayBadge,
@@ -96,6 +99,43 @@ export function TeacherSessionPage() {
 
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [sessionKind, setSessionKind] = useState<SessionKind>('regular')
+  const [sessionFormat, setSessionFormat] = useState<SessionFormat>('lesson')
+  const [promptLanguage, setPromptLanguage] = useState<PromptLanguage>('vi')
+  const [testResources, setTestResources] = useState<LiveTestResource[]>([])
+  const [testBlocks, setTestBlocks] = useState<LiveTestBlock[]>([])
+  const [selectedResourceId, setSelectedResourceId] = useState<string>('')
+  const [selectedBlockId, setSelectedBlockId] = useState<string>('')
+
+  useEffect(() => {
+    let cancelled = false
+    void listLiveTestResources().then((result) => {
+      if (cancelled || !result.ok) return
+      setTestResources(result.data)
+      if (!selectedResourceId && result.data[0]) setSelectedResourceId(result.data[0].id)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedResourceId])
+
+  useEffect(() => {
+    if (!selectedResourceId) {
+      setTestBlocks([])
+      setSelectedBlockId('')
+      return
+    }
+    let cancelled = false
+    void listLiveTestBlocks(selectedResourceId).then((result) => {
+      if (cancelled || !result.ok) return
+      setTestBlocks(result.data)
+      if (!selectedBlockId || !result.data.some((block) => block.id === selectedBlockId)) {
+        setSelectedBlockId(result.data[0]?.id ?? '')
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedResourceId, selectedBlockId])
 
   useEffect(() => {
     if (!classRow) return
@@ -252,6 +292,9 @@ export function TeacherSessionPage() {
     if (selectedIds.length === 0) {
       return err('Select at least one learner before starting')
     }
+    if (sessionFormat === 'test' && (!selectedResourceId || !selectedBlockId)) {
+      return err('Select a live-test resource and session block before starting')
+    }
     let rosterForSession = roster
     for (const learnerId of selectedIds) {
       if (enrolledIds.includes(learnerId)) continue
@@ -278,6 +321,11 @@ export function TeacherSessionPage() {
       maxProbeCount: maxProbe,
       ownerUserId: teacher.id,
       sessionKind,
+      sessionFormat,
+      promptLanguage: sessionFormat === 'test' ? promptLanguage : null,
+      liveTestResourceId: sessionFormat === 'test' ? selectedResourceId : null,
+      liveTestBlockId: sessionFormat === 'test' ? selectedBlockId : null,
+      plannedQuestionCount: sessionFormat === 'test' ? 10 : null,
       participantLearnerIds: selectedIds,
       sessionNumber,
     })
@@ -304,7 +352,7 @@ export function TeacherSessionPage() {
       ok(
         `Live session started · ${selectedIds.length} learner(s)${
           sessionKind !== 'regular' ? ` · ${sessionKind}` : ''
-        }`,
+        }${sessionFormat === 'test' ? ` · test · ${promptLanguage.toUpperCase()}` : ''}`,
       )
     } else {
       ok(
@@ -402,6 +450,71 @@ export function TeacherSessionPage() {
             </ul>
           )}
         </Panel>
+
+        <Panel
+          icon={Layers}
+          title="Session format"
+          description="Lesson keeps current live observation. Live Test drives a fixed 10-item resource block."
+        >
+          <div className="btn-row" role="group" aria-label="Session format">
+            <button
+              type="button"
+              className={sessionFormat === 'lesson' ? 'primary' : 'ghost'}
+              onClick={() => setSessionFormat('lesson')}
+            >
+              Lesson
+            </button>
+            <button
+              type="button"
+              className={sessionFormat === 'test' ? 'primary' : 'ghost'}
+              onClick={() => setSessionFormat('test')}
+            >
+              Live Test
+            </button>
+          </div>
+        </Panel>
+
+        {sessionFormat === 'test' ? (
+          <Panel
+            icon={Gauge}
+            title="Live-test resource"
+            description="Choose a resource block and prompt language. CPD is derived from CVR × CCI."
+          >
+            {testResources.length === 0 ? (
+              <p className="meta">No live-test resources found. Import a resource seed first.</p>
+            ) : (
+              <div className="form-grid">
+                <label>
+                  <span>Resource</span>
+                  <select value={selectedResourceId} onChange={(e) => setSelectedResourceId(e.target.value)}>
+                    {testResources.map((resource) => (
+                      <option key={resource.id} value={resource.id}>
+                        {resource.title} · {resource.version} · {resource.status}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Test session block</span>
+                  <select value={selectedBlockId} onChange={(e) => setSelectedBlockId(e.target.value)}>
+                    {testBlocks.map((block) => (
+                      <option key={block.id} value={block.id}>
+                        Session {block.blockNumber} · {blockSummary(block)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>Prompt language</span>
+                  <select value={promptLanguage} onChange={(e) => setPromptLanguage(e.target.value as PromptLanguage)}>
+                    <option value="vi">Vietnamese — Complete Sentence (Vie)</option>
+                    <option value="en">English — Complete Sentence (Eng)</option>
+                  </select>
+                </label>
+              </div>
+            )}
+          </Panel>
+        ) : null}
 
         <Panel
           icon={Layers}

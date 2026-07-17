@@ -219,6 +219,10 @@ export async function ensureLearningSessionOnServer(
     owner_user_id: session.ownerUserId,
     lock_expires_at: session.lockExpiresAt,
     session_kind: session.sessionKind ?? 'regular',
+    session_format: session.sessionFormat ?? 'lesson',
+    prompt_language: session.sessionFormat === 'test' ? (session.promptLanguage ?? 'vi') : null,
+    live_test_resource_id: session.sessionFormat === 'test' ? session.liveTestResourceId : null,
+    live_test_block_id: session.sessionFormat === 'test' ? session.liveTestBlockId : null,
     participant_learner_ids: session.participantLearnerIds,
   }
 

@@ -114,6 +114,10 @@ export type Database = {
           started_at: string
           completed_at: string | null
           max_probe_count: number
+          session_format: 'lesson' | 'test'
+          prompt_language: 'vi' | 'en' | null
+          live_test_resource_id: string | null
+          live_test_block_id: string | null
         }
         Insert: {
           id?: string
@@ -124,6 +128,10 @@ export type Database = {
           started_at?: string
           completed_at?: string | null
           max_probe_count?: number
+          session_format?: 'lesson' | 'test'
+          prompt_language?: 'vi' | 'en' | null
+          live_test_resource_id?: string | null
+          live_test_block_id?: string | null
         }
         Update: Partial<Database['public']['Tables']['learning_sessions']['Insert']>
       }
@@ -197,6 +205,45 @@ export type Database = {
           entered_probe_flow: boolean
           updated_at: string
         }
+        Insert: Record<string, unknown>
+        Update: Record<string, unknown>
+      }
+      audio_assets: {
+        Row: {
+          id: string
+          organization_id: string | null
+          storage_bucket: string
+          storage_path: string
+          mime_type: string
+          duration_ms: number | null
+          sha256: string | null
+          created_at: string
+        }
+        Insert: Record<string, unknown>
+        Update: Record<string, unknown>
+      }
+      live_test_resources: {
+        Row: {
+          id: string
+          organization_id: string | null
+          title: string
+          version: string
+          status: 'draft' | 'active' | 'archived'
+          source_filename: string | null
+          source_metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: Record<string, unknown>
+        Update: Record<string, unknown>
+      }
+      live_test_blocks: {
+        Row: Record<string, unknown>
+        Insert: Record<string, unknown>
+        Update: Record<string, unknown>
+      }
+      live_test_items: {
+        Row: Record<string, unknown>
         Insert: Record<string, unknown>
         Update: Record<string, unknown>
       }

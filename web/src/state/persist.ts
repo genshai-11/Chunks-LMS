@@ -39,6 +39,10 @@ function normalizeScheduling(s: SchedulingState): SchedulingState {
     learningSessions: (s.learningSessions ?? []).map((ls) => ({
       ...ls,
       sessionKind: ls.sessionKind ?? 'regular',
+      sessionFormat: ls.sessionFormat ?? 'lesson',
+      promptLanguage: ls.sessionFormat === 'test' ? (ls.promptLanguage ?? 'vi') : null,
+      liveTestResourceId: ls.sessionFormat === 'test' ? (ls.liveTestResourceId ?? null) : null,
+      liveTestBlockId: ls.sessionFormat === 'test' ? (ls.liveTestBlockId ?? null) : null,
       participantLearnerIds: ls.participantLearnerIds ?? null,
     })),
   }

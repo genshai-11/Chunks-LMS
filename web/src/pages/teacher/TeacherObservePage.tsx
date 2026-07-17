@@ -39,6 +39,14 @@ import { ObserveHeatmap } from '../../components/ObserveHeatmap'
 import { UserAvatar } from '../../components/UserAvatar'
 import type { ResultColor } from '../../modules/result-lifecycle/types'
 import { PROBE_ACTIONS } from '../../modules/assessment/probe-actions'
+import type { LiveTestItem } from '../../modules/assessment/live-test'
+import {
+  audioAssetIdForLanguage,
+  blockSummary,
+  liveTestExternalRef,
+  promptForLanguage,
+} from '../../modules/assessment/live-test'
+import { audioUrl, listLiveTestBlocks, listLiveTestItems } from '../../lib/live-test-resources'
 import {
   resolveSessionDayNumber,
   sessionDayBadge,
@@ -171,6 +179,9 @@ export function TeacherObservePage() {
   )
   const [activeSplitLearnerId, setActiveSplitLearnerId] = useState<string | null>(null)
   const [showHeatmapPopupLearnerId, setShowHeatmapPopupLearnerId] = useState<string | null>(null)
+  const [liveTestItems, setLiveTestItems] = useState<LiveTestItem[]>([])
+  const [liveTestBlockSummary, setLiveTestBlockSummary] = useState<string | null>(null)
+  const [playedIntroForSessionId, setPlayedIntroForSessionId] = useState<string | null>(null)
   const railWidthRef = useRef(railWidth)
   const captureRef = useRef(capture)
   const liveRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -249,6 +260,31 @@ export function TeacherObservePage() {
         : [],
     [classRow, roster.enrollments],
   )
+  const isLiveTest = openSession?.sessionFormat === 'test'
+  const liveTestLanguage = openSession?.promptLanguage ?? 'vi'
+
+  useEffect(() => {
+    if (!isLiveTest || !openSession?.liveTestBlockId) {
+      setLiveTestItems([])
+      setLiveTestBlockSummary(null)
+      return
+    }
+    let cancelled = false
+    void Promise.all([
+      listLiveTestItems(openSession.liveTestBlockId),
+      openSession.liveTestResourceId ? listLiveTestBlocks(openSession.liveTestResourceId) : Promise.resolve(null),
+    ]).then(([itemsResult, blocksResult]) => {
+      if (cancelled) return
+      if (itemsResult.ok) setLiveTestItems(itemsResult.data)
+      if (blocksResult && blocksResult.ok) {
+        const block = blocksResult.data.find((b) => b.id === openSession.liveTestBlockId)
+        setLiveTestBlockSummary(block ? `Session ${block.blockNumber} · ${blockSummary(block)}` : null)
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [isLiveTest, openSession?.liveTestBlockId, openSession?.liveTestResourceId])
 
   const refreshLiveCapture = useCallback(async () => {
     if (!openSession || !teacher) {
@@ -428,6 +464,36 @@ export function TeacherObservePage() {
 
   const qNum = capture ? capture.position.questionIndex + 1 : 0
   const qTotal = capture?.questions.length ?? 0
+  const currentQuestion = capture?.questions[capture.position.questionIndex] ?? null
+  const currentLiveTestItem = currentQuestion?.externalRef?.startsWith('live-test-item:')
+    ? liveTestItems.find((item) => currentQuestion.externalRef === liveTestExternalRef(item.id)) ?? null
+    : null
+  const currentLiveTestPrompt = currentLiveTestItem
+    ? promptForLanguage(currentLiveTestItem, liveTestLanguage)
+    : null
+
+  useEffect(() => {
+    if (!isLiveTest || !openSession || playedIntroForSessionId === openSession.id) return
+    setPlayedIntroForSessionId(openSession.id)
+    // Intro audio URL lookup is best-effort; prompt text remains visible without audio.
+  }, [isLiveTest, openSession, playedIntroForSessionId])
+
+  useEffect(() => {
+    const assetId = currentLiveTestItem
+      ? audioAssetIdForLanguage(currentLiveTestItem, liveTestLanguage)
+      : null
+    if (!assetId) return
+    let cancelled = false
+    void audioUrl(assetId).then((url) => {
+      if (cancelled || !url) return
+      const audio = new Audio(url)
+      void audio.play().catch((err) => console.warn('[observe] test audio play failed:', err))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [currentLiveTestItem, liveTestLanguage])
+
   const probeDepth = attempt?.snapshot.probeCount ?? 0
   const isFinalized =
     attempt?.snapshot.status === 'finalized' || attempt?.snapshot.status === 'corrected'
@@ -456,6 +522,15 @@ export function TeacherObservePage() {
     window.setTimeout(() => setToast(null), 900)
   }, [])
 
+  const nextLiveTestExternalRef = useCallback(
+    (state: CaptureSessionState): string | null | undefined => {
+      if (!isLiveTest) return undefined
+      const item = liveTestItems[state.questions.length]
+      return item ? liveTestExternalRef(item.id) : null
+    },
+    [isLiveTest, liveTestItems],
+  )
+
   const playReaction = useCallback((color: ResultColor) => {
     const id = Date.now()
     setReaction({ kind: reactionFor(color), color, id })
@@ -480,9 +555,15 @@ export function TeacherObservePage() {
       if (state.position.questionIndex < state.questions.length - 1) {
         return advancePosition(state)
       }
+      const externalRef = nextLiveTestExternalRef(state)
+      if (externalRef === null) {
+        flash('Live-test block complete')
+        return state
+      }
       const created = await createLiveQuestion({
         capture: state,
         openSession: openSession ?? null,
+        externalRef,
       })
       if (!created.ok) {
         flash(created.error)
@@ -490,7 +571,7 @@ export function TeacherObservePage() {
       }
       return created.data
     },
-    [flash, openSession],
+    [flash, openSession, nextLiveTestExternalRef],
   )
 
   const recordColor = useCallback(
@@ -580,10 +661,16 @@ export function TeacherObservePage() {
 
   const advanceLearnerPane = useCallback(
     async (state: CaptureSessionState, learnerUserId: string): Promise<CaptureSessionState> => {
+      const externalRef = nextLiveTestExternalRef(state)
+      if (externalRef === null) {
+        flash('Live-test block complete')
+        return state
+      }
       const created = await createLiveQuestion({
         capture: state,
         openSession: openSession ?? null,
         learnerUserId,
+        externalRef,
       })
       if (!created.ok) {
         flash(created.error)
@@ -591,7 +678,7 @@ export function TeacherObservePage() {
       }
       return created.data
     },
-    [flash, openSession],
+    [flash, openSession, nextLiveTestExternalRef],
   )
 
   const recordColorForLearner = useCallback(
@@ -696,10 +783,16 @@ export function TeacherObservePage() {
       const firstLearners = capture.learnerIds.length === 2 ? capture.learnerIds : [null]
       let next = capture
       for (const learnerUserId of firstLearners) {
+        const externalRef = nextLiveTestExternalRef(next)
+        if (externalRef === null) {
+          flash('Live-test block complete')
+          return
+        }
         const result = await createLiveQuestion({
           capture: next,
           openSession: openSession ?? null,
           learnerUserId,
+          externalRef,
         })
         if (!result.ok) {
           flash(result.error)
@@ -712,7 +805,7 @@ export function TeacherObservePage() {
     } finally {
       setLiveSaving(false)
     }
-  }, [capture, liveSaving, setCapture, flash, openSession])
+  }, [capture, liveSaving, setCapture, flash, openSession, nextLiveTestExternalRef])
 
   const prevCell = useCallback(() => {
     if (!capture || capture.questions.length === 0) return
@@ -1405,6 +1498,24 @@ export function TeacherObservePage() {
                 <p className="observe-depth-inline" title="n = how deep after Green (Continue).">
                   n=<strong>{probeDepth}</strong>
                 </p>
+              ) : null}
+              {isLiveTest ? (
+                <div className="mt-3 rounded-2xl border border-indigo-300/20 bg-indigo-950/25 px-4 py-3 text-center shadow-lg shadow-indigo-950/20">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-indigo-200/80">
+                    {liveTestBlockSummary ?? 'Live Test'} · {liveTestLanguage.toUpperCase()}
+                  </p>
+                  <p className="mt-1 text-sm font-black text-white">
+                    Number {String(qNum).padStart(2, '0')}
+                  </p>
+                  <p className="mt-1 text-base font-semibold text-indigo-50">
+                    {currentLiveTestPrompt ?? 'Prompt pending'}
+                  </p>
+                  {currentLiveTestItem ? (
+                    <p className="mt-1 text-xs text-indigo-100/80">
+                      CCI {currentLiveTestItem.cciValue ?? '—'} · CVR {currentLiveTestItem.cvrValue ?? '—'} · CPD {currentLiveTestItem.cpdValue ?? '—'}
+                    </p>
+                  ) : null}
+                </div>
               ) : null}
             </div>
 

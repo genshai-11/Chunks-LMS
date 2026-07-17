@@ -45,8 +45,20 @@ _Avoid_: Lesson, booking
 
 **Learning Session**:
 The actual teaching and assessment occurrence associated with a Class.
-May carry **session kind** (regular, pretest, posttest) for RFC baseline comparison, and an optional **participant learner list** (subset of the class for multi-select capture).
+May carry **session kind** (regular, pretest, posttest) for RFC baseline comparison, **session format** (lesson or test) for input behavior, an optional **prompt language** for live-test item display/audio, and an optional **participant learner list** (subset of the class for multi-select capture).
 _Avoid_: Round, room session
+
+**Test Resource**:
+A predefined live-test package containing ordered Test Blocks and Test Items, prompt text in Vietnamese/English, audio references, and CVR/CCI metadata.
+_Avoid_: Resource library, lesson content
+
+**Test Block**:
+One ordered 10-item block within a Test Resource, used as the input for one live-test Learning Session.
+_Avoid_: Learning Session, class session
+
+**Test Item**:
+One ordered prompt within a Test Block whose selected language text can drive a Session Question through an external reference.
+_Avoid_: Session Question, sentence identity
 
 **Attendance**:
 A Learner’s participation status for a Learning Session.
@@ -104,6 +116,18 @@ _Avoid_: Failure score
 **RAC**:
 The share of finalized Assessment Attempts ending Green or Purple in a Report Window.
 _Avoid_: Success score
+
+**CVR**:
+Semantic Complexity Value Rating for a Test Item prompt, calculated from Estimated TC × LC × TL.
+_Avoid_: Generic difficulty, final result
+
+**CCI**:
+Seeded current/intensity measurement for a Test Item or Test Block; first-version imports use CSV `Unit (Ohm)` as CCI.
+_Avoid_: Manually derived score
+
+**CPD**:
+Derived live-test demand value calculated as CVR × CCI and reproducible from stored source measurements.
+_Avoid_: Manually entered metric
 
 ---
 

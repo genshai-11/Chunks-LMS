@@ -7,11 +7,26 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { normalizeCourseSchedule } from '../modules/roster/schedule'
 import type { CourseSchedule, DomainUser, RosterState } from '../modules/roster/types'
 import { createEmptyRoster, isUuid, LOCAL_ORG_ID, newId } from '../modules/roster/seed'
-import type { LearningSession, SchedulingState, SessionKind } from '../modules/scheduling/types'
+import type {
+  LearningSession,
+  PromptLanguage,
+  SchedulingState,
+  SessionFormat,
+  SessionKind,
+} from '../modules/scheduling/types'
 
 function parseSessionKind(value: string | null | undefined): SessionKind {
   if (value === 'pretest' || value === 'posttest' || value === 'regular') return value
   return 'regular'
+}
+
+function parseSessionFormat(value: string | null | undefined): SessionFormat {
+  return value === 'test' ? 'test' : 'lesson'
+}
+
+function parsePromptLanguage(value: string | null | undefined): PromptLanguage | null {
+  if (value === 'vi' || value === 'en') return value
+  return null
 }
 import { emptySchedulingState } from '../modules/scheduling/session-lifecycle'
 import { dedupeById, protectedLearningSessionIds, prunableIds } from '../modules/sync/entity-sync'
@@ -514,6 +529,10 @@ export async function loadWorkspaceFromSupabase(options?: {
           owner_user_id?: string | null
           lock_expires_at?: string | null
           session_kind?: string | null
+          session_format?: string | null
+          prompt_language?: string | null
+          live_test_resource_id?: string | null
+          live_test_block_id?: string | null
           participant_learner_ids?: string[] | null
         }
         return {
@@ -529,6 +548,10 @@ export async function loadWorkspaceFromSupabase(options?: {
           ownerUserId: (row.owner_user_id as string | null) ?? null,
           lockExpiresAt: (row.lock_expires_at as string | null) ?? null,
           sessionKind: parseSessionKind(row.session_kind),
+          sessionFormat: parseSessionFormat(row.session_format),
+          promptLanguage: parsePromptLanguage(row.prompt_language),
+          liveTestResourceId: (row.live_test_resource_id as string | null) ?? null,
+          liveTestBlockId: (row.live_test_block_id as string | null) ?? null,
           participantLearnerIds: Array.isArray(row.participant_learner_ids)
             ? row.participant_learner_ids
             : null,
@@ -953,6 +976,10 @@ export async function saveWorkspaceToSupabase(
           owner_user_id: s.ownerUserId,
           lock_expires_at: s.lockExpiresAt,
           session_kind: s.sessionKind ?? 'regular',
+          session_format: s.sessionFormat ?? 'lesson',
+          prompt_language: s.sessionFormat === 'test' ? (s.promptLanguage ?? 'vi') : null,
+          live_test_resource_id: s.sessionFormat === 'test' ? s.liveTestResourceId : null,
+          live_test_block_id: s.sessionFormat === 'test' ? s.liveTestBlockId : null,
           participant_learner_ids: s.participantLearnerIds,
         }))
         const { error } = await sb.from('learning_sessions').upsert(baseRows, { onConflict: 'id' })

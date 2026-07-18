@@ -9,7 +9,7 @@
 - [x] 2.1 Add live-test/audio tables and Learning Session format fields
 - [x] 2.2 Add constraints/RLS for lesson vs test sessions and resource access
 - [x] 2.3 Add CSV import dry-run with 8×10 validation and CPD derivation
-- [ ] 2.4 Seed local resource rows from chunks-resourcce data path when configured
+- [x] 2.4 Seed local resource rows from chunks-resourcce data path when configured
 
 ## 3. Domain model and sync
 
@@ -26,8 +26,8 @@
 ## 5. Reporting and charts
 
 - [x] 5.1 Join finalized results to live-test metadata for reporting
-- [ ] 5.2 Add filters for format, kind, prompt language, resource/block, and CVR/CCI/CPD bands
-- [ ] 5.3 Add test-specific chart/table surfaces for item difficulty and CPD bands
+- [x] 5.2 Add filters for format, kind, prompt language, resource/block, and CVR/CCI/CPD bands
+- [x] 5.3 Add test-specific chart/table surfaces for item difficulty and CPD bands
 
 ## 6. Verification
 

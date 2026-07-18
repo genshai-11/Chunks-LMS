@@ -22,7 +22,7 @@ export function joinLiveTestResults(input: {
 }): LiveTestResultRecord[] {
   const rows: LiveTestResultRecord[] = []
   for (const record of input.records) {
-    const ref = input.externalRefByQuestionId?.get(record.sessionQuestionId) ?? null
+    const ref = input.externalRefByQuestionId?.get(record.sessionQuestionId) ?? record.externalRef ?? null
     const itemId = liveTestItemIdFromExternalRef(ref)
     if (!itemId) continue
     const item = input.itemById.get(itemId)

@@ -11,6 +11,7 @@ import { AdminClassesPage } from './pages/admin/AdminClassesPage'
 import { AdminPeoplePage } from './pages/admin/AdminPeoplePage'
 import { AdminEnrollmentsPage } from './pages/admin/AdminEnrollmentsPage'
 import { AdminMetricsPage } from './pages/admin/AdminMetricsPage'
+import { AdminLiveTestsPage } from './pages/admin/AdminLiveTestsPage'
 import { AdminAnalysisPage } from './pages/admin/AdminAnalysisPage'
 import { AdminOpsPage } from './pages/admin/AdminOpsPage'
 import { AdminAuditPage } from './pages/admin/AdminAuditPage'
@@ -60,6 +61,7 @@ export default function App() {
                 <Route path="enrollments" element={<AdminEnrollmentsPage />} />
                 <Route path="analysis" element={<AdminAnalysisPage />} />
                 <Route path="metrics" element={<AdminMetricsPage />} />
+                <Route path="live-tests" element={<AdminLiveTestsPage />} />
               </Route>
 
               <Route

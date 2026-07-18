@@ -93,6 +93,11 @@ export function AdminAnalysisPage() {
             startedAt: s.startedAt,
             completedAt: s.completedAt,
             sessionNumber: s.sessionNumber,
+            sessionKind: s.sessionKind,
+            sessionFormat: s.sessionFormat,
+            promptLanguage: s.promptLanguage,
+            liveTestResourceId: s.liveTestResourceId,
+            liveTestBlockId: s.liveTestBlockId,
           }))}
         emptyHint="No finalized results for this class yet."
         metricSettings={metricSettings}

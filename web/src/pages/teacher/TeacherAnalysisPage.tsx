@@ -122,6 +122,11 @@ export function TeacherAnalysisPage() {
             startedAt: s.startedAt,
             completedAt: s.completedAt,
             sessionNumber: s.sessionNumber,
+            sessionKind: s.sessionKind,
+            sessionFormat: s.sessionFormat,
+            promptLanguage: s.promptLanguage,
+            liveTestResourceId: s.liveTestResourceId,
+            liveTestBlockId: s.liveTestBlockId,
           }))}
         emptyHint="Start a live session and finalize Focus / Awareness colors to populate this report."
         metricSettings={metricSettings}

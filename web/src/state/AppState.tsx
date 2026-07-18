@@ -55,6 +55,7 @@ function ledgerFromCapture(
   let next = existing
   for (const a of capture.attempts) {
     if (!a.snapshot.effectiveColor || !a.snapshot.finalizedAt) continue
+    const question = capture.questions.find((q) => q.id === a.sessionQuestionId)
     const already = next.some(
       (r) =>
         r.sessionQuestionId === a.sessionQuestionId &&
@@ -71,6 +72,7 @@ function ledgerFromCapture(
       learnerUserId: a.learnerUserId,
       teacherUserId: a.teacherUserId,
       sessionQuestionId: a.sessionQuestionId,
+      externalRef: question?.externalRef ?? null,
       effectiveColor: a.snapshot.effectiveColor,
       enteredProbeFlow: a.snapshot.enteredProbeFlow,
       probeEventCount: a.snapshot.probeCount,

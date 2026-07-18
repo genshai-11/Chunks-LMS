@@ -564,6 +564,16 @@ export async function loadLiveLedger(roster: RosterState): Promise<Result<Result
   })
   if (!snapshotsResult.ok) return snapshotsResult
   const snapshots = snapshotsResult.data
+  const questionIds = attempts.map((row) => row.session_question_id)
+  const questionsResult = await selectInBatches<DbQuestion>(sb, {
+    table: 'session_questions',
+    select: 'id,learning_session_id,sequence_number,external_ref',
+    column: 'id',
+    values: questionIds,
+  })
+  const externalRefByQuestion = new Map(
+    questionsResult.ok ? questionsResult.data.map((row) => [row.id, row.external_ref]) : [],
+  )
   const attemptById = new Map(attempts.map((row) => [row.id, row]))
   const rows: ResultRecord[] = []
   for (const snapshot of snapshots) {
@@ -579,6 +589,7 @@ export async function loadLiveLedger(roster: RosterState): Promise<Result<Result
       learnerUserId: attempt.learner_user_id,
       teacherUserId: attempt.teacher_user_id,
       sessionQuestionId: attempt.session_question_id,
+      externalRef: externalRefByQuestion.get(attempt.session_question_id) ?? null,
       effectiveColor: snapshot.effective_color,
       enteredProbeFlow: snapshot.entered_probe_flow,
       probeEventCount: snapshot.probe_count,

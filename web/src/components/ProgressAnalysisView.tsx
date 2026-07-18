@@ -32,6 +32,10 @@ import { COLOR_SCORE } from '../modules/result-lifecycle/types'
 import type { MetricSettingsState } from '../modules/metrics/settings'
 import { getEnabledMetricKeys } from '../modules/metrics/settings'
 import type { MetricKey, MetricObservation } from '../modules/metrics/calculate'
+import type { LiveTestItem } from '../modules/assessment/live-test'
+import { liveTestItemIdFromExternalRef } from '../modules/assessment/live-test'
+import { listLiveTestItems } from '../lib/live-test-resources'
+import { joinLiveTestResults } from '../modules/reporting/live-test-analysis'
 import { AnalysisChartsPanel } from './AnalysisChartsPanel'
 import { UserAvatar } from './UserAvatar'
 
@@ -49,6 +53,11 @@ type SessionOpt = {
   startedAt: string
   completedAt: string | null
   sessionNumber?: number | null
+  sessionKind?: 'regular' | 'pretest' | 'posttest'
+  sessionFormat?: 'lesson' | 'test'
+  promptLanguage?: 'vi' | 'en' | null
+  liveTestResourceId?: string | null
+  liveTestBlockId?: string | null
 }
 
 type Props = {
@@ -97,6 +106,15 @@ function trendTone(key: 'rfc' | 'rac', delta: number | null | undefined): 'up' |
   if (delta == null || Math.abs(delta) < 0.05) return 'flat'
   if (key === 'rfc') return delta < 0 ? 'up' : 'down' // lower RFC is better
   return delta > 0 ? 'up' : 'down'
+}
+
+function numericBand(value: number | null | undefined, band: 'all' | 'missing' | 'low' | 'medium' | 'high'): boolean {
+  if (band === 'all') return true
+  if (value == null) return band === 'missing'
+  if (band === 'missing') return false
+  if (band === 'low') return value <= 1
+  if (band === 'medium') return value > 1 && value <= 3
+  return value > 3
 }
 
 function formatPp(delta: number | null | undefined): string {
@@ -181,6 +199,15 @@ export function ProgressAnalysisView({
   const [tab, setTab] = useState<
     'overview' | 'charts' | 'sessions' | 'learners' | 'history'
   >('overview')
+  const [formatFilter, setFormatFilter] = useState<'all' | 'lesson' | 'test'>('all')
+  const [kindFilter, setKindFilter] = useState<'all' | 'regular' | 'pretest' | 'posttest'>('all')
+  const [promptLanguageFilter, setPromptLanguageFilter] = useState<'all' | 'vi' | 'en'>('all')
+  const [resourceFilter, setResourceFilter] = useState('all')
+  const [blockFilter, setBlockFilter] = useState('all')
+  const [cciBandFilter, setCciBandFilter] = useState<'all' | 'missing' | 'low' | 'medium' | 'high'>('all')
+  const [cvrBandFilter, setCvrBandFilter] = useState<'all' | 'missing' | 'low' | 'medium' | 'high'>('all')
+  const [cpdBandFilter, setCpdBandFilter] = useState<'all' | 'missing' | 'low' | 'medium' | 'high'>('all')
+  const [liveTestItems, setLiveTestItems] = useState<LiveTestItem[]>([])
 
   const learners = useMemo(
     () => users.filter((u) => u.roles.includes('learner')),
@@ -195,6 +222,39 @@ export function ProgressAnalysisView({
       return a.startedAt.localeCompare(b.startedAt)
     })
   }, [learningSessions])
+
+  const sessionById = useMemo(
+    () => new Map(orderedSessions.map((session) => [session.id, session])),
+    [orderedSessions],
+  )
+  const liveTestResourceIds = useMemo(
+    () => [...new Set(orderedSessions.map((s) => s.liveTestResourceId).filter(Boolean))] as string[],
+    [orderedSessions],
+  )
+  const liveTestBlockIds = useMemo(
+    () => [...new Set(orderedSessions.map((s) => s.liveTestBlockId).filter(Boolean))] as string[],
+    [orderedSessions],
+  )
+
+  useEffect(() => {
+    if (liveTestBlockIds.length === 0) {
+      setLiveTestItems([])
+      return
+    }
+    let cancelled = false
+    async function loadItems() {
+      const rows: LiveTestItem[] = []
+      for (const blockId of liveTestBlockIds) {
+        const result = await listLiveTestItems(blockId)
+        if (result.ok) rows.push(...result.data)
+      }
+      if (!cancelled) setLiveTestItems(rows)
+    }
+    void loadItems()
+    return () => {
+      cancelled = true
+    }
+  }, [liveTestBlockIds])
 
   const window = useMemo(() => {
     try {
@@ -237,6 +297,21 @@ export function ProgressAnalysisView({
     return ledger.filter((r) => r.courseId === courseId && r.classId === classId)
   }, [ledger, courseId, classId])
 
+  const analysisLedger = useMemo(() => {
+    return scopedLedger.filter((record) => {
+      const session = sessionById.get(record.learningSessionId)
+      if (!session) return true
+      const format = session.sessionFormat ?? 'lesson'
+      const sessionKind = session.sessionKind ?? 'regular'
+      if (formatFilter !== 'all' && format !== formatFilter) return false
+      if (kindFilter !== 'all' && sessionKind !== kindFilter) return false
+      if (promptLanguageFilter !== 'all' && session.promptLanguage !== promptLanguageFilter) return false
+      if (resourceFilter !== 'all' && session.liveTestResourceId !== resourceFilter) return false
+      if (blockFilter !== 'all' && session.liveTestBlockId !== blockFilter) return false
+      return true
+    })
+  }, [scopedLedger, sessionById, formatFilter, kindFilter, promptLanguageFilter, resourceFilter, blockFilter])
+
   const focusLearnerId = mode === 'learner' ? learnerUserId : (selectedLearnerIds.length === 1 ? selectedLearnerIds[0] : undefined)
   const focusLearner = focusLearnerId
     ? users.find((u) => u.id === focusLearnerId)
@@ -245,22 +320,22 @@ export function ProgressAnalysisView({
   const courseReport = useMemo(() => {
     if (!window || mode === 'learner' || focusLearnerId) return null
     const learnerIds = selectedLearnerIds.length > 0 ? selectedLearnerIds : learners.map((u) => u.id)
-    return buildCourseProgressReport(scopedLedger, courseId, window, { learnerIds })
-  }, [window, mode, focusLearnerId, scopedLedger, courseId, learners, selectedLearnerIds])
+    return buildCourseProgressReport(analysisLedger, courseId, window, { learnerIds })
+  }, [window, mode, focusLearnerId, analysisLedger, courseId, learners, selectedLearnerIds] )
 
   const learnerReport = useMemo(() => {
     if (!window || !focusLearnerId) return null
-    return buildLearnerProgressReport(scopedLedger, focusLearnerId, window, {
+    return buildLearnerProgressReport(analysisLedger, focusLearnerId, window, {
       courseId,
       classId,
     })
-  }, [window, focusLearnerId, scopedLedger, courseId, classId])
+  }, [window, focusLearnerId, analysisLedger, courseId, classId])
 
   const comparison = learnerReport?.comparison ?? courseReport?.overall ?? null
 
-  const windowRecords = useMemo(() => {
+  const baseWindowRecords = useMemo(() => {
     if (!window) return []
-    const records = filterResults(scopedLedger, window, {
+    const records = filterResults(analysisLedger, window, {
       courseId,
       classId,
       learnerUserId: focusLearnerId,
@@ -269,7 +344,62 @@ export function ProgressAnalysisView({
       return records.filter((r) => selectedLearnerIds.includes(r.learnerUserId))
     }
     return records
-  }, [window, scopedLedger, courseId, classId, focusLearnerId, selectedLearnerIds])
+  }, [window, analysisLedger, courseId, classId, focusLearnerId, selectedLearnerIds])
+
+  const itemById = useMemo(
+    () => new Map(liveTestItems.map((item) => [item.id, item])),
+    [liveTestItems],
+  )
+  const windowRecords = useMemo(() => {
+    if (cciBandFilter === 'all' && cvrBandFilter === 'all' && cpdBandFilter === 'all') {
+      return baseWindowRecords
+    }
+    return baseWindowRecords.filter((record) => {
+      const itemId = liveTestItemIdFromExternalRef(record.externalRef)
+      const item = itemId ? itemById.get(itemId) : null
+      return (
+        numericBand(item?.cciValue, cciBandFilter) &&
+        numericBand(item?.cvrValue, cvrBandFilter) &&
+        numericBand(item?.cpdValue, cpdBandFilter)
+      )
+    })
+  }, [baseWindowRecords, itemById, cciBandFilter, cvrBandFilter, cpdBandFilter])
+
+  const liveTestRows = useMemo(
+    () => joinLiveTestResults({ records: windowRecords, itemById, promptLanguage: 'vi' }),
+    [windowRecords, itemById],
+  )
+  const itemDifficultyRows = useMemo(() => {
+    const byItem = new Map<string, typeof liveTestRows>()
+    for (const row of liveTestRows) {
+      const list = byItem.get(row.liveTestItemId) ?? []
+      list.push(row)
+      byItem.set(row.liveTestItemId, list)
+    }
+    return [...byItem.entries()]
+      .map(([id, rows]) => {
+        const sample = rows.length
+        const redYellow = rows.filter((row) => row.effectiveColor === 'red' || row.effectiveColor === 'yellow').length
+        const greenPurple = sample - redYellow
+        const nCount = rows.filter((row) => row.enteredProbeFlow).length
+        const nDepthAvg = nCount > 0 ? rows.reduce((sum, row) => sum + row.probeEventCount, 0) / nCount : null
+        const first = rows[0]!
+        return {
+          id,
+          itemNumber: first.itemNumber,
+          prompt: first.prompt,
+          cci: first.cciValue,
+          cvr: first.cvrValue,
+          cpd: first.cpdValue,
+          sample,
+          rfc: sample > 0 ? redYellow / sample : null,
+          rac: sample > 0 ? greenPurple / sample : null,
+          nCount,
+          nDepthAvg,
+        }
+      })
+      .sort((a, b) => (b.rfc ?? 0) - (a.rfc ?? 0) || (b.cpd ?? 0) - (a.cpd ?? 0))
+  }, [liveTestRows])
 
   const counts = colorCounts(windowRecords)
   const total = windowRecords.length
@@ -353,8 +483,8 @@ export function ProgressAnalysisView({
   const sessionSeries = useMemo(() => {
     return buildSessionMetricSeries({
       ledger: selectedLearnerIds.length > 0
-        ? scopedLedger.filter((r) => selectedLearnerIds.includes(r.learnerUserId))
-        : scopedLedger,
+        ? analysisLedger.filter((r) => selectedLearnerIds.includes(r.learnerUserId))
+        : analysisLedger,
       learningSessions: orderedSessions.map((s) => ({
         id: s.id,
         classId: classId ?? '',
@@ -367,7 +497,11 @@ export function ProgressAnalysisView({
         sessionNumber: s.sessionNumber ?? null,
         ownerUserId: null,
         lockExpiresAt: null,
-        sessionKind: 'regular' as const,
+        sessionKind: s.sessionKind ?? ('regular' as const),
+        sessionFormat: s.sessionFormat ?? ('lesson' as const),
+        promptLanguage: s.promptLanguage ?? null,
+        liveTestResourceId: s.liveTestResourceId ?? null,
+        liveTestBlockId: s.liveTestBlockId ?? null,
         participantLearnerIds: null,
       })),
       courseId,
@@ -375,7 +509,7 @@ export function ProgressAnalysisView({
       learnerUserId: focusLearnerId,
       metricKeys: dayMetricOptions,
     })
-  }, [scopedLedger, orderedSessions, courseId, classId, focusLearnerId, dayMetricOptions, selectedLearnerIds])
+  }, [analysisLedger, orderedSessions, courseId, classId, focusLearnerId, dayMetricOptions, selectedLearnerIds])
 
   function metricLabel(key: MetricKey): string {
     return metricSettings?.metrics.find((m) => m.key === key)?.label ?? key
@@ -419,7 +553,7 @@ export function ProgressAnalysisView({
     return sessionLabel(num, s.startedAt, totalDays)
   }, [orderedSessions, sessionId, totalDays])
 
-  if (scopedLedger.length === 0) {
+  if (analysisLedger.length === 0) {
     return (
       <div className="empty-state analysis-empty">
         <p>
@@ -547,6 +681,77 @@ export function ProgressAnalysisView({
             </div>
           ) : null}
         </div>
+
+        <div className="analysis-filter-row analysis-dates">
+          <label className="analysis-select-wrap">
+            <span className="analysis-filter-label">Format</span>
+            <select className="analysis-select" value={formatFilter} onChange={(e) => setFormatFilter(e.target.value as typeof formatFilter)}>
+              <option value="all">All</option>
+              <option value="lesson">Lesson</option>
+              <option value="test">Live Test</option>
+            </select>
+          </label>
+          <label className="analysis-select-wrap">
+            <span className="analysis-filter-label">Kind</span>
+            <select className="analysis-select" value={kindFilter} onChange={(e) => setKindFilter(e.target.value as typeof kindFilter)}>
+              <option value="all">All</option>
+              <option value="regular">Regular</option>
+              <option value="pretest">Pretest</option>
+              <option value="posttest">Posttest</option>
+            </select>
+          </label>
+          <label className="analysis-select-wrap">
+            <span className="analysis-filter-label">Prompt</span>
+            <select className="analysis-select" value={promptLanguageFilter} onChange={(e) => setPromptLanguageFilter(e.target.value as typeof promptLanguageFilter)}>
+              <option value="all">All</option>
+              <option value="vi">Vietnamese</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+          {liveTestResourceIds.length > 0 ? (
+            <label className="analysis-select-wrap">
+              <span className="analysis-filter-label">Resource</span>
+              <select className="analysis-select" value={resourceFilter} onChange={(e) => setResourceFilter(e.target.value)}>
+                <option value="all">All</option>
+                {liveTestResourceIds.map((id) => (
+                  <option key={id} value={id}>{id.slice(0, 8)}</option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          {liveTestBlockIds.length > 0 ? (
+            <label className="analysis-select-wrap">
+              <span className="analysis-filter-label">Block</span>
+              <select className="analysis-select" value={blockFilter} onChange={(e) => setBlockFilter(e.target.value)}>
+                <option value="all">All</option>
+                {liveTestBlockIds.map((id) => (
+                  <option key={id} value={id}>{id.slice(0, 8)}</option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+        </div>
+
+        {liveTestBlockIds.length > 0 ? (
+          <div className="analysis-filter-row analysis-dates">
+            {([
+              ['CCI band', cciBandFilter, setCciBandFilter],
+              ['CVR band', cvrBandFilter, setCvrBandFilter],
+              ['CPD band', cpdBandFilter, setCpdBandFilter],
+            ] as const).map(([label, value, setter]) => (
+              <label className="analysis-select-wrap" key={label}>
+                <span className="analysis-filter-label">{label}</span>
+                <select className="analysis-select" value={value} onChange={(e) => setter(e.target.value as typeof value)}>
+                  <option value="all">All</option>
+                  <option value="missing">Missing</option>
+                  <option value="low">Low ≤ 1</option>
+                  <option value="medium">Medium 1–3</option>
+                  <option value="high">High &gt; 3</option>
+                </select>
+              </label>
+            ))}
+          </div>
+        ) : null}
 
         {kind === 'session' && orderedSessions.length > 0 ? (
           <div className="analysis-filter-row">
@@ -982,7 +1187,7 @@ export function ProgressAnalysisView({
             Respects <strong>Who</strong> filter (class or one learner) above.
           </p>
           <AnalysisChartsPanel
-            ledger={scopedLedger}
+            ledger={analysisLedger}
             learningSessions={orderedSessions}
             courseId={courseId}
             classId={classId}
@@ -1150,6 +1355,44 @@ export function ProgressAnalysisView({
               </table>
             </div>
           )}
+
+          {itemDifficultyRows.length > 0 ? (
+            <div className="table-wrap mt-4">
+              <p className="panel-title mb-2">Live-test item difficulty</p>
+              <table aria-label="Live-test item difficulty by CPD">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Prompt</th>
+                    <th>CCI</th>
+                    <th>CVR</th>
+                    <th>CPD</th>
+                    <th>sample</th>
+                    <th>RFC</th>
+                    <th>RAC</th>
+                    <th>n count</th>
+                    <th>n depth avg</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {itemDifficultyRows.map((row) => (
+                    <tr key={row.id}>
+                      <td>#{String(row.itemNumber).padStart(2, '0')}</td>
+                      <td className="def">{row.prompt ?? '—'}</td>
+                      <td>{row.cci ?? '—'}</td>
+                      <td>{row.cvr ?? '—'}</td>
+                      <td>{row.cpd ?? '—'}</td>
+                      <td>{row.sample}</td>
+                      <td>{row.rfc == null ? '—' : `${(row.rfc * 100).toFixed(1)}%`}</td>
+                      <td>{row.rac == null ? '—' : `${(row.rac * 100).toFixed(1)}%`}</td>
+                      <td>{row.nCount}</td>
+                      <td>{row.nDepthAvg == null ? '—' : row.nDepthAvg.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
         </div>
       )}
 

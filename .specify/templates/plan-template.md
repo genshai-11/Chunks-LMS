@@ -40,7 +40,12 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- [ ] Measurement and correction history remains immutable, or a scoped destructive reset has explicit impact counts and final approval.
+- [ ] Standalone tests remain separate from Class-based Learning Sessions.
+- [ ] RLS, privileged RPC grants, actor checks, and hardened `search_path` are designed and tested.
+- [ ] Import/migration work is deterministic, dry-run-first, idempotent, and reconciles remote history first.
+- [ ] Tests cover domain rules, importer anomalies, RLS/RPC contracts, and rollback-sensitive behavior.
+- [ ] Preview/canary, rollback/restore, commit/tag, and post-deploy gates are documented.
 
 ## Project Structure
 

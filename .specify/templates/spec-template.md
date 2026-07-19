@@ -87,6 +87,10 @@
 
 ### Functional Requirements
 
+> Features involving data MUST state immutable-history behavior, organization/learner access scope,
+> import provenance, and destructive-reset boundaries. Production-impacting features MUST state
+> preview/canary, rollback, restore, and post-deploy acceptance requirements.
+
 - **FR-001**: System MUST [specific capability, e.g., "allow users to create accounts"]
 - **FR-002**: System MUST [specific capability, e.g., "validate email addresses"]
 - **FR-003**: Users MUST be able to [key interaction, e.g., "reset their password"]

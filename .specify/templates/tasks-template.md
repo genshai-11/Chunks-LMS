@@ -9,7 +9,7 @@ description: "Task list template for feature implementation"
 
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
+**Tests**: Tests are REQUIRED for domain rules, import validation, RLS/RPC contracts, migrations, and destructive-operation guards. Write them before implementation and verify the expected failure.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -155,7 +155,10 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX Code cleanup and refactoring
 - [ ] TXXX Performance optimization across all stories
 - [ ] TXXX [P] Additional unit tests (if requested) in tests/unit/
-- [ ] TXXX Security hardening
+- [ ] TXXX Security hardening and Supabase advisor review
+- [ ] TXXX Verify remote/local migration history reconciliation
+- [ ] TXXX Document destructive impact counts and final approval gate
+- [ ] TXXX Document preview/canary, rollback/restore, and post-deploy checks
 - [ ] TXXX Run quickstart.md validation
 
 ---

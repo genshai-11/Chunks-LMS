@@ -80,7 +80,6 @@ export function AdminLiveTestsPage() {
   const [selectedProfileId, setSelectedProfileId] = useState<string>('')
   const [cciCategories, setCciCategories] = useState<CciCategory[]>([])
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('')
-  const [overrideTargetCvr, setOverrideTargetCvr] = useState<number>(5)
   const [overrideReason, setOverrideReason] = useState<string>('')
   const [overrideStatus, setOverrideStatus] = useState<string>('')
 
@@ -100,7 +99,6 @@ export function AdminLiveTestsPage() {
   const [packageTitle, setPackageTitle] = useState<string>('')
   const [versionLabel, setVersionLabel] = useState<string>('')
   const [numSessions, setNumSessions] = useState<number>(8)
-  const [defaultCvr, setDefaultCvr] = useState<number>(3)
   const [defaultProfileId, setDefaultProfileId] = useState<string>('')
   const [defaultCategoryId, setDefaultCategoryId] = useState<string>('')
   const [defaultCategories, setDefaultCategories] = useState<CciCategory[]>([])

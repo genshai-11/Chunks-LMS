@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Canonical Chunks Test Import Manifest",
+  "type": "object",
+  "required": ["source", "package", "cciDefinitions", "sessions", "issues"],
+  "properties": {
+    "source": {
+      "type": "object",
+      "required": ["filename", "sha256", "sheets"],
+      "properties": {
+        "filename": { "type": "string" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "sheets": {
+          "type": "array",
+          "const": ["Chunks-resource - CVR_new", "Package-test", "CCI"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "package": {
+      "type": "object",
+      "required": ["sourcePackageId", "title", "description", "versionLabel"],
+      "properties": {
+        "sourcePackageId": { "const": "Pre-test" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "versionLabel": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "cciDefinitions": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "required": ["sessionOrder", "sourceCciId", "name", "ampe", "description"],
+        "properties": {
+          "sessionOrder": { "type": "integer", "minimum": 1, "maximum": 8 },
+          "sourceCciId": { "type": "string", "pattern": "^cci-[0-9]{3}$" },
+          "name": { "type": "string", "minLength": 1 },
+          "ampe": { "type": "number", "minimum": 0 },
+          "description": { "type": "string" },
+          "category": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      }
+    },
+    "sessions": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "required": ["sessionOrder", "name", "sourceCciId", "targetCvrOhm", "introTextVi", "introTextEn", "items"],
+        "properties": {
+          "sessionOrder": { "type": "integer", "minimum": 1, "maximum": 8 },
+          "name": { "type": "string" },
+          "sourceCciId": { "type": "string" },
+          "targetCvrOhm": { "type": "number", "minimum": 0 },
+          "introTextVi": { "type": "string", "minLength": 1 },
+          "introTextEn": { "type": "string", "minLength": 1 },
+          "items": {
+            "type": "array",
+            "minItems": 10,
+            "maxItems": 10,
+            "items": {
+              "type": "object",
+              "required": ["itemOrder", "sourceItemId", "sourceCciId", "sourceCvrId", "termVi", "termEn", "promptVi", "promptEn"],
+              "properties": {
+                "itemOrder": { "type": "integer", "minimum": 1, "maximum": 10 },
+                "sourceItemId": { "type": "string" },
+                "sourceCciId": { "type": "string" },
+                "sourceCvrId": { "type": "number" },
+                "termVi": { "type": "string", "minLength": 1 },
+                "termEn": { "type": "string", "minLength": 1 },
+                "promptVi": { "type": "string", "minLength": 1 },
+                "promptEn": { "type": "string", "minLength": 1 }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["severity", "code", "message", "location"],
+        "properties": {
+          "severity": { "enum": ["warning", "error"] },
+          "code": { "type": "string" },
+          "message": { "type": "string" },
+          "location": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

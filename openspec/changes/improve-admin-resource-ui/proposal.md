@@ -12,6 +12,7 @@ Admins now need a compact resource management surface to load, view, edit, and r
 - Split resource management concerns from the current Admin Live Tests workflow so Live Tests can focus on package/version/section/item generation and review.
 - Redesign `admin/live-tests` layout into smaller, responsive panels with a compact shared filter/selector bar instead of repeated selectors across tabs.
 - Add guarded edit/delete/archive behavior: draft/unused catalog records may be edited or deleted where the database allows it; published or history-linked resources must be archived or superseded instead of destructively changed.
+- Normalize CCI catalog data so action labels, Ampe values, descriptions, and `metadata.mainCategory` (`Blow`/`Flow`/`Chunks`) are visible and editable in Admin Resources.
 - Keep Learning Session assessment identity resource-agnostic and keep CVR/CCI/CPD as measurement/catalog metadata.
 
 ---

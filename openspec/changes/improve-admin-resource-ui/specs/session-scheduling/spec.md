@@ -42,6 +42,20 @@ The system SHALL prevent destructive deletion of resource records that are publi
 - **WHEN** an Admin requests deletion of a published Package Version, active CCI category, historical Test Section, or resource linked to a Learning Session
 - **THEN** the system refuses destructive deletion and offers archive, supersede, or create-new-version guidance instead
 
+### Requirement: CCI catalog main categories
+
+The system SHALL store CCI action labels, Ampe values, descriptions, and a main category value of `Blow`, `Flow`, or `Chunks` for Admin-managed CCI catalog rows.
+
+#### Scenario: Admin reviews CCI categories
+
+- **WHEN** an authorized Admin opens the CCI resource tab
+- **THEN** the system shows the action label, main category, Ampe value, and description for each CCI catalog row
+
+#### Scenario: Admin edits draft CCI main category
+
+- **WHEN** an authorized Admin edits a draft CCI Category
+- **THEN** the system can persist the selected `Blow`, `Flow`, or `Chunks` main category in CCI metadata while preserving historical section measurement snapshots
+
 ### Requirement: Compact Live Tests workflow layout
 
 The system SHALL present Admin Live Tests workflows with a compact shared package/version/section selector and responsive focused panels.

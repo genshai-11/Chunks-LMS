@@ -55,6 +55,7 @@ export type CciCategory = {
   label: string
   value: number
   description: string | null
+  metadata: Record<string, unknown>
 }
 
 export type SectionMeasurementSnapshot = {

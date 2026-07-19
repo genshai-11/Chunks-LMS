@@ -27,11 +27,17 @@
 - [ ] 4.3 Replace repeated selector panels and wide inline grids with responsive panels that collapse cleanly on smaller screens
 - [ ] 4.4 Keep package publish, snapshot override, generation, narration approval, and CSV import behavior unchanged unless covered by tests
 
-## 5. Verification and release controls
+## 5. CCI catalog correction
 
-- [x] 5.1 Run `npm run openspec:validate`
-- [x] 5.2 Run `npm run lint`
-- [x] 5.3 Run `npm run typecheck`
-- [x] 5.4 Run `npm run test`
-- [x] 5.5 Run `npm run build`
-- [x] 5.6 Report no production deploy status, deployment impact, and rollback notes before any push/deploy request
+- [x] 5.1 Add CCI main category metadata (`Blow`/`Flow`/`Chunks`) to the Admin Resources CCI UI
+- [x] 5.2 Add Supabase migration to normalize CCI action labels, Ampe values, descriptions, and latest measurement snapshot overrides
+- [x] 5.3 Keep remote Supabase migration unapplied pending explicit production approval
+
+## 6. Verification and release controls
+
+- [x] 6.1 Run `npm run openspec:validate`
+- [x] 6.2 Run `npm run lint`
+- [x] 6.3 Run `npm run typecheck`
+- [x] 6.4 Run `npm run test`
+- [x] 6.5 Run `npm run build`
+- [x] 6.6 Report no production deploy status, deployment impact, and rollback notes before any push/deploy request

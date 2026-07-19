@@ -59,6 +59,7 @@ const cciCategory: CciCategory = {
   label: 'Current 5',
   value: 5,
   description: null,
+  metadata: {},
 }
 
 describe('test package catalog', () => {

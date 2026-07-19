@@ -72,7 +72,10 @@ type SessionRow = TestSection & {
 }
 
 type CvrDraft = Pick<CvrRow, 'promptVi' | 'promptEn' | 'tc' | 'lc' | 'tl'>
-type CciDraft = Pick<CciRow, 'label' | 'value' | 'description'>
+type MainCciCategory = 'Blow' | 'Flow' | 'Chunks'
+type CciDraft = Pick<CciRow, 'label' | 'value' | 'description'> & {
+  mainCategory: MainCciCategory | ''
+}
 type SessionDraft = Pick<SessionRow, 'title' | 'sectionOrder'>
 
 function textMatch(value: string, query: string) {
@@ -100,6 +103,11 @@ function actionTitle(editable: boolean) {
   return editable
     ? 'Edit/delete is enabled for this draft row.'
     : 'This row is immutable from the UI. Create a new draft/version or use archive/supersede instead.'
+}
+
+function cciMainCategory(row: Pick<CciRow, 'metadata'>): MainCciCategory | null {
+  const value = row.metadata.mainCategory
+  return value === 'Blow' || value === 'Flow' || value === 'Chunks' ? value : null
 }
 
 async function countLearningSessionsForSection(sectionId: string): Promise<number> {
@@ -244,9 +252,13 @@ export function AdminResourcesPage() {
 
   const filteredCciRows = useMemo(() => {
     return cciRows.filter((row) => {
-      const haystack = [row.profileName, row.profileVersion, row.label, row.description ?? ''].join(
-        ' ',
-      )
+      const haystack = [
+        row.profileName,
+        row.profileVersion,
+        row.label,
+        cciMainCategory(row) ?? '',
+        row.description ?? '',
+      ].join(' ')
       return (
         textMatch(haystack, search) &&
         (statusFilter === 'all' || row.profileStatus === statusFilter) &&
@@ -347,7 +359,12 @@ export function AdminResourcesPage() {
       return
     }
     setEditingCategoryId(row.id)
-    setCciDraft({ label: row.label, value: row.value, description: row.description })
+    setCciDraft({
+      label: row.label,
+      value: row.value,
+      description: row.description,
+      mainCategory: cciMainCategory(row) ?? '',
+    })
   }
 
   async function saveCciEdit(row: CciRow) {
@@ -355,7 +372,13 @@ export function AdminResourcesPage() {
     const result = await updateDraftCciCategory({
       categoryId: row.id,
       profileId: row.profileId,
-      ...cciDraft,
+      label: cciDraft.label,
+      value: cciDraft.value,
+      description: cciDraft.description,
+      metadata: {
+        ...row.metadata,
+        mainCategory: cciDraft.mainCategory || null,
+      },
     })
     if (!result.ok) return err(result.error)
     setCciRows((rows) =>
@@ -739,8 +762,9 @@ export function AdminResourcesPage() {
               <thead>
                 <tr>
                   <th>Profile</th>
-                  <th>Category</th>
-                  <th>Value</th>
+                  <th>Action label</th>
+                  <th>Main category</th>
+                  <th>Ampe</th>
                   <th>Description</th>
                   <th>Status</th>
                   <th>Actions</th>
@@ -768,6 +792,28 @@ export function AdminResourcesPage() {
                           />
                         ) : (
                           row.label
+                        )}
+                      </td>
+                      <td>
+                        {editing ? (
+                          <select
+                            value={cciDraft.mainCategory}
+                            onChange={(event) =>
+                              setCciDraft({
+                                ...cciDraft,
+                                mainCategory: event.target.value as MainCciCategory | '',
+                              })
+                            }
+                          >
+                            <option value="">Unmapped</option>
+                            <option value="Blow">Blow</option>
+                            <option value="Flow">Flow</option>
+                            <option value="Chunks">Chunks</option>
+                          </select>
+                        ) : cciMainCategory(row) ? (
+                          <span className="badge">{cciMainCategory(row)}</span>
+                        ) : (
+                          <span className="meta">Unmapped</span>
                         )}
                       </td>
                       <td style={{ width: 96 }}>
@@ -864,7 +910,7 @@ export function AdminResourcesPage() {
                 })}
                 {filteredCciRows.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="meta" style={{ textAlign: 'center' }}>
+                    <td colSpan={7} className="meta" style={{ textAlign: 'center' }}>
                       No CCI categories match the current filters.
                     </td>
                   </tr>

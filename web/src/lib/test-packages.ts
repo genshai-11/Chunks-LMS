@@ -79,6 +79,7 @@ function mapCciCategory(row: any): CciCategory {
     label: row.label,
     value: Number(row.value),
     description: row.description,
+    metadata: row.metadata ?? {},
   }
 }
 
@@ -440,6 +441,7 @@ export async function updateDraftCciCategory(input: {
   label: string
   value: number
   description: string | null
+  metadata?: Record<string, unknown>
 }): Promise<Result<CciCategory>> {
   const draft = await assertDraftCciProfile(input.profileId)
   if (!draft.ok) return draft
@@ -447,7 +449,12 @@ export async function updateDraftCciCategory(input: {
   if (!sb) return { ok: false, error: 'Supabase is not configured' }
   const { data, error } = await sb
     .from('cci_categories')
-    .update({ label: input.label, value: input.value, description: input.description })
+    .update({
+      label: input.label,
+      value: input.value,
+      description: input.description,
+      ...(input.metadata ? { metadata: input.metadata } : {}),
+    })
     .eq('id', input.categoryId)
     .eq('profile_id', input.profileId)
     .select()

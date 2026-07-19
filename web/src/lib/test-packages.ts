@@ -319,6 +319,24 @@ async function countItemExternalRefs(itemId: string): Promise<Result<number>> {
   return { ok: true, data: count ?? 0 }
 }
 
+async function firstOrganizationId(): Promise<Result<string>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { data, error } = await sb.from('organizations').select('id').limit(1)
+  if (error) return { ok: false, error: error.message }
+  const id = data?.[0]?.id
+  if (!id) return { ok: false, error: 'No organization found for catalog creation' }
+  return { ok: true, data: id }
+}
+
+function slugify(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
 export async function updateDraftTestItem(input: {
   itemId: string
   packageVersionId: string
@@ -435,6 +453,65 @@ export async function deleteDraftTestSection(input: {
   return { ok: true, data: true }
 }
 
+export async function createDraftCciProfile(input: {
+  name: string
+  versionLabel?: string
+  description?: string | null
+}): Promise<Result<CciProfile>> {
+  const org = await firstOrganizationId()
+  if (!org.ok) return org
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { data, error } = await sb
+    .from('cci_profiles')
+    .insert({
+      organization_id: org.data,
+      name: input.name.trim(),
+      version_label: input.versionLabel?.trim() || 'draft',
+      status: 'draft',
+      description: input.description ?? null,
+    })
+    .select()
+    .single()
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: mapCciProfile(data) }
+}
+
+export async function createDraftCciCategory(input: {
+  profileId: string
+  label: string
+  value: number
+  description: string | null
+  metadata?: Record<string, unknown>
+}): Promise<Result<CciCategory>> {
+  const draft = await assertDraftCciProfile(input.profileId)
+  if (!draft.ok) return draft
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { data: existing, error: maxError } = await sb
+    .from('cci_categories')
+    .select('category_order')
+    .eq('profile_id', input.profileId)
+    .order('category_order', { ascending: false })
+    .limit(1)
+  if (maxError) return { ok: false, error: maxError.message }
+  const nextOrder = (existing?.[0]?.category_order ?? 0) + 1
+  const { data, error } = await sb
+    .from('cci_categories')
+    .insert({
+      profile_id: input.profileId,
+      category_order: nextOrder,
+      label: input.label.trim(),
+      value: input.value,
+      description: input.description,
+      metadata: input.metadata ?? {},
+    })
+    .select()
+    .single()
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: mapCciCategory(data) }
+}
+
 export async function updateDraftCciCategory(input: {
   categoryId: string
   profileId: string
@@ -493,6 +570,29 @@ export async function deleteDraftCciCategory(input: {
   return { ok: true, data: true }
 }
 
+export async function publishCciProfile(profileId: string): Promise<Result<CciProfile>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { data: current, error: currentError } = await sb
+    .from('cci_profiles')
+    .select('status')
+    .eq('id', profileId)
+    .maybeSingle()
+  if (currentError) return { ok: false, error: currentError.message }
+  if (!current) return { ok: false, error: 'CCI Profile not found' }
+  if (current.status !== 'draft') {
+    return { ok: false, error: 'Only draft CCI Profiles can be published to active.' }
+  }
+  const { data, error } = await sb
+    .from('cci_profiles')
+    .update({ status: 'active' })
+    .eq('id', profileId)
+    .select()
+    .single()
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: mapCciProfile(data) }
+}
+
 export async function archiveCciProfile(profileId: string): Promise<Result<CciProfile>> {
   const sb = client()
   if (!sb) return { ok: false, error: 'Supabase is not configured' }
@@ -505,3 +605,117 @@ export async function archiveCciProfile(profileId: string): Promise<Result<CciPr
   if (error) return { ok: false, error: error.message }
   return { ok: true, data: mapCciProfile(data) }
 }
+
+export async function createDraftTestPackage(input: {
+  title: string
+  versionLabel: string
+  sessionCount: number
+  itemsPerSession: number
+  sessions: Array<{
+    sectionOrder: number
+    title: string
+    targetCvrOhm: number
+    cciProfileId: string
+    cciCategoryId: string
+    cciCategoryLabel: string
+    cciValue: number
+  }>
+}): Promise<Result<{ package: TestPackage; version: TestPackageVersion }>> {
+  const org = await firstOrganizationId()
+  if (!org.ok) return org
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  if (!input.title.trim()) return { ok: false, error: 'Package name is required' }
+  if (!input.versionLabel.trim()) return { ok: false, error: 'Package Version label is required' }
+  if (input.sessionCount < 1 || input.itemsPerSession < 1) {
+    return { ok: false, error: 'Session count and items/session must be positive' }
+  }
+  const slug = `${slugify(input.title) || 'test-package'}-${Date.now().toString(36)}`
+
+  try {
+    const { data: pkgRow, error: pkgError } = await sb
+      .from('test_packages')
+      .insert({
+        organization_id: org.data,
+        title: input.title.trim(),
+        slug,
+        description: 'Created from Admin Resources package builder.',
+        source_metadata: { source: 'admin-resources-builder' },
+      })
+      .select()
+      .single()
+    if (pkgError) throw new Error(pkgError.message)
+
+    const { data: versionRow, error: versionError } = await sb
+      .from('test_package_versions')
+      .insert({
+        package_id: pkgRow.id,
+        version_label: input.versionLabel.trim(),
+        status: 'draft',
+        source_metadata: {
+          source: 'admin-resources-builder',
+          sessionCount: input.sessionCount,
+          itemsPerSession: input.itemsPerSession,
+        },
+      })
+      .select()
+      .single()
+    if (versionError) throw new Error(versionError.message)
+
+    for (const session of input.sessions.slice(0, input.sessionCount)) {
+      const { data: sectionRow, error: sectionError } = await sb
+        .from('test_sections')
+        .insert({
+          package_version_id: versionRow.id,
+          section_order: session.sectionOrder,
+          title: session.title,
+          target_cvr_ohm: session.targetCvrOhm,
+          cci_profile_id: session.cciProfileId,
+          cci_category_id: session.cciCategoryId,
+          cci_snapshot: {
+            label: session.cciCategoryLabel,
+            value: session.cciValue,
+            unit: 'Ampe',
+            targetCvrOhm: session.targetCvrOhm,
+            source: 'admin-resources-builder',
+          },
+        })
+        .select()
+        .single()
+      if (sectionError) throw new Error(sectionError.message)
+
+      const { error: snapshotError } = await sb.from('section_measurement_snapshots').insert({
+        test_section_id: sectionRow.id,
+        package_version_id: versionRow.id,
+        target_cvr_ohm: session.targetCvrOhm,
+        cci_profile_id: session.cciProfileId,
+        cci_category_id: session.cciCategoryId,
+        cci_category_label: session.cciCategoryLabel,
+        cci_value: session.cciValue,
+        snapshot_metadata: {
+          source: 'admin-resources-builder',
+          unit: 'Ampe',
+          sectionOrder: session.sectionOrder,
+        },
+      })
+      if (snapshotError) throw new Error(snapshotError.message)
+
+      const itemRows = Array.from({ length: input.itemsPerSession }, (_, idx) => ({
+        package_version_id: versionRow.id,
+        section_id: sectionRow.id,
+        item_order: idx + 1,
+        source_metadata: {
+          source: 'admin-resources-builder',
+          placeholder: true,
+        },
+      }))
+      const { error: itemsError } = await sb.from('test_items').insert(itemRows)
+      if (itemsError) throw new Error(itemsError.message)
+    }
+
+    return { ok: true, data: { package: mapTestPackage(pkgRow), version: mapTestPackageVersion(versionRow) } }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Could not create Test Package' }
+  }
+}
+

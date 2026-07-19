@@ -18,6 +18,10 @@ import { useFlash } from '../../hooks/useFlash'
 import { getSupabase } from '../../lib/supabase'
 import {
   archiveCciProfile,
+  createDraftCciCategory,
+  createDraftCciProfile,
+  createDraftTestPackage,
+  createSnapshotOverride,
   deleteDraftCciCategory,
   deleteDraftTestItem,
   deleteDraftTestSection,
@@ -28,6 +32,7 @@ import {
   listTestPackages,
   listTestPackageVersions,
   listTestSections,
+  publishCciProfile,
   updateDraftCciCategory,
   updateDraftTestItem,
   updateDraftTestSection,
@@ -35,6 +40,7 @@ import {
 import {
   measuredCvr,
   type CciCategory,
+  type CciProfile,
   type TestItem,
   type TestSection,
 } from '../../modules/catalog/test-package-catalog'
@@ -65,9 +71,13 @@ type SessionRow = TestSection & {
   versionLabel: string
   versionStatus: VersionStatus
   itemCount: number
+  activeSnapshotId: string | null
   activeTargetCvrOhm: number | null
+  activeCciProfileId: string | null
+  activeCciCategoryId: string | null
   activeCciLabel: string | null
   activeCciValue: number | null
+  snapshotCount: number
   learningSessionCount: number
 }
 
@@ -77,6 +87,26 @@ type CciDraft = Pick<CciRow, 'label' | 'value' | 'description'> & {
   mainCategory: MainCciCategory | ''
 }
 type SessionDraft = Pick<SessionRow, 'title' | 'sectionOrder'>
+type NewCciDraft = {
+  profileId: string
+  profileName: string
+  name: string
+  value: number
+  description: string
+  mainCategory: MainCciCategory | ''
+}
+type MappingDraft = {
+  targetCvrOhm: number
+  cciProfileId: string
+  cciCategoryId: string
+  reason: string
+}
+type PackageDraft = {
+  title: string
+  versionLabel: string
+  sessionCount: number
+  itemsPerSession: number
+}
 
 function textMatch(value: string, query: string) {
   return value.toLowerCase().includes(query.trim().toLowerCase())
@@ -121,6 +151,17 @@ async function countLearningSessionsForSection(sectionId: string): Promise<numbe
   return count ?? 0
 }
 
+async function countSnapshotsForSection(sectionId: string): Promise<number> {
+  const sb = getSupabase() as any
+  if (!sb) return 0
+  const { count, error } = await sb
+    .from('section_measurement_snapshots')
+    .select('id', { count: 'exact', head: true })
+    .eq('test_section_id', sectionId)
+  if (error) throw new Error(error.message)
+  return count ?? 0
+}
+
 export function AdminResourcesPage() {
   const { message, error: flashError, ok, err, clear } = useFlash()
   const [state, setState] = useState<LoadState>('loading')
@@ -131,10 +172,30 @@ export function AdminResourcesPage() {
   const [showEditableOnly, setShowEditableOnly] = useState(false)
 
   const [cvrRows, setCvrRows] = useState<CvrRow[]>([])
+  const [cciProfiles, setCciProfiles] = useState<CciProfile[]>([])
   const [cciRows, setCciRows] = useState<CciRow[]>([])
   const [sessionRows, setSessionRows] = useState<SessionRow[]>([])
   const [packageCount, setPackageCount] = useState(0)
   const [versionCount, setVersionCount] = useState(0)
+
+  const [sectionFilter, setSectionFilter] = useState('all')
+  const [expandedSectionId, setExpandedSectionId] = useState<string | null>(null)
+  const [mappingSectionId, setMappingSectionId] = useState<string | null>(null)
+  const [mappingDraft, setMappingDraft] = useState<MappingDraft | null>(null)
+  const [newCciDraft, setNewCciDraft] = useState<NewCciDraft>({
+    profileId: '',
+    profileName: '',
+    name: '',
+    value: 2,
+    description: '',
+    mainCategory: '',
+  })
+  const [packageDraft, setPackageDraft] = useState<PackageDraft>({
+    title: 'Pre-test',
+    versionLabel: 'draft-v1',
+    sessionCount: 8,
+    itemsPerSession: 10,
+  })
 
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [cvrDraft, setCvrDraft] = useState<CvrDraft | null>(null)
@@ -167,10 +228,11 @@ export function AdminResourcesPage() {
           if (!sectionsRes.ok) throw new Error(sectionsRes.error)
 
           for (const section of sectionsRes.data) {
-            const [itemsRes, snapshotRes, learningSessionCount] = await Promise.all([
+            const [itemsRes, snapshotRes, learningSessionCount, snapshotCount] = await Promise.all([
               listTestItems(section.id),
               getSectionSnapshot(section.id),
               countLearningSessionsForSection(section.id),
+              countSnapshotsForSection(section.id),
             ])
             if (!itemsRes.ok) throw new Error(itemsRes.error)
             if (!snapshotRes.ok) throw new Error(snapshotRes.error)
@@ -181,9 +243,13 @@ export function AdminResourcesPage() {
               versionLabel: version.versionLabel,
               versionStatus: version.status,
               itemCount: itemsRes.data.length,
+              activeSnapshotId: snapshotRes.data?.id ?? null,
               activeTargetCvrOhm: snapshotRes.data?.targetCvrOhm ?? null,
+              activeCciProfileId: snapshotRes.data?.cciProfileId ?? null,
+              activeCciCategoryId: snapshotRes.data?.cciCategoryId ?? null,
               activeCciLabel: snapshotRes.data?.cciCategoryLabel ?? null,
               activeCciValue: snapshotRes.data?.cciValue ?? null,
+              snapshotCount,
               learningSessionCount,
             })
 
@@ -218,8 +284,13 @@ export function AdminResourcesPage() {
       setPackageCount(packagesRes.data.length)
       setVersionCount(nextVersionCount)
       setCvrRows(nextCvrRows)
+      setCciProfiles(profilesRes.data)
       setCciRows(nextCciRows)
       setSessionRows(nextSessionRows)
+      setNewCciDraft((draft) => ({
+        ...draft,
+        profileId: draft.profileId || profilesRes.data.find((profile) => profile.status === 'draft')?.id || '',
+      }))
       setState('ready')
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Could not load resources'
@@ -245,10 +316,11 @@ export function AdminResourcesPage() {
       return (
         textMatch(haystack, search) &&
         (statusFilter === 'all' || row.versionStatus === statusFilter) &&
-        (!showEditableOnly || row.versionStatus === 'draft')
+        (!showEditableOnly || row.versionStatus === 'draft') &&
+        (sectionFilter === 'all' || row.sectionId === sectionFilter)
       )
     })
-  }, [cvrRows, search, statusFilter, showEditableOnly])
+  }, [cvrRows, search, sectionFilter, statusFilter, showEditableOnly])
 
   const filteredCciRows = useMemo(() => {
     return cciRows.filter((row) => {
@@ -283,6 +355,20 @@ export function AdminResourcesPage() {
     })
   }, [sessionRows, search, statusFilter, showEditableOnly])
 
+  const sectionOptions = useMemo(() => {
+    const byId = new Map<string, Pick<CvrRow, 'sectionId' | 'sectionOrder' | 'sectionTitle' | 'packageTitle' | 'versionLabel'>>()
+    for (const row of cvrRows) {
+      byId.set(row.sectionId, {
+        sectionId: row.sectionId,
+        sectionOrder: row.sectionOrder,
+        sectionTitle: row.sectionTitle,
+        packageTitle: row.packageTitle,
+        versionLabel: row.versionLabel,
+      })
+    }
+    return [...byId.values()].sort((a, b) => a.sectionOrder - b.sectionOrder)
+  }, [cvrRows])
+
   const editableCounts = {
     cvr: cvrRows.filter((row) => row.versionStatus === 'draft').length,
     cci: cciRows.filter((row) => row.profileStatus === 'draft').length,
@@ -292,6 +378,16 @@ export function AdminResourcesPage() {
     activeTab === 'cvr' ? cvrRows.length : activeTab === 'cci' ? cciRows.length : sessionRows.length
   const activeEditableCount = editableCounts[activeTab]
   const activeLockedCount = Math.max(0, activeTotalCount - activeEditableCount)
+  const draftCciProfiles = cciProfiles.filter((profile) => profile.status === 'draft')
+  const selectableCciProfiles = cciProfiles.filter((profile) => profile.status !== 'archived')
+  const selectedNewCciProfile = cciProfiles.find((profile) => profile.id === newCciDraft.profileId)
+  const cciCategoriesForMapping = (profileId: string) =>
+    cciRows.filter((row) => row.profileId === profileId).sort((a, b) => a.categoryOrder - b.categoryOrder)
+
+  function switchTab(tab: ResourceTab) {
+    setActiveTab(tab)
+    setSectionFilter('all')
+  }
 
   function beginCvrEdit(row: CvrRow) {
     if (row.versionStatus !== 'draft') {
@@ -404,6 +500,54 @@ export function AdminResourcesPage() {
     ok('Deleted draft CCI Category.')
   }
 
+  async function createCciCategory() {
+    const requestedProfile = cciProfiles.find((candidate) => candidate.id === newCciDraft.profileId)
+    let profile = requestedProfile
+    if (!profile) {
+      if (!newCciDraft.profileName.trim()) return err('Choose a draft CCI Profile or enter a new profile name.')
+      const profileResult = await createDraftCciProfile({
+        name: newCciDraft.profileName.trim(),
+        versionLabel: 'draft',
+        description: 'Created from Admin Resources.',
+      })
+      if (!profileResult.ok) return err(profileResult.error)
+      profile = profileResult.data
+      setCciProfiles((rows) => [...rows, profileResult.data])
+    }
+    if (!newCciDraft.name.trim()) return err('CCI name is required.')
+    if (!newCciDraft.mainCategory) return err('Choose category: Blow, Flow, or Chunks.')
+    const result = await createDraftCciCategory({
+      profileId: profile.id,
+      label: newCciDraft.name,
+      value: newCciDraft.value,
+      description: newCciDraft.description || null,
+      metadata: { mainCategory: newCciDraft.mainCategory, source: 'admin-resources-crud' },
+    })
+    if (!result.ok) return err(result.error)
+    setCciRows((rows) => [
+      ...rows,
+      {
+        ...result.data,
+        profileName: profile.name,
+        profileVersion: profile.versionLabel,
+        profileStatus: profile.status,
+      },
+    ])
+    setNewCciDraft((draft) => ({ ...draft, name: '', value: 2, description: '', mainCategory: '' }))
+    ok('Created CCI Category.')
+  }
+
+  async function publishProfile(profileId: string) {
+    if (!window.confirm('Publish this CCI Profile? Once active it can no longer be edited directly.')) return
+    const result = await publishCciProfile(profileId)
+    if (!result.ok) return err(result.error)
+    setCciProfiles((rows) => rows.map((row) => (row.id === profileId ? result.data : row)))
+    setCciRows((rows) =>
+      rows.map((row) => (row.profileId === profileId ? { ...row, profileStatus: result.data.status } : row)),
+    )
+    ok('Published CCI Profile as active.')
+  }
+
   async function archiveProfile(profileId: string) {
     if (
       !window.confirm(
@@ -482,6 +626,83 @@ export function AdminResourcesPage() {
     ok('Deleted draft Test Section.')
   }
 
+  function beginMapping(row: SessionRow) {
+    if (row.versionStatus !== 'draft') return err('Only draft Session resources can change CCI/CVR mapping.')
+    const firstProfileId = row.activeCciProfileId ?? selectableCciProfiles[0]?.id ?? ''
+    const firstCategory = row.activeCciCategoryId
+      ? cciRows.find((category) => category.id === row.activeCciCategoryId)
+      : cciCategoriesForMapping(firstProfileId)[0]
+    setMappingSectionId(row.id)
+    setMappingDraft({
+      targetCvrOhm: row.activeTargetCvrOhm ?? 3,
+      cciProfileId: firstProfileId,
+      cciCategoryId: firstCategory?.id ?? '',
+      reason: row.activeSnapshotId ? 'Admin resource mapping update' : '',
+    })
+  }
+
+  async function saveMapping(row: SessionRow) {
+    if (!mappingDraft) return
+    const category = cciRows.find((candidate) => candidate.id === mappingDraft.cciCategoryId)
+    if (!category) return err('Choose a CCI Category for this Session mapping.')
+    if (mappingDraft.targetCvrOhm <= 0) return err('Target CVR must be greater than 0.')
+    if (row.activeSnapshotId && !mappingDraft.reason.trim()) return err('Reason is required when overriding an existing mapping.')
+    const result = await createSnapshotOverride({
+      sectionId: row.id,
+      packageVersionId: row.packageVersionId,
+      targetCvrOhm: mappingDraft.targetCvrOhm,
+      cciProfileId: category.profileId,
+      cciCategoryId: category.id,
+      cciCategoryLabel: cciMainCategory(category) ?? category.label,
+      cciValue: category.value,
+      supersedesSnapshotId: row.activeSnapshotId,
+      overrideReason: mappingDraft.reason.trim() || 'Initial Admin Resources mapping',
+    })
+    if (!result.ok) return err(result.error)
+    setSessionRows((rows) =>
+      rows.map((candidate) =>
+        candidate.id === row.id
+          ? {
+              ...candidate,
+              activeSnapshotId: result.data.id,
+              activeTargetCvrOhm: result.data.targetCvrOhm,
+              activeCciProfileId: result.data.cciProfileId,
+              activeCciCategoryId: result.data.cciCategoryId,
+              activeCciLabel: result.data.cciCategoryLabel,
+              activeCciValue: result.data.cciValue,
+              snapshotCount: candidate.snapshotCount + 1,
+            }
+          : candidate,
+      ),
+    )
+    setMappingSectionId(null)
+    setMappingDraft(null)
+    ok('Saved Session CCI/CVR mapping.')
+  }
+
+  async function createPackageFromBuilder() {
+    if (cciRows.length === 0) return err('Create at least one CCI Category before creating a Test Package.')
+    const defaults = [3, 5, 7, 9, 11, 13, 15, 17]
+    const categories = [...cciRows].sort((a, b) => a.categoryOrder - b.categoryOrder)
+    const sessions = Array.from({ length: packageDraft.sessionCount }, (_, idx) => {
+      const category = categories[idx % categories.length]
+      return {
+        sectionOrder: idx + 1,
+        title: `Session ${idx + 1}`,
+        targetCvrOhm: defaults[idx] ?? defaults[defaults.length - 1],
+        cciProfileId: category.profileId,
+        cciCategoryId: category.id,
+        cciCategoryLabel: cciMainCategory(category) ?? category.label,
+        cciValue: category.value,
+      }
+    })
+    const result = await createDraftTestPackage({ ...packageDraft, sessions })
+    if (!result.ok) return err(result.error)
+    ok(`Created ${result.data.package.title} with ${packageDraft.sessionCount} sessions × ${packageDraft.itemsPerSession} CVR sentence slots.`)
+    await loadResources()
+    setActiveTab('sessions')
+  }
+
   return (
     <>
       <PageHeader
@@ -529,21 +750,21 @@ export function AdminResourcesPage() {
           <button
             type="button"
             className={activeTab === 'cvr' ? 'primary' : 'ghost'}
-            onClick={() => setActiveTab('cvr')}
+            onClick={() => switchTab('cvr')}
           >
             CVR
           </button>
           <button
             type="button"
             className={activeTab === 'cci' ? 'primary' : 'ghost'}
-            onClick={() => setActiveTab('cci')}
+            onClick={() => switchTab('cci')}
           >
             CCI
           </button>
           <button
             type="button"
             className={activeTab === 'sessions' ? 'primary' : 'ghost'}
-            onClick={() => setActiveTab('sessions')}
+            onClick={() => switchTab('sessions')}
           >
             Sessions
           </button>
@@ -551,7 +772,7 @@ export function AdminResourcesPage() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'minmax(14rem, 1fr) 12rem minmax(12rem, 16rem)',
+            gridTemplateColumns: 'minmax(14rem, 1fr) 12rem minmax(14rem, 1fr) minmax(12rem, 16rem)',
             gap: '0.75rem',
             alignItems: 'end',
           }}
@@ -575,6 +796,21 @@ export function AdminResourcesPage() {
               <option value="published">Published</option>
               <option value="active">Active</option>
               <option value="archived">Archived</option>
+            </select>
+          </label>
+          <label className="field" style={{ margin: 0 }}>
+            CVR Section
+            <select
+              value={sectionFilter}
+              onChange={(event) => setSectionFilter(event.target.value)}
+              disabled={activeTab !== 'cvr'}
+            >
+              <option value="all">All sections</option>
+              {sectionOptions.map((section) => (
+                <option key={section.sectionId} value={section.sectionId}>
+                  {section.packageTitle} · {section.versionLabel} · Session {section.sectionOrder}: {section.sectionTitle ?? 'Untitled'}
+                </option>
+              ))}
             </select>
           </label>
           <label className="field field-inline" style={{ margin: 0, justifyContent: 'flex-start' }}>
@@ -752,11 +988,81 @@ export function AdminResourcesPage() {
       ) : null}
 
       {state === 'ready' && activeTab === 'cci' ? (
-        <Panel
-          icon={Database}
+        <>
+          <Panel
+            icon={Database}
           title={`CCI categories (${filteredCciRows.length})`}
           collapsible={false}
         >
+          <div style={{ marginBottom: '1rem', display: 'grid', gap: '0.75rem' }}>
+            <strong>Create CCI</strong>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 0.75fr 1fr 1.5fr auto', gap: '0.75rem', alignItems: 'end' }}>
+              <label className="field" style={{ margin: 0 }}>
+                Draft profile
+                <select
+                  value={newCciDraft.profileId}
+                  onChange={(event) => setNewCciDraft({ ...newCciDraft, profileId: event.target.value })}
+                >
+                  <option value="">New profile…</option>
+                  {draftCciProfiles.map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.name} ({profile.versionLabel})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field" style={{ margin: 0 }}>
+                New profile name
+                <input
+                  value={newCciDraft.profileName}
+                  onChange={(event) => setNewCciDraft({ ...newCciDraft, profileName: event.target.value })}
+                  placeholder="Chunks CCI Profile"
+                  disabled={Boolean(selectedNewCciProfile)}
+                />
+              </label>
+              <label className="field" style={{ margin: 0 }}>
+                Name
+                <input
+                  value={newCciDraft.name}
+                  onChange={(event) => setNewCciDraft({ ...newCciDraft, name: event.target.value })}
+                  placeholder="Give it a shot"
+                />
+              </label>
+              <label className="field" style={{ margin: 0 }}>
+                Category
+                <select
+                  value={newCciDraft.mainCategory}
+                  onChange={(event) => setNewCciDraft({ ...newCciDraft, mainCategory: event.target.value as MainCciCategory | '' })}
+                >
+                  <option value="">Choose…</option>
+                  <option value="Blow">Blow</option>
+                  <option value="Flow">Flow</option>
+                  <option value="Chunks">Chunks</option>
+                </select>
+              </label>
+              <label className="field" style={{ margin: 0 }}>
+                Unit (Ampe)
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={newCciDraft.value}
+                  onChange={(event) => setNewCciDraft({ ...newCciDraft, value: Number(event.target.value) })}
+                />
+              </label>
+              <button type="button" className="primary" onClick={() => void createCciCategory()}>
+                Create
+              </button>
+            </div>
+            <label className="field" style={{ margin: 0 }}>
+              Description
+              <input
+                value={newCciDraft.description}
+                onChange={(event) => setNewCciDraft({ ...newCciDraft, description: event.target.value })}
+                placeholder="Linear 1 on 1 as Blow"
+              />
+            </label>
+          </div>
           <div className="table-wrap">
             <table>
               <thead>
@@ -892,12 +1198,51 @@ export function AdminResourcesPage() {
                               <button
                                 type="button"
                                 className="ghost"
+                                onClick={() => void publishProfile(row.profileId)}
+                                disabled={row.profileStatus !== 'draft'}
+                                title="Publish draft profile to active so it can be selected for sessions."
+                              >
+                                Publish profile
+                              </button>
+                              <button
+                                type="button"
+                                className="ghost"
                                 onClick={() => void archiveProfile(row.profileId)}
                                 disabled={row.profileStatus === 'archived'}
                                 title="Archive keeps existing measurement snapshots historically reproducible."
                               >
                                 Archive profile
                               </button>
+                              {row.profileStatus === 'draft' ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="ghost"
+                                    onClick={() => void publishProfile(row.profileId)}
+                                    title="Publish profile to active. Once active, direct edits are disabled."
+                                  >
+                                    Publish profile
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="ghost"
+                                    onClick={() => {
+                                      setNewCciDraft((d) => ({
+                                        ...d,
+                                        profileId: row.profileId,
+                                        profileName: row.profileName,
+                                        name: '',
+                                        value: 2,
+                                        description: '',
+                                        mainCategory: '',
+                                      }))
+                                    }}
+                                    title="Pre-fill the Add Category form below for this draft profile."
+                                  >
+                                    Add category
+                                  </button>
+                                </>
+                              ) : null}
                             </div>
                             <div className="meta" style={{ margin: '0.25rem 0 0' }}>
                               {draftActionHint('CCI category', editable)}
@@ -919,6 +1264,97 @@ export function AdminResourcesPage() {
             </table>
           </div>
         </Panel>
+        {/* T7: inline create-category form, shown when "Add category" is clicked on a draft profile row */}
+        {newCciDraft.profileId ? (
+          <div
+            style={{
+              marginTop: '0.75rem',
+              padding: '0.75rem 1rem',
+              background: 'var(--bg-card)',
+              borderRadius: '0.5rem',
+              border: '1px solid var(--border)',
+            }}
+          >
+            <strong style={{ display: 'block', marginBottom: '0.5rem' }}>
+              Add CCI Category to: {newCciDraft.profileName}
+            </strong>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(10rem, 1fr))',
+                gap: '0.5rem',
+              }}
+            >
+              <label className="field" style={{ margin: 0 }}>
+                Name / Label
+                <input
+                  value={newCciDraft.name}
+                  onChange={(e) => setNewCciDraft((d) => ({ ...d, name: e.target.value }))}
+                  placeholder="e.g. Current 5"
+                />
+              </label>
+              <label className="field" style={{ margin: 0 }}>
+                Ampe / Value
+                <input
+                  type="number"
+                  step="0.01"
+                  value={newCciDraft.value}
+                  onChange={(e) =>
+                    setNewCciDraft((d) => ({ ...d, value: Number(e.target.value) }))
+                  }
+                />
+              </label>
+              <label className="field" style={{ margin: 0 }}>
+                Main Category
+                <select
+                  value={newCciDraft.mainCategory}
+                  onChange={(e) =>
+                    setNewCciDraft((d) => ({
+                      ...d,
+                      mainCategory: e.target.value as MainCciCategory | '',
+                    }))
+                  }
+                >
+                  <option value="">Unmapped</option>
+                  <option value="Blow">Blow</option>
+                  <option value="Flow">Flow</option>
+                  <option value="Chunks">Chunks</option>
+                </select>
+              </label>
+              <label className="field" style={{ margin: 0 }}>
+                Description
+                <input
+                  value={newCciDraft.description}
+                  onChange={(e) => setNewCciDraft((d) => ({ ...d, description: e.target.value }))}
+                  placeholder="Optional"
+                />
+              </label>
+            </div>
+            <div className="btn-row" style={{ marginTop: '0.5rem' }}>
+              <button type="button" className="primary" onClick={() => void createCciCategory()}>
+                <Save className="h-4 w-4" aria-hidden />
+                Save category
+              </button>
+              <button
+                type="button"
+                className="ghost"
+                onClick={() =>
+                  setNewCciDraft((d) => ({
+                    ...d,
+                    profileId: '',
+                    name: '',
+                    description: '',
+                    mainCategory: '',
+                  }))
+                }
+              >
+                <X className="h-4 w-4" aria-hidden />
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
+        </>
       ) : null}
 
       {state === 'ready' && activeTab === 'sessions' ? (
@@ -927,6 +1363,53 @@ export function AdminResourcesPage() {
           title={`Session resources (${filteredSessionRows.length})`}
           collapsible={false}
         >
+          <div style={{ marginBottom: '1rem', display: 'grid', gap: '0.75rem' }}>
+            <strong>Create Test Package</strong>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 0.75fr 0.75fr auto', gap: '0.75rem', alignItems: 'end' }}>
+              <label className="field" style={{ margin: 0 }}>
+                Package name
+                <input
+                  value={packageDraft.title}
+                  onChange={(event) => setPackageDraft({ ...packageDraft, title: event.target.value })}
+                  placeholder="Pre-test"
+                />
+              </label>
+              <label className="field" style={{ margin: 0 }}>
+                Version
+                <input
+                  value={packageDraft.versionLabel}
+                  onChange={(event) => setPackageDraft({ ...packageDraft, versionLabel: event.target.value })}
+                  placeholder="draft-v1"
+                />
+              </label>
+              <label className="field" style={{ margin: 0 }}>
+                Sessions
+                <input
+                  type="number"
+                  min={1}
+                  max={12}
+                  value={packageDraft.sessionCount}
+                  onChange={(event) => setPackageDraft({ ...packageDraft, sessionCount: Number(event.target.value) || 8 })}
+                />
+              </label>
+              <label className="field" style={{ margin: 0 }}>
+                Sentences/session
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={packageDraft.itemsPerSession}
+                  onChange={(event) => setPackageDraft({ ...packageDraft, itemsPerSession: Number(event.target.value) || 10 })}
+                />
+              </label>
+              <button type="button" className="primary" onClick={() => void createPackageFromBuilder()}>
+                Create package
+              </button>
+            </div>
+            <p className="meta" style={{ margin: 0 }}>
+              Creates a draft package with {packageDraft.sessionCount} sessions × {packageDraft.itemsPerSession} CVR sentence slots. Each session is mapped to CCI by order and default target CVR sequence 3,5,7,9,11,13,15,17 for CPD calculation.
+            </p>
+          </div>
           <div className="table-wrap">
             <table>
               <thead>
@@ -941,10 +1424,16 @@ export function AdminResourcesPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredSessionRows.map((row) => {
+                {filteredSessionRows.flatMap((row) => {
                   const editing = editingSectionId === row.id && sessionDraft
                   const editable = row.versionStatus === 'draft'
-                  return (
+                  const hasSnapshot = row.activeTargetCvrOhm !== null
+                  const showMapping = mappingSectionId === row.id && mappingDraft
+                  const mappingProfileCategories = mappingDraft
+                    ? cciCategoriesForMapping(mappingDraft.cciProfileId)
+                    : []
+
+                  const mainRow = (
                     <tr key={row.id}>
                       <td>
                         <strong>{row.packageTitle}</strong>
@@ -991,10 +1480,139 @@ export function AdminResourcesPage() {
                           </>
                         )}
                       </td>
-                      <td>{row.itemCount}</td>
                       <td>
-                        {row.activeTargetCvrOhm ?? '—'} Ω · {row.activeCciLabel ?? 'No CCI'}{' '}
-                        {row.activeCciValue != null ? `(${row.activeCciValue})` : ''}
+                        {/* T2: drill-in toggle */}
+                        <button
+                          type="button"
+                          className="ghost"
+                          style={{ padding: '0.1rem 0.3rem', fontSize: '0.8rem' }}
+                          onClick={() =>
+                            setExpandedSectionId(
+                              expandedSectionId === row.id ? null : row.id,
+                            )
+                          }
+                        >
+                          {row.itemCount} items ▾
+                        </button>
+                      </td>
+                      <td style={{ minWidth: 220 }}>
+                        {/* T3: no-snapshot warning + T4: inline mapping form */}
+                        {showMapping ? (
+                          <div style={{ display: 'grid', gap: '0.35rem' }}>
+                            <label className="field" style={{ margin: 0 }}>
+                              Target CVR (Ω)
+                              <input
+                                type="number"
+                                step="0.01"
+                                min={0}
+                                value={mappingDraft.targetCvrOhm}
+                                onChange={(e) =>
+                                  setMappingDraft({
+                                    ...mappingDraft,
+                                    targetCvrOhm: Number(e.target.value),
+                                  })
+                                }
+                                placeholder="e.g. 12"
+                              />
+                            </label>
+                            <label className="field" style={{ margin: 0 }}>
+                              CCI Profile
+                              <select
+                                value={mappingDraft.cciProfileId}
+                                onChange={(e) =>
+                                  setMappingDraft({
+                                    ...mappingDraft,
+                                    cciProfileId: e.target.value,
+                                    cciCategoryId: '',
+                                  })
+                                }
+                              >
+                                <option value="">— Select profile —</option>
+                                {selectableCciProfiles.map((p) => (
+                                  <option key={p.id} value={p.id}>
+                                    {p.name} ({p.versionLabel}) [{p.status}]
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="field" style={{ margin: 0 }}>
+                              CCI Category
+                              <select
+                                value={mappingDraft.cciCategoryId}
+                                onChange={(e) =>
+                                  setMappingDraft({
+                                    ...mappingDraft,
+                                    cciCategoryId: e.target.value,
+                                  })
+                                }
+                              >
+                                <option value="">— Select category —</option>
+                                {mappingProfileCategories.map((c) => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.label} (val {c.value})
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="field" style={{ margin: 0 }}>
+                              Reason{row.activeSnapshotId ? ' (required)' : ' (optional)'}
+                              <input
+                                value={mappingDraft.reason}
+                                onChange={(e) =>
+                                  setMappingDraft({ ...mappingDraft, reason: e.target.value })
+                                }
+                                placeholder="e.g. Approved measurement review"
+                              />
+                            </label>
+                            <div className="btn-row" style={{ margin: 0 }}>
+                              <button
+                                type="button"
+                                className="primary"
+                                onClick={() => void saveMapping(row)}
+                              >
+                                <Save className="h-4 w-4" aria-hidden />
+                                Save
+                              </button>
+                              <button
+                                type="button"
+                                className="ghost"
+                                onClick={() => {
+                                  setMappingSectionId(null)
+                                  setMappingDraft(null)
+                                }}
+                              >
+                                <X className="h-4 w-4" aria-hidden />
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            {hasSnapshot ? (
+                              <div>
+                                {row.activeTargetCvrOhm} Ω · {row.activeCciLabel ?? 'No CCI'}{' '}
+                                {row.activeCciValue != null ? `(${row.activeCciValue})` : ''}
+                              </div>
+                            ) : (
+                              <span
+                                className="badge"
+                                style={{ borderColor: '#d69e2e', color: '#d69e2e' }}
+                              >
+                                ⚠ No snapshot set
+                              </span>
+                            )}
+                            <div style={{ marginTop: '0.25rem' }}>
+                              <button
+                                type="button"
+                                className="ghost"
+                                style={{ fontSize: '0.8rem', padding: '0.1rem 0.35rem' }}
+                                onClick={() => beginMapping(row)}
+                              >
+                                {hasSnapshot ? 'Override mapping' : 'Set mapping'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </td>
                       <td>{row.learningSessionCount}</td>
                       <td>{statusLabel(row.versionStatus)}</td>
@@ -1058,6 +1676,63 @@ export function AdminResourcesPage() {
                       </td>
                     </tr>
                   )
+
+                  if (expandedSectionId !== row.id) return [mainRow]
+
+                  // T2: drill-in items sub-table
+                  const sectionItems = cvrRows.filter((item) => item.sectionId === row.id)
+                  const expandedRow = (
+                    <tr key={`${row.id}-items`}>
+                      <td
+                        colSpan={7}
+                        style={{
+                          padding: '0.5rem 1rem 0.75rem',
+                          background: 'var(--bg-page)',
+                          borderTop: 'none',
+                        }}
+                      >
+                        {sectionItems.length === 0 ? (
+                          <div className="meta" style={{ margin: 0, textAlign: 'center' }}>
+                            No items in this section.
+                          </div>
+                        ) : (
+                          <table style={{ width: '100%', fontSize: '0.85rem' }}>
+                            <thead>
+                              <tr>
+                                <th style={{ width: 32 }}>#</th>
+                                <th>Prompt (VI)</th>
+                                <th>Prompt (EN)</th>
+                                <th style={{ width: 56 }}>TC</th>
+                                <th style={{ width: 56 }}>LC</th>
+                                <th style={{ width: 56 }}>TL</th>
+                                <th style={{ width: 80 }}>CVR (Ω)</th>
+                                <th style={{ width: 80 }}>Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {sectionItems.map((item) => (
+                                <tr key={item.id}>
+                                  <td>{item.itemOrder}</td>
+                                  <td>{item.promptVi ?? '—'}</td>
+                                  <td className="meta" style={{ margin: 0 }}>
+                                    {item.promptEn ?? '—'}
+                                  </td>
+                                  <td>{item.tc ?? '—'}</td>
+                                  <td>{item.lc ?? '—'}</td>
+                                  <td>{item.tl ?? '—'}</td>
+                                  <td>
+                                    <span className="badge">{item.measuredCvr ?? '—'} Ω</span>
+                                  </td>
+                                  <td>{statusLabel(item.versionStatus)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                  return [mainRow, expandedRow]
                 })}
                 {filteredSessionRows.length === 0 ? (
                   <tr>

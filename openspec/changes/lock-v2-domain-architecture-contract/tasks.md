@@ -28,11 +28,11 @@
 
 ## 3. Hosted-data and CSV migration (#7, depends on #5 and #6)
 
-- [ ] 3.1 Stage one-time `Chunks-resource - CVR_new.csv` import with dry-run validation
-- [ ] 3.2 Backfill existing `live_test_resources`, `live_test_blocks`, and `live_test_items` into V2 package/version/section/item rows
-- [ ] 3.3 Map old `session_questions.external_ref` values to V2 immutable item snapshots without rewriting lifecycle history
-- [ ] 3.4 Produce compatibility reports for row counts, external-ref resolution, section targets, measured CVR mismatches, CCI snapshot coverage, and CPD variance
-- [ ] 3.5 Verify restore/rollback path before any remote migration approval request
+- [x] 3.1 Stage one-time `Chunks-resource - CVR_new.csv` import with dry-run validation
+- [x] 3.2 Backfill existing `live_test_resources`, `live_test_blocks`, and `live_test_items` into V2 package/version/section/item rows
+- [x] 3.3 Map old `session_questions.external_ref` values to V2 immutable item snapshots without rewriting lifecycle history
+- [x] 3.4 Produce compatibility reports for row counts, external-ref resolution, section targets, measured CVR mismatches, CCI snapshot coverage, and CPD variance
+- [x] 3.5 Verify restore/rollback path before any remote migration approval request
 
 ## 4. CVR generation and TTS modules (#8, depends on #6 package drafts; server-side only)
 

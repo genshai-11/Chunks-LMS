@@ -526,6 +526,38 @@ export type Database = {
         Insert: Record<string, unknown>
         Update: Record<string, unknown>
       }
+      live_test_v2_migration_runs: {
+        Row: {
+          id: string
+          run_label: string
+          source_filename: string
+          dry_run: boolean
+          report: Json
+          report_checksum: string
+          created_by_user_id: string | null
+          created_at: string
+        }
+        Insert: Record<string, unknown>
+        Update: Record<string, unknown>
+      }
+      live_test_v2_item_mappings: {
+        Row: {
+          legacy_live_test_resource_id: string
+          legacy_live_test_block_id: string
+          legacy_live_test_item_id: string
+          target_test_package_id: string
+          target_package_version_id: string
+          target_test_section_id: string
+          target_test_item_id: string
+          legacy_external_ref: string
+          v2_external_ref: string
+          source_row_checksum: string
+          source_metadata: Json
+          created_at: string
+        }
+        Insert: Record<string, unknown>
+        Update: Record<string, unknown>
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -552,6 +584,22 @@ export type Database = {
       revoke_learner_access_token: {
         Args: { p_token_id: string }
         Returns: undefined
+      }
+      live_test_v2_deterministic_uuid: {
+        Args: { p_basis: string }
+        Returns: string
+      }
+      live_test_v2_source_row_checksum: {
+        Args: { p_item: Json }
+        Returns: string
+      }
+      preview_live_test_v2_migration: {
+        Args: { p_source_filename?: string }
+        Returns: Json
+      }
+      apply_live_test_v2_catalog_backfill: {
+        Args: { p_run_label: string; p_source_filename?: string; p_dry_run?: boolean }
+        Returns: Json
       }
     }
     Enums: {

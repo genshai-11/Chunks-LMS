@@ -384,7 +384,7 @@ export function AdminLiveTestsPage() {
     }
 
     setBuilderStatus('Creating package and version draft...')
-    const sb = getSupabase()
+    const sb = getSupabase() as any
     if (!sb) {
       setBuilderStatus('Error: Supabase is not configured.')
       return
@@ -485,7 +485,7 @@ export function AdminLiveTestsPage() {
     }
 
     setPublishStatus('Publishing...')
-    const sb = getSupabase()
+    const sb = getSupabase() as any
     if (!sb) {
       setPublishStatus('Supabase not configured')
       return
@@ -522,7 +522,7 @@ export function AdminLiveTestsPage() {
     }
 
     setImportStatus('Saving items...')
-    const sb = getSupabase()
+    const sb = getSupabase() as any
     if (!sb) {
       setImportStatus('Error: Supabase not configured.')
       return

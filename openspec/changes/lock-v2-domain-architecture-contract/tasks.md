@@ -36,11 +36,11 @@
 
 ## 4. CVR generation and TTS modules (#8, depends on #6 package drafts; server-side only)
 
-- [ ] 4.1 Implement `generateTestItem` behind a server-side 9Router LLM adapter
-- [ ] 4.2 Implement `generateNarration` behind a server-side 9Router TTS adapter
-- [ ] 4.3 Store generation jobs, provider metadata, retries/errors, source hashes, and private Storage assets
-- [ ] 4.4 Require human approval before generated content/audio can be published
-- [ ] 4.5 Add tests proving provider secrets and adapter details are not exposed to browser callers
+- [x] 4.1 Implement `generateTestItem` behind a server-side 9Router LLM adapter
+- [x] 4.2 Implement `generateNarration` behind a server-side 9Router TTS adapter
+- [x] 4.3 Store generation jobs, provider metadata, retries/errors, source hashes, and private Storage assets
+- [x] 4.4 Require human approval before generated content/audio can be published
+- [x] 4.5 Add tests proving provider secrets and adapter details are not exposed to browser callers
 
 ## 5. Admin package management and Teacher runtime (#9, depends on #5, #6, and #8 where generation is used)
 

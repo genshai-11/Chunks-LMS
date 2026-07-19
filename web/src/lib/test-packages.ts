@@ -106,7 +106,9 @@ export async function listTestPackages(): Promise<Result<TestPackage[]>> {
   return { ok: true, data: (data ?? []).map(mapTestPackage) }
 }
 
-export async function listTestPackageVersions(packageId: string): Promise<Result<TestPackageVersion[]>> {
+export async function listTestPackageVersions(
+  packageId: string,
+): Promise<Result<TestPackageVersion[]>> {
   const sb = client()
   if (!sb) return { ok: false, error: 'Supabase is not configured' }
   const { data, error } = await sb
@@ -162,7 +164,9 @@ export async function listCciCategories(profileId: string): Promise<Result<CciCa
   return { ok: true, data: (data ?? []).map(mapCciCategory) }
 }
 
-export async function getSectionSnapshot(sectionId: string): Promise<Result<SectionMeasurementSnapshot | null>> {
+export async function getSectionSnapshot(
+  sectionId: string,
+): Promise<Result<SectionMeasurementSnapshot | null>> {
   const sb = client()
   if (!sb) return { ok: false, error: 'Supabase is not configured' }
   const { data, error } = await sb
@@ -250,4 +254,247 @@ export async function listNarrationVariants(itemId: string): Promise<Result<Narr
     .order('created_at', { ascending: false })
   if (error) return { ok: false, error: error.message }
   return { ok: true, data: (data ?? []).map(mapNarrationVariant) }
+}
+
+async function assertDraftPackageVersion(packageVersionId: string): Promise<Result<true>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { data, error } = await sb
+    .from('test_package_versions')
+    .select('status')
+    .eq('id', packageVersionId)
+    .maybeSingle()
+  if (error) return { ok: false, error: error.message }
+  if (!data) return { ok: false, error: 'Package Version not found' }
+  if (data.status !== 'draft') {
+    return {
+      ok: false,
+      error:
+        'Published or archived Package Versions are immutable. Create a new draft/version instead.',
+    }
+  }
+  return { ok: true, data: true }
+}
+
+async function assertDraftCciProfile(profileId: string): Promise<Result<true>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { data, error } = await sb
+    .from('cci_profiles')
+    .select('status')
+    .eq('id', profileId)
+    .maybeSingle()
+  if (error) return { ok: false, error: error.message }
+  if (!data) return { ok: false, error: 'CCI Profile not found' }
+  if (data.status !== 'draft') {
+    return {
+      ok: false,
+      error:
+        'Only draft CCI Profiles/Categories can be edited directly. Archive or supersede active catalogs instead.',
+    }
+  }
+  return { ok: true, data: true }
+}
+
+async function countRows(table: string, column: string, value: string): Promise<Result<number>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { count, error } = await sb
+    .from(table)
+    .select('id', { count: 'exact', head: true })
+    .eq(column, value)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: count ?? 0 }
+}
+
+async function countItemExternalRefs(itemId: string): Promise<Result<number>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { count, error } = await sb
+    .from('session_questions')
+    .select('id', { count: 'exact', head: true })
+    .like('external_ref', `live-test-item:${itemId}%`)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: count ?? 0 }
+}
+
+export async function updateDraftTestItem(input: {
+  itemId: string
+  packageVersionId: string
+  promptVi: string | null
+  promptEn: string | null
+  tc: number | null
+  lc: number | null
+  tl: number | null
+}): Promise<Result<TestItem>> {
+  const draft = await assertDraftPackageVersion(input.packageVersionId)
+  if (!draft.ok) return draft
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { data, error } = await sb
+    .from('test_items')
+    .update({
+      prompt_vi: input.promptVi,
+      prompt_en: input.promptEn,
+      tc: input.tc,
+      lc: input.lc,
+      tl: input.tl,
+    })
+    .eq('id', input.itemId)
+    .eq('package_version_id', input.packageVersionId)
+    .select()
+    .single()
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: mapTestItem(data) }
+}
+
+export async function deleteDraftTestItem(input: {
+  itemId: string
+  packageVersionId: string
+}): Promise<Result<true>> {
+  const draft = await assertDraftPackageVersion(input.packageVersionId)
+  if (!draft.ok) return draft
+  const refs = await countItemExternalRefs(input.itemId)
+  if (!refs.ok) return refs
+  if (refs.data > 0) {
+    return {
+      ok: false,
+      error:
+        'This Test Item is linked to Session Questions. It cannot be deleted; create a new draft/version instead.',
+    }
+  }
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { error } = await sb
+    .from('test_items')
+    .delete()
+    .eq('id', input.itemId)
+    .eq('package_version_id', input.packageVersionId)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: true }
+}
+
+export async function updateDraftTestSection(input: {
+  sectionId: string
+  packageVersionId: string
+  title: string | null
+  sectionOrder: number
+}): Promise<Result<TestSection>> {
+  const draft = await assertDraftPackageVersion(input.packageVersionId)
+  if (!draft.ok) return draft
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { data, error } = await sb
+    .from('test_sections')
+    .update({ title: input.title, section_order: input.sectionOrder })
+    .eq('id', input.sectionId)
+    .eq('package_version_id', input.packageVersionId)
+    .select()
+    .single()
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: mapTestSection(data) }
+}
+
+export async function deleteDraftTestSection(input: {
+  sectionId: string
+  packageVersionId: string
+}): Promise<Result<true>> {
+  const draft = await assertDraftPackageVersion(input.packageVersionId)
+  if (!draft.ok) return draft
+  const sessions = await countRows('learning_sessions', 'test_section_id', input.sectionId)
+  if (!sessions.ok) return sessions
+  if (sessions.data > 0) {
+    return {
+      ok: false,
+      error:
+        'This Test Section is linked to Learning Sessions. It cannot be deleted; archive or create a new version instead.',
+    }
+  }
+  const items = await listTestItems(input.sectionId)
+  if (!items.ok) return items
+  for (const item of items.data) {
+    const refs = await countItemExternalRefs(item.id)
+    if (!refs.ok) return refs
+    if (refs.data > 0) {
+      return {
+        ok: false,
+        error:
+          'This Test Section contains items linked to Session Questions. It cannot be deleted.',
+      }
+    }
+  }
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { error } = await sb
+    .from('test_sections')
+    .delete()
+    .eq('id', input.sectionId)
+    .eq('package_version_id', input.packageVersionId)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: true }
+}
+
+export async function updateDraftCciCategory(input: {
+  categoryId: string
+  profileId: string
+  label: string
+  value: number
+  description: string | null
+}): Promise<Result<CciCategory>> {
+  const draft = await assertDraftCciProfile(input.profileId)
+  if (!draft.ok) return draft
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { data, error } = await sb
+    .from('cci_categories')
+    .update({ label: input.label, value: input.value, description: input.description })
+    .eq('id', input.categoryId)
+    .eq('profile_id', input.profileId)
+    .select()
+    .single()
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: mapCciCategory(data) }
+}
+
+export async function deleteDraftCciCategory(input: {
+  categoryId: string
+  profileId: string
+}): Promise<Result<true>> {
+  const draft = await assertDraftCciProfile(input.profileId)
+  if (!draft.ok) return draft
+  const snapshots = await countRows(
+    'section_measurement_snapshots',
+    'cci_category_id',
+    input.categoryId,
+  )
+  if (!snapshots.ok) return snapshots
+  if (snapshots.data > 0) {
+    return {
+      ok: false,
+      error:
+        'This CCI Category is referenced by measurement snapshots. Archive/supersede the catalog instead of deleting it.',
+    }
+  }
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { error } = await sb
+    .from('cci_categories')
+    .delete()
+    .eq('id', input.categoryId)
+    .eq('profile_id', input.profileId)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: true }
+}
+
+export async function archiveCciProfile(profileId: string): Promise<Result<CciProfile>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { data, error } = await sb
+    .from('cci_profiles')
+    .update({ status: 'archived', archived_at: new Date().toISOString() })
+    .eq('id', profileId)
+    .select()
+    .single()
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: mapCciProfile(data) }
 }

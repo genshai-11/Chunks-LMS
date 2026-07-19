@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   ShieldCheck,
   Users,
+  Database,
 } from 'lucide-react'
 import { RoleWorkspace } from '../../components/RoleWorkspace'
 import { useAppState } from '../../state/useAppState'
@@ -17,6 +18,7 @@ const ITEMS = [
   { to: '/admin/courses', label: 'Courses', icon: BookOpen },
   { to: '/admin/classes', label: 'Classes', icon: GraduationCap },
   { to: '/admin/metrics', label: 'Metrics', icon: Gauge },
+  { to: '/admin/resources', label: 'Resources', icon: Database },
   { to: '/admin/live-tests', label: 'Live Tests', icon: FlaskConical },
   { to: '/admin/analysis', label: 'Analysis', icon: ChartColumn },
   { to: '/admin/integrity', label: 'Integrity', icon: ShieldCheck },

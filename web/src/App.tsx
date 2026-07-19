@@ -11,6 +11,7 @@ import { AdminClassesPage } from './pages/admin/AdminClassesPage'
 import { AdminPeoplePage } from './pages/admin/AdminPeoplePage'
 import { AdminEnrollmentsPage } from './pages/admin/AdminEnrollmentsPage'
 import { AdminMetricsPage } from './pages/admin/AdminMetricsPage'
+import { AdminResourcesPage } from './pages/admin/AdminResourcesPage'
 import { AdminLiveTestsPage } from './pages/admin/AdminLiveTestsPage'
 import { AdminAnalysisPage } from './pages/admin/AdminAnalysisPage'
 import { AdminOpsPage } from './pages/admin/AdminOpsPage'
@@ -61,13 +62,11 @@ export default function App() {
                 <Route path="enrollments" element={<AdminEnrollmentsPage />} />
                 <Route path="analysis" element={<AdminAnalysisPage />} />
                 <Route path="metrics" element={<AdminMetricsPage />} />
+                <Route path="resources" element={<AdminResourcesPage />} />
                 <Route path="live-tests" element={<AdminLiveTestsPage />} />
               </Route>
 
-              <Route
-                path="/teacher/observe"
-                element={<TeacherObservePage />}
-              />
+              <Route path="/teacher/observe" element={<TeacherObservePage />} />
 
               <Route
                 path="/teacher"

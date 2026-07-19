@@ -16,6 +16,7 @@ import { AdminOpsPage } from './pages/admin/AdminOpsPage'
 import { AdminAuditPage } from './pages/admin/AdminAuditPage'
 import { AdminIntegrityPage } from './pages/admin/AdminIntegrityPage'
 import { AdminResourcesPage } from './pages/admin/AdminResourcesPage'
+import { AdminTestAudioPage } from './pages/admin/AdminTestAudioPage'
 import { TeacherLayout } from './pages/teacher/TeacherLayout'
 import { TeacherOverviewPage } from './pages/teacher/TeacherOverviewPage'
 import { TeacherSessionPage } from './pages/teacher/TeacherSessionPage'
@@ -66,6 +67,7 @@ export default function App() {
                 <Route path="analysis" element={<AdminAnalysisPage />} />
                 <Route path="metrics" element={<AdminMetricsPage />} />
                 <Route path="resources" element={<AdminResourcesPage />} />
+                <Route path="resources/audio" element={<AdminTestAudioPage />} />
               </Route>
 
               <Route

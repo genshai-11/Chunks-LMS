@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Database,
   FileText,
@@ -762,15 +763,18 @@ export function AdminResourcesPage() {
         title="Resources"
         subtitle="Load, view, edit, and safely remove eligible CVR, CCI, and Live Test Session catalog rows. Published/history-linked records are immutable."
         actions={
-          <button
-            type="button"
-            className="primary"
-            onClick={() => void loadResources()}
-            disabled={state === 'loading'}
-          >
-            <RefreshCw className="h-4 w-4" aria-hidden />
-            <span>{state === 'loading' ? 'Loading…' : 'Load resources'}</span>
-          </button>
+          <div className="btn-row">
+            <Link className="btn ghost" to="/admin/resources/audio">Audio review</Link>
+            <button
+              type="button"
+              className="primary"
+              onClick={() => void loadResources()}
+              disabled={state === 'loading'}
+            >
+              <RefreshCw className="h-4 w-4" aria-hidden />
+              <span>{state === 'loading' ? 'Loading…' : 'Load resources'}</span>
+            </button>
+          </div>
         }
       />
 

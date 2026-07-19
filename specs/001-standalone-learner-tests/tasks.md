@@ -95,16 +95,16 @@
 ### Tests for User Story 3
 
 - [ ] T029 [P] [US3] Add Edge adapter/request/auth/redaction/retry tests in `supabase/functions/live-test-generation/index.test.ts` and `supabase/functions/live-test-generation/adapters.test.ts`
-- [ ] T030 [P] [US3] Add narration source-hash, approval, stale-audio, and readiness tests in `web/src/modules/catalog/narration-readiness.test.ts`
+- [x] T030 [P] [US3] Add narration source-hash, approval, stale-audio, and readiness tests in `web/src/modules/catalog/narration-readiness.test.ts`
 - [ ] T031 [P] [US3] Add private bucket and Storage policy tests in `supabase/tests/narration_storage_test.sql`
 
 ### Implementation for User Story 3
 
-- [ ] T032 [US3] Reconcile and harden stable Edge actions without adding `generateCVRPreview` in `supabase/functions/live-test-generation/index.ts` and `supabase/functions/live-test-generation/adapters.ts`
-- [ ] T033 [US3] Create a migration via `supabase migration new narration_storage_policies` and add private narration bucket/policies in `supabase/migrations/*_narration_storage_policies.sql`
-- [ ] T034 [US3] Implement generation/approval client and readiness calculation in `web/src/modules/catalog/live-test-generation.ts` and `web/src/modules/catalog/narration-readiness.ts`
-- [ ] T035 [US3] Build audio generation, playback review, approval/reject, and readiness panels in `web/src/components/test-resources/AudioReadinessPanel.tsx`
-- [ ] T036 [US3] Integrate audio review into `web/src/pages/admin/AdminResourcesPage.tsx`
+- [x] T032 [US3] Reconcile and harden stable Edge actions without adding `generateCVRPreview` in `supabase/functions/live-test-generation/index.ts` and `supabase/functions/live-test-generation/adapters.ts`
+- [x] T033 [US3] Create a migration via `supabase migration new narration_storage_policies` and add private narration bucket/policies in `supabase/migrations/*_narration_storage_policies.sql`
+- [x] T034 [US3] Implement generation/approval client and readiness calculation in `web/src/modules/catalog/live-test-generation.ts` and `web/src/modules/catalog/narration-readiness.ts`
+- [x] T035 [US3] Build audio generation, playback review, approval/reject, and readiness panels in `web/src/components/test-resources/AudioReadinessPanel.tsx`
+- [x] T036 [US3] Integrate audio review into `web/src/pages/admin/AdminResourcesPage.tsx`
 
 **Checkpoint**: Audio is private, audited, review-gated, and runtime readiness is deterministic.
 

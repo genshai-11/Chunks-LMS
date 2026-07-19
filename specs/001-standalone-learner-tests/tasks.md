@@ -46,17 +46,17 @@
 
 ### Tests for User Story 1
 
-- [ ] T013 [P] [US1] Add workbook fixture tests for valid 8×10 source, missing sheet, duplicate item, blank bilingual prompt, invalid join, and CCI mismatch in `scripts/lib/standalone-test-import/import.test.mjs`
-- [ ] T014 [P] [US1] Add JSON manifest schema/shape tests in `scripts/lib/standalone-test-import/manifest.test.mjs`
+- [x] T013 [P] [US1] Add workbook fixture tests for valid 8×10 source, missing sheet, duplicate item, blank bilingual prompt, invalid join, and CCI mismatch in `scripts/lib/standalone-test-import/import.test.mjs`
+- [x] T014 [P] [US1] Add JSON manifest schema/shape tests in `scripts/lib/standalone-test-import/manifest.test.mjs`
 - [ ] T015 [P] [US1] Add SQL tests for preview-only behavior, allowlisted dependency graph, count/token drift abort, transactional rollback, and excluded LMS tables in `supabase/tests/test_catalog_replacement_test.sql`
 
 ### Implementation for User Story 1
 
-- [ ] T016 [US1] Implement workbook parsing, normalization, SHA-256 provenance, exact count/order/join validation, and anomaly reporting in `scripts/lib/standalone-test-import/workbook.mjs`
-- [ ] T017 [US1] Implement deterministic manifest generation matching `specs/001-standalone-learner-tests/contracts/import-manifest.schema.json` in `scripts/lib/standalone-test-import/manifest.mjs`
-- [ ] T018 [US1] Implement the dry-run-first CLI and JSON/SQL output in `scripts/import-standalone-test-workbook.mjs`
+- [x] T016 [US1] Implement workbook parsing, normalization, SHA-256 provenance, exact count/order/join validation, and anomaly reporting in `scripts/lib/standalone-test-import/workbook.mjs`
+- [x] T017 [US1] Implement deterministic manifest generation matching `specs/001-standalone-learner-tests/contracts/import-manifest.schema.json` in `scripts/lib/standalone-test-import/manifest.mjs`
+- [x] T018 [US1] Implement the dry-run-first CLI and JSON/SQL output in `scripts/import-standalone-test-workbook.mjs`
 - [ ] T019 [US1] Create a migration via `supabase migration new guarded_test_catalog_replacement` and implement import-run audit, preview token/count checks, allowlisted test-only deletion, and canonical draft insert in `supabase/migrations/*_guarded_test_catalog_replacement.sql`
-- [ ] T020 [US1] Generate and review canonical manifest/seed outputs in `supabase/seeds/standalone-test-canonical.generated.json` and `supabase/seeds/standalone-test-canonical.generated.sql`
+- [x] T020 [US1] Generate and review canonical manifest/seed outputs in `supabase/seeds/standalone-test-canonical.generated.json` and `supabase/seeds/standalone-test-canonical.generated.sql`
 - [ ] T021 [US1] Add the exact remote impact query, backup scope, restore path, and final confirmation template to `docs/ops/standalone-test-rollout.md`
 
 **Checkpoint**: Canonical replacement is locally reproducible and remote deletion remains blocked at final approval.

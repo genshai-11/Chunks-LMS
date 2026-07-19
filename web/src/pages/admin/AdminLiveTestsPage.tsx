@@ -258,16 +258,16 @@ export function AdminLiveTestsPage() {
   const handleApproveNarration = async (variantId: string) => {
     setNarrationStatus('Processing approval...')
     try {
-      const ok = await generator.approveGeneratedAsset({
-        jobId: variantId, // maps to variant ID/generation job ID
-        approved: true,
+      const res = await generator.approveGeneratedAsset({
+        generationJobId: variantId, // maps to variant ID/generation job ID
+        notes: 'Approved by administrator',
       })
-      if (ok) {
+      if (res && res.narrationVariantId) {
         setNarrationStatus('Narration variant approved!')
         // Refresh local list
         if (selectedItemIdForNarration) {
-          const res = await listNarrationVariants(selectedItemIdForNarration)
-          if (res.ok) setNarrationVariants(res.data)
+          const r = await listNarrationVariants(selectedItemIdForNarration)
+          if (r.ok) setNarrationVariants(r.data)
         }
       } else {
         setNarrationStatus('Approval failed')
@@ -281,16 +281,16 @@ export function AdminLiveTestsPage() {
   const handleRejectNarration = async (variantId: string) => {
     setNarrationStatus('Processing rejection...')
     try {
-      const ok = await generator.approveGeneratedAsset({
-        jobId: variantId,
-        approved: false,
+      const res = await generator.approveGeneratedAsset({
+        generationJobId: variantId,
+        notes: 'Rejected by administrator',
       })
-      if (ok) {
+      if (res && res.narrationVariantId) {
         setNarrationStatus('Narration variant rejected.')
         // Refresh local list
         if (selectedItemIdForNarration) {
-          const res = await listNarrationVariants(selectedItemIdForNarration)
-          if (res.ok) setNarrationVariants(res.data)
+          const r = await listNarrationVariants(selectedItemIdForNarration)
+          if (r.ok) setNarrationVariants(r.data)
         }
       } else {
         setNarrationStatus('Rejection failed')

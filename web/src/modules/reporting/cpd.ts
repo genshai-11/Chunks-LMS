@@ -47,7 +47,7 @@ export async function calculateLearnerCpd(query: {
 
   // Online Database Path (Canonical RPC)
   if (supabase && !env.authBypass) {
-    const { data, error } = await supabase.rpc('calculate_learner_cpd_report', {
+    const { data, error } = await (supabase as any).rpc('calculate_learner_cpd_report', {
       p_learner_user_id: query.learnerId,
       p_course_id: query.courseId || null,
       p_class_id: query.classId || null,

@@ -62,7 +62,7 @@ describe('calculateLearnerCpd', () => {
   })
 
   it('filters results outside of window duration', async () => {
-    const customLedger = [
+    const customLedger: ResultRecord[] = [
       ...mockLedger,
       {
         id: 'res-3',
@@ -92,7 +92,7 @@ describe('calculateLearnerCpd', () => {
   })
 
   it('joins report correctly to latest correction-effective results', async () => {
-    const correctedLedger = [
+    const correctedLedger: ResultRecord[] = [
       ...mockLedger,
       {
         id: 'res-2-correction',

@@ -73,7 +73,7 @@ export class SupabaseLiveTestGeneration implements LiveTestGeneration {
       }
     }
 
-    const { data, error } = await supabase.rpc('generate_test_item', {
+    const { data, error } = await (supabase as any).rpc('generate_test_item', {
       p_package_version_id: command.packageVersionId,
       p_test_section_id: command.sectionId,
       p_prompt_details: command.promptDetails,
@@ -128,7 +128,7 @@ export class SupabaseLiveTestGeneration implements LiveTestGeneration {
       }
     }
 
-    const { data, error } = await supabase.rpc('generate_narration', {
+    const { data, error } = await (supabase as any).rpc('generate_narration', {
       p_package_version_id: command.packageVersionId,
       p_target: command.target,
       p_test_section_id: command.testSectionId || null,
@@ -179,7 +179,7 @@ export class SupabaseLiveTestGeneration implements LiveTestGeneration {
       }
     }
 
-    const { data, error } = await supabase.rpc('approve_generated_asset', {
+    const { data, error } = await (supabase as any).rpc('approve_generated_asset', {
       p_generation_job_id: command.generationJobId,
       p_notes: command.notes || '',
     })

@@ -1,28 +1,36 @@
 # Chunks-LMS
 
-Chunks-LMS measures a learner’s Focus and Awareness over a course through teacher-observed assessments, scheduling, attendance, and progress reports. It deliberately remains independent of question content and learning-resource ownership.
+Chunks-LMS measures a learner’s Focus and Awareness over a course through teacher-observed assessments, scheduling, attendance, and progress reports. It deliberately remains independent of general question content authoring and learning-resource ownership.
 
 ## People and ownership
 
-**Organization**:
-The administrative scope that owns users, metric templates, and reports.
-_Avoid_: Tenant, school account
+**Chunks Workspace**:
+The single administrative scope that owns staff, learners, classes, Live Test Packages, metric templates, and reports in the current product.
+_Avoid_: Tenant, multi-organization workspace, school account
 
 **User**:
-A person authenticated to access an Organization (or a learner profile reached by invite link).
+A person represented in the Chunks Workspace, either as authenticated staff or as a learner reached through learner access.
 _Avoid_: Account, profile
 
 **Account Status**:
-Active or inactive for a Teacher or Learner profile. Admin may deactivate without deleting history.
+Active or inactive for a Teacher or Learner. Admin may deactivate without deleting history.
 _Avoid_: Banned, deleted
 
+**Admin**:
+A staff User who manages workspace users, Live Test Packages, measurement catalogs, metric templates, and reports.
+_Avoid_: Owner, superuser
+
 **Teacher**:
-A User who owns classes/programs for their learners, starts sessions (selecting 1..N learners), observes, and analyses progress.
+A staff User who owns classes/programs for their learners, starts sessions (selecting 1..N learners), observes, and analyses progress.
 _Avoid_: Instructor, assessor
 
 **Learner**:
-A User whose Focus and Awareness progress is observed across a Course (program label). Access via email invite, not Clerk in V1.
+A User whose Focus and Awareness progress is observed across a Course (program label). Learners use signed learner access in this version, not staff authentication accounts.
 _Avoid_: Student, participant
+
+**Learner Access**:
+A revocable, expiring invitation route that lets one Learner read only their permitted progress, attendance, schedule, and finalized reports.
+_Avoid_: Learner login, learner account, public share link
 
 ## Learning structure
 
@@ -45,20 +53,28 @@ _Avoid_: Lesson, booking
 
 **Learning Session**:
 The actual teaching and assessment occurrence associated with a Class.
-May carry **session kind** (regular, pretest, posttest) for RFC baseline comparison, **session format** (lesson or test) for input behavior, an optional **prompt language** for live-test item display/audio, and an optional **participant learner list** (subset of the class for multi-select capture).
+May carry **session kind** (regular, pretest, posttest) for RFC baseline comparison, **session format** (lesson or test) for input behavior, optional prompt settings for live-test display/audio, and an optional participant learner list (subset of the class for multi-select capture).
 _Avoid_: Round, room session
 
-**Test Resource**:
-A predefined live-test package containing ordered Test Blocks and Test Items, prompt text in Vietnamese/English, audio references, and CVR/CCI metadata.
-_Avoid_: Resource library, lesson content
+**Live Test Package**:
+A versioned package of ordered Test Sections and Test Items used as predefined input for live-test Learning Sessions.
+_Avoid_: Test Resource, resource library, lesson content
 
-**Test Block**:
-One ordered 10-item block within a Test Resource, used as the input for one live-test Learning Session.
-_Avoid_: Learning Session, class session
+**Package Version**:
+An immutable published version of a Live Test Package. Draft versions may change; published versions preserve their section, item, measurement, and narration snapshots.
+_Avoid_: Resource revision, mutable package
+
+**Test Section**:
+An ordered section within a Package Version containing a flexible number of Test Items, section-level `target_cvr_ohm`, CCI snapshot, and optional intro narration.
+_Avoid_: Fixed block, lesson section, class session
 
 **Test Item**:
-One ordered prompt within a Test Block whose selected language text can drive a Session Question through an external reference.
+One ordered prompt within a Test Section whose selected language text can drive a Session Question through an external reference and whose TC/LC/TL values validate measured CVR.
 _Avoid_: Session Question, sentence identity
+
+**Narration Variant**:
+An approved or generated audio choice for a Test Section intro or Test Item, with its own language and voice.
+_Avoid_: Prompt language, package identity
 
 **Attendance**:
 A Learner’s participation status for a Learning Session.
@@ -68,7 +84,7 @@ _Avoid_: Presence
 
 **Session Question**:
 An ordered measurement opportunity within a Learning Session, independent of question content.
-Each Session Question maps to **exactly one** Learner (round-robin assignment across the class roster). With N questions and M learners, each learner is observed on ~N/M questions.
+Each Session Question maps to exactly one Learner (round-robin assignment across the class roster). With N questions and M learners, each learner is observed on ~N/M questions.
 _Avoid_: Card, sentence, resource
 
 **Assessment Attempt**:
@@ -117,28 +133,41 @@ _Avoid_: Failure score
 The share of finalized Assessment Attempts ending Green or Purple in a Report Window.
 _Avoid_: Success score
 
-**CVR**:
-Semantic Complexity Value Rating for a Test Item prompt, calculated from Estimated TC × LC × TL.
-_Avoid_: Generic difficulty, final result
+**Target CVR**:
+A section-level Semantic Complexity Value Rating target stored as `target_cvr_ohm` and imported from CSV `Unit (Ohm)` for the one-time V2 migration.
+_Avoid_: Item CVR, final difficulty score
 
-**CCI**:
-Seeded current/intensity measurement for a Test Item or Test Block; first-version imports use CSV `Unit (Ohm)` as CCI.
-_Avoid_: Manually derived score
+**Measured CVR**:
+An item-level validation value calculated as `TC × LC × TL` for a Test Item prompt.
+_Avoid_: Target CVR, CPD input target
+
+**CCI Profile**:
+An approved catalog of CCI Categories and values that can be snapshotted onto published Test Sections.
+_Avoid_: Manual score sheet, runtime formula
+
+**CCI Category**:
+A named current/intensity category selected through a CCI Profile for Test Section measurement snapshots.
+_Avoid_: Free-text CCI label
 
 **CPD**:
-Derived live-test demand value calculated as CVR × CCI and reproducible from stored source measurements.
+Derived live-test demand value calculated as `target_cvr_ohm × CCI` and reproducible from stored section measurement snapshots.
 _Avoid_: Manually entered metric
+
+**Learner CPD Score**:
+A report value calculated as `item_cpd × finalized effective color score` for a Learner’s finalized or corrected Assessment Attempt.
+_Avoid_: Raw CPD, grade
 
 ---
 
 ## Related project docs (not domain language)
 
-| Doc | Purpose |
-|-----|---------|
-| [`docs/ops/production-runbook.md`](docs/ops/production-runbook.md) | First hosted class: env, seed, Day 1, smoke |
-| [`docs/ops/hosted-e2e-checklist.md`](docs/ops/hosted-e2e-checklist.md) | Production pass/fail checklist |
-| [`docs/ops/ci-cd.md`](docs/ops/ci-cd.md) | GitHub Actions CI/CD, Vercel secrets, migration promote |
-| [`docs/ops/vercel-deploy.md`](docs/ops/vercel-deploy.md) | Manual / first-time Vercel deploy |
-| [`docs/adr/`](docs/adr/) | Architecture decisions |
+| Doc                                                                                                            | Purpose                                                 |
+| -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| [`docs/architecture/v2-domain-architecture-contract.md`](docs/architecture/v2-domain-architecture-contract.md) | V2 domain and architecture contract                     |
+| [`docs/ops/production-runbook.md`](docs/ops/production-runbook.md)                                             | First hosted class: env, seed, Day 1, smoke             |
+| [`docs/ops/hosted-e2e-checklist.md`](docs/ops/hosted-e2e-checklist.md)                                         | Production pass/fail checklist                          |
+| [`docs/ops/ci-cd.md`](docs/ops/ci-cd.md)                                                                       | GitHub Actions CI/CD, Vercel secrets, migration promote |
+| [`docs/ops/vercel-deploy.md`](docs/ops/vercel-deploy.md)                                                       | Manual / first-time Vercel deploy                       |
+| [`docs/adr/`](docs/adr/)                                                                                       | Architecture decisions                                  |
 
 CI/CD workflows: `.github/workflows/ci.yml`, `.github/workflows/cd.yml`. Domain terms above are the source of truth for product language; ops docs do not redefine them.

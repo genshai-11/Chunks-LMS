@@ -20,14 +20,15 @@ export type StaffSession = {
   canAccess: (role: StaffRole) => boolean
   isStaff: boolean
   signInWithEmail: (email: string) => Promise<{ ok: true } | { ok: false; error: string }>
+  signInWithGoogle: () => Promise<{ ok: true } | { ok: false; error: string }>
   signOut: () => Promise<void>
 }
 
 const StaffSessionContext = createContext<StaffSession | null>(null)
 
 function buildSession(
-  partial: Omit<StaffSession, 'canAccess' | 'isStaff' | 'signInWithEmail' | 'signOut'> &
-    Pick<StaffSession, 'signInWithEmail' | 'signOut'>,
+  partial: Omit<StaffSession, 'canAccess' | 'isStaff' | 'signInWithEmail' | 'signInWithGoogle' | 'signOut'> &
+    Pick<StaffSession, 'signInWithEmail' | 'signInWithGoogle' | 'signOut'>,
 ): StaffSession {
   return {
     ...partial,
@@ -68,6 +69,10 @@ const noopSignIn: StaffSession['signInWithEmail'] = async () => ({
   ok: false,
   error: 'Supabase Auth is not configured',
 })
+const noopSignInGoogle: StaffSession['signInWithGoogle'] = async () => ({
+  ok: false,
+  error: 'Supabase Auth is not configured',
+})
 const noopSignOut: StaffSession['signOut'] = async () => {}
 
 const BYPASS_SESSION = buildSession({
@@ -80,6 +85,7 @@ const BYPASS_SESSION = buildSession({
   displayName: 'Local staff',
   staffRoles: ['admin', 'teacher'],
   signInWithEmail: noopSignIn,
+  signInWithGoogle: noopSignInGoogle,
   signOut: noopSignOut,
 })
 
@@ -113,6 +119,19 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
       const { error } = await sb.auth.signInWithOtp({
         email: email.trim(),
         options: redirectTo ? { emailRedirectTo: redirectTo } : undefined,
+      })
+      return error ? { ok: false, error: error.message } : { ok: true }
+    },
+    [sb],
+  )
+
+  const signInWithGoogle = useCallback<StaffSession['signInWithGoogle']>(
+    async () => {
+      if (!sb) return { ok: false, error: 'Supabase Auth is not configured' }
+      const redirectTo = typeof window !== 'undefined' ? window.location.origin : undefined
+      const { error } = await sb.auth.signInWithOAuth({
+        provider: 'google',
+        options: redirectTo ? { redirectTo } : undefined,
       })
       return error ? { ok: false, error: error.message } : { ok: true }
     },
@@ -177,9 +196,10 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
         displayName: displayNameFor(user),
         staffRoles,
         signInWithEmail,
+        signInWithGoogle,
         signOut,
       }),
-    [ready, rolesLoading, user, sb, staffRoles, signInWithEmail, signOut],
+    [ready, rolesLoading, user, sb, staffRoles, signInWithEmail, signInWithGoogle, signOut],
   )
 
   return <StaffSessionContext.Provider value={value}>{children}</StaffSessionContext.Provider>

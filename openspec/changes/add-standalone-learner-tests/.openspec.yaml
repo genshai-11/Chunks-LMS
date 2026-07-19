@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-07-19
+goal: Replace obsolete test data from canonical workbook and add a separate
+  one-to-one learner test module.

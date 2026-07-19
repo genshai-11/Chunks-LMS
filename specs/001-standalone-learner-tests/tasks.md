@@ -125,13 +125,13 @@
 
 ### Implementation for User Story 4
 
-- [ ] T041 [US4] Create a migration via `supabase migration new standalone_test_runtime_rpcs` and implement assignment/setup/start/result/probe/correction/complete RPCs in `supabase/migrations/*_standalone_test_runtime_rpcs.sql`
+- [x] T041 [US4] Create a migration via `supabase migration new standalone_test_runtime_rpcs` and implement assignment/setup/start/result/probe/correction/complete RPCs in `supabase/migrations/*_standalone_test_runtime_rpcs.sql`
 - [ ] T042 [US4] Implement standalone run domain orchestration in `web/src/modules/standalone-tests/run.ts` and `web/src/modules/standalone-tests/result-lifecycle.ts`
-- [ ] T043 [US4] Implement typed standalone assignment/run/RPC access in `web/src/lib/standalone-tests.ts`
-- [ ] T044 [P] [US4] Build assignment/progress dashboard in `web/src/pages/teacher/TeacherTestsPage.tsx`
-- [ ] T045 [P] [US4] Build section setup with learner/language/voice/audio readiness in `web/src/pages/teacher/TeacherTestSetupPage.tsx`
-- [ ] T046 [US4] Build isolated ten-item audio/prompt/result runner in `web/src/pages/teacher/TeacherTestRunPage.tsx`
-- [ ] T047 [US4] Add standalone routes/navigation in `web/src/App.tsx` and `web/src/pages/teacher/TeacherLayout.tsx`
+- [x] T043 [US4] Implement typed standalone assignment/run/RPC access in `web/src/lib/standalone-tests.ts`
+- [x] T044 [P] [US4] Build assignment/progress dashboard in `web/src/pages/teacher/TeacherTestsPage.tsx`
+- [x] T045 [P] [US4] Build section setup with learner/language/voice/audio readiness in `web/src/pages/teacher/TeacherTestSetupPage.tsx`
+- [x] T046 [US4] Build isolated ten-item audio/prompt/result runner in `web/src/pages/teacher/TeacherTestRunPage.tsx`
+- [x] T047 [US4] Add standalone routes/navigation in `web/src/App.tsx` and `web/src/pages/teacher/TeacherLayout.tsx`
 
 **Checkpoint**: Standalone run works without touching live sessions.
 
@@ -151,10 +151,10 @@
 
 ### Implementation for User Story 5
 
-- [ ] T051 [US5] Create a migration via `supabase migration new standalone_test_reporting_rpc` and implement authorized finalized/corrected result reporting in `supabase/migrations/*_standalone_test_reporting_rpc.sql`
+- [x] T051 [US5] Create a migration via `supabase migration new standalone_test_reporting_rpc` and implement authorized finalized/corrected result reporting in `supabase/migrations/*_standalone_test_reporting_rpc.sql`
 - [ ] T052 [US5] Implement correction-aware CPD records/summaries in `web/src/modules/reporting/standalone-test-results.ts`
-- [ ] T053 [US5] Build the separate results surface in `web/src/pages/teacher/TeacherLearnerTestResultsPage.tsx`
-- [ ] T054 [US5] Add profile tabs/nested Test Results route without changing Analysis in `web/src/pages/teacher/TeacherLearnerProfilePage.tsx` and `web/src/App.tsx`
+- [x] T053 [US5] Build the separate results surface in `web/src/pages/teacher/TeacherLearnerTestResultsPage.tsx`
+- [x] T054 [US5] Add profile tabs/nested Test Results route without changing Analysis in `web/src/pages/teacher/TeacherLearnerProfilePage.tsx` and `web/src/App.tsx`
 
 **Checkpoint**: Standalone results are isolated, reproducible, and visible from learner profile.
 

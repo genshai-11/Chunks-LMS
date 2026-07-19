@@ -186,6 +186,10 @@ export function TeacherLearnerProfilePage() {
           </div>
         }
       />
+      <div className="btn-row" role="tablist" aria-label="Learner profile tabs" style={{ marginBottom: '1rem' }}>
+        <Link className="btn primary" role="tab" aria-selected="true" to={`/teacher/learner/${learner.id}`}>Profile & Session Results</Link>
+        <Link className="btn ghost" role="tab" aria-selected="false" to={`/teacher/learner/${learner.id}/tests`}>Test Results</Link>
+      </div>
       <Flash message={message} error={error} />
 
       <div className="teacher-profile-grid">

@@ -1,4 +1,4 @@
-import { Archive, ChartColumn, Radio, Tag, Users } from 'lucide-react'
+import { Archive, ChartColumn, ClipboardCheck, Radio, Tag, Users } from 'lucide-react'
 import { ClassContextSelect } from '../../components/ClassContextSelect'
 import { RoleWorkspace } from '../../components/RoleWorkspace'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
@@ -11,6 +11,7 @@ const ITEMS = [
   { to: '/teacher', label: 'Learners', icon: Users, end: true },
   { to: '/teacher/classes', label: 'Class labels', icon: Tag },
   { to: '/teacher/session', label: 'Live session', icon: Radio },
+  { to: '/teacher/tests', label: 'Tests 1–1', icon: ClipboardCheck },
   { to: '/teacher/archive', label: 'Archive', icon: Archive },
   { to: '/teacher/analysis', label: 'Analysis', icon: ChartColumn },
 ]

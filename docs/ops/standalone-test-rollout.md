@@ -56,7 +56,26 @@ Current read-only inspection found:
 - zero narration variants and generation jobs;
 - no `narration-audio` bucket.
 
-No deletion has been performed. Exact impact queries, table-by-table backup, guarded SQL, and restore steps will be added before the final destructive confirmation gate.
+No deletion has been performed.
+
+### Exact preflight impact query
+
+Run immediately before final confirmation:
+
+```sql
+select private.obsolete_test_catalog_scope() as deletion_scope,
+       private.obsolete_test_catalog_counts(private.obsolete_test_catalog_scope()) as delete_counts;
+```
+
+Current discovery expectation is one legacy resource, eight blocks, 80 legacy items, one compatibility package/version, eight V2 sections, 80 V2 items, one completed test Learning Session, ten attempts, and their questions/events/snapshots. Any drift requires a new preview and confirmation.
+
+### Backup scope and restore path
+
+Before apply, export all rows identified by `deletion_scope`, including dependent Learning Session questions/attempts/events/snapshots, compatibility mappings, package/version/section/item/measurement/CCI rows, legacy resource/block/item rows, narration/generation/audio metadata, and the import preview receipt. Store the encrypted export outside Git and record its checksum.
+
+Restore order is the reverse dependency order: organizations/users remain in place; restore legacy resources/catalog/CCI, mappings, Learning Session, Session Questions, attempts, snapshots, then events. Verify row counts and CPD report output before re-enabling routes. The downloaded Edge v2 source provides the Functions restore path.
+
+The generated SQL artifact calls preview only. The only write path is the reviewed `apply_test_catalog_replacement(import_run_id, confirmation_token)` RPC after final approval.
 
 ## Release gates
 

@@ -26,13 +26,13 @@
 
 **Purpose**: Block all user stories until remote exposure and shared schema contracts are safe.
 
-- [ ] T006 [P] Add SQL regression tests for catalog staff-read predicate, anon RPC denial, explicit grants, and hardened search paths in `supabase/tests/test_catalog_security_test.sql`
-- [ ] T007 [P] Add SQL regression tests for same-organization Teacher access, cross-organization denial, learner self-only access, and one-open-run constraints in `supabase/tests/standalone_test_rls_test.sql`
-- [ ] T008 Create a migration via `supabase migration new harden_test_catalog_security` and implement the reviewed RLS/RPC security fixes in the generated `supabase/migrations/*_harden_test_catalog_security.sql`
-- [ ] T009 Create a migration via `supabase migration new standalone_test_schema` and add import audit plus standalone assignment/run/item/attempt/event/snapshot tables, indexes, explicit grants, and RLS in `supabase/migrations/*_standalone_test_schema.sql`
-- [ ] T010 [P] Add TypeScript catalog/standalone domain types and invariant tests in `web/src/modules/standalone-tests/types.ts` and `web/src/modules/standalone-tests/types.test.ts`
+- [x] T006 [P] Add SQL regression tests for catalog staff-read predicate, anon RPC denial, explicit grants, and hardened search paths in `supabase/tests/test_catalog_security_test.sql`
+- [x] T007 [P] Add SQL regression tests for same-organization Teacher access, cross-organization denial, learner self-only access, and one-open-run constraints in `supabase/tests/standalone_test_rls_test.sql`
+- [x] T008 Create a migration via `supabase migration new harden_test_catalog_security` and implement the reviewed RLS/RPC security fixes in the generated `supabase/migrations/*_harden_test_catalog_security.sql`
+- [x] T009 Create a migration via `supabase migration new standalone_test_schema` and add import audit plus standalone assignment/run/item/attempt/event/snapshot tables, indexes, explicit grants, and RLS in `supabase/migrations/*_standalone_test_schema.sql`
+- [x] T010 [P] Add TypeScript catalog/standalone domain types and invariant tests in `web/src/modules/standalone-tests/types.ts` and `web/src/modules/standalone-tests/types.test.ts`
 - [ ] T011 Implement typed Supabase row mapping/readiness helpers in `web/src/lib/standalone-tests.ts` and `web/src/lib/test-packages.ts`
-- [ ] T012 Run security advisors and record baseline/residual findings in `docs/ops/standalone-test-security-review.md`
+- [x] T012 Run security advisors and record baseline/residual findings in `docs/ops/standalone-test-security-review.md`
 
 **Checkpoint**: Security/schema foundation is testable and blocks unauthorized or Class-coupled behavior.
 
@@ -48,16 +48,16 @@
 
 - [x] T013 [P] [US1] Add workbook fixture tests for valid 8×10 source, missing sheet, duplicate item, blank bilingual prompt, invalid join, and CCI mismatch in `scripts/lib/standalone-test-import/import.test.mjs`
 - [x] T014 [P] [US1] Add JSON manifest schema/shape tests in `scripts/lib/standalone-test-import/manifest.test.mjs`
-- [ ] T015 [P] [US1] Add SQL tests for preview-only behavior, allowlisted dependency graph, count/token drift abort, transactional rollback, and excluded LMS tables in `supabase/tests/test_catalog_replacement_test.sql`
+- [x] T015 [P] [US1] Add SQL tests for preview-only behavior, allowlisted dependency graph, count/token drift abort, transactional rollback, and excluded LMS tables in `supabase/tests/test_catalog_replacement_test.sql`
 
 ### Implementation for User Story 1
 
 - [x] T016 [US1] Implement workbook parsing, normalization, SHA-256 provenance, exact count/order/join validation, and anomaly reporting in `scripts/lib/standalone-test-import/workbook.mjs`
 - [x] T017 [US1] Implement deterministic manifest generation matching `specs/001-standalone-learner-tests/contracts/import-manifest.schema.json` in `scripts/lib/standalone-test-import/manifest.mjs`
 - [x] T018 [US1] Implement the dry-run-first CLI and JSON/SQL output in `scripts/import-standalone-test-workbook.mjs`
-- [ ] T019 [US1] Create a migration via `supabase migration new guarded_test_catalog_replacement` and implement import-run audit, preview token/count checks, allowlisted test-only deletion, and canonical draft insert in `supabase/migrations/*_guarded_test_catalog_replacement.sql`
+- [x] T019 [US1] Create a migration via `supabase migration new guarded_test_catalog_replacement` and implement import-run audit, preview token/count checks, allowlisted test-only deletion, and canonical draft insert in `supabase/migrations/*_guarded_test_catalog_replacement.sql`
 - [x] T020 [US1] Generate and review canonical manifest/seed outputs in `supabase/seeds/standalone-test-canonical.generated.json` and `supabase/seeds/standalone-test-canonical.generated.sql`
-- [ ] T021 [US1] Add the exact remote impact query, backup scope, restore path, and final confirmation template to `docs/ops/standalone-test-rollout.md`
+- [x] T021 [US1] Add the exact remote impact query, backup scope, restore path, and final confirmation template to `docs/ops/standalone-test-rollout.md`
 
 **Checkpoint**: Canonical replacement is locally reproducible and remote deletion remains blocked at final approval.
 

@@ -98,7 +98,7 @@ function buildResource(rows) {
     if (!blockNumber) throw new Error(`Missing Session No. for row ${JSON.stringify(row)}`)
     const itemNumber = (blocks.get(blockNumber)?.items.length ?? 0) + 1
     const cci = num(row['Unit (Ohm)'])
-    const cvr = num(row.CVR)
+    const cvr = num(row['Unit (Ohm)']) // Target CVR is now mapped from the Unit (Ohm) column, not the CVR column
     const item = {
       import_key: stableId(title, blockNumber, itemNumber, row['Tiếng Việt'], row['Tiếng Anh']),
       item_number: itemNumber,

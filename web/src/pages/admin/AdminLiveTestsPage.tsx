@@ -454,7 +454,6 @@ export function AdminLiveTestsPage() {
             cci_category_id: defaultCategoryId,
             cci_category_label: catLabel,
             cci_value: catValue,
-            override_reason: 'Default provisioned snapshot template',
           })
         if (snapErr) throw new Error(snapErr.message)
       }
@@ -569,7 +568,6 @@ export function AdminLiveTestsPage() {
             tc: item.tc,
             lc: item.lc,
             tl: item.tl,
-            measured_cvr: 3.0,
           })
         if (itemErr) throw new Error(itemErr.message)
         count++
@@ -585,25 +583,85 @@ export function AdminLiveTestsPage() {
     }
   }
 
-  // Mock CSV parsing
+  // Parse CSV line taking quotes and nested commas into account
+  const parseCSVRow = (text: string): string[] => {
+    const result: string[] = []
+    let cur = ''
+    let inQuotes = false
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i]
+      if (c === '"') {
+        if (inQuotes && text[i + 1] === '"') {
+          cur += '"'
+          i++ // skip next quote
+        } else {
+          inQuotes = !inQuotes
+        }
+      } else if (c === ',' && !inQuotes) {
+        result.push(cur.trim())
+        cur = ''
+      } else {
+        cur += c
+      }
+    }
+    result.push(cur.trim())
+    return result.map((val) => {
+      if (val.startsWith('"') && val.endsWith('"')) {
+        return val.slice(1, -1).trim()
+      }
+      return val
+    })
+  }
+
+  // Robust CSV parsing with header detection
   const handleParseCsv = () => {
     if (!csvContent.trim()) return
-    const lines = csvContent.split('\n')
+    const lines = csvContent.split(/\r?\n/).filter((line) => line.trim())
+    if (lines.length <= 1) return
+
+    const header = parseCSVRow(lines[0])
+    const isChunksFormat = header.includes('Complete Sentence (Vie)') || header.includes('Tiếng Việt')
+
     const parsed = []
+    const sectionItemCounters: Record<number, number> = {}
+
     for (let i = 1; i < lines.length; i++) {
-      if (!lines[i].trim()) continue
-      const cols = lines[i].split(',')
-      parsed.push({
-        itemNumber: parseInt(cols[0]) || i,
-        termVi: cols[1] ?? '',
-        termEn: cols[2] ?? '',
-        promptVi: cols[3] ?? '',
-        promptEn: cols[4] ?? '',
-        tc: parseFloat(cols[5]) || 1.0,
-        lc: parseFloat(cols[6]) || 1.0,
-        tl: parseFloat(cols[7]) || 1.0,
-        sectionOrder: parseInt(cols[8]) || 1,
-      })
+      const cols = parseCSVRow(lines[i])
+      if (cols.length < 5) continue
+
+      if (isChunksFormat) {
+        // Chunks-resource CSV mapping
+        const sectionOrder = parseInt(cols[header.indexOf('Session No.')]) || 1
+        sectionItemCounters[sectionOrder] = (sectionItemCounters[sectionOrder] || 0) + 1
+        const itemNumber = sectionItemCounters[sectionOrder]
+
+        parsed.push({
+          itemNumber,
+          termVi: cols[header.indexOf('Tiếng Việt')] ?? '',
+          termEn: cols[header.indexOf('Tiếng Anh')] ?? '',
+          promptVi: cols[header.indexOf('Complete Sentence (Vie)')] ?? '',
+          promptEn: cols[header.indexOf('Complete Sentence (Eng)')] ?? '',
+          tc: parseFloat(cols[header.indexOf('TC')]) || 3.0,
+          lc: parseFloat(cols[header.indexOf('LC')]) || 1.0,
+          tl: parseFloat(cols[header.indexOf('TL')]) || 1.0,
+          sectionOrder,
+        })
+      } else {
+        // Default / placeholder mapping
+        const sectionOrder = parseInt(cols[8]) || 1
+        const itemNumber = parseInt(cols[0]) || i
+        parsed.push({
+          itemNumber,
+          termVi: cols[1] ?? '',
+          termEn: cols[2] ?? '',
+          promptVi: cols[3] ?? '',
+          promptEn: cols[4] ?? '',
+          tc: parseFloat(cols[5]) || 1.0,
+          lc: parseFloat(cols[6]) || 1.0,
+          tl: parseFloat(cols[7]) || 1.0,
+          sectionOrder,
+        })
+      }
     }
     setCsvPreviewItems(parsed)
   }

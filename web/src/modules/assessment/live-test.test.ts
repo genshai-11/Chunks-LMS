@@ -3,6 +3,7 @@ import {
   deriveCpd,
   liveTestExternalRef,
   liveTestItemIdFromExternalRef,
+  liveTestVersionIdFromExternalRef,
   promptForLanguage,
   type LiveTestItem,
 } from './live-test'
@@ -40,10 +41,16 @@ describe('live-test helpers', () => {
     expect(deriveCpd(null, 5)).toBeNull()
   })
 
-  it('uses stable live-test external refs', () => {
-    const ref = liveTestExternalRef('abc')
-    expect(ref).toBe('live-test-item:abc')
+  it('uses immutable versioned live-test external refs while preserving legacy refs', () => {
+    const ref = liveTestExternalRef('abc', 'version-1')
+    expect(ref).toBe('live-test-item:abc:vversion-1')
     expect(liveTestItemIdFromExternalRef(ref)).toBe('abc')
+    expect(liveTestVersionIdFromExternalRef(ref)).toBe('version-1')
+
+    const legacyRef = liveTestExternalRef('legacy-item')
+    expect(legacyRef).toBe('live-test-item:legacy-item')
+    expect(liveTestItemIdFromExternalRef(legacyRef)).toBe('legacy-item')
+    expect(liveTestVersionIdFromExternalRef(legacyRef)).toBeNull()
     expect(liveTestItemIdFromExternalRef('other:abc')).toBeNull()
   })
 

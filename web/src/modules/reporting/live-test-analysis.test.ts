@@ -61,6 +61,19 @@ describe('live-test analysis', () => {
     expect(joined[0]?.prompt).toBe('English sentence')
   })
 
+  it('resolves immutable versioned item refs while preserving item lookup by stable item id', () => {
+    const joined = joinLiveTestResults({
+      records: [record('r1', 'q1', 'green')],
+      itemById: new Map([['item-1', item('item-1', 12, 5)]]),
+      promptLanguage: 'en',
+      externalRefByQuestionId: new Map([['q1', 'live-test-item:item-1:vversion-1']]),
+    })
+
+    expect(joined).toHaveLength(1)
+    expect(joined[0]?.liveTestItemId).toBe('item-1')
+    expect(joined[0]?.cpdValue).toBe(60)
+  })
+
   it('groups outcomes by CPD bands', () => {
     const rows = joinLiveTestResults({
       records: [record('r1', 'q1', 'red'), record('r2', 'q2', 'purple')],

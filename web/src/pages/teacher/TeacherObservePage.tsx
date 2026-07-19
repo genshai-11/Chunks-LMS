@@ -44,6 +44,7 @@ import {
   audioAssetIdForLanguage,
   blockSummary,
   liveTestExternalRef,
+  liveTestItemIdFromExternalRef,
   promptForLanguage,
 } from '../../modules/assessment/live-test'
 import { audioUrl, listLiveTestBlocks, listLiveTestItems } from '../../lib/live-test-resources'
@@ -465,8 +466,9 @@ export function TeacherObservePage() {
   const qNum = capture ? capture.position.questionIndex + 1 : 0
   const qTotal = capture?.questions.length ?? 0
   const currentQuestion = capture?.questions[capture.position.questionIndex] ?? null
-  const currentLiveTestItem = currentQuestion?.externalRef?.startsWith('live-test-item:')
-    ? liveTestItems.find((item) => currentQuestion.externalRef === liveTestExternalRef(item.id)) ?? null
+  const currentLiveTestItemId = liveTestItemIdFromExternalRef(currentQuestion?.externalRef)
+  const currentLiveTestItem = currentLiveTestItemId
+    ? liveTestItems.find((item) => item.id === currentLiveTestItemId) ?? null
     : null
   const currentLiveTestPrompt = currentLiveTestItem
     ? promptForLanguage(currentLiveTestItem, liveTestLanguage)
@@ -526,9 +528,9 @@ export function TeacherObservePage() {
     (state: CaptureSessionState): string | null | undefined => {
       if (!isLiveTest) return undefined
       const item = liveTestItems[state.questions.length]
-      return item ? liveTestExternalRef(item.id) : null
+      return item ? liveTestExternalRef(item.id, openSession?.testPackageVersionId ?? null) : null
     },
-    [isLiveTest, liveTestItems],
+    [isLiveTest, liveTestItems, openSession?.testPackageVersionId],
   )
 
   const playReaction = useCallback((color: ResultColor) => {

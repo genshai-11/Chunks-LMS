@@ -58,7 +58,10 @@ async function deleteAttemptsForLearners(
   learnerUserIds: string[],
 ): Promise<DeleteFail | null> {
   if (learnerUserIds.length === 0) return null
-  const attemptDelete = await sb.from('assessment_attempts').delete().in('learner_user_id', learnerUserIds)
+  const attemptDelete = await sb
+    .from('assessment_attempts')
+    .delete()
+    .in('learner_user_id', learnerUserIds)
   return failDelete('assessment attempts', attemptDelete.error)
 }
 
@@ -80,7 +83,8 @@ async function pruneLearnerSessionRows(
 ): Promise<DeleteFail | null> {
   if (learnerUserIds.length === 0) return null
   const sessions = await sb.from('learning_sessions').select('id, participant_learner_ids')
-  if (sessions.error) return { ok: false, error: `learning sessions lookup: ${sessions.error.message}` }
+  if (sessions.error)
+    return { ok: false, error: `learning sessions lookup: ${sessions.error.message}` }
 
   const deleteIds: string[] = []
   const updates: Array<{ id: string; participant_learner_ids: string[] }> = []
@@ -98,7 +102,10 @@ async function pruneLearnerSessionRows(
   if (deleteIds.length > 0) {
     const attemptError = await deleteAttemptsForLearningSessions(sb, deleteIds)
     if (attemptError) return attemptError
-    const attendanceDelete = await sb.from('attendance_records').delete().in('learning_session_id', deleteIds)
+    const attendanceDelete = await sb
+      .from('attendance_records')
+      .delete()
+      .in('learning_session_id', deleteIds)
     const attendanceError = failDelete('attendance', attendanceDelete.error)
     if (attendanceError) return attendanceError
     const sessionDelete = await sb.from('learning_sessions').delete().in('id', deleteIds)
@@ -125,7 +132,7 @@ export async function deleteWorkspaceLearningDataFromSupabase(
   if (!sb) return { ok: false, error: 'Supabase not configured' }
 
   const fail = (scope: string, error: { message?: string } | null) =>
-    error ? ({ ok: false as const, error: `${scope}: ${error.message ?? 'unknown error'}` }) : null
+    error ? { ok: false as const, error: `${scope}: ${error.message ?? 'unknown error'}` } : null
 
   const courses = await sb.from('courses').select('id').eq('organization_id', organizationId)
   if (courses.error) return { ok: false, error: `courses: ${courses.error.message}` }
@@ -156,7 +163,10 @@ export async function deleteWorkspaceLearningDataFromSupabase(
       const attemptError = await deleteAttemptsForLearningSessions(sb, learningIds)
       if (attemptError) return attemptError
 
-      const attendance = await sb.from('attendance_records').delete().in('learning_session_id', learningIds)
+      const attendance = await sb
+        .from('attendance_records')
+        .delete()
+        .in('learning_session_id', learningIds)
       const attendanceError = fail('attendance', attendance.error)
       if (attendanceError) return attendanceError
 
@@ -248,8 +258,8 @@ export async function ensureSupabaseStaffWorkspace(
   const orgs = await sb.from('organizations').select('id').order('created_at', { ascending: true })
   if (orgs.error) return { ok: false, error: orgs.error.message }
 
-  let organizationId =
-    (orgs.data ?? []).find((org) => org.id === LOCAL_ORG_ID)?.id as string | undefined
+  let organizationId = (orgs.data ?? []).find((org) => org.id === LOCAL_ORG_ID)?.id as
+    string | undefined
   organizationId ??= orgs.data?.[0]?.id as string | undefined
   if (!organizationId) {
     const insertedOrg = await sb
@@ -526,6 +536,9 @@ export async function loadWorkspaceFromSupabase(options?: {
           prompt_language?: string | null
           live_test_resource_id?: string | null
           live_test_block_id?: string | null
+          test_package_version_id?: string | null
+          test_section_id?: string | null
+          section_measurement_snapshot_id?: string | null
           participant_learner_ids?: string[] | null
         }
         return {
@@ -545,6 +558,10 @@ export async function loadWorkspaceFromSupabase(options?: {
           promptLanguage: parsePromptLanguage(row.prompt_language),
           liveTestResourceId: (row.live_test_resource_id as string | null) ?? null,
           liveTestBlockId: (row.live_test_block_id as string | null) ?? null,
+          testPackageVersionId: (row.test_package_version_id as string | null) ?? null,
+          testSectionId: (row.test_section_id as string | null) ?? null,
+          sectionMeasurementSnapshotId:
+            (row.section_measurement_snapshot_id as string | null) ?? null,
           participantLearnerIds: Array.isArray(row.participant_learner_ids)
             ? row.participant_learner_ids
             : null,
@@ -665,7 +682,8 @@ export async function saveWorkspaceToSupabase(
           {
             authUserId: (row as { auth_user_id?: string | null }).auth_user_id ?? null,
             clerkUserId: (row as { clerk_user_id?: string | null }).clerk_user_id ?? null,
-            legacyClerkUserId: (row as { legacy_clerk_user_id?: string | null }).legacy_clerk_user_id ?? null,
+            legacyClerkUserId:
+              (row as { legacy_clerk_user_id?: string | null }).legacy_clerk_user_id ?? null,
           },
         ]),
       )
@@ -680,7 +698,8 @@ export async function saveWorkspaceToSupabase(
 
       const baseRows = roster.users.map((u) => {
         const existingIdentity = identityById.get(u.id)
-        const legacyClerkUserId = existingIdentity?.legacyClerkUserId ?? existingIdentity?.clerkUserId ?? null
+        const legacyClerkUserId =
+          existingIdentity?.legacyClerkUserId ?? existingIdentity?.clerkUserId ?? null
         return {
           id: u.id,
           auth_user_id: existingIdentity?.authUserId ?? null,
@@ -733,7 +752,7 @@ export async function saveWorkspaceToSupabase(
         .from('organization_memberships')
         .select('id, user_id, role')
         .eq('organization_id', orgId)
-      
+
       const orphanMembers = existingMembers ?? []
       const orphanMemberIds = orphanMembers
         .filter((m) => !keepIds.has(m.user_id as string))
@@ -755,18 +774,26 @@ export async function saveWorkspaceToSupabase(
             .select('user_id')
             .in('user_id', toDeleteUserIds)
             .neq('organization_id', orgId)
-          const otherMemberUserIds = new Set((otherMemberships ?? []).map((m) => m.user_id as string))
+          const otherMemberUserIds = new Set(
+            (otherMemberships ?? []).map((m) => m.user_id as string),
+          )
           const pureDeleteUserIds = toDeleteUserIds.filter((id) => !otherMemberUserIds.has(id))
 
           if (pureDeleteUserIds.length > 0) {
             const sessionError = await pruneLearnerSessionRows(sb, pureDeleteUserIds)
             if (sessionError) return sessionError
 
-            const enrollmentDelete = await sb.from('enrollments').delete().in('learner_user_id', pureDeleteUserIds)
+            const enrollmentDelete = await sb
+              .from('enrollments')
+              .delete()
+              .in('learner_user_id', pureDeleteUserIds)
             const enrollmentError = failDelete('enrollments', enrollmentDelete.error)
             if (enrollmentError) return enrollmentError
 
-            const attendanceDelete = await sb.from('attendance_records').delete().in('learner_user_id', pureDeleteUserIds)
+            const attendanceDelete = await sb
+              .from('attendance_records')
+              .delete()
+              .in('learner_user_id', pureDeleteUserIds)
             const attendanceError = failDelete('attendance', attendanceDelete.error)
             if (attendanceError) return attendanceError
 
@@ -930,7 +957,8 @@ export async function saveWorkspaceToSupabase(
               .from('scheduled_sessions')
               .update({ rescheduled_from_id: patch.rescheduled_from_id })
               .eq('id', row.id)
-            if (fallbackError) return { ok: false, error: `scheduled refs: ${fallbackError.message}` }
+            if (fallbackError)
+              return { ok: false, error: `scheduled refs: ${fallbackError.message}` }
           }
         }
       }
@@ -980,6 +1008,10 @@ export async function saveWorkspaceToSupabase(
           prompt_language: s.sessionFormat === 'test' ? (s.promptLanguage ?? 'vi') : null,
           live_test_resource_id: s.sessionFormat === 'test' ? s.liveTestResourceId : null,
           live_test_block_id: s.sessionFormat === 'test' ? s.liveTestBlockId : null,
+          test_package_version_id: s.sessionFormat === 'test' ? s.testPackageVersionId : null,
+          test_section_id: s.sessionFormat === 'test' ? s.testSectionId : null,
+          section_measurement_snapshot_id:
+            s.sessionFormat === 'test' ? s.sectionMeasurementSnapshotId : null,
           participant_learner_ids: s.participantLearnerIds,
         }))
         const { error } = await sb.from('learning_sessions').upsert(baseRows, { onConflict: 'id' })

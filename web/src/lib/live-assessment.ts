@@ -223,6 +223,10 @@ export async function ensureLearningSessionOnServer(
     prompt_language: session.sessionFormat === 'test' ? (session.promptLanguage ?? 'vi') : null,
     live_test_resource_id: session.sessionFormat === 'test' ? session.liveTestResourceId : null,
     live_test_block_id: session.sessionFormat === 'test' ? session.liveTestBlockId : null,
+    test_package_version_id: session.sessionFormat === 'test' ? session.testPackageVersionId : null,
+    test_section_id: session.sessionFormat === 'test' ? session.testSectionId : null,
+    section_measurement_snapshot_id:
+      session.sessionFormat === 'test' ? session.sectionMeasurementSnapshotId : null,
     participant_learner_ids: session.participantLearnerIds,
   }
 
@@ -655,8 +659,11 @@ export async function syncCaptureSessionToServer(
     if (aRes.error) return { ok: false, error: `assessment_attempts sync: ${aRes.error.message}` }
 
     // 3. Upsert snapshots
-    const sRes = await sb.from('assessment_attempt_snapshots').upsert(dbSnapshots, { onConflict: 'attempt_id' })
-    if (sRes.error) return { ok: false, error: `assessment_attempt_snapshots sync: ${sRes.error.message}` }
+    const sRes = await sb
+      .from('assessment_attempt_snapshots')
+      .upsert(dbSnapshots, { onConflict: 'attempt_id' })
+    if (sRes.error)
+      return { ok: false, error: `assessment_attempt_snapshots sync: ${sRes.error.message}` }
 
     return { ok: true, data: true }
   } catch (e) {

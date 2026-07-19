@@ -1,8 +1,5 @@
 import type { CaptureSessionState } from '../modules/assessment/session-capture'
-import {
-  createDefaultMetricSettings,
-  type MetricSettingsState,
-} from '../modules/metrics/settings'
+import { createDefaultMetricSettings, type MetricSettingsState } from '../modules/metrics/settings'
 import type { OpsAuditEvent } from '../modules/ops/types'
 import type { ResultRecord } from '../modules/reporting/progress'
 import { createEmptyRoster, LOCAL_ORG_ID } from '../modules/roster/seed'
@@ -43,6 +40,10 @@ function normalizeScheduling(s: SchedulingState): SchedulingState {
       promptLanguage: ls.sessionFormat === 'test' ? (ls.promptLanguage ?? 'vi') : null,
       liveTestResourceId: ls.sessionFormat === 'test' ? (ls.liveTestResourceId ?? null) : null,
       liveTestBlockId: ls.sessionFormat === 'test' ? (ls.liveTestBlockId ?? null) : null,
+      testPackageVersionId: ls.sessionFormat === 'test' ? (ls.testPackageVersionId ?? null) : null,
+      testSectionId: ls.sessionFormat === 'test' ? (ls.testSectionId ?? null) : null,
+      sectionMeasurementSnapshotId:
+        ls.sessionFormat === 'test' ? (ls.sectionMeasurementSnapshotId ?? null) : null,
       participantLearnerIds: ls.participantLearnerIds ?? null,
     })),
   }

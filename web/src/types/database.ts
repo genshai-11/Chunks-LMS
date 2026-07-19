@@ -165,6 +165,9 @@ export type Database = {
           prompt_language: 'vi' | 'en' | null
           live_test_resource_id: string | null
           live_test_block_id: string | null
+          test_package_version_id: string | null
+          test_section_id: string | null
+          section_measurement_snapshot_id: string | null
         }
         Insert: {
           id?: string
@@ -179,6 +182,9 @@ export type Database = {
           prompt_language?: 'vi' | 'en' | null
           live_test_resource_id?: string | null
           live_test_block_id?: string | null
+          test_package_version_id?: string | null
+          test_section_id?: string | null
+          section_measurement_snapshot_id?: string | null
         }
         Update: Partial<Database['public']['Tables']['learning_sessions']['Insert']>
       }
@@ -264,6 +270,10 @@ export type Database = {
           mime_type: string
           duration_ms: number | null
           sha256: string | null
+          visibility: 'private' | 'public'
+          bytes: number | null
+          source_kind: 'custom_upload' | 'generated_tts' | 'legacy_import' | null
+          metadata: Json
           created_at: string
         }
         Insert: Record<string, unknown>
@@ -291,6 +301,228 @@ export type Database = {
       }
       live_test_items: {
         Row: Record<string, unknown>
+        Insert: Record<string, unknown>
+        Update: Record<string, unknown>
+      }
+      test_packages: {
+        Row: {
+          id: string
+          organization_id: string
+          title: string
+          slug: string
+          description: string | null
+          created_by_user_id: string | null
+          source_metadata: Json
+          created_at: string
+          updated_at: string
+          archived_at: string | null
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          title: string
+          slug: string
+          description?: string | null
+          created_by_user_id?: string | null
+          source_metadata?: Json
+          created_at?: string
+          updated_at?: string
+          archived_at?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['test_packages']['Insert']>
+      }
+      test_package_versions: {
+        Row: {
+          id: string
+          package_id: string
+          version_label: string
+          status: 'draft' | 'published' | 'archived'
+          draft_of_version_id: string | null
+          snapshot_hash: string | null
+          source_metadata: Json
+          created_by_user_id: string | null
+          published_by_user_id: string | null
+          created_at: string
+          updated_at: string
+          published_at: string | null
+          archived_at: string | null
+        }
+        Insert: {
+          id?: string
+          package_id: string
+          version_label: string
+          status?: 'draft' | 'published' | 'archived'
+          draft_of_version_id?: string | null
+          snapshot_hash?: string | null
+          source_metadata?: Json
+          created_by_user_id?: string | null
+          published_by_user_id?: string | null
+          created_at?: string
+          updated_at?: string
+          published_at?: string | null
+          archived_at?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['test_package_versions']['Insert']>
+      }
+      cci_profiles: {
+        Row: {
+          id: string
+          organization_id: string
+          name: string
+          version_label: string
+          status: 'draft' | 'active' | 'archived'
+          description: string | null
+          created_by_user_id: string | null
+          created_at: string
+          updated_at: string
+          archived_at: string | null
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          name: string
+          version_label?: string
+          status?: 'draft' | 'active' | 'archived'
+          description?: string | null
+          created_by_user_id?: string | null
+          created_at?: string
+          updated_at?: string
+          archived_at?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['cci_profiles']['Insert']>
+      }
+      cci_categories: {
+        Row: {
+          id: string
+          profile_id: string
+          category_order: number
+          label: string
+          value: number
+          description: string | null
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          profile_id: string
+          category_order: number
+          label: string
+          value: number
+          description?: string | null
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['cci_categories']['Insert']>
+      }
+      test_sections: {
+        Row: {
+          id: string
+          package_version_id: string
+          section_order: number
+          title: string | null
+          target_cvr_ohm: number | null
+          cci_profile_id: string | null
+          cci_category_id: string | null
+          cci_snapshot: Json
+          intro_text_vi: string | null
+          intro_text_en: string | null
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: Record<string, unknown>
+        Update: Record<string, unknown>
+      }
+      section_measurement_snapshots: {
+        Row: {
+          id: string
+          test_section_id: string
+          package_version_id: string
+          target_cvr_ohm: number
+          cci_profile_id: string
+          cci_category_id: string
+          cci_category_label: string
+          cci_value: number
+          snapshot_metadata: Json
+          supersedes_snapshot_id: string | null
+          override_reason: string | null
+          created_by_user_id: string | null
+          created_at: string
+        }
+        Insert: Record<string, unknown>
+        Update: Record<string, unknown>
+      }
+      test_items: {
+        Row: {
+          id: string
+          package_version_id: string
+          section_id: string
+          item_order: number
+          source_day: string | null
+          source_stt: string | null
+          term_vi: string | null
+          term_en: string | null
+          prompt_vi: string | null
+          prompt_en: string | null
+          tc: number | null
+          lc: number | null
+          tl: number | null
+          measured_cvr: number | null
+          cvr_breakdown: Json
+          source_metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: Record<string, unknown>
+        Update: Record<string, unknown>
+      }
+      narration_variants: {
+        Row: {
+          id: string
+          package_version_id: string
+          test_section_id: string | null
+          test_item_id: string | null
+          narration_target: 'section_intro' | 'test_item'
+          language: 'vi' | 'en'
+          voice_id: string
+          voice_label: string | null
+          source_text_hash: string
+          provider_metadata: Json
+          audio_asset_id: string | null
+          approval_status: 'draft' | 'generated' | 'approved' | 'rejected' | 'archived'
+          approved_by_user_id: string | null
+          approved_at: string | null
+          generation_job_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: Record<string, unknown>
+        Update: Record<string, unknown>
+      }
+      generation_jobs: {
+        Row: {
+          id: string
+          organization_id: string
+          requested_by_user_id: string | null
+          package_version_id: string | null
+          test_section_id: string | null
+          test_item_id: string | null
+          narration_variant_id: string | null
+          job_type: 'test_item' | 'section_intro_narration' | 'item_narration'
+          status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
+          prompt_hash: string | null
+          source_hash: string | null
+          provider_metadata: Json
+          attempts: Json
+          error_code: string | null
+          error_message: string | null
+          requested_at: string
+          started_at: string | null
+          completed_at: string | null
+          updated_at: string
+        }
         Insert: Record<string, unknown>
         Update: Record<string, unknown>
       }

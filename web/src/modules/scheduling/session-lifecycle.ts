@@ -11,8 +11,7 @@ import type {
 } from './types'
 
 export type SchedulingResult<T> =
-  | { ok: true; value: T; state: SchedulingState }
-  | { ok: false; error: string }
+  { ok: true; value: T; state: SchedulingState } | { ok: false; error: string }
 
 export function emptySchedulingState(): SchedulingState {
   return { scheduledSessions: [], learningSessions: [], attendance: [] }
@@ -38,10 +37,7 @@ export function nextTeachingDayNumber(state: SchedulingState, classId: string): 
  * Preserves sessionNumber on slots that already have a live Learning Session
  * (teaching Day N must not jump when the course plan has 15 placeholders).
  */
-export function reindexSessionNumbers(
-  state: SchedulingState,
-  classId: string,
-): SchedulingState {
+export function reindexSessionNumbers(state: SchedulingState, classId: string): SchedulingState {
   const linkedScheduledIds = new Set(
     state.learningSessions
       .filter((ls) => ls.classId === classId && ls.scheduledSessionId)
@@ -307,6 +303,9 @@ export function startLearningSession(
     promptLanguage?: import('./types').PromptLanguage | null
     liveTestResourceId?: string | null
     liveTestBlockId?: string | null
+    testPackageVersionId?: string | null
+    testSectionId?: string | null
+    sectionMeasurementSnapshotId?: string | null
     /** Explicit display ordinal for learner-first single sessions. Defaults to next class day. */
     sessionNumber?: number | null
     /** Subset of class learners for this capture; null = all enrolled at start */
@@ -358,14 +357,17 @@ export function startLearningSession(
     maxProbeCount: input.maxProbeCount ?? 2,
     sessionNumber,
     ownerUserId,
-    lockExpiresAt: ownerUserId
-      ? new Date(new Date(at).getTime() + ttl).toISOString()
-      : null,
+    lockExpiresAt: ownerUserId ? new Date(new Date(at).getTime() + ttl).toISOString() : null,
     sessionKind: input.sessionKind ?? 'regular',
     sessionFormat: input.sessionFormat ?? 'lesson',
     promptLanguage: input.sessionFormat === 'test' ? (input.promptLanguage ?? 'vi') : null,
     liveTestResourceId: input.sessionFormat === 'test' ? (input.liveTestResourceId ?? null) : null,
     liveTestBlockId: input.sessionFormat === 'test' ? (input.liveTestBlockId ?? null) : null,
+    testPackageVersionId:
+      input.sessionFormat === 'test' ? (input.testPackageVersionId ?? null) : null,
+    testSectionId: input.sessionFormat === 'test' ? (input.testSectionId ?? null) : null,
+    sectionMeasurementSnapshotId:
+      input.sessionFormat === 'test' ? (input.sectionMeasurementSnapshotId ?? null) : null,
     participantLearnerIds: participants,
   }
 

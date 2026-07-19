@@ -20,11 +20,11 @@
 
 ## 2. Flexible packages and measurement catalogs (#6, depends on #4; implementation should coordinate with #5 RLS seams)
 
-- [ ] 2.1 Add `test_packages`, `test_package_versions`, `test_sections`, `test_items`, CCI Profile/Category, narration variant, audio, and generation job schema
-- [ ] 2.2 Enforce draft mutability and published-version immutability
-- [ ] 2.3 Store section-level `target_cvr_ohm` and CCI snapshots/overrides
-- [ ] 2.4 Store item-level TC/LC/TL and `measured_cvr = TC × LC × TL` validation data
-- [ ] 2.5 Preserve resource-agnostic Session Question identity through immutable external refs/snapshots
+- [x] 2.1 Add `test_packages`, `test_package_versions`, `test_sections`, `test_items`, CCI Profile/Category, narration variant, audio, and generation job schema
+- [x] 2.2 Enforce draft mutability and published-version immutability
+- [x] 2.3 Store section-level `target_cvr_ohm` and CCI snapshots/overrides
+- [x] 2.4 Store item-level TC/LC/TL and `measured_cvr = TC × LC × TL` validation data
+- [x] 2.5 Preserve resource-agnostic Session Question identity through immutable external refs/snapshots
 
 ## 3. Hosted-data and CSV migration (#7, depends on #5 and #6)
 

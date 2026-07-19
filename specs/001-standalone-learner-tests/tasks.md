@@ -12,11 +12,11 @@
 
 **Purpose**: Establish an accurate, reviewable branch baseline before feature migrations.
 
-- [ ] T001 Link only the new worktree to project `ekubetkxfcuxlyahesrl` and record the command/result in `docs/ops/standalone-test-rollout.md`
-- [ ] T002 Fetch/recover hosted migrations `20260719025253` through `20260719072000`, compare with `fix/supabase-auth-resource-recovery`, and commit reconciled files under `supabase/migrations/`
-- [ ] T003 Download deployed `live-test-generation` v2 into a temporary review folder, reconcile stable source into `supabase/functions/live-test-generation/`, and document its rollback hash in `docs/ops/standalone-test-rollout.md`
-- [ ] T004 [P] Add the canonical workbook to `chunks-resourcce/Chunks Resource.xlsx` and record SHA-256 `1022fd3d09fc17e8b07be3e48b67bb6bae5eaac01d2c1498d5933f258a3185d6` in `chunks-resourcce/README.md`
-- [ ] T005 [P] Install and pin the workbook parser dependency at the repository root and commit `package.json` plus lockfile
+- [x] T001 Link only the new worktree to project `ekubetkxfcuxlyahesrl` and record the command/result in `docs/ops/standalone-test-rollout.md`
+- [x] T002 Fetch/recover hosted migrations `20260719025253` through `20260719072000`, compare with `fix/supabase-auth-resource-recovery`, and commit reconciled files under `supabase/migrations/`
+- [x] T003 Download deployed `live-test-generation` v2 into a temporary review folder, reconcile stable source into `supabase/functions/live-test-generation/`, and document its rollback hash in `docs/ops/standalone-test-rollout.md`
+- [x] T004 [P] Add the canonical workbook to `chunks-resourcce/Chunks Resource.xlsx` and record SHA-256 `1022fd3d09fc17e8b07be3e48b67bb6bae5eaac01d2c1498d5933f258a3185d6` in `chunks-resourcce/README.md`
+- [x] T005 [P] Install and pin the workbook parser dependency at the repository root and commit `package.json` plus lockfile
 
 **Checkpoint**: Local branch accurately represents the hosted schema/function baseline and canonical source.
 

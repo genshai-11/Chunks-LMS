@@ -18,5 +18,8 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "read-excel-file": "9.3.2"
   }
 }

@@ -1,6 +1,6 @@
 ## 1. Setup and Hosted Baseline
 
-- [ ] 1.1 Complete Spec Kit tasks T001–T005: link only the new worktree, reconcile hosted migrations and Edge source, add canonical workbook, and pin parser dependency
+- [x] 1.1 Complete Spec Kit tasks T001–T005: link only the new worktree, reconcile hosted migrations and Edge source, add canonical workbook, and pin parser dependency
 
 ## 2. Security and Standalone Foundation
 

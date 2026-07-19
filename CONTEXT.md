@@ -57,8 +57,16 @@ One ordered 10-item block within a Test Resource, used as the input for one live
 _Avoid_: Learning Session, class session
 
 **Test Item**:
-One ordered prompt within a Test Block whose selected language text can drive a Session Question through an external reference.
+One ordered bilingual complete-sentence prompt within a Test Section.
 _Avoid_: Session Question, sentence identity
+
+**Standalone Test Assignment**:
+One active Learner assigned directly to one published Test Package Version. It has no Class or Enrollment dependency.
+_Avoid_: Class test, hidden enrollment
+
+**Standalone Test Run**:
+One Learner's attempt at one Test Section with frozen CVR, CCI Name/Ampe, prompt language, voice, approved narration, ordered Test Items, and immutable result history. It is not a Learning Session.
+_Avoid_: Live Test Session, class session
 
 **Attendance**:
 A Learner’s participation status for a Learning Session.
@@ -122,8 +130,8 @@ Semantic Complexity Value Rating for a Test Item prompt, calculated from Estimat
 _Avoid_: Generic difficulty, final result
 
 **CCI**:
-Seeded current/intensity measurement for a Test Item or Test Block; first-version imports use CSV `Unit (Ohm)` as CCI.
-_Avoid_: Manually derived score
+Named current/intensity measurement for a Test Section. The canonical workbook maps `CCI.Ampe (A)` to CCI value and retains CCI ID, Name, description, and category. Legacy `Unit (Ohm)` mappings are obsolete.
+_Avoid_: CVR, manually derived score
 
 **CPD**:
 Derived live-test demand value calculated as CVR × CCI and reproducible from stored source measurements.

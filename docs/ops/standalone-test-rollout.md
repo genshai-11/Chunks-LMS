@@ -87,6 +87,18 @@ The generated SQL artifact calls preview only. The only write path is the review
 6. One learner + one session canary.
 7. Separate preview/production approval.
 
+## Local validation results — 2026-07-19
+
+- OpenSpec strict validation: **10 passed, 0 failed**.
+- Import tests: **6 passed**.
+- Web tests: **138 passed across 34 files**.
+- TypeScript typecheck: **passed**.
+- Production build: **passed**.
+- Oxlint: no new standalone/resource errors; three pre-existing warnings remain in `StaffSessionContext.tsx`, `main.tsx`, and `TeacherObservePage.tsx`.
+- Bundle warning: main JS chunk is approximately 1.59 MB; existing code-splitting work remains outside this change.
+- SQL/RLS migration replay: **blocked — Docker/Supabase local stack unavailable**.
+- Remote migration/apply/deploy: **not run**.
+
 ## Rollback outline
 
 - Disable standalone routes before reverting data.

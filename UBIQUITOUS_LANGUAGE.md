@@ -16,7 +16,9 @@
 | --- | --- | --- |
 | **Test Resource** | A predefined live-test package containing a test name, ordered session blocks, ordered test items, optional audio prompts, and target complexity metadata. | Resource library, lesson content |
 | **Test Session Block** | One ordered block inside a Test Resource, e.g. Session 1 through Session 8, each containing ten Test Items. | Learning Session, class session |
-| **Test Item** | One prompted question/sentence in a Test Session Block with display number, Vietnamese/English prompt text, audio prompt reference, and complexity metadata. | Session Question, resource, sentence |
+| **Test Item** | One ordered bilingual complete-sentence prompt in a Test Section with source identity and approved narration references. | Session Question, resource, sentence |
+| **Standalone Test Assignment** | One active Learner assigned directly to a published Test Package Version without a Class or Enrollment. | Class test, hidden enrollment |
+| **Standalone Test Run** | One Learner's attempt at one Test Section with frozen measurement, language, voice, audio, items, and immutable result history. | Live Test Session, Learning Session |
 | **Prompt Language** | The live-test setting that chooses whether item audio/display uses the Vietnamese complete sentence or the English complete sentence. | UI language, translation mode |
 | **Audio Prompt** | A stored or generated audio asset played at the beginning of each Test Session Block and/or for each Test Item in the selected Prompt Language. | Reaction audio, color audio |
 | **External Reference** | The stable reference linking a Session Question to its originating Test Item without making the Session Question itself content-owned. | Question ID if it implies global assessment identity |
@@ -31,13 +33,13 @@
 | **RFC** | The share of finalized Assessment Attempts ending Red or Yellow in a Report Window. | Failure score |
 | **RAC** | The share of finalized Assessment Attempts ending Green or Purple in a Report Window. | Success score |
 | **CVR** | Semantic Complexity Value Rating for Vietnamese text: Estimated TC × LC × TL. | Generic difficulty |
-| **CCI** | The seeded current/intensity value for a Test Item or Test Session Block, sourced from the resource CSV and used with CVR to derive CPD. | Undefined content metric, ad-hoc complexity |
-| **CPD** | The derived live-test potential/demand value calculated as CVR × CCI. | Manually entered score |
-| **Unit Ohm** | The CSV source value currently used as the seed value for CCI unless a separate CCI column is later supplied. | Final CPD, CVR |
+| **CCI** | The named current/intensity value for a Test Section, sourced from workbook `CCI.Ampe (A)` with CCI ID and Name, and used with session CVR to derive CPD. | CVR, ad-hoc complexity |
+| **CPD** | The derived Test Section demand value calculated as session CVR × CCI Ampe. | Manually entered score |
 
 ## Relationships
 
-- A **Live Test Session** is a specialized **Live Observation Session**; it must not change existing live observation behavior.
+- A **Standalone Test Run** is not a **Learning Session** and never creates a Class or Enrollment.
+- Legacy **Live Test Session** history remains separate and is not the runtime model for new standalone tests.
 - A **Test Resource** contains exactly eight **Test Session Blocks** for the requested first version.
 - Each **Test Session Block** contains exactly ten ordered **Test Items** for the requested first version.
 - A **Test Item** may produce a **Session Question** by storing the Test Item ID as the **External Reference**.
@@ -64,7 +66,7 @@
 
 - “mode” is overloaded: use **Session Kind** for `regular/pretest/posttest`, **Capture Mode** for question-first/learner-first UI, and **Live Test Session** for the test-driven extension.
 - “resource” is risky because the existing domain intentionally keeps **Session Questions** resource-agnostic; use **Test Resource** only for live-test prompt packages.
-- **CCI** is now defined for this upgrade as seeded current/intensity; the current CSV does not have a literal `CCI` column, so the implementation should map `Unit (Ohm)` to `cci` unless Lucy later provides a separate CCI source column.
+- **CCI** uses the canonical workbook `CCI` sheet: `Ampe (A)` is the numeric value and `CCI Name` is retained; legacy `Unit (Ohm)` mapping must not be reused.
 - **CPD** is now defined as `CVR × CCI`; decide display precision and whether to store it as a generated DB column or compute it in views.
 - **CVR** is defined in [chunks-resourcce/cvr-formula-and-generation-guide.md](chunks-resourcce/cvr-formula-and-generation-guide.md); missing CVR rows for Sessions 5–8 need generation before complete seed/import.
 - **Prompt Language** is separate from app locale: live-test can speak Vietnamese or English while keeping the same Test Item identity and metrics.

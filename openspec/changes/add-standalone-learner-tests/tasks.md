@@ -4,11 +4,11 @@
 
 ## 2. Security and Standalone Foundation
 
-- [ ] 2.1 Complete Spec Kit tasks T006–T012: write security/RLS tests, harden privileged RPCs, create standalone schema/RLS, and record advisor findings
+- [x] 2.1 Complete Spec Kit tasks T006–T012: write security/RLS tests, harden privileged RPCs, create standalone schema/RLS, and record advisor findings
 
 ## 3. Canonical Workbook Replacement
 
-- [ ] 3.1 Complete Spec Kit tasks T013–T021 with tests first: deterministic workbook manifest, guarded replacement transaction, canonical draft seed, impact preview, backup, and restore documentation
+- [x] 3.1 Complete Spec Kit tasks T013–T021 with tests first: deterministic workbook manifest, guarded replacement transaction, canonical draft seed, impact preview, backup, and restore documentation
 
 ## 4. Resource and Audio Management
 

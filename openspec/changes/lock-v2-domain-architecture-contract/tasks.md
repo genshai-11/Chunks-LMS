@@ -52,11 +52,11 @@
 
 ## 6. Correction-aware learner CPD reporting (#10, depends on #6 and #7)
 
-- [ ] 6.1 Implement canonical report path for `item_cpd = target_cvr_ohm × CCI`
-- [ ] 6.2 Implement `learner_cpd_score = item_cpd × finalized effective color score`
-- [ ] 6.3 Join reports to correction-effective final results without duplicating result lifecycle rules in UI callers
-- [ ] 6.4 Display sample sizes, definitions, and measurement snapshot/version provenance
-- [ ] 6.5 Add regression tests for corrected results and historical package versions
+- [x] 6.1 Implement canonical report path for `item_cpd = target_cvr_ohm × CCI`
+- [x] 6.2 Implement `learner_cpd_score = item_cpd × finalized effective color score`
+- [x] 6.3 Join reports to correction-effective final results without duplicating result lifecycle rules in UI callers
+- [x] 6.4 Display sample sizes, definitions, and measurement snapshot/version provenance
+- [x] 6.5 Add regression tests for corrected results and historical package versions
 
 ## 7. Release hardening and controlled production readiness (#11, depends on #5 through #10)
 

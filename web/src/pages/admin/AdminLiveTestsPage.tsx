@@ -502,7 +502,7 @@ export function AdminLiveTestsPage() {
                         <th>TC</th>
                         <th>LC</th>
                         <th>TL</th>
-                        <th>Measured CVR</th>
+                        <th>Target CVR</th>
                       </tr>
                     </thead>
                     <tbody>

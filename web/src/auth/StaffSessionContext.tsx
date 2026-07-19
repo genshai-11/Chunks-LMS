@@ -20,6 +20,8 @@ export type StaffSession = {
   canAccess: (role: StaffRole) => boolean
   isStaff: boolean
   signInWithEmail: (email: string) => Promise<{ ok: true } | { ok: false; error: string }>
+  signInWithPassword: (email: string, password: string) => Promise<{ ok: true } | { ok: false; error: string }>
+  signUpWithPassword: (email: string, password: string) => Promise<{ ok: true; message: string } | { ok: false; error: string }>
   signInWithGoogle: () => Promise<{ ok: true } | { ok: false; error: string }>
   signOut: () => Promise<void>
 }
@@ -27,8 +29,24 @@ export type StaffSession = {
 const StaffSessionContext = createContext<StaffSession | null>(null)
 
 function buildSession(
-  partial: Omit<StaffSession, 'canAccess' | 'isStaff' | 'signInWithEmail' | 'signInWithGoogle' | 'signOut'> &
-    Pick<StaffSession, 'signInWithEmail' | 'signInWithGoogle' | 'signOut'>,
+  partial: Omit<
+    StaffSession,
+    | 'canAccess'
+    | 'isStaff'
+    | 'signInWithEmail'
+    | 'signInWithPassword'
+    | 'signUpWithPassword'
+    | 'signInWithGoogle'
+    | 'signOut'
+  > &
+    Pick<
+      StaffSession,
+      | 'signInWithEmail'
+      | 'signInWithPassword'
+      | 'signUpWithPassword'
+      | 'signInWithGoogle'
+      | 'signOut'
+    >,
 ): StaffSession {
   return {
     ...partial,
@@ -69,6 +87,14 @@ const noopSignIn: StaffSession['signInWithEmail'] = async () => ({
   ok: false,
   error: 'Supabase Auth is not configured',
 })
+const noopSignInPassword: StaffSession['signInWithPassword'] = async () => ({
+  ok: false,
+  error: 'Supabase Auth is not configured',
+})
+const noopSignUpPassword: StaffSession['signUpWithPassword'] = async () => ({
+  ok: false,
+  error: 'Supabase Auth is not configured',
+})
 const noopSignInGoogle: StaffSession['signInWithGoogle'] = async () => ({
   ok: false,
   error: 'Supabase Auth is not configured',
@@ -85,6 +111,8 @@ const BYPASS_SESSION = buildSession({
   displayName: 'Local staff',
   staffRoles: ['admin', 'teacher'],
   signInWithEmail: noopSignIn,
+  signInWithPassword: noopSignInPassword,
+  signUpWithPassword: noopSignUpPassword,
   signInWithGoogle: noopSignInGoogle,
   signOut: noopSignOut,
 })
@@ -121,6 +149,35 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
         options: redirectTo ? { emailRedirectTo: redirectTo } : undefined,
       })
       return error ? { ok: false, error: error.message } : { ok: true }
+    },
+    [sb],
+  )
+
+  const signInWithPassword = useCallback<StaffSession['signInWithPassword']>(
+    async (email, password) => {
+      if (!sb) return { ok: false, error: 'Supabase Auth is not configured' }
+      const { error } = await sb.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      })
+      return error ? { ok: false, error: error.message } : { ok: true }
+    },
+    [sb],
+  )
+
+  const signUpWithPassword = useCallback<StaffSession['signUpWithPassword']>(
+    async (email, password) => {
+      if (!sb) return { ok: false, error: 'Supabase Auth is not configured' }
+      const { data, error } = await sb.auth.signUp({
+        email: email.trim(),
+        password,
+      })
+      if (error) return { ok: false, error: error.message }
+      if (data.session) {
+        return { ok: true, message: 'Account created and signed in successfully!' }
+      } else {
+        return { ok: true, message: 'Account created! Please check your email to confirm signup.' }
+      }
     },
     [sb],
   )
@@ -196,10 +253,23 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
         displayName: displayNameFor(user),
         staffRoles,
         signInWithEmail,
+        signInWithPassword,
+        signUpWithPassword,
         signInWithGoogle,
         signOut,
       }),
-    [ready, rolesLoading, user, sb, staffRoles, signInWithEmail, signInWithGoogle, signOut],
+    [
+      ready,
+      rolesLoading,
+      user,
+      sb,
+      staffRoles,
+      signInWithEmail,
+      signInWithPassword,
+      signUpWithPassword,
+      signInWithGoogle,
+      signOut,
+    ],
   )
 
   return <StaffSessionContext.Provider value={value}>{children}</StaffSessionContext.Provider>

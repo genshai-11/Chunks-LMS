@@ -548,7 +548,7 @@ export function TeacherSessionPage() {
           <Panel
             icon={Gauge}
             title="Live-test resource"
-            description="Choose a package version and section. CPD is derived from CVR × CCI."
+            description="Choose a package version and section to execute the test."
           >
             {testResources.length === 0 && packages.length === 0 ? (
               <p className="meta">No live-test resources or packages found. Import a resource seed first.</p>

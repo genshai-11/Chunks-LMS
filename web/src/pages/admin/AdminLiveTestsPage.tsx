@@ -271,7 +271,7 @@ export function AdminLiveTestsPage() {
     const res = await createSnapshotOverride({
       sectionId: selectedSecId,
       packageVersionId: selectedVerId,
-      targetCvrOhm: overrideTargetCvr,
+      targetCvrOhm: selectedSnapshot?.targetCvrOhm || 3,
       cciProfileId: selectedProfileId,
       cciCategoryId: selectedCategoryId,
       cciCategoryLabel: cat.label,
@@ -451,7 +451,7 @@ export function AdminLiveTestsPage() {
           .insert({
             test_section_id: section.id,
             package_version_id: verId,
-            target_cvr_ohm: defaultCvr,
+            target_cvr_ohm: 3, // Default CVR to 3 ohm
             cci_profile_id: defaultProfileId,
             cci_category_id: defaultCategoryId,
             cci_category_label: catLabel,
@@ -461,7 +461,7 @@ export function AdminLiveTestsPage() {
         if (snapErr) throw new Error(snapErr.message)
       }
 
-      setBuilderStatus(`Successfully created package version draft! Created ${numSessions} sections with target CVR = ${defaultCvr} ohm and CCI = ${catValue} (${catLabel}).`)
+      setBuilderStatus(`Successfully created package version draft! Created ${numSessions} sections with CCI = ${catValue} (${catLabel}).`)
       
       // Clear inputs
       setPackageTitle('')
@@ -571,7 +571,7 @@ export function AdminLiveTestsPage() {
             tc: item.tc,
             lc: item.lc,
             tl: item.tl,
-            measured_cvr: item.cvrValue,
+            measured_cvr: 3.0,
           })
         if (itemErr) throw new Error(itemErr.message)
         count++
@@ -604,8 +604,7 @@ export function AdminLiveTestsPage() {
         tc: parseFloat(cols[5]) || 1.0,
         lc: parseFloat(cols[6]) || 1.0,
         tl: parseFloat(cols[7]) || 1.0,
-        cvrValue: parseFloat(cols[8]) || 1.0,
-        sectionOrder: parseInt(cols[9]) || 1,
+        sectionOrder: parseInt(cols[8]) || 1,
       })
     }
     setCsvPreviewItems(parsed)
@@ -743,16 +742,6 @@ export function AdminLiveTestsPage() {
                     />
                   </label>
                   <label>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Default CVR (Ohm)</span>
-                    <input 
-                      type="number" 
-                      min={1} 
-                      value={defaultCvr}
-                      onChange={(e) => setDefaultCvr(parseInt(e.target.value) || 3)}
-                      style={{ width: '100%', padding: '0.4rem', marginTop: '0.25rem' }}
-                    />
-                  </label>
-                  <label>
                     <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Default CCI Profile</span>
                     <select
                       style={{ width: '100%', padding: '0.4rem', marginTop: '0.25rem' }}
@@ -820,16 +809,6 @@ export function AdminLiveTestsPage() {
                   </label>
 
                   <label>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Target CVR (Ohm)</span>
-                    <input
-                      type="number"
-                      style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
-                      value={overrideTargetCvr}
-                      onChange={(e) => setOverrideTargetCvr(Number(e.target.value))}
-                    />
-                  </label>
-
-                  <label>
                     <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Override Reason</span>
                     <input
                       type="text"
@@ -867,10 +846,8 @@ export function AdminLiveTestsPage() {
                       Active Snapshot ID: <span style={{ color: '#63b3ed' }}>{selectedSnapshot.id}</span>
                     </div>
                     <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem', fontSize: '0.85rem' }}>
-                      <span>Target CVR Ohm: <strong>{selectedSnapshot.targetCvrOhm}</strong></span>
                       <span>CCI Category: <strong>{selectedSnapshot.cciCategoryLabel}</strong></span>
                       <span>CCI Value: <strong>{selectedSnapshot.cciValue}</strong></span>
-                      <span>Computed Section CPD: <strong>{selectedSnapshot.targetCvrOhm * selectedSnapshot.cciValue}</strong></span>
                     </div>
                     {selectedSnapshot.overrideReason && (
                       <div className="meta" style={{ marginTop: '0.5rem', color: '#f6ad55' }}>
@@ -909,7 +886,6 @@ export function AdminLiveTestsPage() {
                         <th>TC</th>
                         <th>LC</th>
                         <th>TL</th>
-                        <th>Target CVR</th>
                         <th>Action</th>
                       </tr>
                     </thead>
@@ -922,7 +898,6 @@ export function AdminLiveTestsPage() {
                           <td>{item.tc ?? '—'}</td>
                           <td>{item.lc ?? '—'}</td>
                           <td>{item.tl ?? '—'}</td>
-                          <td>{item.measuredCvr ?? '—'}</td>
                           <td>
                             <div style={{ display: 'flex', gap: '0.25rem' }}>
                               <button 
@@ -1082,7 +1057,7 @@ export function AdminLiveTestsPage() {
             )}
             <textarea
               style={{ width: '100%', height: '200px', padding: '0.5rem', fontFamily: 'monospace', fontSize: '0.85rem' }}
-              placeholder="item_number,term_vi,term_en,prompt_vi,prompt_en,tc,lc,tl,cvr_value,section_order&#10;1,Chữ A,Letter A,Nhấn màu xanh...,Press green...,1.0,1.2,1.1,3.0,1"
+              placeholder="item_number,term_vi,term_en,prompt_vi,prompt_en,tc,lc,tl,section_order&#10;1,Chữ A,Letter A,Nhấn màu xanh...,Press green...,1.0,1.2,1.1,1"
               value={csvContent}
               onChange={(e) => setCsvContent(e.target.value)}
             />
@@ -1142,7 +1117,6 @@ export function AdminLiveTestsPage() {
                     <th>Term (VI/EN)</th>
                     <th>Prompt (VI/EN)</th>
                     <th>TC / LC / TL</th>
-                    <th>Computed CVR</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1152,12 +1126,11 @@ export function AdminLiveTestsPage() {
                       <td>{item.termVi} / {item.termEn}</td>
                       <td>{item.promptVi?.substring(0, 15)}... / {item.promptEn?.substring(0, 15)}...</td>
                       <td>{item.tc} / {item.lc} / {item.tl}</td>
-                      <td>{item.cvrValue}</td>
                     </tr>
                   ))}
                   {csvPreviewItems.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="meta" style={{ textAlign: 'center' }}>
+                      <td colSpan={4} className="meta" style={{ textAlign: 'center' }}>
                         Paste CSV content and click Preview to verify structure.
                       </td>
                     </tr>

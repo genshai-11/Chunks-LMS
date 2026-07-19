@@ -399,6 +399,10 @@ begin
     return v_report || jsonb_build_object('applied', false, 'migrationRunChecksum', v_checksum);
   end if;
 
+  if current_setting('app.live_test_v2_allow_local_apply', true) is distinct from 'local-only-reviewed' then
+    raise exception 'Non-dry-run backfill is disabled. Set app.live_test_v2_allow_local_apply=local-only-reviewed only in a reviewed local database; never use this as remote approval.';
+  end if;
+
   if exists (
     select 1
     from jsonb_array_elements(coalesce(v_report->'anomalies', '[]'::jsonb)) anomaly
@@ -484,7 +488,7 @@ begin
     public.live_test_v2_deterministic_uuid('live-test-package-version:' || r.id::text || ':' || r.version),
     b.block_number,
     b.title,
-    min(i.unit_ohm),
+    coalesce((select min(csv.unit_ohm) from public.live_test_v2_csv_rows csv where csv.source_filename = p_source_filename and csv.session_no = b.block_number), min(i.unit_ohm)),
     public.live_test_v2_deterministic_uuid('cci-profile:migrated-csv:' || r.organization_id::text),
     public.live_test_v2_deterministic_uuid('cci-category:migrated-csv:' || r.organization_id::text || ':' || min(i.cci_value)::text),
     jsonb_build_object('label', 'Migrated CCI ' || min(i.cci_value)::text, 'value', min(i.cci_value), 'source', p_source_filename),
@@ -508,7 +512,7 @@ begin
     public.live_test_v2_deterministic_uuid('section-measurement-snapshot:' || b.id::text),
     public.live_test_v2_deterministic_uuid('live-test-section:' || b.id::text),
     public.live_test_v2_deterministic_uuid('live-test-package-version:' || r.id::text || ':' || r.version),
-    min(i.unit_ohm),
+    coalesce((select min(csv.unit_ohm) from public.live_test_v2_csv_rows csv where csv.source_filename = p_source_filename and csv.session_no = b.block_number), min(i.unit_ohm)),
     public.live_test_v2_deterministic_uuid('cci-profile:migrated-csv:' || r.organization_id::text),
     public.live_test_v2_deterministic_uuid('cci-category:migrated-csv:' || r.organization_id::text || ':' || min(i.cci_value)::text),
     'Migrated CCI ' || min(i.cci_value)::text,
@@ -577,16 +581,18 @@ begin
   )
   on conflict (legacy_live_test_item_id) do nothing;
 
-  update public.cci_profiles
+  update public.cci_profiles profile
   set status = 'active'
-  where name = 'Migrated CSV CCI Profile'
-    and status = 'draft';
+  where profile.name = 'Migrated CSV CCI Profile'
+    and profile.status = 'draft'
+    and profile.description = 'Seeded from reviewed one-time Live Test V2 migration dry-run.';
 
   update public.test_package_versions v
   set status = 'published',
       snapshot_hash = 'sha256:' || encode(digest(convert_to(v.id::text || ':' || v.source_metadata::text, 'UTF8'), 'sha256'), 'hex'),
       published_by_user_id = v_actor
   where v.status = 'draft'
+    and v.source_metadata->>'migrationRunChecksum' = v_checksum
     and exists (
       select 1 from public.test_items ti where ti.package_version_id = v.id
     );

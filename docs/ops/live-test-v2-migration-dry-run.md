@@ -26,8 +26,10 @@ It returns deterministic counts, checksums, external-ref mappings, CCI profile s
 The local migration [supabase/migrations/20260719041046_hosted_live_test_v2_migration_prep.sql](../../supabase/migrations/20260719041046_hosted_live_test_v2_migration_prep.sql) creates:
 
 - `live_test_v2_migration_runs` — stores reviewed dry-run/apply reports and checksums;
+- `live_test_v2_csv_rows` + `stage_live_test_v2_csv_rows(source_filename, rows_json)` — deterministic staging for the one-time `Chunks-resource - CVR_new.csv` source;
 - `live_test_v2_item_mappings` — additive legacy item/external-ref to V2 immutable item-ref mapping;
-- `preview_live_test_v2_migration(source_filename)` — read-only report function.
+- `preview_live_test_v2_migration(source_filename)` — read-only report function;
+- `apply_live_test_v2_catalog_backfill(...)` — idempotent local-only backfill helper that defaults to dry-run and refuses non-dry-run unless the session explicitly sets `app.live_test_v2_allow_local_apply=local-only-reviewed`.
 
 Once local Supabase is available, run against a local restored/synthetic database only:
 
@@ -37,11 +39,15 @@ supabase migration up --local
 supabase test db --local
 ```
 
-Then inspect the read-only report locally:
+Then stage parsed CSV rows and inspect the read-only report locally:
 
 ```sql
+select public.stage_live_test_v2_csv_rows('Chunks-resource - CVR_new.csv', '[{"Session No.":"1","Unit (Ohm)":"3","TC":"3","LC":"1","TL":"1","CVR":"3"}]'::jsonb);
 select public.preview_live_test_v2_migration('Chunks-resource - CVR_new.csv');
+select public.apply_live_test_v2_catalog_backfill('ticket-7-local-dry-run', 'Chunks-resource - CVR_new.csv', true);
 ```
+
+If `csv.not-staged` appears, the report is not release-ready; it is using legacy `unit_ohm` as a fallback only for local development.
 
 ## Expected dry-run evidence
 

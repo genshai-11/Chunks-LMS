@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(15);
+SELECT plan(17);
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
 values ('12000000-0000-4000-8000-000000000001', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'migration-admin@example.com', crypt('password', gen_salt('bf')), now(), now(), now(), '{}'::jsonb, '{}'::jsonb);
@@ -32,9 +32,11 @@ insert into public.session_questions (id, learning_session_id, sequence_number, 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '12000000-0000-4000-8000-000000000001', true);
 
+select is((public.stage_live_test_v2_csv_rows('Chunks-resource - CVR_new.csv', '[{"Session No.":"1","Session":"Day 2","STT":"S1","Tiếng Việt":"A","Tiếng Anh":"A en","Complete Sentence (Vie)":"Câu A","Complete Sentence (Eng)":"Sentence A","Unit (Ohm)":"3","TC":"3","LC":"1","TL":"1","CVR":"3"},{"Session No.":"1","Session":"Day 2","STT":"S2","Tiếng Việt":"B","Tiếng Anh":"B en","Complete Sentence (Vie)":"Câu B","Complete Sentence (Eng)":"Sentence B","Unit (Ohm)":"3","TC":"2","LC":"2","TL":"1","CVR":"4"}]'::jsonb)->>'stagedRows')::int, 2, 'CSV staging helper records deterministic one-time rows');
 select is(public.live_test_v2_deterministic_uuid('same-basis'), public.live_test_v2_deterministic_uuid('same-basis'), 'Deterministic UUID helper is idempotent');
 select like(public.live_test_v2_source_row_checksum((select i from public.live_test_items i where id = '43000000-0000-4000-8000-000000000001')), 'sha256:%', 'Source row checksum is present');
 
+select is((public.preview_live_test_v2_migration('Chunks-resource - CVR_new.csv')->'counts'->>'csvRows')::int, 2, 'Preview counts staged CSV rows');
 select is((public.preview_live_test_v2_migration('Chunks-resource - CVR_new.csv')->'counts'->>'legacyResources')::int, 1, 'Preview counts legacy resources');
 select is((public.preview_live_test_v2_migration('Chunks-resource - CVR_new.csv')->'counts'->>'legacyBlocks')::int, 1, 'Preview counts legacy blocks');
 select is((public.preview_live_test_v2_migration('Chunks-resource - CVR_new.csv')->'counts'->>'legacyItems')::int, 2, 'Preview counts legacy items');

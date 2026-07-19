@@ -266,10 +266,6 @@ function stableHash(value: unknown): string {
   return (hash >>> 0).toString(16).padStart(8, '0')
 }
 
-function stableId(prefix: string, ...parts: Array<string | number | null>): string {
-  return `${prefix}-${stableHash(parts)}`
-}
-
 function stableUuid(...parts: Array<string | number | null>): string {
   const seed = `${stableHash(parts)}${stableHash([...parts, 'a'])}${stableHash([...parts, 'b'])}${stableHash([...parts, 'c'])}`
   return `${seed.slice(0, 8)}-${seed.slice(8, 12)}-${seed.slice(12, 16)}-${seed.slice(16, 20)}-${seed.slice(20, 32)}`

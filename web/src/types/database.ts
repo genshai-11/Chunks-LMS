@@ -540,6 +540,29 @@ export type Database = {
         Insert: Record<string, unknown>
         Update: Record<string, unknown>
       }
+      live_test_v2_csv_rows: {
+        Row: {
+          source_filename: string
+          row_number: number
+          session_no: number
+          source_session: string | null
+          source_stt: string | null
+          term_vi: string | null
+          term_en: string | null
+          prompt_vi: string | null
+          prompt_en: string | null
+          unit_ohm: number | null
+          tc: number | null
+          lc: number | null
+          tl: number | null
+          cvr: number | null
+          row_payload: Json
+          row_checksum: string
+          staged_at: string
+        }
+        Insert: Record<string, unknown>
+        Update: Record<string, unknown>
+      }
       live_test_v2_item_mappings: {
         Row: {
           legacy_live_test_resource_id: string
@@ -588,6 +611,10 @@ export type Database = {
       live_test_v2_deterministic_uuid: {
         Args: { p_basis: string }
         Returns: string
+      }
+      stage_live_test_v2_csv_rows: {
+        Args: { p_source_filename: string; p_rows: Json }
+        Returns: Json
       }
       live_test_v2_source_row_checksum: {
         Args: { p_item: Json }

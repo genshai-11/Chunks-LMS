@@ -28,6 +28,21 @@ export type ApprovedGenerationAsset = {
   message?: string
 }
 
+export type CvrPreviewItem = {
+  termVi: string
+  termEn: string
+  promptVi: string
+  promptEn: string
+  tc: number
+  lc: number
+  tl: number
+  measuredCvr: number
+}
+
+export type CvrPreviewResult = {
+  items: CvrPreviewItem[]
+}
+
 export interface LiveTestGeneration {
   generateTestItem(command: {
     packageVersionId: string
@@ -48,6 +63,14 @@ export interface LiveTestGeneration {
     generationJobId: string
     notes?: string
   }): Promise<ApprovedGenerationAsset>
+
+  generateCVRPreview(command: {
+    packageVersionId: string
+    sectionId: string
+    topic: string
+    targetOhm: number
+    count: number
+  }): Promise<CvrPreviewResult>
 }
 
 type SupabaseFunctionsClient = {
@@ -193,6 +216,44 @@ export class SupabaseLiveTestGeneration implements LiveTestGeneration {
       approved: approval.approved === true || approval.approved === 'true',
       message: approval.message ? String(approval.message) : undefined,
     }
+  }
+
+  async generateCVRPreview(command: {
+    packageVersionId: string
+    sectionId: string
+    topic: string
+    targetOhm: number
+    count: number
+  }): Promise<CvrPreviewResult> {
+    if (this.useDeterministicMock) {
+      const items: CvrPreviewItem[] = Array.from({ length: command.count }, (_, i) => {
+        const tc = 3
+        const lc = 1.5
+        const tl = Math.round((command.targetOhm / (tc * lc)) * 100) / 100
+        return {
+          termVi: `Từ vựng ${i + 1}`,
+          termEn: `Vocab ${i + 1}`,
+          promptVi: `[Mock] Câu tiếng Việt ${i + 1} về ${command.topic}`,
+          promptEn: `[Mock] English sentence ${i + 1} about ${command.topic}`,
+          tc,
+          lc,
+          tl,
+          measuredCvr: command.targetOhm,
+        }
+      })
+      return { items }
+    }
+
+    const data = (await this.invokeGenerationFunction({
+      action: 'generateCVRPreview',
+      packageVersionId: command.packageVersionId,
+      sectionId: command.sectionId,
+      topic: command.topic,
+      targetOhm: command.targetOhm,
+      count: command.count,
+    })) as { items: CvrPreviewItem[] }
+
+    return { items: data.items ?? [] }
   }
 
   private async invokeGenerationFunction(body: Record<string, unknown>): Promise<unknown> {

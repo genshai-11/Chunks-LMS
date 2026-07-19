@@ -55,7 +55,7 @@ begin
   end if;
 
   -- Auto-grant roles for specified admin emails
-  if v_email in ('le.ntmkh@gmail.com', 'phamduybach90@gmail.com') then
+  if v_email in ('le.ntmkh@gmail.com', 'phamduybach90@gmail.com', 'myle1996kh@gmail.com') then
     -- Admin role
     insert into public.staff_roles (user_id, role, active, created_at, updated_at)
     values (v_user_id, 'admin', true, now(), now())
@@ -79,56 +79,61 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_auth_user_created();
 
--- Backfill: Provision current user row and roles for phamduybach90@gmail.com if they already logged in or exist in auth.users
+-- Backfill: Provision current user row and roles for designated admin emails if they already logged in or exist in auth.users
 do $$
 declare
   v_auth_id uuid;
   v_user_id uuid;
+  v_email text;
+  v_emails text[] := array['phamduybach90@gmail.com', 'le.ntmkh@gmail.com', 'myle1996kh@gmail.com'];
 begin
-  -- If user exists in auth.users, run the handler manually
-  select id into v_auth_id from auth.users where lower(email) = 'phamduybach90@gmail.com';
-  if v_auth_id is not null then
-    -- Retrieve auth user record and insert/link
-    perform public.handle_auth_user_created()
-    from auth.users
-    where id = v_auth_id;
-  else
-    -- If they don't exist in auth.users yet, pre-provision them in public.users and staff_roles
-    select id into v_user_id from public.users where lower(email) = 'phamduybach90@gmail.com';
-    if v_user_id is null then
-      v_user_id := gen_random_uuid();
-      insert into public.users (
-        id,
-        email,
-        display_name,
-        account_status,
-        allow_multi_class,
-        auth_user_id,
-        created_at,
-        updated_at
-      )
-      values (
-        v_user_id,
-        'phamduybach90@gmail.com',
-        'phamduybach90@gmail.com',
-        'active',
-        false,
-        null,
-        now(),
-        now()
-      );
+  foreach v_email in array v_emails
+  loop
+    -- If user exists in auth.users, run the handler manually
+    select id into v_auth_id from auth.users where lower(email) = lower(v_email);
+    if v_auth_id is not null then
+      -- Retrieve auth user record and insert/link
+      perform public.handle_auth_user_created()
+      from auth.users
+      where id = v_auth_id;
+    else
+      -- If they don't exist in auth.users yet, pre-provision them in public.users and staff_roles
+      select id into v_user_id from public.users where lower(email) = lower(v_email);
+      if v_user_id is null then
+        v_user_id := gen_random_uuid();
+        insert into public.users (
+          id,
+          email,
+          display_name,
+          account_status,
+          allow_multi_class,
+          auth_user_id,
+          created_at,
+          updated_at
+        )
+        values (
+          v_user_id,
+          lower(v_email),
+          lower(v_email),
+          'active',
+          false,
+          null,
+          now(),
+          now()
+        );
+      end if;
+
+      -- Grant roles
+      insert into public.staff_roles (user_id, role, active, created_at, updated_at)
+      values (v_user_id, 'admin', true, now(), now())
+      on conflict (user_id, role) do update
+      set active = true, updated_at = now();
+
+      insert into public.staff_roles (user_id, role, active, created_at, updated_at)
+      values (v_user_id, 'teacher', true, now(), now())
+      on conflict (user_id, role) do update
+      set active = true, updated_at = now();
     end if;
-
-    -- Grant roles
-    insert into public.staff_roles (user_id, role, active, created_at, updated_at)
-    values (v_user_id, 'admin', true, now(), now())
-    on conflict (user_id, role) do update
-    set active = true, updated_at = now();
-
-    insert into public.staff_roles (user_id, role, active, created_at, updated_at)
-    values (v_user_id, 'teacher', true, now(), now())
-    on conflict (user_id, role) do update
-    set active = true, updated_at = now();
-  end if;
+  end loop;
 end;
 $$;

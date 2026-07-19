@@ -11,7 +11,10 @@ import { AdminClassesPage } from './pages/admin/AdminClassesPage'
 import { AdminPeoplePage } from './pages/admin/AdminPeoplePage'
 import { AdminEnrollmentsPage } from './pages/admin/AdminEnrollmentsPage'
 import { AdminMetricsPage } from './pages/admin/AdminMetricsPage'
+import { AdminResourcesPage } from './pages/admin/AdminResourcesPage'
+import { AdminLiveTestsPage } from './pages/admin/AdminLiveTestsPage'
 import { AdminAnalysisPage } from './pages/admin/AdminAnalysisPage'
+import { AdminLiveTestAnalysisPage } from './pages/admin/AdminLiveTestAnalysisPage'
 import { AdminOpsPage } from './pages/admin/AdminOpsPage'
 import { AdminAuditPage } from './pages/admin/AdminAuditPage'
 import { AdminIntegrityPage } from './pages/admin/AdminIntegrityPage'
@@ -20,6 +23,7 @@ import { TeacherOverviewPage } from './pages/teacher/TeacherOverviewPage'
 import { TeacherSessionPage } from './pages/teacher/TeacherSessionPage'
 import { TeacherObservePage } from './pages/teacher/TeacherObservePage'
 import { TeacherAnalysisPage } from './pages/teacher/TeacherAnalysisPage'
+import { TeacherLiveTestAnalysisPage } from './pages/teacher/TeacherLiveTestAnalysisPage'
 import { TeacherArchivePage } from './pages/teacher/TeacherArchivePage'
 import { TeacherClassesPage } from './pages/teacher/TeacherClassesPage'
 import { TeacherLearnerProfilePage } from './pages/teacher/TeacherLearnerProfilePage'
@@ -27,6 +31,7 @@ import { LearnerLayout } from './pages/learner/LearnerLayout'
 import { LearnerOverviewPage } from './pages/learner/LearnerOverviewPage'
 import { LearnerEnrollmentsPage } from './pages/learner/LearnerEnrollmentsPage'
 import { LearnerAnalysisPage } from './pages/learner/LearnerAnalysisPage'
+import { LearnerLiveTestAnalysisPage } from './pages/learner/LearnerLiveTestAnalysisPage'
 import { LearnerAccessPage } from './pages/LearnerAccessPage'
 import { AppStateProvider } from './state/AppState'
 
@@ -59,13 +64,13 @@ export default function App() {
                 <Route path="people" element={<AdminPeoplePage />} />
                 <Route path="enrollments" element={<AdminEnrollmentsPage />} />
                 <Route path="analysis" element={<AdminAnalysisPage />} />
+                <Route path="test-analysis" element={<AdminLiveTestAnalysisPage />} />
                 <Route path="metrics" element={<AdminMetricsPage />} />
+                <Route path="resources" element={<AdminResourcesPage />} />
+                <Route path="live-tests" element={<AdminLiveTestsPage />} />
               </Route>
 
-              <Route
-                path="/teacher/observe"
-                element={<TeacherObservePage />}
-              />
+              <Route path="/teacher/observe" element={<TeacherObservePage />} />
 
               <Route
                 path="/teacher"
@@ -81,16 +86,18 @@ export default function App() {
                 <Route path="session" element={<TeacherSessionPage />} />
                 <Route path="archive" element={<TeacherArchivePage />} />
                 <Route path="analysis" element={<TeacherAnalysisPage />} />
+                <Route path="test-analysis" element={<TeacherLiveTestAnalysisPage />} />
                 <Route path="progress" element={<Navigate to="/teacher/analysis" replace />} />
               </Route>
 
-              {/* Learner portal — share link only; no Clerk */}
+              {/* Learner portal — signed learner access only; no staff Auth account */}
               <Route path="/learner" element={<LearnerLayout />}>
                 <Route index element={<LearnerOverviewPage />} />
                 <Route path="enrollments" element={<LearnerEnrollmentsPage />} />
                 <Route path="attendance" element={<Navigate to="/learner" replace />} />
                 <Route path="results" element={<Navigate to="/learner/analysis" replace />} />
                 <Route path="analysis" element={<LearnerAnalysisPage />} />
+                <Route path="test-analysis" element={<LearnerLiveTestAnalysisPage />} />
                 <Route path="progress" element={<Navigate to="/learner/analysis" replace />} />
               </Route>
 

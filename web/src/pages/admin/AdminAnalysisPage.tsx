@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { ChartColumn } from 'lucide-react'
 import { ClassContextSelect } from '../../components/ClassContextSelect'
 import { PageHeader } from '../../components/PageHeader'
-import { ProgressAnalysisView } from '../../components/ProgressAnalysisView'
+import { SessionProgressAnalysisView } from '../../components/SessionProgressAnalysisView'
 import { EmptyState } from '../../components/ui'
 import {
   listAdminClassOptions,
@@ -72,7 +72,7 @@ export function AdminAnalysisPage() {
           />
         }
       />
-      <ProgressAnalysisView
+      <SessionProgressAnalysisView
         mode="teacher"
         courseId={course.id}
         courseCode={course.code}
@@ -93,6 +93,11 @@ export function AdminAnalysisPage() {
             startedAt: s.startedAt,
             completedAt: s.completedAt,
             sessionNumber: s.sessionNumber,
+            sessionKind: s.sessionKind,
+            sessionFormat: s.sessionFormat,
+            promptLanguage: s.promptLanguage,
+            liveTestResourceId: s.liveTestResourceId,
+            liveTestBlockId: s.liveTestBlockId,
           }))}
         emptyHint="No finalized results for this class yet."
         metricSettings={metricSettings}

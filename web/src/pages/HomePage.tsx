@@ -15,35 +15,26 @@ export function HomePage() {
     return <Navigate to={session.canAccess('admin') ? '/admin' : '/teacher'} replace />
   }
 
-  const chips: Array<{
-    to: string
-    title: string
-    description: string
-    icon: typeof Shield
-  }> = []
-
-  if (session.canAccess('admin')) {
-    chips.push({
+  const chips = [
+    {
       to: '/admin',
-      title: 'Admin',
-      description: 'Dashboard, classes, invites, analysis',
+      title: 'Admin portal',
+      description: 'Manage accounts, metrics, analysis & settings',
       icon: Shield,
-    })
-  }
-  if (session.canAccess('teacher')) {
-    chips.push({
+    },
+    {
       to: '/teacher',
-      title: 'Teacher',
-      description: 'Home, schedule, live observe, analysis',
+      title: 'Teacher console',
+      description: 'Start sessions, roster, observe & analyze',
       icon: Users,
-    })
-  }
-  chips.push({
-    to: '/access',
-    title: 'Learner portal',
-    description: 'Open invite link or enter registered email',
-    icon: GraduationCap,
-  })
+    },
+    {
+      to: '/access',
+      title: 'Learner portal',
+      description: 'View attendance, progress & reports',
+      icon: GraduationCap,
+    },
+  ]
 
   return (
     <div className="home-compact">
@@ -59,10 +50,21 @@ export function HomePage() {
         <h1 className="sr-only">Chunks LMS</h1>
         <p>Focus &amp; Awareness observation for small classes.</p>
         <div className="home-tools">
-          <Link to="/access" className="btn ghost">
-            <LogIn className="h-4 w-4" aria-hidden />
-            Learner portal
-          </Link>
+          {!session.signedIn && !session.authBypass ? (
+            <Link to="/admin" className="btn primary">
+              <LogIn className="h-4 w-4" aria-hidden />
+              Staff Sign In
+            </Link>
+          ) : session.signedIn && !session.authBypass ? (
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => void session.signOut()}
+            >
+              <LogIn className="h-4 w-4" aria-hidden />
+              Sign out
+            </button>
+          ) : null}
           {(session.authBypass || session.canAccess('admin')) && (
             <button
               type="button"
@@ -110,8 +112,7 @@ export function HomePage() {
 
       {!session.signedIn && !session.authBypass ? (
         <p className="meta" style={{ textAlign: 'center', marginTop: 16 }}>
-          Admin and Teacher require a Clerk staff account. Learners never use Clerk — share their
-          invite link from the class roster.
+          Admin and Teacher require a Supabase Auth staff account. Learners do not get staff Auth accounts — open the signed link sent by your teacher.
         </p>
       ) : null}
     </div>

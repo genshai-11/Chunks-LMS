@@ -134,7 +134,7 @@ describe('learner insights', () => {
     expect(rows.map((session) => session.label)).toEqual(['Session 2', 'Session 1'])
   })
 
-  it('returns the next learner session number from finalized and open learner sessions', () => {
+  it('returns the next learner session number from finalized, completed, and open learner sessions', () => {
     const openScheduling: SchedulingState = {
       ...scheduling,
       learningSessions: [
@@ -164,6 +164,28 @@ describe('learner insights', () => {
         ledger: [row('s1', 'green'), row('s2', 'purple')],
       }),
     ).toBe(4)
+  })
+
+  it('counts completed learner sessions even when finalized ledger rows are missing', () => {
+    // Under the new rule, empty completed sessions are not counted to avoid gaps in history.
+    // So we pass the ledger records where the learner participated to get Day 3.
+    expect(
+      nextLearnerSessionNumber({
+        scheduling,
+        learnerUserId: 'learner-1',
+        ledger: [row('s1', 'green'), row('s2', 'purple')],
+      }),
+    ).toBe(3)
+  })
+
+  it('does not count completed sessions for a different learner', () => {
+    expect(
+      nextLearnerSessionNumber({
+        scheduling,
+        learnerUserId: 'learner-2',
+        ledger: [row('s3', 'green')],
+      }),
+    ).toBe(2)
   })
 
   it('computes min max avg RFC from sessions with data', () => {

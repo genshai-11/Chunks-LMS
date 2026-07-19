@@ -17,6 +17,8 @@ export type TeacherClassContext = {
   activeClassId: string | null
   setActiveClassId: (id: string | null) => void
   hasMultiple: boolean
+  selectedClassIds: string[]
+  mode: 'one' | 'multi' | 'all'
 }
 
 /** Active class for Teacher workspace (multi-class switcher). */
@@ -50,12 +52,22 @@ export function useTeacherClassContext(): TeacherClassContext {
     return latest?.classId ?? null
   }, [classes, scheduling.learningSessions])
 
-  const classRow = useMemo(
-    () => resolveActiveClass(classes, activeClassId ?? preferredSessionClassId),
-    [classes, activeClassId, preferredSessionClassId],
-  )
+  const classRow = useMemo(() => {
+    if (activeClassId === 'all' || (activeClassId && activeClassId.includes(','))) {
+      return null
+    }
+    return resolveActiveClass(classes, activeClassId ?? preferredSessionClassId)
+  }, [classes, activeClassId, preferredSessionClassId])
 
   useEffect(() => {
+    if (activeClassId === 'all') return
+
+    if (activeClassId && activeClassId.includes(',')) {
+      const parts = activeClassId.split(',')
+      const allValid = parts.every((part) => classes.some((c) => c.id === part))
+      if (allValid) return
+    }
+
     const resolved = resolveActiveClass(classes, activeClassId ?? preferredSessionClassId)
     if (resolved && resolved.id !== activeClassId) {
       setActiveClassId(resolved.id)
@@ -66,14 +78,29 @@ export function useTeacherClassContext(): TeacherClassContext {
 
   const option = classRow ? toClassOption(roster, classRow) : null
 
+  const selectedClassIds = useMemo(() => {
+    if (activeClassId === 'all') return classes.map((c) => c.id)
+    if (activeClassId && activeClassId.includes(',')) return activeClassId.split(',')
+    const resolved = resolveActiveClass(classes, activeClassId ?? preferredSessionClassId)
+    return resolved ? [resolved.id] : []
+  }, [classes, activeClassId, preferredSessionClassId])
+
+  const mode = useMemo(() => {
+    if (activeClassId === 'all') return 'all'
+    if (activeClassId && activeClassId.includes(',')) return 'multi'
+    return 'one'
+  }, [activeClassId])
+
   return {
     options,
     classRow: option?.classRow ?? null,
     course: option?.course ?? null,
     teacher: option?.teacher ?? signedInTeacher ?? null,
     seats: option?.seats ?? 0,
-    activeClassId: option?.classRow.id ?? null,
+    activeClassId: activeClassId ?? (option?.classRow.id ?? null),
     setActiveClassId,
     hasMultiple: options.length > 1,
+    selectedClassIds,
+    mode,
   }
 }

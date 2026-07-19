@@ -1,5 +1,5 @@
 import { PageHeader } from '../../components/PageHeader'
-import { ProgressAnalysisView } from '../../components/ProgressAnalysisView'
+import { SessionProgressAnalysisView } from '../../components/SessionProgressAnalysisView'
 import { useLearnerClassContext } from '../../hooks/useLearnerClassContext'
 import { useAppState } from '../../state/useAppState'
 
@@ -22,7 +22,7 @@ export function LearnerAnalysisPage() {
         title="Your progress"
         subtitle={`${course.code}${classRow ? ` · ${classRow.name}` : ''} · how focus changes day by day`}
       />
-      <ProgressAnalysisView
+      <SessionProgressAnalysisView
         mode="learner"
         courseId={course.id}
         courseCode={course.code}
@@ -41,6 +41,11 @@ export function LearnerAnalysisPage() {
             startedAt: s.startedAt,
             completedAt: s.completedAt,
             sessionNumber: s.sessionNumber,
+            sessionKind: s.sessionKind,
+            sessionFormat: s.sessionFormat,
+            promptLanguage: s.promptLanguage,
+            liveTestResourceId: s.liveTestResourceId,
+            liveTestBlockId: s.liveTestBlockId,
           }))}
         emptyHint="After your teacher finishes sessions, progress appears here."
         metricSettings={metricSettings}

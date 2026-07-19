@@ -723,7 +723,7 @@
   }
 
   .user-avatar-sm {
-    @apply h-7 w-7 text-[9px];
+    @apply h-14 w-14 text-sm;
   }
 
   .user-avatar-md {
@@ -921,7 +921,7 @@
   }
 
   .mobile-class-context {
-    @apply px-3 pt-2 sm:hidden;
+    @apply px-3 pt-2 lg:hidden;
   }
 
   .attendance-matrix-wrap {
@@ -972,45 +972,48 @@
   }
 
   .archive-layout {
-    @apply grid gap-4 lg:grid-cols-[minmax(0,16rem)_1fr];
+    @apply grid gap-6 lg:grid-cols-[minmax(0,18rem)_1fr];
   }
 
   .archive-day-btn {
-    @apply w-full text-left rounded-xl border border-slate-200 bg-white px-3 py-2.5 mb-2
-      hover:border-slate-300 transition-colors cursor-pointer flex flex-col gap-0.5;
+    @apply w-full text-left rounded-xl border border-slate-200/80 bg-white px-4 py-3.5 mb-2.5
+      hover:border-slate-300 hover:bg-slate-50/30 transition-all cursor-pointer flex flex-col gap-1 shadow-3xs;
   }
   .archive-day-btn.is-active {
-    @apply border-slate-900 ring-1 ring-slate-900/10;
+    @apply border-indigo-600 bg-indigo-50/5 ring-2 ring-indigo-600/10;
   }
 
   .archive-heat {
-    @apply grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2;
+    @apply grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3;
   }
 
   .archive-heat-cell {
-    @apply rounded-xl border border-slate-200 p-3 flex flex-col gap-1 text-xs;
+    @apply rounded-xl border border-slate-200 bg-white p-3.5 flex flex-col gap-1 text-xs shadow-3xs transition-all hover:shadow-2xs;
   }
   .archive-heat-cell.is-red {
-    @apply bg-red-50 border-red-100;
+    @apply border-l-4 border-l-red-500 border-slate-200/80 bg-red-50/20;
   }
   .archive-heat-cell.is-yellow {
-    @apply bg-yellow-50 border-yellow-100;
+    @apply border-l-4 border-l-yellow-500 border-slate-200/80 bg-yellow-50/20;
   }
   .archive-heat-cell.is-green {
-    @apply bg-green-50 border-green-100;
+    @apply border-l-4 border-l-green-500 border-slate-200/80 bg-green-50/20;
   }
   .archive-heat-cell.is-purple {
-    @apply bg-purple-50 border-purple-100;
+    @apply border-l-4 border-l-purple-500 border-slate-200/80 bg-purple-50/20;
+  }
+  .archive-heat-cell.is-empty {
+    @apply border-l-4 border-l-slate-300 border-slate-200/80 bg-slate-50/50;
   }
 
   .archive-heat-q {
-    @apply font-mono text-[10px] font-bold text-slate-400 uppercase;
+    @apply font-mono text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5;
   }
   .archive-heat-name {
-    @apply font-semibold text-slate-800;
+    @apply font-bold text-slate-800 text-sm;
   }
   .archive-heat-color {
-    @apply font-mono text-[11px] uppercase font-bold text-slate-600;
+    @apply inline-flex items-center gap-1.5 font-sans text-[11px] uppercase font-bold text-slate-600;
   }
 
   .class-students-full {
@@ -1323,6 +1326,18 @@
 
   .observe-bar-slim {
     @apply py-1.5;
+  }
+
+  .observe-bar.is-hidden {
+    display: none !important;
+  }
+
+  .observe-header-toggle {
+    @apply fixed left-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-[85] h-10 w-10 rounded-full border border-white/10 bg-slate-950/70! shadow-xl backdrop-blur-md sm:bottom-5 sm:left-5;
+  }
+
+  .observe-header-toggle svg {
+    @apply h-5 w-5;
   }
 
   .observe-bar-actions {
@@ -1696,14 +1711,94 @@
 
   .observe-split {
     @apply grid h-full w-full min-h-0 flex-1 gap-2 p-2;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
   }
 
-  .observe-split.is-landscape {
-    @apply grid-cols-2;
+  @media (orientation: landscape) {
+    .observe-split {
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr;
+    }
   }
 
-  .observe-split.is-portrait {
-    @apply grid-rows-2;
+  /* Split Pane overrides to make colors dock compact */
+  .observe-split-pane .observe-dock {
+    margin-top: 0.5rem !important;
+    gap: 0.5rem !important;
+    max-width: 8rem !important;
+  }
+
+  .observe-split-pane .observe-dock-colors {
+    @apply gap-2 p-2 rounded-[2rem] border-2;
+  }
+
+  .observe-split-pane .observe-dock-color {
+    height: 3.5rem !important;
+    width: 3.5rem !important;
+    @apply border-2 p-1;
+  }
+
+  @media (min-width: 640px) {
+    .observe-split-pane .observe-dock-color {
+      height: 4rem !important;
+      width: 4rem !important;
+    }
+  }
+
+  .observe-split-pane .observe-dock-num {
+    font-size: 1rem !important;
+  }
+
+  @media (min-width: 640px) {
+    .observe-split-pane .observe-dock-num {
+      font-size: 1.125rem !important;
+    }
+  }
+
+  .observe-split-pane .observe-dock-probe {
+    @apply gap-2 p-2 rounded-[2rem] border-2;
+  }
+
+  .observe-split-pane .observe-dock-probe-btn {
+    height: 3.5rem !important;
+    width: 3.5rem !important;
+    @apply border-2 p-1 text-[10px];
+  }
+
+  @media (min-width: 640px) {
+    .observe-split-pane .observe-dock-probe-btn {
+      height: 4rem !important;
+      width: 4rem !important;
+    }
+  }
+
+  .observe-split-pane .observe-dock-probe-btn kbd {
+    display: none !important;
+  }
+
+
+
+  /* Heatmap row layout inside the popup modal */
+  .observe-heat.layout-row {
+    @apply flex flex-col gap-2 w-full;
+  }
+
+  .observe-heat.layout-row .observe-heat-summary {
+    @apply flex flex-row items-center justify-between gap-3 text-xs text-slate-400 mb-2 border-b border-white/5 pb-2;
+  }
+
+  .observe-heat.layout-row .observe-heat-grid {
+    @apply flex flex-row flex-wrap gap-1.5 justify-start py-1 overflow-y-auto;
+  }
+
+  /* Utility to hide scrollbar */
+  .hide-scrollbar {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none !important;
   }
 
   .observe-split-pane {
@@ -1712,6 +1807,15 @@
 
   .observe-split-pane.is-active {
     @apply border-indigo-300/70 bg-indigo-500/10 ring-2 ring-indigo-300/40;
+    overflow: visible;
+  }
+
+  .observe-split-head {
+    @apply flex w-full min-w-0 items-center justify-center gap-3 px-2 pr-11;
+  }
+
+  .observe-split-head .user-avatar {
+    @apply shrink-0;
   }
 
   .observe-split-hero {
@@ -1735,7 +1839,24 @@
   }
 
   .observe-split-tools {
-    @apply mt-3 max-w-[13rem] justify-center gap-3;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    max-width: none !important;
+    margin-top: 0.75rem !important;
+    gap: 0.75rem !important;
+    width: auto !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  .observe-split-tools .observe-dock-q {
+    @apply text-xs bg-white/5 px-2 py-0.5 rounded text-slate-300 font-mono font-bold tracking-wider;
+  }
+
+  .observe-split-tools .observe-meta-muted {
+    @apply text-[10px] text-slate-500 font-medium tracking-wider uppercase;
   }
 
   .observe-stage-hero {
@@ -2106,15 +2227,15 @@
 
   /* Bottom dock — inline control panel inside stage */
   .observe-dock {
-    @apply mt-3 mx-auto flex w-full max-w-[9rem] shrink-0 flex-col items-center gap-3;
+    @apply mt-3 mx-auto flex w-full max-w-[12rem] shrink-0 flex-col items-center gap-4;
   }
 
   .observe-dock-lg .observe-dock-colors {
-    @apply gap-3 sm:mx-auto;
+    @apply gap-4 sm:mx-auto;
   }
 
   .observe-dock-colors {
-    @apply relative mx-auto flex w-fit flex-col items-center justify-center gap-3 rounded-[3rem] border-4 border-slate-600 bg-gradient-to-b from-slate-950 via-slate-800 to-slate-950 p-3 shadow-2xl ring-1 ring-black;
+    @apply relative mx-auto flex w-fit flex-col items-center justify-center gap-4 rounded-[3.5rem] border-4 border-slate-600 bg-gradient-to-b from-slate-950 via-slate-800 to-slate-950 p-4 shadow-2xl ring-1 ring-black;
     box-shadow:
       inset 0 0 0 2px rgb(255 255 255 / 0.08),
       inset 10px 0 18px rgb(255 255 255 / 0.025),
@@ -2123,7 +2244,7 @@
   }
 
   .observe-dock-color {
-    @apply relative flex h-[5rem] min-h-0 w-[5rem] min-w-0 shrink-0 cursor-pointer flex-col items-center justify-center rounded-full border-4 border-slate-950 p-2 text-white transition-all duration-200 active:scale-95 disabled:opacity-40 sm:h-[5.5rem] sm:w-[5.5rem];
+    @apply relative flex h-[7rem] min-h-0 w-[7rem] min-w-0 shrink-0 cursor-pointer flex-col items-center justify-center rounded-full border-4 border-slate-950 p-2 text-white transition-all duration-200 active:scale-95 disabled:opacity-40 sm:h-[8.5rem] sm:w-[8.5rem];
     box-shadow:
       inset 0 7px 10px rgb(255 255 255 / 0.28),
       inset 0 -9px 12px rgb(0 0 0 / 0.32),
@@ -2251,11 +2372,11 @@
   }
 
   .observe-dock-label {
-    @apply font-display text-[7px] sm:text-[8px] font-bold uppercase tracking-wider opacity-90 mt-0.5;
+    @apply hidden!;
   }
 
   .observe-dock-num {
-    @apply font-display text-sm sm:text-base font-black leading-none tabular-nums tracking-tight opacity-95;
+    @apply font-display text-2xl sm:text-4xl font-black leading-none tabular-nums tracking-tight opacity-95;
   }
 
   .observe-dock-probe {
@@ -2264,7 +2385,7 @@
   }
 
   .observe-dock-probe-btn {
-    @apply relative flex h-16 w-16 shrink-0 cursor-pointer flex-col items-center justify-center rounded-full border-2 border-slate-500 bg-slate-800 text-xs font-bold text-slate-100 shadow-lg transition-all duration-150 hover:border-slate-300 hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 sm:h-[4.5rem] sm:w-[4.5rem];
+    @apply relative flex h-[5.5rem] w-[5.5rem] shrink-0 cursor-pointer flex-col items-center justify-center rounded-full border-2 border-slate-500 bg-slate-800 text-xs font-bold text-slate-100 shadow-lg transition-all duration-150 hover:border-slate-300 hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 sm:h-[7rem] sm:w-[7rem] sm:text-sm;
     box-shadow:
       inset 0 2px 5px rgb(255 255 255 / 0.08),
       0 8px 18px rgb(0 0 0 / 0.32);
@@ -2281,11 +2402,19 @@
   }
 
   .observe-dock-tools {
-    @apply mt-6 mx-auto flex w-full max-w-[15rem] items-center justify-between gap-4 rounded-full border border-white/10 bg-slate-900/80 p-2 px-3 shadow-lg;
+    @apply mt-5 mx-auto flex items-center justify-between w-full max-w-[10.5rem] rounded-full border border-white/5 bg-slate-950/40 p-1 shadow-lg backdrop-blur-md transition-all duration-300 hover:border-white/10;
   }
 
   .observe-tool {
-    @apply border-0 bg-transparent! shadow-none min-h-0 inline-flex h-9 min-w-11 items-center justify-center gap-1 rounded-lg px-2 text-[11px] font-semibold text-slate-400 hover:bg-white/5 hover:text-slate-200 disabled:opacity-30;
+    @apply border-0 bg-transparent! shadow-none shrink-0 w-8 h-8 rounded-full flex items-center justify-center p-0 text-slate-400 hover:text-white hover:bg-white/5 active:scale-95 transition-all duration-200 disabled:opacity-20 disabled:pointer-events-none;
+  }
+
+  .observe-tool-text {
+    @apply hidden!;
+  }
+
+  .observe-dock-q {
+    @apply font-mono text-xs font-bold text-slate-300 tracking-wider;
   }
 
   /*
@@ -2353,19 +2482,41 @@
 
     .observe-stage,
     .observe-stage-tight {
-      @apply flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-y-auto px-3 py-4;
+      @apply flex min-h-0 flex-1 flex-col items-center justify-center gap-2 overflow-hidden px-2 py-2;
+    }
+
+    .observe-root.is-header-hidden .observe-stage,
+    .observe-root.is-header-hidden .observe-stage-tight {
+      @apply pt-1;
+    }
+
+    .observe-split {
+      @apply h-full min-h-0 flex-1 overflow-hidden gap-1.5 p-1.5 pb-16;
+      grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    .observe-split-pane {
+      @apply min-h-0 justify-between overflow-hidden rounded-2xl px-2 pb-2 pt-3;
+    }
+
+    .observe-split-pane.is-active {
+      overflow: hidden;
+    }
+
+    .observe-split-head {
+      @apply justify-start gap-2 px-1 pr-10;
+    }
+
+    .observe-split-head .user-avatar {
+      @apply !h-11 !w-11 border-2 border-slate-950 bg-[#121214] !text-xs font-bold shadow-xl;
     }
 
     .observe-stage-hero {
       @apply -translate-y-2 flex w-full max-w-xs flex-col items-center justify-center gap-2 py-0;
     }
 
-    .observe-phone-avatar {
-      @apply flex justify-center items-center shrink-0 mb-2;
-    }
-
     .observe-phone-avatar .user-avatar {
-      @apply !h-20 !w-20 border-4 border-slate-950 bg-[#121214] !text-xl font-bold shadow-2xl;
+      @apply !h-14 !w-14 border-4 border-slate-950 bg-[#121214] !text-base font-bold shadow-2xl;
     }
 
     .observe-hint-phone {
@@ -2384,6 +2535,31 @@
       @apply text-xs;
     }
 
+    .observe-split-hero {
+      @apply max-w-none -translate-y-0 flex-1 items-start justify-center gap-0 px-0 text-left;
+    }
+
+    .observe-split-name {
+      @apply justify-start text-xl leading-none;
+      max-width: calc(100vw - 8.25rem);
+    }
+
+    .observe-split-hero .observe-meta-row {
+      @apply mt-1 justify-start gap-1.5;
+    }
+
+    .observe-split-hero .observe-learner-rfc {
+      @apply px-2 py-0.5 text-[10px];
+    }
+
+    .observe-split-hero .observe-meta-muted {
+      @apply text-xs;
+    }
+
+    .observe-split-tools {
+      margin-top: 0.25rem !important;
+    }
+
     .observe-dock,
     .observe-dock-lg {
       @apply mt-0 mx-auto flex w-full max-w-xs flex-col items-center gap-2;
@@ -2398,7 +2574,7 @@
     }
 
     .observe-dock-color {
-      @apply h-[4.75rem] min-h-0 w-[4.75rem] min-w-0 rounded-full border-[3px] border-slate-950 p-1.5 text-white;
+      @apply h-20 min-h-0 w-20 min-w-0 rounded-full border-[3px] border-slate-950 p-1 text-white;
     }
 
     .observe-dock-label {
@@ -2406,26 +2582,58 @@
     }
 
     .observe-dock-probe-btn {
-      @apply flex h-16 min-h-16 w-16 min-w-16 flex-col items-center justify-center rounded-full border-2 border-slate-500 bg-slate-800 p-1.5 text-[10px] text-slate-100;
+      @apply flex h-[4.25rem] min-h-[4.25rem] w-[4.25rem] min-w-[4.25rem] flex-col items-center justify-center rounded-full border-2 border-slate-500 bg-slate-800 p-1.5 text-xs text-slate-100;
       box-shadow:
         inset 0 2px 5px rgb(255 255 255 / 0.08),
         0 6px 14px rgb(0 0 0 / 0.3);
     }
 
+    .observe-dock-num {
+      @apply text-2xl!;
+    }
+
+    .observe-dock-probe-btn kbd {
+      @apply hidden!;
+    }
+
+    .observe-split-pane .observe-dock,
+    .observe-split-pane .observe-dock-lg {
+      @apply flex-col gap-1;
+      margin-top: 0.25rem !important;
+      max-width: 5rem !important;
+    }
+
+    .observe-split-pane .observe-dock-colors,
+    .observe-split-pane .observe-dock-probe {
+      @apply flex-col gap-1.5 rounded-[2rem] border-2 p-1.5;
+    }
+
+    .observe-split-pane .observe-dock-color,
+    .observe-split-pane .observe-dock-probe-btn {
+      height: clamp(2.55rem, 6.5dvh, 3.3rem) !important;
+      min-height: clamp(2.55rem, 6.5dvh, 3.3rem) !important;
+      width: clamp(2.55rem, 6.5dvh, 3.3rem) !important;
+      min-width: clamp(2.55rem, 6.5dvh, 3.3rem) !important;
+    }
+
+    .observe-split-pane .observe-dock-num {
+      font-size: clamp(0.95rem, 2.8dvh, 1.25rem) !important;
+    }
+
     .observe-dock-tools {
-      @apply mt-5 mx-auto flex w-full max-w-[12rem] items-center justify-between gap-3 rounded-full border border-white/10 bg-slate-900/85 p-1.5 px-3.5 shadow-md;
+      @apply max-w-[10.5rem] bg-slate-950/40 border-white/5;
     }
 
     .observe-tool {
-      @apply h-10 min-w-12;
+      @apply h-8 w-8 min-w-0;
     }
 
     .observe-tool-text {
-      @apply inline text-[11px];
+      @apply hidden!;
     }
 
     .observe-dock-q {
-      @apply text-sm text-slate-300;
+      @apply text-xs;
     }
 
     .observe-empty {
@@ -2459,24 +2667,76 @@
 
   /* Short landscape phones: keep dock usable, shrink hero */
   @media (max-height: 500px) and (orientation: landscape) {
+    .observe-bar.observe-bar-slim {
+      display: none !important;
+    }
+
+    .observe-stage,
+    .observe-stage-tight {
+      @apply flex-row justify-center items-center gap-8 py-2 px-4 overflow-hidden;
+    }
+
     .observe-stage-hero {
-      @apply flex-row flex-wrap items-center justify-center gap-2 py-0;
+      @apply flex-col items-center gap-1.5 max-w-[200px] -translate-y-0 py-0;
     }
 
     .observe-phone-avatar {
-      @apply mb-0;
+      @apply mb-1;
+    }
+
+    .observe-phone-avatar .user-avatar {
+      @apply !h-12 !w-12 border-2 bg-[#121214] !text-sm font-bold shadow-md;
     }
 
     .observe-learner-solo {
-      @apply text-lg;
+      @apply text-base font-bold tracking-tight text-white;
+    }
+
+    .observe-learner-rfc {
+      @apply text-[10px] px-2 py-0.5 rounded-full;
+    }
+
+    .observe-dock,
+    .observe-dock-lg {
+      @apply mt-0 mx-0 flex-col gap-2;
+    }
+
+    .observe-dock-colors {
+      @apply flex-row gap-1.5 p-1.5 rounded-[2rem] border-2 border-slate-600 bg-gradient-to-r from-slate-950 to-slate-800;
     }
 
     .observe-dock-color {
-      @apply min-h-12;
+      @apply h-11 min-h-0 w-11 min-w-0 rounded-full border-2 border-slate-950 p-1 text-white;
     }
 
     .observe-dock-probe-btn {
-      @apply min-h-12;
+      @apply h-11 min-h-11 w-11 min-w-11 border-2 border-slate-500 bg-slate-800 p-1 text-[8px];
+      box-shadow: none;
+    }
+
+    .observe-dock-probe {
+      @apply flex-row gap-1.5 p-1.5 rounded-[2rem] border-2 border-slate-600 bg-slate-950/95;
+    }
+
+    .observe-split-pane .observe-dock-colors,
+    .observe-split-pane .observe-dock-probe {
+      @apply flex-col;
+    }
+
+    .observe-dock-tools {
+      @apply mt-0 max-w-[10.5rem] bg-slate-950/40 border-white/5;
+    }
+
+    .observe-tool {
+      @apply h-8 w-8 min-w-0;
+    }
+
+    .observe-tool-text {
+      @apply hidden!;
+    }
+
+    .observe-dock-q {
+      @apply text-xs;
     }
 
     .observe-map-sheet {
@@ -3153,7 +3413,7 @@
   }
 
   .column-toggle-row button {
-    @apply px-3 py-1.5 text-xs;
+    @apply px-2.5 py-0.5 text-[11px] rounded-full border border-slate-200/60 transition-all font-semibold;
   }
 
   .learner-session-table-wrap table,

@@ -1,31 +1,39 @@
 /**
- * Idempotent domain User upsert from a Clerk user payload.
- * Intended for webhook handlers (Edge Function / server) — pure merge logic here.
+ * Idempotent domain User upsert from native Supabase Auth user data.
+ * Pure merge logic only; database authorization comes from staff_roles.
  */
-export type ClerkUserPayload = {
+export type SupabaseAuthUserPayload = {
   id: string
-  first_name?: string | null
-  last_name?: string | null
-  email_addresses?: Array<{ email_address: string }>
+  email?: string | null
+  user_metadata?: Record<string, unknown> | null
 }
 
 export type DomainUserWrite = {
-  clerk_user_id: string
+  auth_user_id: string
+  legacy_clerk_user_id?: string | null
   display_name: string
   email: string | null
 }
 
-export function mapClerkUserToDomain(payload: ClerkUserPayload): DomainUserWrite {
-  const name = [payload.first_name, payload.last_name].filter(Boolean).join(' ').trim()
+function displayNameFromMetadata(payload: SupabaseAuthUserPayload): string {
+  const metadata = payload.user_metadata ?? {}
+  const fullName = typeof metadata.full_name === 'string' ? metadata.full_name.trim() : ''
+  const name = typeof metadata.name === 'string' ? metadata.name.trim() : ''
+  return fullName || name || payload.email || payload.id
+}
+
+export function mapSupabaseAuthUserToDomain(payload: SupabaseAuthUserPayload): DomainUserWrite {
   return {
-    clerk_user_id: payload.id,
-    display_name: name || payload.email_addresses?.[0]?.email_address || payload.id,
-    email: payload.email_addresses?.[0]?.email_address ?? null,
+    auth_user_id: payload.id,
+    legacy_clerk_user_id: null,
+    display_name: displayNameFromMetadata(payload),
+    email: payload.email ?? null,
   }
 }
 
 /**
- * Apply a webhook delivery twice → same domain row (idempotent by clerk_user_id).
+ * Apply a provisioning event twice → same domain row (idempotent by auth_user_id).
+ * Existing legacy Clerk references are preserved only for migration/rollback evidence.
  */
 export function mergeUserUpsert(
   existing: DomainUserWrite | null,
@@ -33,7 +41,8 @@ export function mergeUserUpsert(
 ): DomainUserWrite {
   if (!existing) return incoming
   return {
-    clerk_user_id: existing.clerk_user_id,
+    auth_user_id: existing.auth_user_id,
+    legacy_clerk_user_id: existing.legacy_clerk_user_id ?? incoming.legacy_clerk_user_id ?? null,
     display_name: incoming.display_name || existing.display_name,
     email: incoming.email ?? existing.email,
   }

@@ -1,92 +1,114 @@
 import { describe, expect, it } from 'vitest'
 import {
-  canManageCourse,
+  canCaptureAssessment,
+  canManageWorkspaceCatalog,
+  canReadClass,
   canReadEnrollment,
   canReadLearnerAssessment,
-  canReadOrganization,
+  canReadWorkspace,
   filterVisible,
   type PolicyActor,
 } from './access-policy'
 
-const orgA = 'org-a'
-const orgB = 'org-b'
+const now = '2026-07-19T02:48:00.000Z'
 
-const adminA: PolicyActor = {
-  userId: 'admin-a',
-  organizationIds: [orgA],
-  rolesByOrg: { [orgA]: ['admin'] },
+const admin: PolicyActor = {
+  kind: 'staff',
+  userId: 'admin-1',
+  roles: ['admin', 'teacher'],
+  ownedClassIds: [],
 }
 
 const teacherA: PolicyActor = {
+  kind: 'staff',
   userId: 'teacher-a',
-  organizationIds: [orgA],
-  rolesByOrg: { [orgA]: ['teacher'] },
+  roles: ['teacher'],
+  ownedClassIds: ['class-a'],
 }
 
-const learner1: PolicyActor = {
-  userId: 'learner-1',
-  organizationIds: [orgA],
-  rolesByOrg: { [orgA]: ['learner'] },
+const teacherB: PolicyActor = {
+  kind: 'staff',
+  userId: 'teacher-b',
+  roles: ['teacher'],
+  ownedClassIds: ['class-b'],
 }
 
-const learner2: PolicyActor = {
-  userId: 'learner-2',
-  organizationIds: [orgA],
-  rolesByOrg: { [orgA]: ['learner'] },
+const learnerToken: PolicyActor = {
+  kind: 'learner-token',
+  learnerUserId: 'learner-1',
+  classId: 'class-a',
+  expiresAt: '2026-07-20T00:00:00.000Z',
 }
 
-const outsider: PolicyActor = {
-  userId: 'outsider',
-  organizationIds: [orgB],
-  rolesByOrg: { [orgB]: ['admin'] },
+const expiredLearnerToken: PolicyActor = {
+  kind: 'learner-token',
+  learnerUserId: 'learner-1',
+  classId: 'class-a',
+  expiresAt: '2026-07-18T00:00:00.000Z',
 }
 
-describe('RLS-equivalent access policy', () => {
-  it('denies cross-organization organization reads', () => {
-    expect(canReadOrganization(outsider, { organizationId: orgA })).toBe(false)
-    expect(canReadOrganization(adminA, { organizationId: orgA })).toBe(true)
+const revokedLearnerToken: PolicyActor = {
+  kind: 'learner-token',
+  learnerUserId: 'learner-1',
+  classId: 'class-a',
+  expiresAt: '2026-07-20T00:00:00.000Z',
+  revokedAt: '2026-07-19T00:00:00.000Z',
+}
+
+const anon: PolicyActor = { kind: 'anon' }
+
+const learnerRow = {
+  learnerUserId: 'learner-1',
+  teacherUserId: 'teacher-a',
+  classId: 'class-a',
+}
+
+const otherLearnerRow = {
+  learnerUserId: 'learner-2',
+  teacherUserId: 'teacher-a',
+  classId: 'class-a',
+}
+
+const otherClassRow = {
+  learnerUserId: 'learner-1',
+  teacherUserId: 'teacher-b',
+  classId: 'class-b',
+}
+
+describe('V2 RLS-equivalent access policy', () => {
+  it('uses database-owned staff roles instead of user-editable metadata or org membership', () => {
+    expect(canReadWorkspace(admin)).toBe(true)
+    expect(canManageWorkspaceCatalog(admin)).toBe(true)
+    expect(canManageWorkspaceCatalog(teacherA)).toBe(false)
+    expect(canReadWorkspace(anon)).toBe(false)
   })
 
-  it('denies cross-organization course management', () => {
-    expect(canManageCourse(outsider, { organizationId: orgA })).toBe(false)
-    expect(canManageCourse(adminA, { organizationId: orgA })).toBe(true)
-    expect(canManageCourse(teacherA, { organizationId: orgA })).toBe(false)
+  it('scopes Teacher through owned Classes', () => {
+    expect(canReadClass(teacherA, { classId: 'class-a' })).toBe(true)
+    expect(canReadClass(teacherA, { classId: 'class-b' })).toBe(false)
+    expect(canCaptureAssessment(teacherA, { classId: 'class-a', teacherUserId: 'teacher-a', learnerUserIds: ['learner-1'] })).toBe(true)
+    expect(canCaptureAssessment(teacherB, { classId: 'class-a', teacherUserId: 'teacher-a', learnerUserIds: ['learner-1'] })).toBe(false)
   })
 
-  it('denies learner reading another learner enrollment/assessment', () => {
-    const row = {
-      organizationId: orgA,
-      learnerUserId: 'learner-1',
-      teacherUserId: 'teacher-a',
-    }
-    expect(canReadEnrollment(learner1, row)).toBe(true)
-    expect(canReadEnrollment(learner2, row)).toBe(false)
-    expect(canReadLearnerAssessment(learner2, row)).toBe(false)
-    expect(canReadLearnerAssessment(teacherA, row)).toBe(true)
-    expect(canReadLearnerAssessment(adminA, row)).toBe(true)
-    expect(canReadLearnerAssessment(outsider, row)).toBe(false)
+  it('allows a valid signed learner token to read only its learner and class scope', () => {
+    expect(canReadEnrollment(learnerToken, learnerRow)).toBe(true)
+    expect(canReadLearnerAssessment(learnerToken, learnerRow, now)).toBe(true)
+    expect(canReadLearnerAssessment(learnerToken, otherLearnerRow, now)).toBe(false)
+    expect(canReadLearnerAssessment(learnerToken, otherClassRow, now)).toBe(false)
   })
 
-  it('filters collections so only authorized rows remain', () => {
-    const rows = [
-      {
-        organizationId: orgA,
-        learnerUserId: 'learner-1',
-        teacherUserId: 'teacher-a',
-      },
-      {
-        organizationId: orgA,
-        learnerUserId: 'learner-2',
-        teacherUserId: 'teacher-a',
-      },
-      {
-        organizationId: orgB,
-        learnerUserId: 'learner-x',
-        teacherUserId: 'teacher-b',
-      },
-    ]
-    const visible = filterVisible(rows, learner1, canReadLearnerAssessment)
-    expect(visible).toHaveLength(1)
-    expect(visible[0]?.learnerUserId).toBe('learner-1')
+  it('denies expired, revoked, and anonymous learner access', () => {
+    expect(canReadLearnerAssessment(expiredLearnerToken, learnerRow, now)).toBe(false)
+    expect(canReadLearnerAssessment(revokedLearnerToken, learnerRow, now)).toBe(false)
+    expect(canReadLearnerAssessment(anon, learnerRow, now)).toBe(false)
+  })
+
+  it('filters collections so only authorized learner rows remain', () => {
+    const visible = filterVisible(
+      [learnerRow, otherLearnerRow, otherClassRow],
+      learnerToken,
+      (actor, row) => canReadLearnerAssessment(actor, row, now),
+    )
+    expect(visible).toEqual([learnerRow])
   })
 })

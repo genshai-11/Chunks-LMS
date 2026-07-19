@@ -21,6 +21,8 @@ export type ResultRecord = {
   learnerUserId: string
   teacherUserId: string
   sessionQuestionId: string
+  /** Optional resource/test item reference copied from Session Question external_ref. */
+  externalRef?: string | null
   effectiveColor: ResultColor
   enteredProbeFlow: boolean
   probeEventCount: number

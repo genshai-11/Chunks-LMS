@@ -64,6 +64,43 @@ function client() {
   return getSupabase() as any
 }
 
+export const SUPABASE_IN_FILTER_BATCH_SIZE = 100
+
+export function chunkForSupabaseInFilter<T>(
+  values: readonly T[],
+  batchSize = SUPABASE_IN_FILTER_BATCH_SIZE,
+): T[][] {
+  const uniqueValues = [...new Set(values)]
+  const chunks: T[][] = []
+  for (let i = 0; i < uniqueValues.length; i += batchSize) {
+    chunks.push(uniqueValues.slice(i, i + batchSize))
+  }
+  return chunks
+}
+
+export async function selectInBatches<T>(
+  sb: any,
+  options: {
+    table: string
+    select: string
+    column: string
+    values: readonly string[]
+    batchSize?: number
+    apply?: (query: any) => any
+  },
+): Promise<Result<T[]>> {
+  const batches = chunkForSupabaseInFilter(options.values, options.batchSize)
+  const rows: T[] = []
+  for (const batch of batches) {
+    let query = sb.from(options.table).select(options.select).in(options.column, batch)
+    query = options.apply ? options.apply(query) : query
+    const result = await query
+    if (result.error) return { ok: false, error: result.error.message }
+    rows.push(...((result.data ?? []) as T[]))
+  }
+  return { ok: true, data: rows }
+}
+
 function snapshotFromDb(row: DbSnapshot): AssessmentSnapshot {
   return {
     status: row.status,
@@ -182,6 +219,14 @@ export async function ensureLearningSessionOnServer(
     owner_user_id: session.ownerUserId,
     lock_expires_at: session.lockExpiresAt,
     session_kind: session.sessionKind ?? 'regular',
+    session_format: session.sessionFormat ?? 'lesson',
+    prompt_language: session.sessionFormat === 'test' ? (session.promptLanguage ?? 'vi') : null,
+    live_test_resource_id: session.sessionFormat === 'test' ? session.liveTestResourceId : null,
+    live_test_block_id: session.sessionFormat === 'test' ? session.liveTestBlockId : null,
+    test_package_version_id: session.sessionFormat === 'test' ? session.testPackageVersionId : null,
+    test_section_id: session.sessionFormat === 'test' ? session.testSectionId : null,
+    section_measurement_snapshot_id:
+      session.sessionFormat === 'test' ? session.sectionMeasurementSnapshotId : null,
     participant_learner_ids: session.participantLearnerIds,
   }
 
@@ -260,15 +305,17 @@ export async function loadLiveCapture(input: {
   const attemptIds = dbAttempts.map((attempt) => attempt.id)
   let snapshots: DbSnapshot[] = []
   if (attemptIds.length > 0) {
-    const snapshotResult = await sb
-      .from('assessment_attempt_snapshots')
-      .select('*')
-      .in('attempt_id', attemptIds)
-    if (snapshotResult.error) {
+    const snapshotResult = await selectInBatches<DbSnapshot>(sb, {
+      table: 'assessment_attempt_snapshots',
+      select: '*',
+      column: 'attempt_id',
+      values: attemptIds,
+    })
+    if (!snapshotResult.ok) {
       if (compatibleFallback) return { ok: true, data: compatibleFallback }
-      return { ok: false, error: snapshotResult.error.message }
+      return snapshotResult
     }
-    snapshots = (snapshotResult.data ?? []) as DbSnapshot[]
+    snapshots = snapshotResult.data
   }
 
   const snapshotByAttempt = new Map(snapshots.map((snapshot) => [snapshot.attempt_id, snapshot]))
@@ -486,12 +533,14 @@ export async function loadLiveLedger(roster: RosterState): Promise<Result<Result
   const classIds = roster.classes.map((row) => row.id)
   if (classIds.length === 0) return { ok: true, data: [] }
 
-  const sessionsResult = await sb
-    .from('learning_sessions')
-    .select('id,class_id')
-    .in('class_id', classIds)
-  if (sessionsResult.error) return { ok: false, error: sessionsResult.error.message }
-  for (const session of sessionsResult.data ?? []) {
+  const sessionsResult = await selectInBatches<{ id: string; class_id: string }>(sb, {
+    table: 'learning_sessions',
+    select: 'id,class_id',
+    column: 'class_id',
+    values: classIds,
+  })
+  if (!sessionsResult.ok) return sessionsResult
+  for (const session of sessionsResult.data) {
     const klass = classById.get(session.class_id as string)
     if (klass)
       classBySession.set(session.id as string, { classId: klass.id, courseId: klass.courseId })
@@ -499,26 +548,36 @@ export async function loadLiveLedger(roster: RosterState): Promise<Result<Result
   const sessionIds = [...classBySession.keys()]
   if (sessionIds.length === 0) return { ok: true, data: [] }
 
-  const attemptsResult = await sb
-    .from('assessment_attempts')
-    .select('id,learning_session_id,session_question_id,learner_user_id,teacher_user_id')
-    .in('learning_session_id', sessionIds)
-  if (attemptsResult.error) return { ok: false, error: attemptsResult.error.message }
-  const attempts = (attemptsResult.data ?? []) as DbAttempt[]
+  const attemptsResult = await selectInBatches<DbAttempt>(sb, {
+    table: 'assessment_attempts',
+    select: 'id,learning_session_id,session_question_id,learner_user_id,teacher_user_id',
+    column: 'learning_session_id',
+    values: sessionIds,
+  })
+  if (!attemptsResult.ok) return attemptsResult
+  const attempts = attemptsResult.data
   if (attempts.length === 0) return { ok: true, data: [] }
 
-  const snapshotsResult = await sb
-    .from('assessment_attempt_snapshots')
-    .select(
+  const snapshotsResult = await selectInBatches<DbSnapshot>(sb, {
+    table: 'assessment_attempt_snapshots',
+    select:
       'attempt_id,status,provisional_color,effective_color,effective_score,probe_count,max_probe_count,entered_probe_flow,finalized_at,updated_at',
-    )
-    .in(
-      'attempt_id',
-      attempts.map((row) => row.id),
-    )
-    .in('status', ['finalized', 'corrected'])
-  if (snapshotsResult.error) return { ok: false, error: snapshotsResult.error.message }
-  const snapshots = (snapshotsResult.data ?? []) as DbSnapshot[]
+    column: 'attempt_id',
+    values: attempts.map((row) => row.id),
+    apply: (query) => query.in('status', ['finalized', 'corrected']),
+  })
+  if (!snapshotsResult.ok) return snapshotsResult
+  const snapshots = snapshotsResult.data
+  const questionIds = attempts.map((row) => row.session_question_id)
+  const questionsResult = await selectInBatches<DbQuestion>(sb, {
+    table: 'session_questions',
+    select: 'id,learning_session_id,sequence_number,external_ref',
+    column: 'id',
+    values: questionIds,
+  })
+  const externalRefByQuestion = new Map(
+    questionsResult.ok ? questionsResult.data.map((row) => [row.id, row.external_ref]) : [],
+  )
   const attemptById = new Map(attempts.map((row) => [row.id, row]))
   const rows: ResultRecord[] = []
   for (const snapshot of snapshots) {
@@ -534,6 +593,7 @@ export async function loadLiveLedger(roster: RosterState): Promise<Result<Result
       learnerUserId: attempt.learner_user_id,
       teacherUserId: attempt.teacher_user_id,
       sessionQuestionId: attempt.session_question_id,
+      externalRef: externalRefByQuestion.get(attempt.session_question_id) ?? null,
       effectiveColor: snapshot.effective_color,
       enteredProbeFlow: snapshot.entered_probe_flow,
       probeEventCount: snapshot.probe_count,
@@ -550,5 +610,63 @@ export function replaceLiveAttempt(
   return {
     ...capture,
     attempts: capture.attempts.map((current) => (current.id === attempt.id ? attempt : current)),
+  }
+}
+
+export async function syncCaptureSessionToServer(
+  capture: CaptureSessionState,
+): Promise<Result<true>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+
+  try {
+    if (capture.questions.length === 0) return { ok: true, data: true }
+
+    const dbQuestions: DbQuestion[] = capture.questions.map((q) => ({
+      id: q.id,
+      learning_session_id: q.learningSessionId,
+      sequence_number: q.sequenceNumber,
+      external_ref: q.externalRef,
+    }))
+
+    const dbAttempts: DbAttempt[] = capture.attempts.map((a) => ({
+      id: a.id,
+      learning_session_id: a.learningSessionId,
+      session_question_id: a.sessionQuestionId,
+      learner_user_id: a.learnerUserId,
+      teacher_user_id: a.teacherUserId,
+    }))
+
+    const dbSnapshots: DbSnapshot[] = capture.attempts.map((a) => ({
+      attempt_id: a.id,
+      status: a.snapshot.status,
+      provisional_color: a.snapshot.provisionalColor,
+      effective_color: a.snapshot.effectiveColor,
+      effective_score: a.snapshot.effectiveScore,
+      probe_count: a.snapshot.probeCount,
+      max_probe_count: a.snapshot.maxProbeCount,
+      entered_probe_flow: a.snapshot.enteredProbeFlow,
+      finalized_at: a.snapshot.finalizedAt,
+      updated_at: new Date().toISOString(),
+    }))
+
+    // 1. Upsert questions
+    const qRes = await sb.from('session_questions').upsert(dbQuestions, { onConflict: 'id' })
+    if (qRes.error) return { ok: false, error: `session_questions sync: ${qRes.error.message}` }
+
+    // 2. Upsert attempts
+    const aRes = await sb.from('assessment_attempts').upsert(dbAttempts, { onConflict: 'id' })
+    if (aRes.error) return { ok: false, error: `assessment_attempts sync: ${aRes.error.message}` }
+
+    // 3. Upsert snapshots
+    const sRes = await sb
+      .from('assessment_attempt_snapshots')
+      .upsert(dbSnapshots, { onConflict: 'attempt_id' })
+    if (sRes.error)
+      return { ok: false, error: `assessment_attempt_snapshots sync: ${sRes.error.message}` }
+
+    return { ok: true, data: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'capture sync failed' }
   }
 }

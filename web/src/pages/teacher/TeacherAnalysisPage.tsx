@@ -1,13 +1,76 @@
 import { Link } from 'react-router-dom'
 import { PageHeader } from '../../components/PageHeader'
-import { ProgressAnalysisView } from '../../components/ProgressAnalysisView'
+import { SessionProgressAnalysisView } from '../../components/SessionProgressAnalysisView'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import { activeEnrollmentsForClass } from '../../modules/roster/service'
 import { useAppState } from '../../state/useAppState'
+import { getSupabase } from '../../lib/supabase'
 
 export function TeacherAnalysisPage() {
-  const { roster, scheduling, ledger, metricSettings, activeLearnerUserId } = useAppState()
+  const {
+    roster,
+    scheduling,
+    setScheduling,
+    ledger,
+    setLedger,
+    syncNow,
+    metricSettings,
+    activeLearnerUserId,
+  } = useAppState()
   const { classRow, course } = useTeacherClassContext()
+
+  const deleteSession = async (sessionId: string) => {
+    if (
+      !window.confirm(
+        'Are you sure you want to delete this live session? All question captures and attendance for this session will be permanently deleted.',
+      )
+    ) {
+      return
+    }
+
+    const nextScheduling = {
+      ...scheduling,
+      learningSessions: scheduling.learningSessions.filter((s) => s.id !== sessionId),
+      attendance: scheduling.attendance.filter((a) => a.learningSessionId !== sessionId),
+    }
+    const nextLedger = ledger.filter((r) => r.learningSessionId !== sessionId)
+
+    setScheduling(nextScheduling)
+    setLedger(nextLedger)
+
+    try {
+      const sb = getSupabase()
+      if (sb) {
+        await sb.from('learning_sessions').delete().eq('id', sessionId)
+      }
+      await syncNow({ scheduling: nextScheduling, pruneMissing: true })
+    } catch (e) {
+      console.warn('Session delete sync failed:', e)
+    }
+  }
+
+  const editSessionNumber = async (sessionId: string, sessionNumber: number) => {
+    const nextScheduling = {
+      ...scheduling,
+      learningSessions: scheduling.learningSessions.map((s) =>
+        s.id === sessionId ? { ...s, sessionNumber } : s
+      ),
+    }
+
+    setScheduling(nextScheduling)
+
+    try {
+      const sb = getSupabase()
+      if (sb) {
+        await (sb.from('learning_sessions') as any)
+          .update({ session_number: sessionNumber })
+          .eq('id', sessionId)
+      }
+      await syncNow({ scheduling: nextScheduling })
+    } catch (e) {
+      console.warn('Session update sync failed:', e)
+    }
+  }
 
   const learners = classRow
     ? activeEnrollmentsForClass(roster, classRow.id)
@@ -30,7 +93,7 @@ export function TeacherAnalysisPage() {
   return (
     <>
       <PageHeader
-        title="Analysis"
+        title="Progress Analysis"
         subtitle={`${course.code} · ${classRow.name} · focus on RFC/RAC by day & learner`}
         actions={
           <Link to="/teacher/session" className="btn ghost">
@@ -38,7 +101,7 @@ export function TeacherAnalysisPage() {
           </Link>
         }
       />
-      <ProgressAnalysisView
+      <SessionProgressAnalysisView
         mode="teacher"
         courseId={course.id}
         courseCode={course.code}
@@ -59,10 +122,17 @@ export function TeacherAnalysisPage() {
             startedAt: s.startedAt,
             completedAt: s.completedAt,
             sessionNumber: s.sessionNumber,
+            sessionKind: s.sessionKind,
+            sessionFormat: s.sessionFormat,
+            promptLanguage: s.promptLanguage,
+            liveTestResourceId: s.liveTestResourceId,
+            liveTestBlockId: s.liveTestBlockId,
           }))}
         emptyHint="Start a live session and finalize Focus / Awareness colors to populate this report."
         metricSettings={metricSettings}
         learnerUserId={activeLearnerUserId ?? undefined}
+        onDeleteSession={deleteSession}
+        onEditSessionNumber={editSessionNumber}
       />
     </>
   )

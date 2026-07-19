@@ -212,11 +212,32 @@ export async function createSnapshotOverride(input: {
 
 export type NarrationVariant = {
   id: string
-  item_id: string
-  language_code: string
-  voice_name: string
-  approval_status: 'generated' | 'approved' | 'rejected'
-  audio_asset_id: string | null
+  packageVersionId: string
+  testSectionId: string | null
+  testItemId: string | null
+  narrationTarget: 'section_intro' | 'test_item'
+  language: 'vi' | 'en'
+  voiceId: string
+  voiceLabel: string | null
+  approvalStatus: 'draft' | 'generated' | 'approved' | 'rejected' | 'archived'
+  audioAssetId: string | null
+  generationJobId: string | null
+}
+
+function mapNarrationVariant(row: any): NarrationVariant {
+  return {
+    id: row.id,
+    packageVersionId: row.package_version_id,
+    testSectionId: row.test_section_id,
+    testItemId: row.test_item_id,
+    narrationTarget: row.narration_target,
+    language: row.language,
+    voiceId: row.voice_id,
+    voiceLabel: row.voice_label,
+    approvalStatus: row.approval_status,
+    audioAssetId: row.audio_asset_id,
+    generationJobId: row.generation_job_id,
+  }
 }
 
 export async function listNarrationVariants(itemId: string): Promise<Result<NarrationVariant[]>> {
@@ -225,7 +246,8 @@ export async function listNarrationVariants(itemId: string): Promise<Result<Narr
   const { data, error } = await sb
     .from('narration_variants')
     .select('*')
-    .eq('item_id', itemId)
+    .eq('test_item_id', itemId)
+    .order('created_at', { ascending: false })
   if (error) return { ok: false, error: error.message }
-  return { ok: true, data: data ?? [] }
+  return { ok: true, data: (data ?? []).map(mapNarrationVariant) }
 }

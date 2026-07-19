@@ -46,7 +46,7 @@ insert into public.test_sections (id, package_version_id, section_order, title) 
   ('48000000-0000-4000-8000-000000000001', '45000000-0000-4000-8000-000000000002', 1, 'Section 1');
 
 -- Create immutable snapshot setting target_cvr_ohm = 5, cciValue = 4
-insert into public.section_measurement_snapshots (id, section_id, package_version_id, target_cvr_ohm, cci_profile_id, cci_category_id, cci_category_label, cci_value) values
+insert into public.section_measurement_snapshots (id, test_section_id, package_version_id, target_cvr_ohm, cci_profile_id, cci_category_id, cci_category_label, cci_value) values
   ('49000000-0000-4000-8000-000000000001', '48000000-0000-4000-8000-000000000001', '45000000-0000-4000-8000-000000000002', 5, '46000000-0000-4000-8000-000000000001', '47000000-0000-4000-8000-000000000001', 'Rep Cat 1', 4);
 
 -- Live learning sessions linking version, section, and snapshot

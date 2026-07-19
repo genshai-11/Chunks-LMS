@@ -255,11 +255,15 @@ export function AdminLiveTestsPage() {
   }
 
   // Handle Narration Audio Approval
-  const handleApproveNarration = async (variantId: string) => {
+  const handleApproveNarration = async (generationJobId: string | null) => {
+    if (!generationJobId) {
+      setNarrationStatus('Cannot approve: this narration variant is missing its generation job reference.')
+      return
+    }
     setNarrationStatus('Processing approval...')
     try {
       const res = await generator.approveGeneratedAsset({
-        generationJobId: variantId, // maps to variant ID/generation job ID
+        generationJobId,
         notes: 'Approved by administrator',
       })
       if (res && res.narrationVariantId) {
@@ -277,27 +281,9 @@ export function AdminLiveTestsPage() {
     }
   }
 
-  // Handle Narration Audio Rejection
-  const handleRejectNarration = async (variantId: string) => {
-    setNarrationStatus('Processing rejection...')
-    try {
-      const res = await generator.approveGeneratedAsset({
-        generationJobId: variantId,
-        notes: 'Rejected by administrator',
-      })
-      if (res && res.narrationVariantId) {
-        setNarrationStatus('Narration variant rejected.')
-        // Refresh local list
-        if (selectedItemIdForNarration) {
-          const r = await listNarrationVariants(selectedItemIdForNarration)
-          if (r.ok) setNarrationVariants(r.data)
-        }
-      } else {
-        setNarrationStatus('Rejection failed')
-      }
-    } catch (e: any) {
-      setNarrationStatus(`Error: ${e.message}`)
-    }
+  // Rejection requires a separate audited server action; do not route it through approval.
+  const handleRejectNarration = () => {
+    setNarrationStatus('Reject is not wired yet. Leave this variant generated, or approve it after review.')
   }
 
   // Mock CSV parsing
@@ -592,17 +578,17 @@ export function AdminLiveTestsPage() {
                 <tbody>
                   {narrationVariants.map((v) => (
                     <tr key={v.id}>
-                      <td><strong>{v.language_code.toUpperCase()}</strong></td>
-                      <td>{v.voice_name}</td>
+                      <td><strong>{v.language.toUpperCase()}</strong></td>
+                      <td>{v.voiceLabel ?? v.voiceId}</td>
                       <td>
-                        <span className={`badge ${v.approval_status === 'approved' ? 'green' : v.approval_status === 'rejected' ? 'red' : 'yellow'}`}>
-                          {v.approval_status}
+                        <span className={`badge ${v.approvalStatus === 'approved' ? 'green' : v.approvalStatus === 'rejected' ? 'red' : 'yellow'}`}>
+                          {v.approvalStatus}
                         </span>
                       </td>
                       <td>
-                        {v.audio_asset_id ? (
+                        {v.audioAssetId ? (
                           <button className="ghost" onClick={async () => {
-                            const url = await audioUrl(v.audio_asset_id)
+                            const url = await audioUrl(v.audioAssetId)
                             if (url) {
                               const audio = new Audio(url)
                               void audio.play()
@@ -616,10 +602,16 @@ export function AdminLiveTestsPage() {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: '0.25rem' }}>
-                          <button className="ghost" style={{ padding: '0.25rem' }} title="Approve Narration" onClick={() => handleApproveNarration(v.id)}>
+                          <button
+                            className="ghost"
+                            style={{ padding: '0.25rem' }}
+                            title="Approve Narration"
+                            disabled={!v.generationJobId || v.approvalStatus === 'approved'}
+                            onClick={() => handleApproveNarration(v.generationJobId)}
+                          >
                             <Check className="h-4 w-4 text-green" />
                           </button>
-                          <button className="ghost" style={{ padding: '0.25rem' }} title="Reject Narration" onClick={() => handleRejectNarration(v.id)}>
+                          <button className="ghost" style={{ padding: '0.25rem' }} title="Reject Narration" onClick={handleRejectNarration}>
                             <X className="h-4 w-4 text-red" />
                           </button>
                         </div>
@@ -629,7 +621,7 @@ export function AdminLiveTestsPage() {
                   {narrationVariants.length === 0 && (
                     <tr>
                       <td colSpan={5} className="meta" style={{ textAlign: 'center' }}>
-                        No narration variants registered for this item yet. Use server-side RPC to request generation.
+                        No narration variants registered for this item yet. Request generation through the live-test-generation Edge Function.
                       </td>
                     </tr>
                   )}

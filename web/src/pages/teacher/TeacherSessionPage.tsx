@@ -43,6 +43,17 @@ import type { LiveTestBlock, LiveTestResource } from '../../modules/assessment/l
 import { blockSummary } from '../../modules/assessment/live-test'
 import { listLiveTestBlocks, listLiveTestResources } from '../../lib/live-test-resources'
 import {
+  listTestPackages,
+  listTestPackageVersions,
+  listTestSections,
+  getSectionSnapshot,
+} from '../../lib/test-packages'
+import type {
+  TestPackage,
+  TestPackageVersion,
+  TestSection,
+} from '../../modules/catalog/test-package-catalog'
+import {
   resolveSessionDayNumber,
   sessionDayBadge,
   sessionDayHash,
@@ -105,6 +116,54 @@ export function TeacherSessionPage() {
   const [testBlocks, setTestBlocks] = useState<LiveTestBlock[]>([])
   const [selectedResourceId, setSelectedResourceId] = useState<string>('')
   const [selectedBlockId, setSelectedBlockId] = useState<string>('')
+
+  const [packages, setPackages] = useState<TestPackage[]>([])
+  const [selectedPkgId, setSelectedPkgId] = useState<string>('')
+  const [versions, setVersions] = useState<TestPackageVersion[]>([])
+  const [selectedVerId, setSelectedVerId] = useState<string>('')
+  const [sections, setSections] = useState<TestSection[]>([])
+  const [selectedSecId, setSelectedSecId] = useState<string>('')
+
+  // Load packages
+  useEffect(() => {
+    void listTestPackages().then((res) => {
+      if (res.ok && res.data[0]) {
+        setPackages(res.data)
+        setSelectedPkgId(res.data[0].id)
+      }
+    })
+  }, [])
+
+  // Load versions when package changes
+  useEffect(() => {
+    if (!selectedPkgId) return
+    void listTestPackageVersions(selectedPkgId).then((res) => {
+      if (res.ok) {
+        setVersions(res.data)
+        if (res.data[0]) {
+          setSelectedVerId(res.data[0].id)
+        } else {
+          setSelectedVerId('')
+          setSections([])
+        }
+      }
+    })
+  }, [selectedPkgId])
+
+  // Load sections when version changes
+  useEffect(() => {
+    if (!selectedVerId) return
+    void listTestSections(selectedVerId).then((res) => {
+      if (res.ok) {
+        setSections(res.data)
+        if (res.data[0]) {
+          setSelectedSecId(res.data[0].id)
+        } else {
+          setSelectedSecId('')
+        }
+      }
+    })
+  }, [selectedVerId])
 
   useEffect(() => {
     let cancelled = false
@@ -292,8 +351,8 @@ export function TeacherSessionPage() {
     if (selectedIds.length === 0) {
       return err('Select at least one learner before starting')
     }
-    if (sessionFormat === 'test' && (!selectedResourceId || !selectedBlockId)) {
-      return err('Select a live-test resource and session block before starting')
+    if (sessionFormat === 'test' && !selectedResourceId && !selectedSecId) {
+      return err('Select a live-test resource or package section before starting')
     }
     let rosterForSession = roster
     for (const learnerId of selectedIds) {
@@ -316,6 +375,14 @@ export function TeacherSessionPage() {
     )
     const sessionNumber = nextNums.length > 0 ? Math.max(...nextNums) : undefined
 
+    let activeSnapshotId: string | null = null
+    if (sessionFormat === 'test' && selectedSecId) {
+      const snapRes = await getSectionSnapshot(selectedSecId)
+      if (snapRes.ok && snapRes.data) {
+        activeSnapshotId = snapRes.data.id
+      }
+    }
+
     const r = startLearningSession(scheduling, {
       classId: classRow.id,
       maxProbeCount: maxProbe,
@@ -323,8 +390,11 @@ export function TeacherSessionPage() {
       sessionKind,
       sessionFormat,
       promptLanguage: sessionFormat === 'test' ? promptLanguage : null,
-      liveTestResourceId: sessionFormat === 'test' ? selectedResourceId : null,
-      liveTestBlockId: sessionFormat === 'test' ? selectedBlockId : null,
+      liveTestResourceId: sessionFormat === 'test' ? selectedResourceId || null : null,
+      liveTestBlockId: sessionFormat === 'test' ? selectedBlockId || null : null,
+      testPackageVersionId: sessionFormat === 'test' ? selectedVerId || null : null,
+      testSectionId: sessionFormat === 'test' ? selectedSecId || null : null,
+      sectionMeasurementSnapshotId: sessionFormat === 'test' ? activeSnapshotId : null,
       plannedQuestionCount: sessionFormat === 'test' ? 10 : null,
       participantLearnerIds: selectedIds,
       sessionNumber,
@@ -478,32 +548,47 @@ export function TeacherSessionPage() {
           <Panel
             icon={Gauge}
             title="Live-test resource"
-            description="Choose a resource block and prompt language. CPD is derived from CVR × CCI."
+            description="Choose a package version and section. CPD is derived from CVR × CCI."
           >
-            {testResources.length === 0 ? (
-              <p className="meta">No live-test resources found. Import a resource seed first.</p>
+            {testResources.length === 0 && packages.length === 0 ? (
+              <p className="meta">No live-test resources or packages found. Import a resource seed first.</p>
             ) : (
-              <div className="form-grid">
-                <label>
-                  <span>Resource</span>
-                  <select value={selectedResourceId} onChange={(e) => setSelectedResourceId(e.target.value)}>
-                    {testResources.map((resource) => (
-                      <option key={resource.id} value={resource.id}>
-                        {resource.title} · {resource.version} · {resource.status}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span>Test session block</span>
-                  <select value={selectedBlockId} onChange={(e) => setSelectedBlockId(e.target.value)}>
-                    {testBlocks.map((block) => (
-                      <option key={block.id} value={block.id}>
-                        Session {block.blockNumber} · {blockSummary(block)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+              <div className="form-grid" style={{ gap: '1.25rem' }}>
+                {packages.length > 0 && (
+                  <>
+                    <label>
+                      <span>V2 Package</span>
+                      <select value={selectedPkgId} onChange={(e) => setSelectedPkgId(e.target.value)}>
+                        {packages.map((pkg) => (
+                          <option key={pkg.id} value={pkg.id}>
+                            {pkg.title}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Version</span>
+                      <select value={selectedVerId} onChange={(e) => setSelectedVerId(e.target.value)}>
+                        {versions.map((ver) => (
+                          <option key={ver.id} value={ver.id}>
+                            {ver.versionLabel} ({ver.status})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Section</span>
+                      <select value={selectedSecId} onChange={(e) => setSelectedSecId(e.target.value)}>
+                        {sections.map((sec) => (
+                          <option key={sec.id} value={sec.id}>
+                            Section {sec.sectionOrder}: {sec.title ?? 'Untitled'}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </>
+                )}
+
                 <label>
                   <span>Prompt language</span>
                   <select value={promptLanguage} onChange={(e) => setPromptLanguage(e.target.value as PromptLanguage)}>
@@ -511,6 +596,36 @@ export function TeacherSessionPage() {
                     <option value="en">English — Complete Sentence (Eng)</option>
                   </select>
                 </label>
+
+                <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #4a5568', paddingTop: '1rem', marginTop: '0.5rem' }}>
+                  <span className="meta" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                    Legacy resources (V1 Catalog fallback)
+                  </span>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <label>
+                      <span>Resource</span>
+                      <select value={selectedResourceId} onChange={(e) => setSelectedResourceId(e.target.value)}>
+                        <option value="">-- None --</option>
+                        {testResources.map((resource) => (
+                          <option key={resource.id} value={resource.id}>
+                            {resource.title} · {resource.version}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Session block</span>
+                      <select value={selectedBlockId} onChange={(e) => setSelectedBlockId(e.target.value)}>
+                        <option value="">-- None --</option>
+                        {testBlocks.map((block) => (
+                          <option key={block.id} value={block.id}>
+                            Session {block.blockNumber} · {blockSummary(block)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                </div>
               </div>
             )}
           </Panel>

@@ -44,11 +44,11 @@
 
 ## 5. Admin package management and Teacher runtime (#9, depends on #5, #6, and #8 where generation is used)
 
-- [ ] 5.1 Add Admin draft/package/version/section/item management with CSV preview
-- [ ] 5.2 Add CCI Profile/Category selection and section snapshot/override UI
-- [ ] 5.3 Add generated-content review and custom/generated audio approval surfaces
-- [ ] 5.4 Add independent intro/item narration language and voice controls
-- [ ] 5.5 Upgrade Teacher live-test runtime for flexible sections/items and deterministic selected package version/section playback
+- [x] 5.1 Add Admin draft/package/version/section/item management with CSV preview
+- [x] 5.2 Add CCI Profile/Category selection and section snapshot/override UI
+- [x] 5.3 Add generated-content review and custom/generated audio approval surfaces
+- [x] 5.4 Add independent intro/item narration language and voice controls
+- [x] 5.5 Upgrade Teacher live-test runtime for flexible sections/items and deterministic selected package version/section playback
 
 ## 6. Correction-aware learner CPD reporting (#10, depends on #6 and #7)
 

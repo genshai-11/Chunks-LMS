@@ -37,10 +37,15 @@
 ## 4. CVR generation and TTS modules (#8, depends on #6 package drafts; server-side only)
 
 - [x] 4.1 Implement `generateTestItem` behind a server-side 9Router LLM adapter
+  - [x] 4.1R Recovery: production-configured path calls the `live-test-generation` Edge Function, whose 9Router adapter performs real `/v1/chat/completions` HTTP requests; deterministic item generation is explicit mock/local-CI only.
 - [x] 4.2 Implement `generateNarration` behind a server-side 9Router TTS adapter
+  - [x] 4.2R Recovery: production-configured path calls 9Router `/v1/audio/speech`, receives real audio bytes, and uploads them server-side to private `narration-audio` Storage before creating `audio_assets`/`narration_variants` rows.
 - [x] 4.3 Store generation jobs, provider metadata, retries/errors, source hashes, and private Storage assets
+  - [x] 4.3R Recovery: Edge Function records job status, retry attempts, hashes, redacted provider metadata, Storage path, and failure information without storing provider secrets.
 - [x] 4.4 Require human approval before generated content/audio can be published
+  - [x] 4.4R Recovery: generated narration variants remain `generated` pending Admin `approveGeneratedAsset`; no generation path marks assets approved automatically.
 - [x] 4.5 Add tests proving provider secrets and adapter details are not exposed to browser callers
+  - [x] 4.5R Recovery: TypeScript tests cover Edge Function delegation, explicit mock switch, no silent missing-config mock, 9Router request shapes, TTS bytes, redaction, retry auditing, and server-audited approval.
 
 ## 5. Admin package management and Teacher runtime (#9, depends on #5, #6, and #8 where generation is used)
 

@@ -1,7 +1,7 @@
 BEGIN;
-SELECT plan(15);
+SELECT plan(16);
 
--- Setup mock 9Router key
+-- Setup explicit local/CI mock mode and a sentinel secret that must not leak.
 select set_config('app.ninerouter_api_key', 'super-secret-token-12345', true);
 
 -- Create Fixtures
@@ -41,11 +41,20 @@ insert into public.test_items (id, section_id, package_version_id, item_order, p
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '13000000-0000-4000-8000-000000000001', true);
 
--- 1. Test generate_test_item success
+-- 1. Database generation RPCs are explicit local/CI mocks only. The real
+-- production path is the live-test-generation Edge Function.
+select throws(
+  $$ select public.generate_test_item('45000000-0000-4000-8000-000000000001', '46000000-0000-4000-8000-000000000001', 'Mẫu mới') $$,
+  'Generation requires the live-test-generation Edge Function; database deterministic mocks require app.live_test_generation_mode=mock.',
+  'Database RPC does not silently mock without explicit local/CI mode'
+);
+
+select set_config('app.live_test_generation_mode', 'mock', true);
+
 select is(
   (select public.generate_test_item('45000000-0000-4000-8000-000000000001', '46000000-0000-4000-8000-000000000001', 'Mẫu mới')->>'status'),
   'succeeded',
-  'Admin can trigger test item generation successfully'
+  'Admin can trigger explicit local/CI test item mock generation successfully'
 );
 
 select is(

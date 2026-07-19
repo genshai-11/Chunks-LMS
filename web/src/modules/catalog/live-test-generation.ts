@@ -50,22 +50,72 @@ export interface LiveTestGeneration {
   }): Promise<ApprovedGenerationAsset>
 }
 
+type SupabaseFunctionsClient = {
+  functions: {
+    invoke: (
+      functionName: string,
+      options: { body: Record<string, unknown> },
+    ) => Promise<{ data: unknown; error: { message: string } | null }>
+  }
+}
+
+type LiveTestGenerationOptions = {
+  /** Explicit local/CI-only adapter. Defaults to VITE_AUTH_BYPASS; never inferred from missing Supabase config. */
+  useDeterministicMock?: boolean
+}
+
+function makeMockJobId(prefix: string): string {
+  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+function normalizeReceipt(data: unknown): GenerationJobReceipt {
+  const receipt = data as Record<string, unknown>
+  const status = receipt.status as GenerationJobStatus
+  const jobId = String(receipt.jobId)
+  const requestedAt = String(receipt.requestedAt || new Date().toISOString())
+
+  if (status === 'failed') {
+    return {
+      jobId,
+      status,
+      requestedAt,
+      error: {
+        code: String(receipt.errorCode || 'GENERATION_FAILED'),
+        message: String(receipt.errorMessage || 'Generation failed'),
+      },
+    }
+  }
+
+  return {
+    jobId,
+    status,
+    requestedAt,
+    completedAt: receipt.completedAt ? String(receipt.completedAt) : undefined,
+    itemPreview: receipt.itemPreview as { promptVi: string; promptEn: string } | undefined,
+    narrationVariantId: receipt.narrationVariantId ? String(receipt.narrationVariantId) : undefined,
+    audioPath: receipt.audioPath ? String(receipt.audioPath) : undefined,
+  }
+}
+
 export class SupabaseLiveTestGeneration implements LiveTestGeneration {
+  private readonly useDeterministicMock: boolean
+
+  constructor(options: LiveTestGenerationOptions = {}) {
+    this.useDeterministicMock = options.useDeterministicMock ?? env.authBypass
+  }
+
   async generateTestItem(command: {
     packageVersionId: string
     sectionId: string
     promptDetails: string
   }): Promise<GenerationJobReceipt> {
-    const supabase = getSupabase()
-    
-    // Graceful degradation for mock/development/CI environments
-    if (!supabase || env.authBypass) {
-      const jobId = 'mock-job-' + Math.random().toString(36).slice(2, 10)
+    if (this.useDeterministicMock) {
+      const now = new Date().toISOString()
       return {
-        jobId,
+        jobId: makeMockJobId('mock-job'),
         status: 'succeeded',
-        requestedAt: new Date().toISOString(),
-        completedAt: new Date().toISOString(),
+        requestedAt: now,
+        completedAt: now,
         itemPreview: {
           promptVi: `[Mock] Câu hỏi mẫu tiếng Việt từ ${command.promptDetails}`,
           promptEn: `[Mock] Sample English prompt from ${command.promptDetails}`,
@@ -73,36 +123,14 @@ export class SupabaseLiveTestGeneration implements LiveTestGeneration {
       }
     }
 
-    const { data, error } = await (supabase as any).rpc('generate_test_item', {
-      p_package_version_id: command.packageVersionId,
-      p_test_section_id: command.sectionId,
-      p_prompt_details: command.promptDetails,
-    })
-
-    if (error) {
-      throw new Error(`generateTestItem failed: ${error.message}`)
-    }
-
-    const receipt = data as Record<string, unknown>
-    if (receipt.status === 'failed') {
-      return {
-        jobId: String(receipt.jobId),
-        status: 'failed',
-        requestedAt: String(receipt.requestedAt || new Date().toISOString()),
-        error: {
-          code: String(receipt.errorCode),
-          message: String(receipt.errorMessage),
-        },
-      }
-    }
-
-    return {
-      jobId: String(receipt.jobId),
-      status: receipt.status as GenerationJobStatus,
-      requestedAt: String(receipt.requestedAt),
-      completedAt: String(receipt.completedAt),
-      itemPreview: receipt.itemPreview as { promptVi: string; promptEn: string } | undefined,
-    }
+    return normalizeReceipt(
+      await this.invokeGenerationFunction({
+        action: 'generateTestItem',
+        packageVersionId: command.packageVersionId,
+        sectionId: command.sectionId,
+        promptDetails: command.promptDetails,
+      }),
+    )
   }
 
   async generateNarration(command: {
@@ -113,82 +141,51 @@ export class SupabaseLiveTestGeneration implements LiveTestGeneration {
     language: 'vi' | 'en'
     voiceId: string
   }): Promise<GenerationJobReceipt> {
-    const supabase = getSupabase()
-
-    if (!supabase || env.authBypass) {
-      const jobId = 'mock-job-' + Math.random().toString(36).slice(2, 10)
-      const variantId = 'mock-variant-' + Math.random().toString(36).slice(2, 10)
+    if (this.useDeterministicMock) {
+      const jobId = makeMockJobId('mock-job')
+      const now = new Date().toISOString()
       return {
         jobId,
         status: 'succeeded',
-        requestedAt: new Date().toISOString(),
-        completedAt: new Date().toISOString(),
-        narrationVariantId: variantId,
-        audioPath: `narrations/${jobId}.mp3`,
+        requestedAt: now,
+        completedAt: now,
+        narrationVariantId: makeMockJobId('mock-variant'),
+        audioPath: `narrations/mock/${jobId}.mp3`,
       }
     }
 
-    const { data, error } = await (supabase as any).rpc('generate_narration', {
-      p_package_version_id: command.packageVersionId,
-      p_target: command.target,
-      p_test_section_id: command.testSectionId || null,
-      p_test_item_id: command.testItemId || null,
-      p_language: command.language,
-      p_voice_id: command.voiceId,
-    })
-
-    if (error) {
-      throw new Error(`generateNarration failed: ${error.message}`)
-    }
-
-    const receipt = data as Record<string, unknown>
-    if (receipt.status === 'failed') {
-      return {
-        jobId: String(receipt.jobId),
-        status: 'failed',
-        requestedAt: String(receipt.requestedAt || new Date().toISOString()),
-        error: {
-          code: String(receipt.errorCode),
-          message: String(receipt.errorMessage),
-        },
-      }
-    }
-
-    return {
-      jobId: String(receipt.jobId),
-      status: receipt.status as GenerationJobStatus,
-      requestedAt: String(receipt.requestedAt),
-      completedAt: String(receipt.completedAt),
-      narrationVariantId: String(receipt.narrationVariantId),
-      audioPath: String(receipt.audioPath),
-    }
+    return normalizeReceipt(
+      await this.invokeGenerationFunction({
+        action: 'generateNarration',
+        packageVersionId: command.packageVersionId,
+        target: command.target,
+        testSectionId: command.testSectionId ?? null,
+        testItemId: command.testItemId ?? null,
+        language: command.language,
+        voiceId: command.voiceId,
+      }),
+    )
   }
 
   async approveGeneratedAsset(command: {
     generationJobId: string
     notes?: string
   }): Promise<ApprovedGenerationAsset> {
-    const supabase = getSupabase()
-
-    if (!supabase || env.authBypass) {
+    if (this.useDeterministicMock) {
       return {
-        narrationVariantId: 'mock-variant-' + Math.random().toString(36).slice(2, 10),
+        narrationVariantId: makeMockJobId('mock-variant'),
         approvedAt: new Date().toISOString(),
         approvedByUserId: 'mock-admin-id',
         approved: true,
       }
     }
 
-    const { data, error } = await (supabase as any).rpc('approve_generated_asset', {
-      p_generation_job_id: command.generationJobId,
-      p_notes: command.notes || '',
-    })
+    const approval = (await this.invokeGenerationFunction({
+      action: 'approveGeneratedAsset',
+      generationJobId: command.generationJobId,
+      notes: command.notes || '',
+    })) as Record<string, unknown>
 
-    if (error) {
-      throw new Error(`approveGeneratedAsset failed: ${error.message}`)
-    }
-
-    const approval = data as Record<string, unknown>
     return {
       narrationVariantId: String(approval.narrationVariantId),
       approvedAt: String(approval.approvedAt || new Date().toISOString()),
@@ -196,5 +193,28 @@ export class SupabaseLiveTestGeneration implements LiveTestGeneration {
       approved: approval.approved === true || approval.approved === 'true',
       message: approval.message ? String(approval.message) : undefined,
     }
+  }
+
+  private async invokeGenerationFunction(body: Record<string, unknown>): Promise<unknown> {
+    const supabase = getSupabase() as SupabaseFunctionsClient | null
+    if (!supabase) {
+      throw new Error(
+        'Supabase is not configured; live-test generation cannot run outside explicit local/CI mock mode.',
+      )
+    }
+
+    const { data, error } = await supabase.functions.invoke('live-test-generation', { body })
+    if (error) {
+      throw new Error(`live-test-generation failed: ${error.message}`)
+    }
+
+    const payload = data as { error?: { message?: string; code?: string } } | null
+    if (payload?.error) {
+      throw new Error(
+        `live-test-generation failed: ${payload.error.message || payload.error.code || 'Unknown error'}`,
+      )
+    }
+
+    return data
   }
 }

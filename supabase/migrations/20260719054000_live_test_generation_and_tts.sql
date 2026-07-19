@@ -1,15 +1,24 @@
--- Live Test V2 Generation and TTS Modules.
--- Hides 9Router API keys and provider credentials from browser callers.
+-- Live Test V2 Generation and TTS server seams.
+-- Real 9Router LLM/TTS requests are performed by the `live-test-generation`
+-- Supabase Edge Function. The database RPCs below keep only an explicit
+-- local/CI deterministic adapter for pgTAP/local development and must not be
+-- used as the production generation path.
+
+SET search_path TO public, extensions;
+
+-- The Edge Function uploads to the private `narration-audio` Storage bucket.
+-- Bucket provisioning/remote verification remains a release-control concern for
+-- the later #11 hardening ticket; this recovery performs no remote Storage action.
 
 -- ---------------------------------------------------------------------------
 -- Staging and Job Helpers
 -- ---------------------------------------------------------------------------
-SET search_path TO public, extensions;
 
 create or replace function public.live_test_v2_current_user_id()
 returns uuid
 language plpgsql
 security definer
+set search_path = public, extensions
 as $$
 begin
   return coalesce(
@@ -19,8 +28,16 @@ begin
 end;
 $$;
 
+create or replace function public.live_test_generation_mock_mode_enabled()
+returns boolean
+language sql
+stable
+as $$
+  select lower(coalesce(current_setting('app.live_test_generation_mode', true), '')) = 'mock';
+$$;
+
 -- ---------------------------------------------------------------------------
--- 1. generate_test_item RPC (LLM deep module adapter)
+-- 1. Deprecated generate_test_item RPC (explicit local/CI mock only)
 -- ---------------------------------------------------------------------------
 
 create or replace function public.generate_test_item(
@@ -31,6 +48,7 @@ create or replace function public.generate_test_item(
 returns jsonb
 language plpgsql
 security definer
+set search_path = public, extensions
 as $$
 declare
   v_job_id uuid;
@@ -38,16 +56,18 @@ declare
   v_org_id uuid;
   v_prompt_hash text;
   v_item_id uuid;
-  v_ninerouter_key text;
+  v_now timestamptz := now();
 begin
-  -- Access control: Admin staff only
+  if not public.live_test_generation_mock_mode_enabled() then
+    raise exception 'Generation requires the live-test-generation Edge Function; database deterministic mocks require app.live_test_generation_mode=mock.';
+  end if;
+
   if not public.current_staff_is_admin() then
     raise exception 'Access Denied: Only Admin staff can request Test Item generation.';
   end if;
 
   v_actor := public.live_test_v2_current_user_id();
 
-  -- Get organization context from package version
   select package.organization_id into v_org_id
   from public.test_package_versions v
   join public.test_packages package on package.id = v.package_id
@@ -57,7 +77,6 @@ begin
     raise exception 'Invalid package_version_id: Package version does not exist.';
   end if;
 
-  -- Verify target section exists and is part of the package version
   if not exists (
     select 1 from public.test_sections
     where id = p_test_section_id and package_version_id = p_package_version_id
@@ -65,7 +84,6 @@ begin
     raise exception 'Invalid test_section_id: Section does not belong to the package version.';
   end if;
 
-  -- Ensure package version is in draft status
   if not exists (
     select 1 from public.test_package_versions
     where id = p_package_version_id and status = 'draft'
@@ -74,8 +92,8 @@ begin
   end if;
 
   v_prompt_hash := 'sha256:' || encode(digest(coalesce(p_prompt_details, ''), 'sha256'), 'hex');
+  v_item_id := public.live_test_v2_deterministic_uuid('mock-generated-item:' || p_package_version_id::text || ':' || p_test_section_id::text || ':' || v_prompt_hash);
 
-  -- Create auditable generation job
   insert into public.generation_jobs (
     organization_id,
     requested_by_user_id,
@@ -84,6 +102,10 @@ begin
     job_type,
     status,
     prompt_hash,
+    started_at,
+    completed_at,
+    attempts,
+    provider_metadata,
     updated_at
   )
   values (
@@ -92,81 +114,48 @@ begin
     p_package_version_id,
     p_test_section_id,
     'test_item',
-    'running',
+    'succeeded',
     v_prompt_hash,
-    now()
+    v_now,
+    v_now,
+    jsonb_build_array(jsonb_build_object('attempt', 1, 'status', 'succeeded', 'provider', 'local-deterministic-mock')),
+    jsonb_build_object(
+      'provider', 'local-deterministic-mock',
+      'mode', 'mock',
+      'generated_item', jsonb_build_object(
+        'id', v_item_id,
+        'prompt_vi', '[Mock] Câu hỏi mẫu tiếng Việt từ ' || p_prompt_details,
+        'prompt_en', '[Mock] Sample English prompt from ' || p_prompt_details,
+        'tc', 3,
+        'lc', 1,
+        'tl', 1,
+        'measured_cvr', 3
+      )
+    ),
+    v_now
   )
   returning id into v_job_id;
 
-  -- Read 9Router API secret from private environment context (database parameter)
-  v_ninerouter_key := current_setting('app.ninerouter_api_key', true);
-
-  -- Adapter logic: In offline/mock mode or if no key is present, generate deterministically.
-  -- In production, this would make an HTTP request to the 9Router proxy using pg_net or edge function.
-  -- Here we mock the server-side response, hiding adapter details from the browser.
-  begin
-    -- Deterministic item payload generation
-    v_item_id := public.live_test_v2_deterministic_uuid('generated-item:' || v_job_id::text);
-
-    -- Simulating successful LLM payload insertion into generation_jobs provider_metadata
-    update public.generation_jobs
-    set status = 'succeeded',
-        completed_at = now(),
-        provider_metadata = jsonb_build_object(
-          'model', '9router/claude-3-5-sonnet',
-          'generated_item', jsonb_build_object(
-            'id', v_item_id,
-            'prompt_vi', 'Câu hỏi mẫu tiếng Việt gợi ý từ ' || p_prompt_details,
-            'prompt_en', 'Sample English prompt generated from ' || p_prompt_details,
-            'tc', 3,
-            'lc', 1,
-            'tl', 1,
-            'measured_cvr', 3
-          )
-        )
-    where id = v_job_id;
-
-    -- Return receipt without exposing v_ninerouter_key
-    return jsonb_build_object(
-      'jobId', v_job_id,
-      'status', 'succeeded',
-      'requestedAt', now(),
-      'completedAt', now(),
-      'itemPreview', jsonb_build_object(
-        'promptVi', 'Câu hỏi mẫu tiếng Việt gợi ý từ ' || p_prompt_details,
-        'promptEn', 'Sample English prompt generated from ' || p_prompt_details
-      )
-    );
-  exception when others then
-    -- Handle errors and log attempts
-    update public.generation_jobs
-    set status = 'failed',
-        completed_at = now(),
-        error_code = sqlstate,
-        error_message = sqlerrm,
-        attempts = coalesce(attempts, '[]'::jsonb) || jsonb_build_object(
-          'timestamp', now(),
-          'error', sqlerrm
-        )
-    where id = v_job_id;
-
-    return jsonb_build_object(
-      'jobId', v_job_id,
-      'status', 'failed',
-      'errorCode', sqlstate,
-      'errorMessage', sqlerrm
-    );
-  end;
+  return jsonb_build_object(
+    'jobId', v_job_id,
+    'status', 'succeeded',
+    'requestedAt', v_now,
+    'completedAt', v_now,
+    'itemPreview', jsonb_build_object(
+      'promptVi', '[Mock] Câu hỏi mẫu tiếng Việt từ ' || p_prompt_details,
+      'promptEn', '[Mock] Sample English prompt from ' || p_prompt_details
+    )
+  );
 end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- 2. generate_narration RPC (TTS deep module adapter)
+-- 2. Deprecated generate_narration RPC (explicit local/CI mock only)
 -- ---------------------------------------------------------------------------
 
 create or replace function public.generate_narration(
   p_package_version_id uuid,
-  p_target text, -- 'section_intro' | 'test_item'
+  p_target text,
   p_test_section_id uuid,
   p_test_item_id uuid,
   p_language text,
@@ -175,6 +164,7 @@ create or replace function public.generate_narration(
 returns jsonb
 language plpgsql
 security definer
+set search_path = public, extensions
 as $$
 declare
   v_job_id uuid;
@@ -184,16 +174,19 @@ declare
   v_source_hash text;
   v_audio_id uuid;
   v_variant_id uuid;
-  v_ninerouter_key text;
+  v_now timestamptz := now();
+  v_storage_path text;
 begin
-  -- Access control: Admin staff only
+  if not public.live_test_generation_mock_mode_enabled() then
+    raise exception 'Generation requires the live-test-generation Edge Function; database deterministic mocks require app.live_test_generation_mode=mock.';
+  end if;
+
   if not public.current_staff_is_admin() then
     raise exception 'Access Denied: Only Admin staff can request narration generation.';
   end if;
 
   v_actor := public.live_test_v2_current_user_id();
 
-  -- Target validations
   if p_target not in ('section_intro', 'test_item') then
     raise exception 'Invalid parameter: p_target must be section_intro or test_item.';
   end if;
@@ -206,7 +199,6 @@ begin
     raise exception 'Invalid parameters for test_item target.';
   end if;
 
-  -- Get organization context
   select package.organization_id into v_org_id
   from public.test_package_versions v
   join public.test_packages package on package.id = v.package_id
@@ -216,13 +208,16 @@ begin
     raise exception 'Invalid package_version_id: Package version does not exist.';
   end if;
 
-  -- Extract text to speak
+  if not exists (select 1 from public.test_package_versions where id = p_package_version_id and status = 'draft') then
+    raise exception 'Conflict: Package version is not a draft and cannot be modified.';
+  end if;
+
   if p_target = 'section_intro' then
     select title into v_text_to_speak
     from public.test_sections
     where id = p_test_section_id and package_version_id = p_package_version_id;
   else
-    select coalesce(prompt_vi, prompt_en) into v_text_to_speak
+    select case when p_language = 'vi' then prompt_vi else prompt_en end into v_text_to_speak
     from public.test_items
     where id = p_test_item_id and package_version_id = p_package_version_id;
   end if;
@@ -232,8 +227,9 @@ begin
   end if;
 
   v_source_hash := 'sha256:' || encode(digest(v_text_to_speak || ':' || p_language || ':' || p_voice_id, 'sha256'), 'hex');
+  v_audio_id := public.live_test_v2_deterministic_uuid('mock-generated-audio:' || p_package_version_id::text || ':' || v_source_hash);
+  v_variant_id := public.live_test_v2_deterministic_uuid('mock-generated-variant:' || p_package_version_id::text || ':' || v_source_hash);
 
-  -- Create auditable generation job
   insert into public.generation_jobs (
     organization_id,
     requested_by_user_id,
@@ -243,6 +239,7 @@ begin
     job_type,
     status,
     source_hash,
+    started_at,
     updated_at
   )
   values (
@@ -254,114 +251,108 @@ begin
     case when p_target = 'section_intro' then 'section_intro_narration'::text else 'item_narration'::text end,
     'running',
     v_source_hash,
-    now()
+    v_now,
+    v_now
   )
   returning id into v_job_id;
 
-  -- Read 9Router API secret
-  v_ninerouter_key := current_setting('app.ninerouter_api_key', true);
+  v_storage_path := 'narrations/mock/' || v_job_id::text || '.mp3';
 
-  begin
-    -- Deterministic IDs for audio asset and narration variant
-    v_audio_id := public.live_test_v2_deterministic_uuid('generated-audio:' || v_job_id::text);
-    v_variant_id := public.live_test_v2_deterministic_uuid('generated-variant:' || v_job_id::text);
+  insert into public.audio_assets (
+    id,
+    organization_id,
+    storage_bucket,
+    storage_path,
+    mime_type,
+    sha256,
+    visibility,
+    source_kind,
+    bytes,
+    metadata
+  )
+  values (
+    v_audio_id,
+    v_org_id,
+    'narration-audio',
+    v_storage_path,
+    'audio/mpeg',
+    'sha256:' || encode(digest('mock-audio:' || v_source_hash, 'sha256'), 'hex'),
+    'private',
+    'generated_tts',
+    length('mock-audio:' || v_source_hash),
+    jsonb_build_object('provider', 'local-deterministic-mock', 'mode', 'mock')
+  );
 
-    -- Create private storage audio asset row
-    insert into public.audio_assets (
-      id,
-      organization_id,
-      storage_bucket,
-      storage_path,
-      mime_type,
-      duration_ms,
-      visibility,
-      source_kind,
-      bytes
-    )
-    values (
-      v_audio_id,
-      v_org_id,
-      'narration-audio',
-      'narrations/' || v_job_id::text || '.mp3',
-      'audio/mpeg',
-      1200, -- simulated duration ms
-      'private',
-      'generated_tts',
-      4500 -- simulated bytes size
-    );
+  insert into public.narration_variants (
+    id,
+    package_version_id,
+    test_section_id,
+    test_item_id,
+    narration_target,
+    language,
+    voice_id,
+    voice_label,
+    source_text_hash,
+    audio_asset_id,
+    approval_status,
+    generation_job_id,
+    provider_metadata
+  )
+  values (
+    v_variant_id,
+    p_package_version_id,
+    p_test_section_id,
+    p_test_item_id,
+    p_target,
+    p_language,
+    p_voice_id,
+    '[Mock] ' || p_voice_id,
+    v_source_hash,
+    v_audio_id,
+    'generated',
+    v_job_id,
+    jsonb_build_object('provider', 'local-deterministic-mock', 'mode', 'mock')
+  );
 
-    -- Create narration variant pending approval (human-approval requirement)
-    insert into public.narration_variants (
-      id,
-      package_version_id,
-      test_section_id,
-      test_item_id,
-      narration_target,
-      language,
-      voice_id,
-      voice_label,
-      source_text_hash,
-      audio_asset_id,
-      approval_status,
-      generation_job_id,
-      provider_metadata
-    )
-    values (
-      v_variant_id,
-      p_package_version_id,
-      p_test_section_id,
-      p_test_item_id,
-      p_target,
-      p_language,
-      p_voice_id,
-      '9Router TTS voice ' || p_voice_id,
-      v_source_hash,
-      v_audio_id,
-      'generated', -- status set to 'generated', pending human review
-      v_job_id,
-      jsonb_build_object('model', '9router/tts-1', 'voice', p_voice_id)
-    );
+  update public.generation_jobs
+  set status = 'succeeded',
+      completed_at = v_now,
+      narration_variant_id = v_variant_id,
+      attempts = jsonb_build_array(jsonb_build_object('attempt', 1, 'status', 'succeeded', 'provider', 'local-deterministic-mock')),
+      provider_metadata = jsonb_build_object(
+        'provider', 'local-deterministic-mock',
+        'mode', 'mock',
+        'audio_asset_id', v_audio_id,
+        'narration_variant_id', v_variant_id,
+        'storage_bucket', 'narration-audio',
+        'storage_path', v_storage_path
+      )
+  where id = v_job_id;
 
-    -- Update job to succeeded
-    update public.generation_jobs
-    set status = 'succeeded',
-        completed_at = now(),
-        narration_variant_id = v_variant_id,
-        provider_metadata = jsonb_build_object(
-          'model', '9router/tts-1',
-          'audio_asset_id', v_audio_id,
-          'narration_variant_id', v_variant_id
-        )
-    where id = v_job_id;
-
-    -- Return receipt without exposing v_ninerouter_key
-    return jsonb_build_object(
-      'jobId', v_job_id,
-      'status', 'succeeded',
-      'requestedAt', now(),
-      'completedAt', now(),
-      'narrationVariantId', v_variant_id,
-      'audioPath', 'narrations/' || v_job_id::text || '.mp3'
-    );
-  exception when others then
+  return jsonb_build_object(
+    'jobId', v_job_id,
+    'status', 'succeeded',
+    'requestedAt', v_now,
+    'completedAt', v_now,
+    'narrationVariantId', v_variant_id,
+    'audioPath', v_storage_path
+  );
+exception when others then
+  if v_job_id is not null then
     update public.generation_jobs
     set status = 'failed',
         completed_at = now(),
         error_code = sqlstate,
         error_message = sqlerrm,
         attempts = coalesce(attempts, '[]'::jsonb) || jsonb_build_object(
-          'timestamp', now(),
-          'error', sqlerrm
+          'attempt', jsonb_array_length(coalesce(attempts, '[]'::jsonb)) + 1,
+          'status', 'failed',
+          'errorCode', sqlstate,
+          'errorMessage', sqlerrm
         )
     where id = v_job_id;
-
-    return jsonb_build_object(
-      'jobId', v_job_id,
-      'status', 'failed',
-      'errorCode', sqlstate,
-      'errorMessage', sqlerrm
-    );
-  end;
+  end if;
+  raise;
 end;
 $$;
 
@@ -376,20 +367,20 @@ create or replace function public.approve_generated_asset(
 returns jsonb
 language plpgsql
 security definer
+set search_path = public, extensions
 as $$
 declare
   v_actor uuid;
   v_variant_id uuid;
   v_status text;
+  v_now timestamptz := now();
 begin
-  -- Access control: Admin staff only
   if not public.current_staff_is_admin() then
     raise exception 'Access Denied: Only Admin staff can approve generated narration variants.';
   end if;
 
   v_actor := public.live_test_v2_current_user_id();
 
-  -- Get narration variant associated with the generation job
   select id, approval_status into v_variant_id, v_status
   from public.narration_variants
   where generation_job_id = p_generation_job_id;
@@ -406,23 +397,22 @@ begin
     );
   end if;
 
-  -- Apply human approval
   update public.narration_variants
   set approval_status = 'approved',
       approved_by_user_id = v_actor,
-      approved_at = now(),
+      approved_at = v_now,
       provider_metadata = provider_metadata || jsonb_build_object('approval_notes', p_notes),
-      updated_at = now()
+      updated_at = v_now
   where id = v_variant_id;
 
   update public.generation_jobs
-  set provider_metadata = provider_metadata || jsonb_build_object('approved_at', now(), 'approved_by', v_actor)
+  set provider_metadata = provider_metadata || jsonb_build_object('approved_at', v_now, 'approved_by', v_actor)
   where id = p_generation_job_id;
 
   return jsonb_build_object(
     'narrationVariantId', v_variant_id,
     'approved', true,
-    'approvedAt', now(),
+    'approvedAt', v_now,
     'approvedByUserId', v_actor
   );
 end;

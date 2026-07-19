@@ -178,6 +178,7 @@ export function AdminResourcesPage() {
   const [packageCount, setPackageCount] = useState(0)
   const [versionCount, setVersionCount] = useState(0)
 
+  const [packageFilter, setPackageFilter] = useState('all')
   const [sectionFilter, setSectionFilter] = useState('all')
   const [expandedSectionId, setExpandedSectionId] = useState<string | null>(null)
   const [mappingSectionId, setMappingSectionId] = useState<string | null>(null)
@@ -320,10 +321,11 @@ export function AdminResourcesPage() {
         textMatch(haystack, search) &&
         (statusFilter === 'all' || row.versionStatus === statusFilter) &&
         (!showEditableOnly || row.versionStatus === 'draft') &&
+        (packageFilter === 'all' || row.packageVersionId === packageFilter) &&
         (sectionFilter === 'all' || row.sectionId === sectionFilter)
       )
     })
-  }, [cvrRows, search, sectionFilter, statusFilter, showEditableOnly])
+  }, [cvrRows, packageFilter, search, sectionFilter, statusFilter, showEditableOnly])
 
   const filteredCciRows = useMemo(() => {
     return cciRows.filter((row) => {
@@ -353,10 +355,39 @@ export function AdminResourcesPage() {
       return (
         textMatch(haystack, search) &&
         (statusFilter === 'all' || row.versionStatus === statusFilter) &&
-        (!showEditableOnly || row.versionStatus === 'draft')
+        (!showEditableOnly || row.versionStatus === 'draft') &&
+        (packageFilter === 'all' || row.packageVersionId === packageFilter)
       )
     })
-  }, [sessionRows, search, statusFilter, showEditableOnly])
+  }, [packageFilter, search, sessionRows, statusFilter, showEditableOnly])
+
+  const packageOptions = useMemo(() => {
+    const byId = new Map<
+      string,
+      {
+        packageVersionId: string
+        packageTitle: string
+        versionLabel: string
+        sessions: number
+        items: number
+      }
+    >()
+    for (const row of sessionRows) {
+      byId.set(row.packageVersionId, {
+        packageVersionId: row.packageVersionId,
+        packageTitle: row.packageTitle,
+        versionLabel: row.versionLabel,
+        sessions: (byId.get(row.packageVersionId)?.sessions ?? 0) + 1,
+        items: (byId.get(row.packageVersionId)?.items ?? 0) + row.itemCount,
+      })
+    }
+    return [...byId.values()].sort((a, b) => a.packageTitle.localeCompare(b.packageTitle))
+  }, [sessionRows])
+
+  const selectedPackageSummary =
+    packageFilter === 'all'
+      ? null
+      : packageOptions.find((option) => option.packageVersionId === packageFilter)
 
   const sectionOptions = useMemo(() => {
     const byId = new Map<
@@ -364,6 +395,7 @@ export function AdminResourcesPage() {
       Pick<CvrRow, 'sectionId' | 'sectionOrder' | 'sectionTitle' | 'packageTitle' | 'versionLabel'>
     >()
     for (const row of cvrRows) {
+      if (packageFilter !== 'all' && row.packageVersionId !== packageFilter) continue
       byId.set(row.sectionId, {
         sectionId: row.sectionId,
         sectionOrder: row.sectionOrder,
@@ -373,7 +405,7 @@ export function AdminResourcesPage() {
       })
     }
     return [...byId.values()].sort((a, b) => a.sectionOrder - b.sectionOrder)
-  }, [cvrRows])
+  }, [cvrRows, packageFilter])
 
   const editableCounts = {
     cvr: cvrRows.filter((row) => row.versionStatus === 'draft').length,
@@ -791,11 +823,30 @@ export function AdminResourcesPage() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'minmax(14rem, 1fr) 12rem minmax(14rem, 1fr) minmax(12rem, 16rem)',
+            gridTemplateColumns:
+              'minmax(14rem, 1.2fr) minmax(14rem, 1fr) 12rem minmax(14rem, 1fr) minmax(12rem, 16rem)',
             gap: '0.75rem',
             alignItems: 'end',
           }}
         >
+          <label className="field" style={{ margin: 0 }}>
+            Test Package
+            <select
+              value={packageFilter}
+              onChange={(event) => {
+                setPackageFilter(event.target.value)
+                setSectionFilter('all')
+              }}
+            >
+              <option value="all">All packages</option>
+              {packageOptions.map((option) => (
+                <option key={option.packageVersionId} value={option.packageVersionId}>
+                  {option.packageTitle} · {option.versionLabel} · {option.sessions} sessions ·{' '}
+                  {option.items} items
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="field" style={{ margin: 0 }}>
             Search
             <input
@@ -843,6 +894,9 @@ export function AdminResourcesPage() {
           </label>
         </div>
         <p className="meta" style={{ margin: '0.75rem 0 0' }}>
+          {selectedPackageSummary
+            ? `${selectedPackageSummary.packageTitle} · ${selectedPackageSummary.versionLabel}: ${selectedPackageSummary.sessions} sessions, ${selectedPackageSummary.items} sentence items.`
+            : 'Select a Test Package to manage sessions and CVR sentence items package-first.'}{' '}
           Draft rows can be edited/deleted. Published, active, archived, or history-linked rows stay
           immutable; use archive, supersede, or create a new draft/version instead.
         </p>

@@ -1,177 +1,81 @@
-# Fix Admin/Resources Tab – OpenSpec Tasks
+# Redefine Admin Resources from Chunks Resource.xlsx
 
-> **Baseline**: Tests ✅ (36 files, 151 tests), TypeCheck ✅  
-> **Gate**: All tasks below must pass `npm run lint && npm run typecheck && npm run test -- --run && npm run build` before any push/deploy.
+Source reviewed: `C:\Users\gensh\Downloads\Chunks Resource.xlsx` on 2026-07-19.
 
----
+## Workbook-derived data model
 
-## Gap analysis (what is currently broken / missing)
+### Sheets
 
-| #   | Area                                            | Problem                                                                                                                                                                                                                                                                           |
-| --- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| G1  | **CCI tab – create**                            | No way to create a new CCI Profile or add a new CCI Category to a draft profile. CRUD is only edit + delete + archive-profile.                                                                                                                                                    |
-| G2  | **CCI tab – publish**                           | No way to publish a draft CCI Profile to `active` status directly from Resources tab. Only archive is offered.                                                                                                                                                                    |
-| G3  | **CCI tab – supersede**                         | No way to create a measurement override snapshot (supersede) from the CCI tab; the override form only lives inside `AdminLiveTestsPage`.                                                                                                                                          |
-| G4  | **Sessions tab – set/override CCI+CVR mapping** | Measurement snapshot column is read-only. Admin can _see_ `activeCciLabel / activeTargetCvrOhm` but cannot set or override the mapping from this tab. Must navigate to Live Tests page, which is opaque.                                                                          |
-| G5  | **Sessions tab – drill into items**             | Sessions tab shows `itemCount` but clicking it does nothing. No inline or linked view of the CVR items (questions) belonging to a section.                                                                                                                                        |
-| G6  | **CVR tab – filter by session/section**         | CVR tab lists all items across all packages. No section-scoped filter. Only text search and status filter exist.                                                                                                                                                                  |
-| G7  | **Sessions – no-snapshot warning**              | Sessions table shows snapshot label+value but does not warn when no snapshot is set (blocking a live session).                                                                                                                                                                    |
-| G8  | **CCI status filter ambiguity**                 | CCI `profileStatus` uses `active` (not `published`). The shared `StatusFilter` has `active` as an option but the hint text says "published, active, archived" mixing package-version and CCI-profile status terminology. Needs clarity + verify the predicate is correctly wired. |
+1. **Package-test**
+   - Defines one package: `Pre-test`
+   - Description in workbook: `Test đầu khóa ERE`; product target from Lucy: `Bài test đầu khóa EE65`
+   - Contains 8 package sessions: `Test 01` … `Test 08`
 
----
+2. **CCI**
+   - Defines 8 CCI rows: `cci-001` … `cci-008`
+   - Columns: `Session`, `CCI_id`, `CCI Name`, `Ampe (A)`, `Description`, `Category`
+   - App mapping:
+     - `CCI Name` → `cci_categories.label`
+     - `Ampe (A)` → `cci_categories.value`
+     - `Description` → `cci_categories.description`
+     - `Category` → `cci_categories.metadata.mainCategory` (`Blow` / `Flow` / `Chunks`; workbook has `null` for sessions 4 and 8)
+     - `CCI_id` → `cci_categories.metadata.sourceCciId`
 
-## Task list
+3. **Chunks-resource - CVR_new**
+   - Defines 80 sentence items
+   - 8 sessions × 10 items/session
+   - Columns: `Material`, `Session No.`, `Item_id`, `CCI-id`, `CVR-id`, `Term (Tiếng Việt)`, `Term (Tiếng Anh)`, `Session No.`, `Complete Sentence (Vie)`, `Complete Sentence (Eng)`
+   - App mapping:
+     - one row → one `test_items` row
+     - `Complete Sentence (Vie/Eng)` → `prompt_vi` / `prompt_en`
+     - `Term` fields → `term_vi` / `term_en`
+     - `CVR-id` → stored as `source_metadata.sourceCvrId` and mirrored into generated `measured_cvr` by `tc=CVR-id`, `lc=1`, `tl=1` until true TC/LC/TL are available
+     - `CCI-id` → item-level source metadata; session-level CCI still comes from `Package-test`/`CCI` mapping
 
-### Phase 1 – Fixes (bugs / missing critical paths)
+### Distribution verified
 
-#### T1 – Add section-scoped filter to CVR tab
+- Session 1: 10 items, CVR 3.0, workbook item-level CCI has `cci-001` × 9 and `cci-002` × 1
+- Session 2: 10 items, CVR 5.0, CCI `cci-002`
+- Session 3: 10 items, CVR 7.0, CCI `cci-003`
+- Session 4: 10 items, CVR 9.0, CCI `cci-004`
+- Session 5: 10 items, CVR 11.0, CCI `cci-005`
+- Session 6: 10 items, CVR 13.0, CCI `cci-006`
+- Session 7: 10 items, CVR 15.0, CCI `cci-007`
+- Session 8: 10 items, CVR 17.0, CCI `cci-008`
 
-**Files**: `web/src/pages/admin/AdminResourcesPage.tsx`  
-**What**: Add a **Section** `<select>` populated from unique `(sectionId, sectionTitle, sectionOrder)` tuples already present in `cvrRows`. Adds `sectionFilter` state; `filteredCvrRows` gains `.filter(row => sectionFilter === 'all' || row.sectionId === sectionFilter)`.  
-**Acceptance**:
+## Required implementation update
 
-- [ ] Section select resets to `all` when switching tabs.
-- [ ] Items correctly scoped when a section is chosen.
-- [ ] Visual verify; no new unit test required.
+### Phase 1 — Supabase canonical seed from workbook
 
----
+- [x] T1.1 Review workbook sheets and derive package/session/CCI/CVR item model
+- [x] T1.2 Add idempotent Supabase migration to seed canonical `Pre-test` / `Bài test đầu khóa EE65`
+- [x] T1.3 Seed 8 CCI categories with source IDs, Ampe, descriptions, and main categories
+- [x] T1.4 Seed 8 Test Sections mapped to CCI and target CVR
+- [x] T1.5 Seed 80 Test Items with sentence text, term text, source item id, source CCI id, and source CVR id
+- [x] T1.6 Preserve existing legacy/resource rows; do not delete or rewrite assessment history
 
-#### T2 – Drill-in: Sessions tab → items inline
+### Phase 2 — Package-first Admin Resources UI
 
-**Files**: `web/src/pages/admin/AdminResourcesPage.tsx`  
-**What**: Each session row gets an expand toggle. When expanded, render a sub-table of items filtered from `cvrRows` by `sectionId` (no new network call needed).  
-**Acceptance**:
+- [x] T2.1 Rename/reframe Resources page around `Test Packages`, not generic resources
+- [x] T2.2 Add package selector/list: package name, version, description, session count, item count, mapping status
+- [ ] T2.3 Show selected package sessions: Session/Test name, target CVR, mapped CCI, Ampe, CPD = target CVR × Ampe, item count
+- [ ] T2.4 Session drill-in shows the 10 sentence items with VI/EN sentence, term, source CCI id, source CVR id, and measured CVR
+- [x] T2.5 Keep CCI CRUD as supporting catalog management, not the primary page model
+- [x] T2.6 Keep CVR sentence CRUD scoped to selected package/session instead of showing a global unscoped item list by default
 
-- [ ] Expanded view shows: item order, promptVi, promptEn, TC, LC, TL, measured CVR, status.
-- [ ] Collapse restores row to compact view.
-- [ ] Visual verify; no new unit test required.
+### Phase 3 — Package creation/editing UX
 
----
+- [ ] T3.1 Create package from existing CCI/CVR sentence rows or manual empty draft
+- [ ] T3.2 Admin can edit draft package name/version/description
+- [ ] T3.3 Admin can edit draft session CCI/CVR mapping and see CPD immediately
+- [ ] T3.4 Admin can edit draft item sentences and term fields
+- [ ] T3.5 Published/history-linked packages remain immutable; create new draft/version for changes
 
-#### T3 – Show "No snapshot" warning on Sessions rows
+### Phase 4 — Verification and release controls
 
-**Files**: `web/src/pages/admin/AdminResourcesPage.tsx`  
-**What**: In the Measurement snapshot column, if both `row.activeTargetCvrOhm === null` and `row.activeCciLabel === null`, replace the current `—` with a `⚠ No snapshot set` badge in a warning color.  
-**Acceptance**:
-
-- [ ] Badge visible for rows with no snapshot.
-- [ ] Normal display unchanged for rows with snapshot data.
-
----
-
-#### T4 – Inline "Set / Override mapping" for Sessions tab
-
-**Files**:
-
-- `web/src/pages/admin/AdminResourcesPage.tsx`
-- `web/src/lib/test-packages.ts` (already has `createSnapshotOverride`)
-
-**What**: Add an inline form per Sessions row:
-
-1. **Target CVR (Ω)** — number input, required.
-2. **CCI Profile** — select from `cciRows` distinct profiles where `profileStatus` is `draft` or `active`, ordered by name.
-3. **CCI Category** — select filtered by chosen profile, ordered by `categoryOrder`.
-4. **Reason** — text input (required for override when a snapshot already exists; optional for first mapping).
-5. Save button calls existing `createSnapshotOverride()` from `lib/test-packages.ts`.
-6. On success: update `sessionRows[n].activeTargetCvrOhm`, `activeCciLabel`, `activeCciValue` in local state.
-
-**Acceptance**:
-
-- [ ] Form opens inline (not a modal).
-- [ ] Profile/Category selects are wired correctly (category list re-fetches from already-loaded `cciRows`, no new network call).
-- [ ] Validation error shown if CVR or Category missing.
-- [ ] Supersedes previous snapshot (`supersedesSnapshotId` = current snapshot id or null).
-- [ ] No DB migration needed — `section_measurement_snapshots` table exists since `20260719033446`.
-
----
-
-#### T5 – Verify and fix CCI `active` status filter
-
-**Files**: `web/src/pages/admin/AdminResourcesPage.tsx`  
-**What**: Audit `filteredCciRows` predicate — confirm `statusFilter === 'active'` correctly matches `row.profileStatus === 'active'`. Update hint text from "Published, active, archived" → "Active, draft, archived" specifically for CCI context, or add a tooltip clarifying the difference between package `published` and CCI profile `active`.  
-**Acceptance**:
-
-- [ ] Setting status filter to `active` shows only active CCI profile rows.
-- [ ] Setting to `published` shows zero CCI rows (since CCI has no `published` state) — current behavior is probably wrong here.
-- [ ] Hint/tooltip text is accurate for both CVR (package version status) and CCI (profile status) contexts.
-
----
-
-#### T6 – Add "Publish profile" button for draft CCI profiles
-
-**Files**:
-
-- `web/src/pages/admin/AdminResourcesPage.tsx`
-- `web/src/lib/test-packages.ts`
-
-**What**:
-
-1. Add `publishCciProfile(profileId)` to `lib/test-packages.ts`: updates `cci_profiles` set `status = 'active'` where `id = profileId` and current status is `draft`. Returns mapped `CciProfile`.
-2. CCI rows table: add **"Publish profile"** button in Actions column, visible when `row.profileStatus === 'draft'`. Confirm dialog: "Publish this CCI Profile? Once active it can no longer be edited — only archived."
-3. On success: update `cciRows` state entries for that `profileId` to `profileStatus: 'active'`.
-
-**Acceptance**:
-
-- [ ] `publishCciProfile` guard rejects non-draft profiles with a clear error.
-- [ ] Button absent / disabled when profile is `active` or `archived`.
-- [ ] On publish, CCI edit button becomes disabled for that profile's rows (same as `active` rows today).
-- [ ] Unit test: add `publishCciProfile` domain guard test.
-
----
-
-#### T7 – Add "Create category" form for draft CCI profiles
-
-**Files**:
-
-- `web/src/pages/admin/AdminResourcesPage.tsx`
-- `web/src/lib/test-packages.ts`
-
-**What**:
-
-1. Add `createDraftCciCategory(input: { profileId, label, value, description, mainCategory })` to `lib/test-packages.ts`. Guard: profile must be `draft`. Inserts row, auto-computes `category_order` as `max + 1`. Returns mapped `CciCategory`.
-2. CCI panel: show a **"+ Add category"** button per profile group (or at the CCI panel header). Opens an inline row form at the bottom of that profile's rows: label (text), value (number), description (text, optional), mainCategory (select: Blow/Flow/Chunks/Unmapped).
-3. On save: append new `CciRow` (with `profileName`, `profileVersion`, `profileStatus`) to `cciRows` state.
-
-**Acceptance**:
-
-- [ ] Create form only appears for profiles with `profileStatus === 'draft'`.
-- [ ] New category appears in the CCI table immediately.
-- [ ] Unit test: domain guard (draft profile required).
-
----
-
-### Phase 2 – UX polish (after Phase 1 green)
-
-#### T8 – Sessions tab: snapshot history count
-
-**Files**: `web/src/pages/admin/AdminResourcesPage.tsx`  
-**What**: Extend `loadResources()` to count `section_measurement_snapshots` per `test_section_id`. Add `snapshotCount: number` to `SessionRow`. Display as "1 mapping" / "N mappings" / `⚠ No mapping` in the Measurement snapshot column.
-
-#### T9 – CVR tab: package+version breadcrumb in section column
-
-The section column already shows package title and version label but the width is fixed. Make it `min-width: auto` and allow wrapping on smaller viewports.
-
-#### T10 – Deprecate snapshot override in AdminLiveTestsPage
-
-After T4 is validated, add a `// TODO: remove after admin-resources override is live (tasks-fix-resources-tab T4)` comment to the snapshot override panel in `AdminLiveTestsPage.tsx` so it can be cleaned up in a follow-up pass without blocking current work.
-
----
-
-## Pre-run checklist (before implementing any task)
-
-- [x] `npm run test -- --run` passes (36 files, 151 tests — confirmed 2026-07-19)
-- [x] `npm run typecheck` passes (confirmed 2026-07-19)
-- [ ] `npm run lint` — run and fix any existing errors before starting
-- [ ] `npm run build` — baseline to confirm no pre-existing build regressions
-
-## Completion gate (after all Phase 1 tasks)
-
-```bash
-npm run lint
-npm run typecheck
-npm run test -- --run   # must remain 36+ files, 151+ tests
-npm run build
-```
-
-**No production deploy or remote Supabase migration** until Lucy explicitly approves in the current turn.  
-T4, T6, T7 write to already-migrated Supabase tables — no new migration SQL needed.
+- [ ] T4.1 `npm run openspec:validate`
+- [ ] T4.2 `npm run lint`
+- [ ] T4.3 `npm run typecheck`
+- [ ] T4.4 `npm run test`
+- [ ] T4.5 `npm run build`
+- [ ] T4.6 Do not apply remote Supabase migration or deploy production without Lucy's explicit approval in the current turn

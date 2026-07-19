@@ -31,7 +31,7 @@
 - [x] T008 Create a migration via `supabase migration new harden_test_catalog_security` and implement the reviewed RLS/RPC security fixes in the generated `supabase/migrations/*_harden_test_catalog_security.sql`
 - [x] T009 Create a migration via `supabase migration new standalone_test_schema` and add import audit plus standalone assignment/run/item/attempt/event/snapshot tables, indexes, explicit grants, and RLS in `supabase/migrations/*_standalone_test_schema.sql`
 - [x] T010 [P] Add TypeScript catalog/standalone domain types and invariant tests in `web/src/modules/standalone-tests/types.ts` and `web/src/modules/standalone-tests/types.test.ts`
-- [ ] T011 Implement typed Supabase row mapping/readiness helpers in `web/src/lib/standalone-tests.ts` and `web/src/lib/test-packages.ts`
+- [x] T011 Implement typed Supabase row mapping/readiness helpers in `web/src/lib/standalone-tests.ts` and `web/src/lib/test-packages.ts`
 - [x] T012 Run security advisors and record baseline/residual findings in `docs/ops/standalone-test-security-review.md`
 
 **Checkpoint**: Security/schema foundation is testable and blocks unauthorized or Class-coupled behavior.
@@ -71,16 +71,16 @@
 
 ### Tests for User Story 2
 
-- [ ] T022 [P] [US2] Add catalog immutability, section measurement, and CPD tests in `web/src/modules/catalog/test-package-catalog.test.ts`
+- [x] T022 [P] [US2] Add catalog immutability, section measurement, and CPD tests in `web/src/modules/catalog/test-package-catalog.test.ts`
 - [ ] T023 [P] [US2] Add Resource workspace load/filter/edit/publish/error component tests in `web/src/pages/admin/AdminResourcesPage.test.tsx`
 
 ### Implementation for User Story 2
 
-- [ ] T024 [US2] Selectively port/refine V2 catalog domain logic into `web/src/modules/catalog/test-package-catalog.ts`
-- [ ] T025 [US2] Implement draft CRUD, publish/archive, snapshot override, import preview, and readiness data access in `web/src/lib/test-packages.ts`
+- [x] T024 [US2] Selectively port/refine V2 catalog domain logic into `web/src/modules/catalog/test-package-catalog.ts`
+- [x] T025 [US2] Implement draft CRUD, publish/archive, snapshot override, import preview, and readiness data access in `web/src/lib/test-packages.ts`
 - [ ] T026 [P] [US2] Build package/session filter and summary components in `web/src/components/test-resources/ResourceScopeFilters.tsx` and `web/src/components/test-resources/ResourceSummaryCards.tsx`
 - [ ] T027 [P] [US2] Build focused package/session, CCI, item/CVR, and import-issues panels under `web/src/components/test-resources/`
-- [ ] T028 [US2] Assemble `/admin/resources` in `web/src/pages/admin/AdminResourcesPage.tsx`, `web/src/pages/admin/AdminLayout.tsx`, and `web/src/App.tsx`
+- [x] T028 [US2] Assemble `/admin/resources` in `web/src/pages/admin/AdminResourcesPage.tsx`, `web/src/pages/admin/AdminLayout.tsx`, and `web/src/App.tsx`
 
 **Checkpoint**: Admin can fully review the canonical draft and cannot mutate published history.
 

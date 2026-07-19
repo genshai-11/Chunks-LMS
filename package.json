@@ -17,6 +17,6 @@
     "ci": "npm run openspec:validate && npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "engines": {
-    "node": ">=20"
+    "node": "20.x"
   }
 }

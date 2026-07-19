@@ -5,6 +5,7 @@ import { PageHeader } from '../components/PageHeader'
 import type { StaffRole } from './staff-roles'
 import { StaffSignInForm } from './AuthProvider'
 import { useStaffSession } from './useStaffSession'
+import { Panel } from '../components/ui'
 
 type Props = {
   /** Required staff role for this workspace */
@@ -35,27 +36,36 @@ export function StaffGate({ role, children }: Props) {
           title={role === 'admin' ? 'Admin sign-in required' : 'Teacher sign-in required'}
           subtitle="Use your Supabase Auth staff account. Learners open a signed learner access link instead."
         />
-        <div className="panel" style={{ maxWidth: 460, margin: '0 auto' }}>
-          {session.authEnabled ? (
-            <>
-              <StaffSignInForm />
-              <p className="meta" style={{ marginTop: 12 }}>
-                <LogIn className="h-4 w-4" aria-hidden /> Enter the magic link sent by Supabase Auth.
+        <div style={{ maxWidth: 460, margin: '0 auto', width: '100%' }}>
+          <Panel
+            icon={Lock}
+            title={role === 'admin' ? 'Admin Sign In' : 'Teacher Sign In'}
+            description="Sign in using your email magic link or Google OAuth."
+            collapsible={false}
+          >
+            {session.authEnabled ? (
+              <>
+                <StaffSignInForm />
+                <p className="meta" style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  <LogIn className="h-4 w-4" aria-hidden /> Enter the magic link sent by Supabase Auth.
+                </p>
+              </>
+            ) : (
+              <p className="meta">
+                Supabase Auth is not configured. Set <code>VITE_SUPABASE_URL</code> and{' '}
+                <code>VITE_SUPABASE_ANON_KEY</code>, or enable <code>VITE_AUTH_BYPASS=true</code>{' '}
+                for local demos.
               </p>
-            </>
-          ) : (
-            <p className="meta">
-              Supabase Auth is not configured. Set <code>VITE_SUPABASE_URL</code> and{' '}
-              <code>VITE_SUPABASE_ANON_KEY</code>, or enable <code>VITE_AUTH_BYPASS=true</code>{' '}
-              for local demos.
-            </p>
-          )}
-          <p className="meta" style={{ marginTop: 12 }}>
-            Student?{' '}
-            <Link to="/access" className="underline">
-              Open learner portal
-            </Link>
-          </p>
+            )}
+            <div style={{ marginTop: '1.25rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
+              <p className="meta">
+                Student?{' '}
+                <Link to="/access" className="underline">
+                  Open learner portal
+                </Link>
+              </p>
+            </div>
+          </Panel>
         </div>
       </div>
     )

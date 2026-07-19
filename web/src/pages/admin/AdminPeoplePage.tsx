@@ -35,29 +35,18 @@ import type { DomainUser } from '../../modules/roster/types'
 import { useAppState } from '../../state/useAppState'
 
 type Tab = 'teachers' | 'learners'
-type Draft = { displayName: string; email: string; avatarUrl?: string }
+type Draft = { displayName: string; email: string; avatarUrl?: string; allowMultiClass?: boolean }
 
-const emptyDraft = (): Draft => ({ displayName: '', email: '', avatarUrl: '' })
+const emptyDraft = (): Draft => ({ displayName: '', email: '', avatarUrl: '', allowMultiClass: false })
 
-function invitationUrl(user: DomainUser): string {
-  const origin = window.location.origin
-  if (user.roles.includes('learner') && user.email) {
-    return `${origin}/access?email=${encodeURIComponent(user.email)}`
-  }
-  return `${origin}/teacher`
+function staffInvitationUrl(): string {
+  return `${window.location.origin}/teacher`
 }
 
-function invitationMailto(user: DomainUser): string {
-  const link = invitationUrl(user)
-  const isLearner = user.roles.includes('learner')
-  const subject = encodeURIComponent(
-    isLearner ? 'Chunks LMS learner invite' : 'Chunks LMS teacher invite',
-  )
-  const body = encodeURIComponent(
-    isLearner
-      ? `Hi ${user.displayName},\n\nOpen your portal:\n${link}\n`
-      : `Hi ${user.displayName},\n\nSign in as Teacher:\n${link}\n`,
-  )
+function staffInvitationMailto(user: DomainUser): string {
+  const link = staffInvitationUrl()
+  const subject = encodeURIComponent('Chunks LMS teacher invite')
+  const body = encodeURIComponent(`Hi ${user.displayName},\n\nSign in as Teacher with Supabase Auth:\n${link}\n`)
   return `mailto:${encodeURIComponent(user.email ?? '')}?subject=${subject}&body=${body}`
 }
 
@@ -96,6 +85,7 @@ export function AdminPeoplePage() {
         displayName: draft.displayName,
         email: draft.email.trim(),
         avatarUrl: draft.avatarUrl || null,
+        allowMultiClass: draft.allowMultiClass,
       })
       if (!r.ok) return err(r.error)
       setRoster(r.state)
@@ -111,6 +101,7 @@ export function AdminPeoplePage() {
       displayName: editDraft.displayName,
       email: editDraft.email || null,
       avatarUrl: editDraft.avatarUrl || null,
+      allowMultiClass: editDraft.allowMultiClass,
     })
     if (!r.ok) return err(r.error)
     setRoster(r.state)
@@ -125,7 +116,7 @@ export function AdminPeoplePage() {
         icon={Users}
         kicker="Admin"
         title="Accounts"
-        subtitle="One row per email · teacher (Clerk) · learner (invite link)"
+        subtitle="One row per email · teacher (Supabase Auth) · learner (signed access)"
         actions={
           <button
             type="button"
@@ -200,8 +191,8 @@ export function AdminPeoplePage() {
           title={tab === 'teachers' ? 'New teacher' : 'New learner'}
           description={
             tab === 'teachers'
-              ? 'Email must match Clerk staff sign-in. Unique across all accounts.'
-              : 'Email is the portal invite identity. Unique across all accounts.'
+              ? 'Email must match Supabase Auth staff sign-in. Unique across all accounts.'
+              : 'Email receives signed learner access links from Class rosters. Unique across all accounts.'
           }
         >
           <form
@@ -230,6 +221,16 @@ export function AdminPeoplePage() {
                 placeholder={tab === 'learners' ? 'learner@school.edu' : 'teacher@school.edu'}
               />
             </label>
+            {tab === 'learners' && (
+              <label className="flex items-center gap-2 mt-2 select-none cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={draft.allowMultiClass ?? false}
+                  onChange={(e) => setDraft((d) => ({ ...d, allowMultiClass: e.target.checked }))}
+                />
+                <span className="text-xs text-slate-600 font-medium">Allow multi-class (Cho phép học nhiều lớp)</span>
+              </label>
+            )}
             <div className="avatar-field">
               <UserAvatar
                 name={draft.displayName || 'User'}
@@ -333,6 +334,18 @@ export function AdminPeoplePage() {
                             aria-label="Email"
                             placeholder="Email"
                           />
+                          {tab === 'learners' && (
+                            <label className="flex items-center gap-1.5 text-xs text-slate-600 select-none cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={editDraft.allowMultiClass ?? false}
+                                onChange={(e) =>
+                                  setEditDraft((d) => ({ ...d, allowMultiClass: e.target.checked }))
+                                }
+                              />
+                              <span>Multi-class</span>
+                            </label>
+                          )}
                           <div className="flex items-center gap-2">
                             <UserAvatar
                               name={editDraft.displayName || 'User'}
@@ -408,7 +421,14 @@ export function AdminPeoplePage() {
                         <span className="cell-with-avatar">
                           <UserAvatar name={u.displayName} avatarUrl={u.avatarUrl} size="sm" />
                           <span>
-                            <strong className="accounts-name">{u.displayName}</strong>
+                            <strong className="accounts-name">
+                              {u.displayName}
+                              {u.allowMultiClass && (
+                                <span className="ml-2 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 rounded">
+                                  Multi-class
+                                </span>
+                              )}
+                            </strong>
                             <span className="accounts-email">{u.email ?? '—'}</span>
                           </span>
                         </span>
@@ -422,18 +442,18 @@ export function AdminPeoplePage() {
                       </td>
                       <td>
                         <div className="row-actions accounts-actions">
-                          {u.email ? (
+                          {u.email && u.roles.includes('teacher') ? (
                             <>
                               <button
                                 type="button"
                                 className="ghost"
-                                title="Copy invite link"
+                                title="Copy staff sign-in link"
                                 onClick={async () => {
                                   try {
-                                    await navigator.clipboard.writeText(invitationUrl(u))
-                                    ok('Invite copied')
+                                    await navigator.clipboard.writeText(staffInvitationUrl())
+                                    ok('Staff sign-in link copied')
                                   } catch {
-                                    ok(invitationUrl(u))
+                                    ok(staffInvitationUrl())
                                   }
                                 }}
                               >
@@ -441,12 +461,15 @@ export function AdminPeoplePage() {
                               </button>
                               <a
                                 className="btn ghost"
-                                href={invitationMailto(u)}
-                                title="Send invite email"
+                                href={staffInvitationMailto(u)}
+                                title="Send staff sign-in email"
                               >
                                 <Mail className="h-3.5 w-3.5" aria-hidden />
                               </a>
                             </>
+                          ) : null}
+                          {u.email && u.roles.includes('learner') ? (
+                            <span className="meta">Issue learner links from a Class roster</span>
                           ) : null}
                           <button
                             type="button"
@@ -476,6 +499,7 @@ export function AdminPeoplePage() {
                                 displayName: u.displayName,
                                 email: u.email ?? '',
                                 avatarUrl: u.avatarUrl ?? '',
+                                allowMultiClass: u.allowMultiClass ?? false,
                               })
                             }}
                           >

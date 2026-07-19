@@ -53,27 +53,27 @@ Main specs live under `openspec/specs/` (7 capabilities). No active change by de
 - CI/CD: `.github/workflows/ci.yml`, `cd.yml`
 - **Ship:** [`docs/ops/production-runbook.md`](docs/ops/production-runbook.md)
 
-## V1 identity (product decision)
+## V2 identity (product decision)
 
-**No organization membership product for now.**
+**No organization membership product for now.** The Chunks Workspace remains singleton for this version.
 
 | Role | Access | Scope |
 |------|--------|--------|
-| **Admin** | Clerk sign-in | **Accounts** (teacher/learner active\|inactive, invites) + **Metrics** catalog (enable/label/min sample). Not courses/classes. |
-| **Teacher** | Clerk sign-in | **Learner tree first** → programs/classes/seating → start session (1..N learners, pretest/posttest) → observe → analysis. |
-| **Learner** | **Share link** | Profile **email** registered by Admin → invite URL `/access?email=…`. Read-only own progress. No Clerk learner account. |
+| **Admin** | Native Supabase Auth staff sign-in + active `staff_roles.admin` grant | **Accounts** (teacher/learner active\|inactive, signed learner access) + **Metrics** catalog (enable/label/min sample). Not courses/classes. |
+| **Teacher** | Native Supabase Auth staff sign-in + active `staff_roles.teacher` grant | **Learner tree first** → programs/classes/seating → start session (1..N learners, pretest/posttest) → observe → analysis. |
+| **Learner** | **Signed learner access** | Profile **email** registered by staff → revocable, expiring `/access?token=…` link. Read-only own progress. No Supabase Auth learner account. |
 
-- Staff maps Clerk → domain admin/teacher (allowlist / `clerk_user_id`) — **not** membership UI.
-- Learner portal is read-only, scoped to the matched email profile (`activeLearnerUserId`).
-- Membership, multi-org, and Clerk-for-learners are **Phase F / later**.
+- Staff maps Supabase Auth `auth.users.id` → domain `users.auth_user_id`; authorization comes from database-owned `staff_roles`, not user-editable Auth metadata.
+- Learner portal is read-only, scoped by a hashed, expiring, revocable learner access token.
+- Membership, multi-org, and Supabase Auth accounts for learners are **Phase F / later**.
 
 ### Flow (current product)
 
 ```text
-Home → Admin (Clerk)  accounts (active/inactive · invites) · metrics catalog · analysis
-     → Teacher (Clerk) learners tree → classes/programs → start session (select HV)
-                              → observe (per-learner columns / learner-first) → analysis
-     → Learner (share link)   /access?email= → own attendance · analysis (enabled metrics only)
+Home → Admin (Supabase Auth)  accounts (active/inactive · signed access) · metrics catalog · analysis
+     → Teacher (Supabase Auth) learners tree → classes/programs → start session (select HV)
+                                       → observe (per-learner columns / learner-first) → analysis
+     → Learner (signed access) /access?token=… → own attendance · analysis (enabled metrics only)
 ```
 
 ### Probe counters (product language)
@@ -98,15 +98,15 @@ Session **ceiling** (`maxProbeCount`) is not “n depth max”.
 |-------|----|----------------|
 | Domain + ADRs + unit tests | 90–95 | Measurement core + n_* metrics |
 | Role UI (CRUD / observe / analysis) | ~90 | Admin accounts/metrics; Teacher learner-first |
-| Staff Clerk (Admin/Teacher gates) | ~75 | StaffGate + role allowlist; `VITE_AUTH_BYPASS` for CI |
-| Learner share-link portal | ~90 | Invites + multi-enrollment class picker |
+| Staff Supabase Auth (Admin/Teacher gates) | ~75 | StaffGate + database `staff_roles`; `VITE_AUTH_BYPASS` for CI |
+| Signed learner access portal | ~90 | Revocable/expiring token invites + multi-enrollment class picker |
 | Multi-class / teacher-owned programs | ~85 | Teacher creates program/class/seat |
 | Hosted multi-user production | ~85 | Runbook + OpenSpec archive |
 | **Overall V1 production readiness** | **~88** | First class shippable; live sign-off via runbook |
 
 **Full plan (phases A–F):** [`docs/plans/lms-completion-by-role.md`](docs/plans/lms-completion-by-role.md) — still historical for A–E; product flow above is authoritative for Admin vs Teacher ownership.
 
-**V1 “100%” definition:** Admin provisions accounts + metrics; teachers own learners/sessions/capture; learners open **email invite links** and see only own progress from **finalized real data**; multi-class teacher works; hosted course without data loss.
+**V2 hosted-course definition:** Admin provisions accounts + metrics; teachers own learners/sessions/capture; learners open **signed learner access links** and see only own progress from **finalized real data**; multi-class teacher works; hosted course without data loss.
 
 ## Release controls and deployment gates
 
@@ -125,8 +125,8 @@ Session **ceiling** (`maxProbeCount`) is not “n depth max”.
 - Only finalized results feed progress metrics.
 - Treat question sequence numbers as presentation, not stable identity.
 - Keep learner-first and question-first as UI modes over the same domain model.
-- Staff workspaces: gate with Clerk (Admin/Teacher). Learner portal: email invite scope only — never expose other learners’ rows.
+- Staff workspaces: gate with native Supabase Auth and database-owned `staff_roles` (Admin/Teacher). Learner portal: signed learner access token scope only — never expose other learners’ rows.
 - Prefer Supabase RLS for staff-backed data paths when configured; do not block V1 on full membership RLS.
 - Treat V1 metrics as operational indicators, not validated psychometric instruments.
 - Keep resource content and CCI/CVR integrations outside the V1 core domain.
-- Do not build organization membership UI or Clerk learner accounts unless product reopens that scope.
+- Do not build organization membership UI or Supabase Auth learner accounts unless product reopens that scope.

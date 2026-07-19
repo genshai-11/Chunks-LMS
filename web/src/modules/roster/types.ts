@@ -18,6 +18,7 @@ export type DomainUser = {
   roles: Array<'admin' | 'teacher' | 'learner'>
   /** Admin can deactivate teacher/learner accounts without deleting history */
   accountStatus: AccountStatus
+  allowMultiClass?: boolean
 }
 
 /**

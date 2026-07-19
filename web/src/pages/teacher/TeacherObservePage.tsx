@@ -11,8 +11,10 @@ import {
   Activity,
   Check,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   GripVertical,
   Keyboard,
   LayoutGrid,
@@ -37,6 +39,15 @@ import { ObserveHeatmap } from '../../components/ObserveHeatmap'
 import { UserAvatar } from '../../components/UserAvatar'
 import type { ResultColor } from '../../modules/result-lifecycle/types'
 import { PROBE_ACTIONS } from '../../modules/assessment/probe-actions'
+import type { LiveTestItem } from '../../modules/assessment/live-test'
+import {
+  audioAssetIdForLanguage,
+  blockSummary,
+  liveTestExternalRef,
+  liveTestItemIdFromExternalRef,
+  promptForLanguage,
+} from '../../modules/assessment/live-test'
+import { audioUrl, listLiveTestBlocks, listLiveTestItems } from '../../lib/live-test-resources'
 import {
   resolveSessionDayNumber,
   sessionDayBadge,
@@ -44,6 +55,7 @@ import {
   sessionLabel,
 } from '../../modules/reporting/session-series'
 import { completeLearningSession } from '../../modules/scheduling/session-lifecycle'
+import { learnerCurrentSessionNumber } from '../../modules/teacher/learner-insights'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import { useAppState } from '../../state/useAppState'
 import {
@@ -139,6 +151,7 @@ export function TeacherObservePage() {
   const exitPath = fromChunker ? '/chunker' : '/teacher/session'
   const {
     roster,
+    ledger,
     capture,
     setCapture,
     appendFinalizedFromCapture,
@@ -148,6 +161,8 @@ export function TeacherObservePage() {
     syncNow,
   } = useAppState()
   const [toast, setToast] = useState<string | null>(null)
+  const [showHeader, setShowHeader] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 768 : true)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success'>('idle')
   const [showKeys, setShowKeys] = useState(false)
   const [finishing, setFinishing] = useState(false)
   const [liveLoading, setLiveLoading] = useState(true)
@@ -164,6 +179,10 @@ export function TeacherObservePage() {
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 639px)').matches : false,
   )
   const [activeSplitLearnerId, setActiveSplitLearnerId] = useState<string | null>(null)
+  const [showHeatmapPopupLearnerId, setShowHeatmapPopupLearnerId] = useState<string | null>(null)
+  const [liveTestItems, setLiveTestItems] = useState<LiveTestItem[]>([])
+  const [liveTestBlockSummary, setLiveTestBlockSummary] = useState<string | null>(null)
+  const [playedIntroForSessionId, setPlayedIntroForSessionId] = useState<string | null>(null)
   const railWidthRef = useRef(railWidth)
   const captureRef = useRef(capture)
   const liveRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -242,6 +261,31 @@ export function TeacherObservePage() {
         : [],
     [classRow, roster.enrollments],
   )
+  const isLiveTest = openSession?.sessionFormat === 'test'
+  const liveTestLanguage = openSession?.promptLanguage ?? 'vi'
+
+  useEffect(() => {
+    if (!isLiveTest || !openSession?.liveTestBlockId) {
+      setLiveTestItems([])
+      setLiveTestBlockSummary(null)
+      return
+    }
+    let cancelled = false
+    void Promise.all([
+      listLiveTestItems(openSession.liveTestBlockId),
+      openSession.liveTestResourceId ? listLiveTestBlocks(openSession.liveTestResourceId) : Promise.resolve(null),
+    ]).then(([itemsResult, blocksResult]) => {
+      if (cancelled) return
+      if (itemsResult.ok) setLiveTestItems(itemsResult.data)
+      if (blocksResult && blocksResult.ok) {
+        const block = blocksResult.data.find((b) => b.id === openSession.liveTestBlockId)
+        setLiveTestBlockSummary(block ? `Session ${block.blockNumber} · ${blockSummary(block)}` : null)
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [isLiveTest, openSession?.liveTestBlockId, openSession?.liveTestResourceId])
 
   const refreshLiveCapture = useCallback(async () => {
     if (!openSession || !teacher) {
@@ -350,8 +394,51 @@ export function TeacherObservePage() {
         learningSessions: scheduling.learningSessions,
       })
     : null
-  const dayLabel = sessionLabel(dayNumber, openSession?.startedAt, totalDays)
-  const dayBadge = sessionDayBadge(dayNumber, totalDays)
+
+  const targetDayNumber = openSession
+    ? (openSession.sessionNumber ?? dayNumber)
+    : (activeLearnerUserId
+        ? learnerCurrentSessionNumber({
+            ledger,
+            scheduling,
+            learnerUserId: activeLearnerUserId,
+            classId: classRow?.id,
+          })
+        : dayNumber)
+
+  const dayLabel = sessionLabel(targetDayNumber, openSession?.startedAt, totalDays)
+  const finishMetrics = useMemo(() => {
+    if (!capture) return null
+    const summary = sessionColorSummary(capture)
+    const unresolved = summary.byColor.open + summary.byColor.draft
+    return {
+      className: classRow?.name ?? 'Class',
+      dayLabel,
+      learnerCount: capture.learnerIds.length,
+      questionCount: capture.questions.length,
+      done: summary.done,
+      total: summary.total,
+      red: summary.byColor.red,
+      yellow: summary.byColor.yellow,
+      green: summary.byColor.green,
+      purple: summary.byColor.purple,
+      maxProbeDepth: summary.maxProbeDepth,
+      unresolved,
+    }
+  }, [capture, classRow?.name, dayLabel])
+  const finishButtonLabel =
+    saveStatus === 'success' ? 'Saved!' : saveStatus === 'saving' || finishing ? 'Saving…' : 'Finish'
+  const confirmFinishLabel =
+    saveStatus === 'success'
+      ? 'Saved!'
+      : saveStatus === 'saving' || finishing
+        ? 'Saving…'
+        : 'Save & Finish'
+  useEffect(() => {
+    if (isPhone && (capture?.questions.length ?? 0) > 0) setShowHeader(false)
+  }, [isPhone, capture?.questions.length])
+
+  const dayBadge = sessionDayBadge(targetDayNumber, totalDays)
   const openParticipants = openSession?.participantLearnerIds?.length
     ? openSession.participantLearnerIds
     : activeLearnerIds
@@ -368,16 +455,47 @@ export function TeacherObservePage() {
 
   // Keep browser URL in sync: /teacher/observe#day-3
   useEffect(() => {
-    if (dayNumber == null) return
-    const hash = sessionDayHash(dayNumber)
+    if (targetDayNumber == null) return
+    const hash = sessionDayHash(targetDayNumber)
     if (window.location.hash !== hash) {
       window.history.replaceState(null, '', `${window.location.pathname}${hash}`)
     }
     document.title = `${dayBadge} · Observe · Chunks LMS`
-  }, [dayNumber, dayBadge])
+  }, [targetDayNumber, dayBadge])
 
   const qNum = capture ? capture.position.questionIndex + 1 : 0
   const qTotal = capture?.questions.length ?? 0
+  const currentQuestion = capture?.questions[capture.position.questionIndex] ?? null
+  const currentLiveTestItemId = liveTestItemIdFromExternalRef(currentQuestion?.externalRef)
+  const currentLiveTestItem = currentLiveTestItemId
+    ? liveTestItems.find((item) => item.id === currentLiveTestItemId) ?? null
+    : null
+  const currentLiveTestPrompt = currentLiveTestItem
+    ? promptForLanguage(currentLiveTestItem, liveTestLanguage)
+    : null
+
+  useEffect(() => {
+    if (!isLiveTest || !openSession || playedIntroForSessionId === openSession.id) return
+    setPlayedIntroForSessionId(openSession.id)
+    // Intro audio URL lookup is best-effort; prompt text remains visible without audio.
+  }, [isLiveTest, openSession, playedIntroForSessionId])
+
+  useEffect(() => {
+    const assetId = currentLiveTestItem
+      ? audioAssetIdForLanguage(currentLiveTestItem, liveTestLanguage)
+      : null
+    if (!assetId) return
+    let cancelled = false
+    void audioUrl(assetId).then((url) => {
+      if (cancelled || !url) return
+      const audio = new Audio(url)
+      void audio.play().catch((err) => console.warn('[observe] test audio play failed:', err))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [currentLiveTestItem, liveTestLanguage])
+
   const probeDepth = attempt?.snapshot.probeCount ?? 0
   const isFinalized =
     attempt?.snapshot.status === 'finalized' || attempt?.snapshot.status === 'corrected'
@@ -406,6 +524,15 @@ export function TeacherObservePage() {
     window.setTimeout(() => setToast(null), 900)
   }, [])
 
+  const nextLiveTestExternalRef = useCallback(
+    (state: CaptureSessionState): string | null | undefined => {
+      if (!isLiveTest) return undefined
+      const item = liveTestItems[state.questions.length]
+      return item ? liveTestExternalRef(item.id, openSession?.testPackageVersionId ?? null) : null
+    },
+    [isLiveTest, liveTestItems, openSession?.testPackageVersionId],
+  )
+
   const playReaction = useCallback((color: ResultColor) => {
     const id = Date.now()
     setReaction({ kind: reactionFor(color), color, id })
@@ -430,9 +557,15 @@ export function TeacherObservePage() {
       if (state.position.questionIndex < state.questions.length - 1) {
         return advancePosition(state)
       }
+      const externalRef = nextLiveTestExternalRef(state)
+      if (externalRef === null) {
+        flash('Live-test block complete')
+        return state
+      }
       const created = await createLiveQuestion({
         capture: state,
         openSession: openSession ?? null,
+        externalRef,
       })
       if (!created.ok) {
         flash(created.error)
@@ -440,7 +573,7 @@ export function TeacherObservePage() {
       }
       return created.data
     },
-    [flash, openSession],
+    [flash, openSession, nextLiveTestExternalRef],
   )
 
   const recordColor = useCallback(
@@ -530,10 +663,16 @@ export function TeacherObservePage() {
 
   const advanceLearnerPane = useCallback(
     async (state: CaptureSessionState, learnerUserId: string): Promise<CaptureSessionState> => {
+      const externalRef = nextLiveTestExternalRef(state)
+      if (externalRef === null) {
+        flash('Live-test block complete')
+        return state
+      }
       const created = await createLiveQuestion({
         capture: state,
         openSession: openSession ?? null,
         learnerUserId,
+        externalRef,
       })
       if (!created.ok) {
         flash(created.error)
@@ -541,7 +680,7 @@ export function TeacherObservePage() {
       }
       return created.data
     },
-    [flash, openSession],
+    [flash, openSession, nextLiveTestExternalRef],
   )
 
   const recordColorForLearner = useCallback(
@@ -646,10 +785,16 @@ export function TeacherObservePage() {
       const firstLearners = capture.learnerIds.length === 2 ? capture.learnerIds : [null]
       let next = capture
       for (const learnerUserId of firstLearners) {
+        const externalRef = nextLiveTestExternalRef(next)
+        if (externalRef === null) {
+          flash('Live-test block complete')
+          return
+        }
         const result = await createLiveQuestion({
           capture: next,
           openSession: openSession ?? null,
           learnerUserId,
+          externalRef,
         })
         if (!result.ok) {
           flash(result.error)
@@ -662,7 +807,7 @@ export function TeacherObservePage() {
     } finally {
       setLiveSaving(false)
     }
-  }, [capture, liveSaving, setCapture, flash, openSession])
+  }, [capture, liveSaving, setCapture, flash, openSession, nextLiveTestExternalRef])
 
   const prevCell = useCallback(() => {
     if (!capture || capture.questions.length === 0) return
@@ -694,10 +839,12 @@ export function TeacherObservePage() {
   const handleConfirmFinish = useCallback(async () => {
     if (!capture || !openSession || finishing) return
     setFinishing(true)
+    setSaveStatus('saving')
     try {
       const done = completeLearningSession(scheduling, openSession.id, capture.learnerIds)
       if (!done.ok) {
         flash(done.error)
+        setSaveStatus('idle')
         return
       }
 
@@ -706,13 +853,18 @@ export function TeacherObservePage() {
       setCapture(completedCapture)
       appendFinalizedFromCapture(completedCapture)
       try {
+        const { syncCaptureSessionToServer } = await import('../../lib/live-assessment')
+        await syncCaptureSessionToServer(completedCapture)
         await syncNow({ scheduling: done.state })
       } catch {
         /* local persist still holds; backend may be offline */
       }
-      flash('Session saved')
+      setSaveStatus('success')
+      await new Promise((resolve) => window.setTimeout(resolve, 1500))
       setFinishSummary(null)
-      navigate(exitPath)
+      navigate('/teacher/analysis')
+    } catch {
+      setSaveStatus('idle')
     } finally {
       setFinishing(false)
     }
@@ -926,7 +1078,6 @@ export function TeacherObservePage() {
     const paneAttempt = currentAttemptForLearner(capture, learnerId)
     const user = roster.users.find((u) => u.id === learnerId)
     const learnerQuestions = capture.questions.filter((q) => q.assignedLearnerUserId === learnerId)
-    const learnerQuestionIds = new Set(learnerQuestions.map((q) => q.id))
     const learnerAttempts = capture.attempts.filter((a) => a.learnerUserId === learnerId)
     const paneProbeOpen =
       paneAttempt?.snapshot.status === 'probe_open' ||
@@ -947,18 +1098,13 @@ export function TeacherObservePage() {
       (a) => a.snapshot.effectiveColor === 'red' || a.snapshot.effectiveColor === 'yellow',
     ).length
     const learnerRfc = learnerDone > 0 ? Math.round((learnerRy / learnerDone) * 100) : 0
-    const learnerCapture: CaptureSessionState = {
-      ...capture,
-      learnerIds: [learnerId],
-      questions: learnerQuestions,
-      attempts: capture.attempts.filter((a) => learnerQuestionIds.has(a.sessionQuestionId)),
-      position: {
-        ...capture.position,
-        questionIndex: learnerQuestionIndex,
-        learnerIndex: 0,
-      },
-    }
     const active = activeSplitLearnerId === learnerId
+    const paneLearnerDayNumber = learnerCurrentSessionNumber({
+      ledger,
+      scheduling,
+      learnerUserId: learnerId,
+      classId: classRow?.id,
+    })
 
     return (
       <section
@@ -967,50 +1113,54 @@ export function TeacherObservePage() {
         aria-label={`Observe ${user?.displayName ?? learnerId}`}
         onPointerDown={() => setActiveSplitLearnerId(learnerId)}
       >
-        <div className="observe-stage-hero observe-split-hero">
-          <div className="observe-phone-avatar" aria-hidden={false}>
-            <UserAvatar
-              name={user?.displayName ?? 'Learner'}
-              avatarUrl={user?.avatarUrl}
-              size="md"
-            />
+        <div className="observe-split-head">
+          <UserAvatar
+            name={user?.displayName ?? 'Learner'}
+            avatarUrl={user?.avatarUrl}
+            size="sm"
+          />
+
+          <div className="observe-stage-hero observe-split-hero">
+            <h2 className="observe-learner observe-learner-solo observe-split-name flex items-center justify-center gap-2">
+              <span>{user?.displayName ?? 'Learner'}</span>
+              <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full font-mono font-bold">
+                Day {paneLearnerDayNumber}
+              </span>
+            </h2>
+            <div className="observe-meta-row">
+              <span className="observe-learner-rfc" title="Learner RFC in this session">
+                <Activity className="h-3.5 w-3.5" aria-hidden />
+                RFC {learnerDone ? `${learnerRfc}%` : '—'}
+              </span>
+              <span className="observe-meta-muted">
+                {learnerDone}/{Math.max(learnerAttempts.length, 1)} done
+              </span>
+            </div>
+            {paneProbeOpen ? (
+              <p className="observe-depth-inline" title="n = how deep after Green (Continue).">
+                n=<strong>{paneProbeDepth}</strong>
+              </p>
+            ) : null}
           </div>
-          <h2 className="observe-learner observe-learner-solo observe-split-name">
-            {user?.displayName ?? 'Learner'}
-          </h2>
-          <div className="observe-meta-row">
-            <span className="observe-learner-rfc" title="Learner RFC in this session">
-              <Activity className="h-3.5 w-3.5" aria-hidden />
-              RFC {learnerDone ? `${learnerRfc}%` : '—'}
-            </span>
-            <span className="observe-meta-muted">
-              {learnerDone}/{Math.max(learnerAttempts.length, 1)} done
-            </span>
-          </div>
-          {paneProbeOpen ? (
-            <p className="observe-depth-inline" title="n = how deep after Green (Continue).">
-              n=<strong>{paneProbeDepth}</strong>
-            </p>
-          ) : null}
         </div>
+
+        <div className="absolute top-3 right-3 z-10">
+          <button
+            type="button"
+            className="btn ghost sm p-2 rounded-full hover:bg-white/10 text-white/70 hover:text-white transition"
+            title="View Heatmap"
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowHeatmapPopupLearnerId(learnerId)
+            }}
+          >
+            <LayoutGrid className="h-5 w-5" aria-hidden />
+          </button>
+        </div>
+
 
         {paneAttempt ? (
           <>
-            <div className="observe-split-map">
-              <ObserveHeatmap
-                capture={learnerCapture}
-                currentQuestionIndex={learnerQuestionIndex}
-                learnerName={learnerName}
-                onSelectQuestion={(i) => {
-                  const q = learnerQuestions[i]
-                  if (!q) return
-                  const originalIndex = capture.questions.findIndex((x) => x.id === q.id)
-                  setActiveSplitLearnerId(learnerId)
-                  setCapture(jumpToQuestion(capture, originalIndex))
-                }}
-                layout="row"
-              />
-            </div>
             <div
               className={`observe-dock observe-dock-lg${reaction ? ` is-glowing is-${reaction.color}` : ''}`}
             >
@@ -1063,7 +1213,6 @@ export function TeacherObservePage() {
                 <span className="observe-dock-q" aria-live="polite">
                   Q{learnerQuestionIndex + 1}/{Math.max(learnerQuestions.length, 1)}
                 </span>
-                <span className="observe-meta-muted">Tab switches pane</span>
               </div>
             </div>
           </>
@@ -1089,17 +1238,17 @@ export function TeacherObservePage() {
     <div
       className={`observe-root${reaction ? ` is-react-${reaction.kind} is-react-${reaction.color}` : ''}${
         isPhone ? ' is-phone' : ''
-      }${mapOpen ? ' is-map-open' : ''}`}
+      }${mapOpen ? ' is-map-open' : ''}${showHeader ? '' : ' is-header-hidden'}`}
       role="application"
       aria-label={`${dayLabel} · Focus and Awareness observation`}
     >
-      <header className="observe-bar observe-bar-slim">
+      <header className={`observe-bar observe-bar-slim${showHeader ? '' : ' is-hidden'}`}>
         <Link to={exitPath} className="observe-nav-exit" aria-label="Exit observe">
           <X aria-hidden strokeWidth={2.5} />
         </Link>
         <div className="observe-bar-center">
           <span className="observe-day-badge" title={dayLabel}>
-            {dayNumber ? `Day ${dayNumber}` : 'Day —'}
+            {targetDayNumber ? `Day ${targetDayNumber}` : 'Day —'}
           </span>
           {qTotal > 0 ? (
             <>
@@ -1142,6 +1291,21 @@ export function TeacherObservePage() {
 
       <button
         type="button"
+        className="observe-nav-btn observe-header-toggle"
+        onClick={() => setShowHeader((value) => !value)}
+        aria-pressed={showHeader}
+        aria-label={showHeader ? 'Hide observe header' : 'Show observe header'}
+        title={showHeader ? 'Hide header' : 'Show header'}
+      >
+        {showHeader ? (
+          <ChevronUp aria-hidden strokeWidth={2.25} />
+        ) : (
+          <ChevronDown aria-hidden strokeWidth={2.25} />
+        )}
+      </button>
+
+      <button
+        type="button"
         className="observe-finish-fab"
         onClick={() => void finishSessionAndSave()}
         disabled={finishing}
@@ -1149,7 +1313,7 @@ export function TeacherObservePage() {
         title="Finish & save (F)"
       >
         <CheckCircle2 aria-hidden strokeWidth={2.25} />
-        <span>{finishing ? 'Saving…' : 'Finish'}</span>
+        <span>{finishButtonLabel}</span>
       </button>
 
       {/* Desktop left rail (resizable). Phone uses bottom map sheet instead. */}
@@ -1275,7 +1439,7 @@ export function TeacherObservePage() {
       {/* Center: name + fixed color dock (phone-first stack) */}
       <main className="observe-stage observe-stage-tight">
         {splitMode && capture.questions.length > 0 ? (
-          <div className={`observe-split${isPhone ? ' is-portrait' : ' is-landscape'}`}>
+          <div className="observe-split">
             {capture.learnerIds.map(renderLearnerPane)}
           </div>
         ) : capture.questions.length === 0 ? (
@@ -1336,6 +1500,24 @@ export function TeacherObservePage() {
                 <p className="observe-depth-inline" title="n = how deep after Green (Continue).">
                   n=<strong>{probeDepth}</strong>
                 </p>
+              ) : null}
+              {isLiveTest ? (
+                <div className="mt-3 rounded-2xl border border-indigo-300/20 bg-indigo-950/25 px-4 py-3 text-center shadow-lg shadow-indigo-950/20">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-indigo-200/80">
+                    {liveTestBlockSummary ?? 'Live Test'} · {liveTestLanguage.toUpperCase()}
+                  </p>
+                  <p className="mt-1 text-sm font-black text-white">
+                    Number {String(qNum).padStart(2, '0')}
+                  </p>
+                  <p className="mt-1 text-base font-semibold text-indigo-50">
+                    {currentLiveTestPrompt ?? 'Prompt pending'}
+                  </p>
+                  {currentLiveTestItem ? (
+                    <p className="mt-1 text-xs text-indigo-100/80">
+                      CCI {currentLiveTestItem.cciValue ?? '—'} · CVR {currentLiveTestItem.cvrValue ?? '—'} · CPD {currentLiveTestItem.cpdValue ?? '—'}
+                    </p>
+                  ) : null}
+                </div>
               ) : null}
             </div>
 
@@ -1512,6 +1694,84 @@ export function TeacherObservePage() {
         </div>
       )}
 
+      {showHeatmapPopupLearnerId && (
+        <div className="observe-modal-container" style={{ zIndex: 100 }}>
+          <div className="observe-modal-backdrop" aria-hidden="true" onClick={() => setShowHeatmapPopupLearnerId(null)} />
+          <div
+            className="observe-modal-card"
+            style={{ maxWidth: '500px', width: '100%' }}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="flex items-center justify-between mb-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+              <h3 className="text-lg font-bold text-white flex items-center gap-2 m-0">
+                <LayoutGrid className="h-5 w-5 text-indigo-400" />
+                Heatmap: {
+                  roster.users.find(u => u.id === showHeatmapPopupLearnerId)?.displayName ?? 'Learner'
+                }
+              </h3>
+              <button
+                type="button"
+                className="text-white/60 hover:text-white p-1 rounded-lg hover:bg-white/5 transition border-0 bg-transparent cursor-pointer"
+                onClick={() => setShowHeatmapPopupLearnerId(null)}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="py-2 overflow-y-auto hide-scrollbar" style={{ maxHeight: '60vh' }}>
+              {(() => {
+                const learnerId = showHeatmapPopupLearnerId
+                const learnerQuestions = capture.questions.filter((q) => q.assignedLearnerUserId === learnerId)
+                const learnerQuestionIds = new Set(learnerQuestions.map((q) => q.id))
+                const paneAttempt = currentAttemptForLearner(capture, learnerId)
+                const learnerQuestionIndex = paneAttempt
+                  ? Math.max(
+                      0,
+                      learnerQuestions.findIndex((q) => q.id === paneAttempt.sessionQuestionId),
+                    )
+                  : 0
+                const learnerCapture: CaptureSessionState = {
+                  ...capture,
+                  learnerIds: [learnerId],
+                  questions: learnerQuestions,
+                  attempts: capture.attempts.filter((a) => learnerQuestionIds.has(a.sessionQuestionId)),
+                  position: {
+                    ...capture.position,
+                    questionIndex: learnerQuestionIndex,
+                    learnerIndex: 0,
+                  },
+                }
+                return (
+                  <ObserveHeatmap
+                    capture={learnerCapture}
+                    currentQuestionIndex={learnerQuestionIndex}
+                    learnerName={learnerName}
+                    onSelectQuestion={(i) => {
+                      const q = learnerQuestions[i]
+                      if (!q) return
+                      const originalIndex = capture.questions.findIndex((x) => x.id === q.id)
+                      setActiveSplitLearnerId(learnerId)
+                      setCapture(jumpToQuestion(capture, originalIndex))
+                      setShowHeatmapPopupLearnerId(null)
+                    }}
+                    layout="row"
+                  />
+                )
+              })()}
+            </div>
+            <div className="flex justify-end mt-4 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+              <button
+                type="button"
+                className="btn secondary px-4 py-2"
+                onClick={() => setShowHeatmapPopupLearnerId(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {finishSummary && (
         <div className="observe-modal-container">
           <div className="observe-modal-backdrop" aria-hidden="true" />
@@ -1531,7 +1791,74 @@ export function TeacherObservePage() {
               Review this session summary. Save & Finish will close this day permanently, then the
               next visit starts a new day.
             </p>
-            <pre className="observe-modal-summary-text">{finishSummary}</pre>
+            {finishMetrics && (
+              <div className="w-full flex flex-col gap-4 text-left my-4 bg-slate-900/50 p-4 rounded-xl border border-white/5">
+                <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                  <span className="text-sm font-semibold text-slate-200">{finishMetrics.dayLabel}</span>
+                  <span className="text-[11px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded font-mono font-bold uppercase">{finishMetrics.className}</span>
+                </div>
+                
+                {/* 3 KPIs */}
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-slate-950/40 p-2.5 rounded-lg border border-white/5">
+                    <p className="text-[10px] text-slate-400 uppercase font-medium">Learners</p>
+                    <p className="text-lg font-bold text-white mt-0.5">{finishMetrics.learnerCount}</p>
+                  </div>
+                  <div className="bg-slate-950/40 p-2.5 rounded-lg border border-white/5">
+                    <p className="text-[10px] text-slate-400 uppercase font-medium">Questions</p>
+                    <p className="text-lg font-bold text-white mt-0.5">{finishMetrics.questionCount}</p>
+                  </div>
+                  <div className="bg-slate-950/40 p-2.5 rounded-lg border border-white/5">
+                    <p className="text-[10px] text-slate-400 uppercase font-medium">Finalized</p>
+                    <p className="text-lg font-bold text-emerald-400 mt-0.5">{finishMetrics.done}/{finishMetrics.total}</p>
+                  </div>
+                </div>
+
+                {/* Color distribution bar */}
+                <div>
+                  <p className="text-[10px] text-slate-400 uppercase font-medium mb-1.5">Color Distribution</p>
+                  <div className="h-3 w-full rounded-full bg-slate-950 overflow-hidden flex">
+                    {finishMetrics.red > 0 && <div className="h-full bg-red-500" style={{ width: `${(finishMetrics.red / Math.max(finishMetrics.done, 1)) * 100}%` }} />}
+                    {finishMetrics.yellow > 0 && <div className="h-full bg-yellow-400" style={{ width: `${(finishMetrics.yellow / Math.max(finishMetrics.done, 1)) * 100}%` }} />}
+                    {finishMetrics.green > 0 && <div className="h-full bg-emerald-500" style={{ width: `${(finishMetrics.green / Math.max(finishMetrics.done, 1)) * 100}%` }} />}
+                    {finishMetrics.purple > 0 && <div className="h-full bg-fuchsia-500" style={{ width: `${(finishMetrics.purple / Math.max(finishMetrics.done, 1)) * 100}%` }} />}
+                  </div>
+                  <div className="grid grid-cols-4 gap-1.5 mt-2.5 text-center text-[10px]">
+                    <div className="bg-red-500/10 text-red-400 border border-red-500/20 py-1 rounded font-bold">
+                      Red: {finishMetrics.red}
+                    </div>
+                    <div className="bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 py-1 rounded font-bold">
+                      Yellow: {finishMetrics.yellow}
+                    </div>
+                    <div className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 py-1 rounded font-bold">
+                      Green: {finishMetrics.green}
+                    </div>
+                    <div className="bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20 py-1 rounded font-bold">
+                      Purple: {finishMetrics.purple}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Additional metrics */}
+                <div className="flex justify-between items-center text-xs pt-1 border-t border-white/5">
+                  <span className="text-slate-400">Peak probe depth:</span>
+                  <span className="font-mono font-bold text-white">n={finishMetrics.maxProbeDepth}</span>
+                </div>
+
+                {/* Unresolved / status info */}
+                <div className="mt-1">
+                  {finishMetrics.unresolved > 0 ? (
+                    <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-lg p-2 text-[11px] font-medium">
+                      ⚠️ Left unfinalized when session closed: {finishMetrics.unresolved}
+                    </div>
+                  ) : (
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg p-2 text-[11px] font-medium text-center">
+                      ✓ All captured attempts finalized.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             <div className="observe-modal-actions">
               <button
                 type="button"
@@ -1547,7 +1874,7 @@ export function TeacherObservePage() {
                 onClick={() => void handleConfirmFinish()}
                 disabled={finishing}
               >
-                {finishing ? 'Saving…' : 'Save & Finish'}
+                {confirmFinishLabel}
               </button>
             </div>
           </div>

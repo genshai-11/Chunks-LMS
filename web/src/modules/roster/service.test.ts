@@ -19,9 +19,7 @@ import {
   updateUserProfile,
   deleteUserProfile,
   deleteEnrollment,
-  learnerInviteUrl,
-  learnerInviteMailto,
-  formatClassInviteClipboard,
+  classInviteCandidates,
   isLearnerEmailTaken,
   isEmailTaken,
   addTeacherProfile,
@@ -259,19 +257,14 @@ describe('admin roster workflows', () => {
     expect(gone.ok).toBe(true)
   })
 
-  it('builds share-link invites and enforces unique learner emails', () => {
+  it('lists learner access candidates and enforces unique learner emails', () => {
     const seed = createSeedRoster()
     const learner = seed.users.find((u) => u.roles.includes('learner') && u.email)!
-    const url = learnerInviteUrl(learner, 'https://lms.example')
-    expect(url).toBe(`https://lms.example/access?email=${encodeURIComponent(learner.email!)}`)
-    const mailto = learnerInviteMailto(learner, 'https://lms.example')
-    expect(mailto).toContain('mailto:')
-    expect(mailto).toContain(encodeURIComponent(url!))
 
     const classId = seed.classes[0]!.id
-    const clip = formatClassInviteClipboard(seed, classId, 'https://lms.example')
-    expect(clip.split('\n').length).toBeGreaterThanOrEqual(1)
-    expect(clip).toContain('/access?email=')
+    const candidates = classInviteCandidates(seed, classId)
+    expect(candidates.length).toBeGreaterThanOrEqual(1)
+    expect(candidates.map((c) => c.learner.id)).toContain(learner.id)
 
     expect(isLearnerEmailTaken(seed, learner.email)).toBe(true)
     expect(isLearnerEmailTaken(seed, learner.email, learner.id)).toBe(false)
@@ -329,6 +322,39 @@ describe('admin roster workflows', () => {
       ).length,
     ).toBe(1)
     expect(merged.state.classes.every((c) => c.teacherUserId !== cloneId)).toBe(true)
+  })
+
+  it('prevents enrolling a learner in multiple classes unless allowMultiClass is enabled', () => {
+    let state = createSeedRoster()
+    const newClass = {
+      id: 'class-2',
+      courseId: state.courses[0]!.id,
+      name: 'Second Class',
+      capacity: 10,
+      teacherUserId: state.users.find((u) => u.roles.includes('teacher'))!.id,
+      status: 'active' as const,
+      startsOn: '2026-07-01',
+      endsOn: '2026-08-01',
+      schedule: null,
+    }
+    state = {
+      ...state,
+      classes: [...state.classes, newClass],
+    }
+
+    const learner = state.users.find((u) => u.roles.includes('learner'))!
+    const errRes = enrollLearner(state, 'class-2', learner.id)
+    expect(errRes.ok).toBe(false)
+    if (errRes.ok) return
+    expect(errRes.error).toContain('already enrolled in another active class')
+
+    const updateRes = updateUserProfile(state, learner.id, { allowMultiClass: true })
+    expect(updateRes.ok).toBe(true)
+    if (!updateRes.ok) return
+    state = updateRes.state
+
+    const okRes = enrollLearner(state, 'class-2', learner.id)
+    expect(okRes.ok).toBe(true)
   })
 })
 

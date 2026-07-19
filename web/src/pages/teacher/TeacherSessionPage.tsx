@@ -7,6 +7,7 @@ import {
   Play,
   Plus,
   Radio,
+  Trash2,
   Users,
 } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -37,7 +38,21 @@ import {
 import { subscribeToClassSnapshots } from '../../modules/realtime/snapshot-channel'
 import { closeOrphanOpenSessions } from '../../modules/scheduling/orphan-sessions'
 import { startLearningSession } from '../../modules/scheduling/session-lifecycle'
-import type { SessionKind } from '../../modules/scheduling/types'
+import type { PromptLanguage, SessionFormat, SessionKind } from '../../modules/scheduling/types'
+import type { LiveTestBlock, LiveTestResource } from '../../modules/assessment/live-test'
+import { blockSummary } from '../../modules/assessment/live-test'
+import { listLiveTestBlocks, listLiveTestResources } from '../../lib/live-test-resources'
+import {
+  listTestPackages,
+  listTestPackageVersions,
+  listTestSections,
+  getSectionSnapshot,
+} from '../../lib/test-packages'
+import type {
+  TestPackage,
+  TestPackageVersion,
+  TestSection,
+} from '../../modules/catalog/test-package-catalog'
 import {
   resolveSessionDayNumber,
   sessionDayBadge,
@@ -65,6 +80,7 @@ export function TeacherSessionPage() {
     ledger,
     metricSettings,
     syncNow,
+    setActiveLearnerUserId,
   } = useAppState()
   const { message, error, ok, err } = useFlash()
   const { classRow, teacher } = useTeacherClassContext()
@@ -87,11 +103,98 @@ export function TeacherSessionPage() {
     if (openSession?.participantLearnerIds?.length) {
       return openSession.participantLearnerIds.filter((id) => activeLearnerIds.includes(id))
     }
-    return activeLearnerIds
+    return []
   }, [openSession, activeLearnerIds])
+
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
 
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [sessionKind, setSessionKind] = useState<SessionKind>('regular')
+  const [sessionFormat, setSessionFormat] = useState<SessionFormat>('lesson')
+  const [promptLanguage, setPromptLanguage] = useState<PromptLanguage>('vi')
+  const [testResources, setTestResources] = useState<LiveTestResource[]>([])
+  const [testBlocks, setTestBlocks] = useState<LiveTestBlock[]>([])
+  const [selectedResourceId, setSelectedResourceId] = useState<string>('')
+  const [selectedBlockId, setSelectedBlockId] = useState<string>('')
+
+  const [packages, setPackages] = useState<TestPackage[]>([])
+  const [selectedPkgId, setSelectedPkgId] = useState<string>('')
+  const [versions, setVersions] = useState<TestPackageVersion[]>([])
+  const [selectedVerId, setSelectedVerId] = useState<string>('')
+  const [sections, setSections] = useState<TestSection[]>([])
+  const [selectedSecId, setSelectedSecId] = useState<string>('')
+
+  // Load packages
+  useEffect(() => {
+    void listTestPackages().then((res) => {
+      if (res.ok && res.data[0]) {
+        setPackages(res.data)
+        setSelectedPkgId(res.data[0].id)
+      }
+    })
+  }, [])
+
+  // Load versions when package changes
+  useEffect(() => {
+    if (!selectedPkgId) return
+    void listTestPackageVersions(selectedPkgId).then((res) => {
+      if (res.ok) {
+        setVersions(res.data)
+        if (res.data[0]) {
+          setSelectedVerId(res.data[0].id)
+        } else {
+          setSelectedVerId('')
+          setSections([])
+        }
+      }
+    })
+  }, [selectedPkgId])
+
+  // Load sections when version changes
+  useEffect(() => {
+    if (!selectedVerId) return
+    void listTestSections(selectedVerId).then((res) => {
+      if (res.ok) {
+        setSections(res.data)
+        if (res.data[0]) {
+          setSelectedSecId(res.data[0].id)
+        } else {
+          setSelectedSecId('')
+        }
+      }
+    })
+  }, [selectedVerId])
+
+  useEffect(() => {
+    let cancelled = false
+    void listLiveTestResources().then((result) => {
+      if (cancelled || !result.ok) return
+      setTestResources(result.data)
+      if (!selectedResourceId && result.data[0]) setSelectedResourceId(result.data[0].id)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedResourceId])
+
+  useEffect(() => {
+    if (!selectedResourceId) {
+      setTestBlocks([])
+      setSelectedBlockId('')
+      return
+    }
+    let cancelled = false
+    void listLiveTestBlocks(selectedResourceId).then((result) => {
+      if (cancelled || !result.ok) return
+      setTestBlocks(result.data)
+      if (!selectedBlockId || !result.data.some((block) => block.id === selectedBlockId)) {
+        setSelectedBlockId(result.data[0]?.id ?? '')
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedResourceId, selectedBlockId])
 
   useEffect(() => {
     if (!classRow) return
@@ -201,13 +304,55 @@ export function TeacherSessionPage() {
   ])
 
   function toggleLearner(id: string) {
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+    setSelectedIds((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((x) => x !== id)
+      }
+      if (prev.length >= 2) {
+        return prev
+      }
+      return [...prev, id]
+    })
+  }
+
+  function deleteActiveSession() {
+    setShowCancelConfirm(true)
+  }
+
+  async function handleConfirmCancelActiveSession() {
+    if (!openSession) return
+    try {
+      const supabase = getSupabase()
+      if (supabase) {
+        const { error: dbErr } = await supabase
+          .from('learning_sessions')
+          .delete()
+          .eq('id', openSession.id)
+        if (dbErr) {
+          err(`Database error: ${dbErr.message}`)
+          return
+        }
+      }
+
+      const nextSessions = scheduling.learningSessions.filter((s) => s.id !== openSession.id)
+      const nextState = { ...scheduling, learningSessions: nextSessions }
+      setScheduling(nextState)
+      setCapture(null)
+      ok('Active session cancelled and deleted')
+    } catch (e: any) {
+      err(e.message || 'Failed to delete session')
+    } finally {
+      setShowCancelConfirm(false)
+    }
   }
 
   async function startLiveNow() {
     if (!classRow || !teacher) return
     if (selectedIds.length === 0) {
       return err('Select at least one learner before starting')
+    }
+    if (sessionFormat === 'test' && !selectedResourceId && !selectedSecId) {
+      return err('Select a live-test resource or package section before starting')
     }
     let rosterForSession = roster
     for (const learnerId of selectedIds) {
@@ -219,16 +364,40 @@ export function TeacherSessionPage() {
     if (rosterForSession !== roster) setRoster(rosterForSession)
 
     const maxProbe = metricSettings.defaultMaxProbeCount
+    const nextNums = selectedIds.map((id) =>
+      nextLearnerSessionNumber({
+        ledger,
+        scheduling,
+        learnerUserId: id,
+        enrollments: roster.enrollments,
+        classId: classRow.id,
+      }),
+    )
+    const sessionNumber = nextNums.length > 0 ? Math.max(...nextNums) : undefined
+
+    let activeSnapshotId: string | null = null
+    if (sessionFormat === 'test' && selectedSecId) {
+      const snapRes = await getSectionSnapshot(selectedSecId)
+      if (snapRes.ok && snapRes.data) {
+        activeSnapshotId = snapRes.data.id
+      }
+    }
+
     const r = startLearningSession(scheduling, {
       classId: classRow.id,
       maxProbeCount: maxProbe,
       ownerUserId: teacher.id,
       sessionKind,
+      sessionFormat,
+      promptLanguage: sessionFormat === 'test' ? promptLanguage : null,
+      liveTestResourceId: sessionFormat === 'test' ? selectedResourceId || null : null,
+      liveTestBlockId: sessionFormat === 'test' ? selectedBlockId || null : null,
+      testPackageVersionId: sessionFormat === 'test' ? selectedVerId || null : null,
+      testSectionId: sessionFormat === 'test' ? selectedSecId || null : null,
+      sectionMeasurementSnapshotId: sessionFormat === 'test' ? activeSnapshotId : null,
+      plannedQuestionCount: sessionFormat === 'test' ? 10 : null,
       participantLearnerIds: selectedIds,
-      sessionNumber:
-        selectedIds.length === 1
-          ? nextLearnerSessionNumber({ ledger, scheduling, learnerUserId: selectedIds[0]! })
-          : undefined,
+      sessionNumber,
     })
     if (!r.ok) return err(r.error)
     const sched = r.state
@@ -241,6 +410,9 @@ export function TeacherSessionPage() {
         maxProbeCount: maxProbe,
       }),
     )
+    if (selectedIds.length > 0) {
+      setActiveLearnerUserId(selectedIds[0]!)
+    }
     // Best-effort cloud push (full workspace + dedicated session upsert).
     // Observe works local-first even if this fails.
     const { ensureLearningSessionOnServer } = await import('../../lib/live-assessment')
@@ -250,7 +422,7 @@ export function TeacherSessionPage() {
       ok(
         `Live session started · ${selectedIds.length} learner(s)${
           sessionKind !== 'regular' ? ` · ${sessionKind}` : ''
-        }`,
+        }${sessionFormat === 'test' ? ` · test · ${promptLanguage.toUpperCase()}` : ''}`,
       )
     } else {
       ok(
@@ -305,26 +477,31 @@ export function TeacherSessionPage() {
             </div>
           }
         >
-          {activeLearnerIds.length === 0 ? (
+          {enrolledIds.length === 0 ? (
             <EmptyState
               icon={Users}
-              title="No learners yet"
-              description="Create learner profiles from Teacher → Learners first."
+              title="No learners seated"
+              description="Seat learners in this class under Teacher → Classes first."
               action={
-                <Link to="/teacher" className="btn ghost">
-                  Learners
+                <Link to="/teacher/classes" className="btn ghost">
+                  Manage Roster
                 </Link>
               }
             />
           ) : (
             <ul className="person-list">
-              {activeLearnerIds.map((id) => {
+              {enrolledIds.map((id) => {
                 const user = roster.users.find((u) => u.id === id)
                 const checked = selectedIds.includes(id)
                 return (
                   <li key={id}>
                     <label className="person-row-check">
-                      <input type="checkbox" checked={checked} onChange={() => toggleLearner(id)} />
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={!checked && selectedIds.length >= 2}
+                        onChange={() => toggleLearner(id)}
+                      />
                       <UserAvatar
                         name={user?.displayName ?? id}
                         avatarUrl={user?.avatarUrl}
@@ -333,10 +510,7 @@ export function TeacherSessionPage() {
                       <span>
                         <strong>{user?.displayName ?? id}</strong>
                         <span className="meta" style={{ display: 'block', margin: 0 }}>
-                          {user?.email ?? 'No email'} ·{' '}
-                          {enrolledIds.includes(id)
-                            ? 'Class assigned'
-                            : 'Will assign class on start'}
+                          {user?.email ?? 'No email'}
                         </span>
                       </span>
                     </label>
@@ -346,6 +520,116 @@ export function TeacherSessionPage() {
             </ul>
           )}
         </Panel>
+
+        <Panel
+          icon={Layers}
+          title="Session format"
+          description="Lesson keeps current live observation. Live Test drives a fixed 10-item resource block."
+        >
+          <div className="btn-row" role="group" aria-label="Session format">
+            <button
+              type="button"
+              className={sessionFormat === 'lesson' ? 'primary' : 'ghost'}
+              onClick={() => setSessionFormat('lesson')}
+            >
+              Lesson
+            </button>
+            <button
+              type="button"
+              className={sessionFormat === 'test' ? 'primary' : 'ghost'}
+              onClick={() => setSessionFormat('test')}
+            >
+              Live Test
+            </button>
+          </div>
+        </Panel>
+
+        {sessionFormat === 'test' ? (
+          <Panel
+            icon={Gauge}
+            title="Live-test resource"
+            description="Choose a package version and section to execute the test."
+          >
+            {testResources.length === 0 && packages.length === 0 ? (
+              <p className="meta">No live-test resources or packages found. Import a resource seed first.</p>
+            ) : (
+              <div className="form-grid" style={{ gap: '1.25rem' }}>
+                {packages.length > 0 && (
+                  <>
+                    <label>
+                      <span>V2 Package</span>
+                      <select value={selectedPkgId} onChange={(e) => setSelectedPkgId(e.target.value)}>
+                        {packages.map((pkg) => (
+                          <option key={pkg.id} value={pkg.id}>
+                            {pkg.title}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Version</span>
+                      <select value={selectedVerId} onChange={(e) => setSelectedVerId(e.target.value)}>
+                        {versions.map((ver) => (
+                          <option key={ver.id} value={ver.id}>
+                            {ver.versionLabel} ({ver.status})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Section</span>
+                      <select value={selectedSecId} onChange={(e) => setSelectedSecId(e.target.value)}>
+                        {sections.map((sec) => (
+                          <option key={sec.id} value={sec.id}>
+                            Section {sec.sectionOrder}: {sec.title ?? 'Untitled'}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </>
+                )}
+
+                <label>
+                  <span>Prompt language</span>
+                  <select value={promptLanguage} onChange={(e) => setPromptLanguage(e.target.value as PromptLanguage)}>
+                    <option value="vi">Vietnamese — Complete Sentence (Vie)</option>
+                    <option value="en">English — Complete Sentence (Eng)</option>
+                  </select>
+                </label>
+
+                <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #4a5568', paddingTop: '1rem', marginTop: '0.5rem' }}>
+                  <span className="meta" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                    Legacy resources (V1 Catalog fallback)
+                  </span>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <label>
+                      <span>Resource</span>
+                      <select value={selectedResourceId} onChange={(e) => setSelectedResourceId(e.target.value)}>
+                        <option value="">-- None --</option>
+                        {testResources.map((resource) => (
+                          <option key={resource.id} value={resource.id}>
+                            {resource.title} · {resource.version}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Session block</span>
+                      <select value={selectedBlockId} onChange={(e) => setSelectedBlockId(e.target.value)}>
+                        <option value="">-- None --</option>
+                        {testBlocks.map((block) => (
+                          <option key={block.id} value={block.id}>
+                            Session {block.blockNumber} · {blockSummary(block)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
+          </Panel>
+        ) : null}
 
         <Panel
           icon={Layers}
@@ -433,11 +717,19 @@ export function TeacherSessionPage() {
             : ''
         } · ${learnerCount} learner(s)`}
         actions={
-          <div className="page-actions">
+          <div className="page-actions flex items-center gap-2">
             <Link to={observeTo} className="btn primary">
               <Eye className="h-4 w-4" aria-hidden />
               <span>{finalizedCount > 0 ? `Open ${dayBadge}` : `Observe ${dayBadge}`}</span>
             </Link>
+            <button
+              type="button"
+              className="btn ghost text-red-400 hover:text-red-300 hover:bg-red-500/10 px-3 py-1.5 rounded flex items-center gap-1.5"
+              onClick={deleteActiveSession}
+            >
+              <Trash2 className="h-4 w-4" aria-hidden />
+              <span>Cancel Session</span>
+            </button>
           </div>
         }
       />
@@ -529,11 +821,19 @@ export function TeacherSessionPage() {
               full-screen. Use learner-first mode to walk each learner’s questions in turn.
             </p>
           </div>
-          <div className="btn-row">
+          <div className="btn-row flex items-center gap-2">
             <Link to={observeTo} className="btn primary observe-entry-cta">
               <Eye className="h-4 w-4" aria-hidden />
               <span>{finalizedCount > 0 ? `Open ${dayBadge}` : `Enter ${dayBadge}`}</span>
             </Link>
+            <button
+              type="button"
+              className="btn ghost text-red-400 hover:text-red-300 hover:bg-red-500/10 px-3 py-1.5 rounded flex items-center gap-1.5"
+              onClick={deleteActiveSession}
+            >
+              <Trash2 className="h-4 w-4" aria-hidden />
+              <span>Cancel Session</span>
+            </button>
             <button
               type="button"
               className="ghost"
@@ -612,6 +912,35 @@ export function TeacherSessionPage() {
           </div>
         )}
       </Panel>
+
+      {/* Custom Cancel Active Session Modal */}
+      {showCancelConfirm && (
+        <div className="observe-modal-container">
+          <div className="observe-modal-backdrop" onClick={() => setShowCancelConfirm(false)} />
+          <div className="observe-modal-card text-left max-w-md p-6 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl relative z-50">
+            <h3 className="text-lg font-bold text-white mb-2">Cancel Active Session?</h3>
+            <p className="text-sm text-slate-300 mb-6">
+              Are you sure you want to cancel and delete this active session? All progress captured in this session will be permanently lost.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                className="btn secondary px-4 py-2 text-xs font-semibold rounded-lg"
+                onClick={() => setShowCancelConfirm(false)}
+              >
+                Keep Session
+              </button>
+              <button
+                type="button"
+                className="btn primary bg-red-600 hover:bg-red-500 text-white px-4 py-2 text-xs font-semibold rounded-lg shadow-lg hover:shadow-red-500/20"
+                onClick={() => void handleConfirmCancelActiveSession()}
+              >
+                Cancel Session
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

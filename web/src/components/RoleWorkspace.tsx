@@ -82,6 +82,7 @@ export function RoleWorkspace({
             )
           })}
         </nav>
+        {contextSlot ? <div className="mobile-class-context">{contextSlot}</div> : null}
         <div className="page">
           <AnimatePresence mode="wait">
             <motion.div

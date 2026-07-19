@@ -68,6 +68,25 @@ describe('session lifecycle and attendance', () => {
     expect(secondOpen.ok).toBe(false)
   })
 
+  it('stores immutable package version, section, and measurement snapshot refs for test sessions', () => {
+    const started = startLearningSession(emptySchedulingState(), {
+      classId,
+      sessionFormat: 'test',
+      promptLanguage: 'vi',
+      testPackageVersionId: 'version-1',
+      testSectionId: 'section-1',
+      sectionMeasurementSnapshotId: 'snapshot-1',
+      plannedQuestionCount: 12,
+    })
+
+    expect(started.ok).toBe(true)
+    if (!started.ok) return
+    expect(started.value.testPackageVersionId).toBe('version-1')
+    expect(started.value.testSectionId).toBe('section-1')
+    expect(started.value.sectionMeasurementSnapshotId).toBe('snapshot-1')
+    expect(started.value.plannedQuestionCount).toBe(12)
+  })
+
   it('accepts an explicit learner-history display session number', () => {
     const started = startLearningSession(emptySchedulingState(), {
       classId,
@@ -111,11 +130,7 @@ describe('session lifecycle and attendance', () => {
     if (!created.ok) throw new Error(created.error)
     state = created.state
 
-    const rescheduled = rescheduleSession(
-      state,
-      created.value.id,
-      '2026-07-21T09:00:00.000Z',
-    )
+    const rescheduled = rescheduleSession(state, created.value.id, '2026-07-21T09:00:00.000Z')
     expect(rescheduled.ok).toBe(true)
     if (!rescheduled.ok) return
     state = rescheduled.state

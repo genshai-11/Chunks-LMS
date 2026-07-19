@@ -83,7 +83,7 @@ export function canAccessOrgStorage(
   if (!isOrgMember(actor, organizationId)) return false
   if (hasOrgRole(actor, organizationId, 'admin')) return true
   if (hasOrgRole(actor, organizationId, 'teacher')) return true
-  if (objectOwnerUserId && actor.userId === objectOwnerUserId) return true
+  if (objectOwnerUserId && 'userId' in actor && actor.userId === objectOwnerUserId) return true
   return false
 }
 

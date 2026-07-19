@@ -13,15 +13,12 @@ import {
 import { readImageAsDataUrl } from '../lib/readImageFile'
 import {
   activeEnrollmentsForClass,
-  classInviteLines,
   createLearnerAndEnroll,
   endEnrollment,
   enrollLearner,
-  formatClassInviteClipboard,
-  learnerInviteMailto,
-  learnerInviteUrl,
   learnersAvailableForClass,
 } from '../modules/roster/service'
+import { issueLearnerAccess, learnerAccessMailto } from '../modules/identity/learner-access'
 import { useAppState } from '../state/useAppState'
 import { UserAvatar } from './UserAvatar'
 import { EmptyState } from './ui'
@@ -39,7 +36,7 @@ type Props = {
  * - list roster with avatars
  * - enroll existing directory learner
  * - quick-add new learner (profile + seat)
- * - copy / email portal invite links (share-link V1 — no Clerk for learners)
+ * - issue / email signed learner access links (no Supabase Auth accounts for learners)
  */
 export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Props) {
   const { roster, setRoster } = useAppState()
@@ -59,8 +56,8 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
     [roster, klass],
   )
   const inviteReady = useMemo(
-    () => (klass ? classInviteLines(roster, klass.id) : []),
-    [roster, klass],
+    () => active.filter((e) => roster.users.find((u) => u.id === e.learnerUserId)?.email?.trim()),
+    [active, roster.users],
   )
 
   if (!klass) {
@@ -101,7 +98,7 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
           <p className="meta">
             {seatsLabel}
             {klass.status !== 'active' ? ' · class not active' : ''}
-            {inviteReady.length > 0 ? ` · ${inviteReady.length} invite ready` : ''}
+            {inviteReady.length > 0 ? ` · ${inviteReady.length} can receive signed access` : ''}
             {missingEmail > 0 ? ` · ${missingEmail} missing email` : ''}
           </p>
         </div>
@@ -113,16 +110,24 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
           <button
             type="button"
             className="ghost"
-            title="Copy all portal links"
-            onClick={() =>
-              void copyText(
-                formatClassInviteClipboard(roster, klass.id),
-                `Copied ${inviteReady.length} invite link(s)`,
-              )
-            }
+            title="Issue and copy signed learner access links"
+            onClick={async () => {
+              const lines: string[] = []
+              for (const enrollment of inviteReady) {
+                const learner = roster.users.find((u) => u.id === enrollment.learnerUserId)
+                if (!learner?.email) continue
+                const issued = await issueLearnerAccess({
+                  learnerUserId: learner.id,
+                  classId: klass.id,
+                })
+                if (!issued.ok) return err(issued.error)
+                lines.push(`${learner.displayName} <${learner.email}>: ${issued.value.url}`)
+              }
+              await copyText(lines.join('\n'), `Issued and copied ${lines.length} signed access link(s)`)
+            }}
           >
             <ClipboardCopy className="h-3.5 w-3.5" aria-hidden />
-            <span>Copy all links</span>
+            <span>Issue & copy all</span>
           </button>
         </div>
       ) : null}
@@ -137,8 +142,7 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
         <ul className="person-list class-students-list">
           {active.map((e) => {
             const user = roster.users.find((u) => u.id === e.learnerUserId)
-            const url = user ? learnerInviteUrl(user) : null
-            const mailto = user ? learnerInviteMailto(user) : null
+            const canInvite = Boolean(user?.email?.trim())
             return (
               <li key={e.id} className="person-row">
                 <UserAvatar
@@ -149,29 +153,44 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
                 <div className="person-body">
                   <strong>{user?.displayName ?? e.learnerUserId}</strong>
                   <span>
-                    {user?.email ?? 'No email — required for invite link'}
-                    {url ? ' · invite ready' : ''}
+                    {user?.email ?? 'No email — required for signed access'}
+                    {canInvite ? ' · signed access available' : ''}
                   </span>
                 </div>
                 <div className="row-actions">
-                  {url ? (
+                  {canInvite && user ? (
                     <button
                       type="button"
                       className="ghost"
-                      title="Copy portal invite link"
-                      onClick={() =>
-                        void copyText(url, `Invite link copied for ${user?.displayName}`)
-                      }
+                      title="Issue and copy signed learner access link"
+                      onClick={async () => {
+                        const issued = await issueLearnerAccess({ learnerUserId: user.id, classId: klass.id })
+                        if (!issued.ok) return err(issued.error)
+                        await copyText(issued.value.url, `Signed access link copied for ${user.displayName}`)
+                      }}
                     >
                       <Link2 className="h-3.5 w-3.5" aria-hidden />
-                      <span>Copy</span>
+                      <span>Issue & copy</span>
                     </button>
                   ) : null}
-                  {mailto ? (
-                    <a className="btn ghost" href={mailto} title="Open email with invite link">
+                  {canInvite && user ? (
+                    <button
+                      type="button"
+                      className="ghost"
+                      title="Issue and open email with signed access link"
+                      onClick={async () => {
+                        const issued = await issueLearnerAccess({ learnerUserId: user.id, classId: klass.id })
+                        if (!issued.ok) return err(issued.error)
+                        window.location.href = learnerAccessMailto({
+                          learnerEmail: user.email!,
+                          learnerDisplayName: user.displayName,
+                          url: issued.value.url,
+                        })
+                      }}
+                    >
                       <Mail className="h-3.5 w-3.5" aria-hidden />
                       <span>Email</span>
-                    </a>
+                    </button>
                   ) : null}
                   {klass.status === 'active' ? (
                     <button
@@ -237,12 +256,7 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
                 })
                 if (!r.ok) return err(r.error)
                 setRoster(r.state)
-                const invite = learnerInviteUrl(r.value.learner)
-                ok(
-                  invite
-                    ? `${r.value.learner.displayName} seated · invite ready — Copy or Email`
-                    : `${r.value.learner.displayName} added`,
-                )
+                ok(`${r.value.learner.displayName} seated · signed access available — Issue & copy or Email`)
                 setNewName('')
                 setNewEmail('')
                 setNewAvatar(null)
@@ -301,7 +315,7 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
               </label>
               <p className="meta form-span-full">
                 After seating, use <strong>Copy</strong> or <strong>Email</strong> to send their
-                login link. Learners do not use Clerk.
+                signed access link. Learners do not use Supabase Auth accounts.
               </p>
               <button type="submit" className="primary" disabled={full}>
                 <UserPlus className="h-4 w-4" aria-hidden />
@@ -320,10 +334,10 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
                 const learner = roster.users.find((u) => u.id === existingId)
                 const name = learner?.displayName ?? 'Learner'
                 setRoster(r.state)
-                if (learnerInviteUrl(learner!)) {
-                  ok(`${name} enrolled · invite ready`)
+                if (learner?.email?.trim()) {
+                  ok(`${name} enrolled · signed access available`)
                 } else {
-                  ok(`${name} enrolled — add email on People to enable invite link`)
+                  ok(`${name} enrolled — add email on People to enable signed access`)
                 }
                 setExistingId('')
               }}

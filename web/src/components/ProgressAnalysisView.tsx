@@ -1,12 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import {
   Activity,
   CalendarDays,
   ChevronRight,
+  Info,
   TrendingDown,
   TrendingUp,
   Users,
 } from 'lucide-react'
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import {
   buildCourseProgressReport,
   buildLearnerProgressReport,
@@ -30,6 +32,10 @@ import { COLOR_SCORE } from '../modules/result-lifecycle/types'
 import type { MetricSettingsState } from '../modules/metrics/settings'
 import { getEnabledMetricKeys } from '../modules/metrics/settings'
 import type { MetricKey, MetricObservation } from '../modules/metrics/calculate'
+import type { LiveTestItem } from '../modules/assessment/live-test'
+import { liveTestItemIdFromExternalRef } from '../modules/assessment/live-test'
+import { listLiveTestItems } from '../lib/live-test-resources'
+import { joinLiveTestResults } from '../modules/reporting/live-test-analysis'
 import { AnalysisChartsPanel } from './AnalysisChartsPanel'
 import { UserAvatar } from './UserAvatar'
 
@@ -47,6 +53,11 @@ type SessionOpt = {
   startedAt: string
   completedAt: string | null
   sessionNumber?: number | null
+  sessionKind?: 'regular' | 'pretest' | 'posttest'
+  sessionFormat?: 'lesson' | 'test'
+  promptLanguage?: 'vi' | 'en' | null
+  liveTestResourceId?: string | null
+  liveTestBlockId?: string | null
 }
 
 type Props = {
@@ -69,6 +80,8 @@ type Props = {
    * Full metric catalog lives on Admin → Metrics, not here.
    */
   metricSettings?: MetricSettingsState
+  onDeleteSession?: (sessionId: string) => void
+  onEditSessionNumber?: (sessionId: string, sessionNumber: number) => void
 }
 
 /** Time scope: keep simple — course total, one day, or custom range */
@@ -93,6 +106,15 @@ function trendTone(key: 'rfc' | 'rac', delta: number | null | undefined): 'up' |
   if (delta == null || Math.abs(delta) < 0.05) return 'flat'
   if (key === 'rfc') return delta < 0 ? 'up' : 'down' // lower RFC is better
   return delta > 0 ? 'up' : 'down'
+}
+
+function numericBand(value: number | null | undefined, band: 'all' | 'missing' | 'low' | 'medium' | 'high'): boolean {
+  if (band === 'all') return true
+  if (value == null) return band === 'missing'
+  if (band === 'missing') return false
+  if (band === 'low') return value <= 1
+  if (band === 'medium') return value > 1 && value <= 3
+  return value > 3
 }
 
 function formatPp(delta: number | null | undefined): string {
@@ -152,6 +174,8 @@ export function ProgressAnalysisView({
   learningSessions = [],
   emptyHint,
   metricSettings,
+  onDeleteSession,
+  onEditSessionNumber,
 }: Props) {
   const [kind, setKind] = useState<ReportWindowKind>('course')
   const [customStart, setCustomStart] = useState(courseStart.slice(0, 10) || '2026-07-01')
@@ -159,10 +183,31 @@ export function ProgressAnalysisView({
     (courseEnd ?? '2026-12-31').toString().slice(0, 10),
   )
   const [sessionId, setSessionId] = useState(learningSessions[0]?.id ?? '')
-  const [selectedLearner, setSelectedLearner] = useState(learnerUserId ?? '')
+  const [selectedLearnerIds, setSelectedLearnerIds] = useState<string[]>(
+    learnerUserId ? [learnerUserId] : [],
+  )
+  const [whoOpen, setWhoOpen] = useState(false)
+  const [columnsPanelOpen, setColumnsPanelOpen] = useState(false)
+  const [deleteSessionIdConfirm, setDeleteSessionIdConfirm] = useState<string | null>(null)
+  const [editSessionId, setEditSessionId] = useState<string | null>(null)
+  const [editSessionNumberInput, setEditSessionNumberInput] = useState<string>('')
+  
+  useEffect(() => {
+    setSelectedLearnerIds(learnerUserId ? [learnerUserId] : [])
+  }, [learnerUserId])
+
   const [tab, setTab] = useState<
     'overview' | 'charts' | 'sessions' | 'learners' | 'history'
   >('overview')
+  const [formatFilter, setFormatFilter] = useState<'all' | 'lesson' | 'test'>('all')
+  const [kindFilter, setKindFilter] = useState<'all' | 'regular' | 'pretest' | 'posttest'>('all')
+  const [promptLanguageFilter, setPromptLanguageFilter] = useState<'all' | 'vi' | 'en'>('all')
+  const [resourceFilter, setResourceFilter] = useState('all')
+  const [blockFilter, setBlockFilter] = useState('all')
+  const [cciBandFilter, setCciBandFilter] = useState<'all' | 'missing' | 'low' | 'medium' | 'high'>('all')
+  const [cvrBandFilter, setCvrBandFilter] = useState<'all' | 'missing' | 'low' | 'medium' | 'high'>('all')
+  const [cpdBandFilter, setCpdBandFilter] = useState<'all' | 'missing' | 'low' | 'medium' | 'high'>('all')
+  const [liveTestItems, setLiveTestItems] = useState<LiveTestItem[]>([])
 
   const learners = useMemo(
     () => users.filter((u) => u.roles.includes('learner')),
@@ -177,6 +222,39 @@ export function ProgressAnalysisView({
       return a.startedAt.localeCompare(b.startedAt)
     })
   }, [learningSessions])
+
+  const sessionById = useMemo(
+    () => new Map(orderedSessions.map((session) => [session.id, session])),
+    [orderedSessions],
+  )
+  const liveTestResourceIds = useMemo(
+    () => [...new Set(orderedSessions.map((s) => s.liveTestResourceId).filter(Boolean))] as string[],
+    [orderedSessions],
+  )
+  const liveTestBlockIds = useMemo(
+    () => [...new Set(orderedSessions.map((s) => s.liveTestBlockId).filter(Boolean))] as string[],
+    [orderedSessions],
+  )
+
+  useEffect(() => {
+    if (liveTestBlockIds.length === 0) {
+      setLiveTestItems([])
+      return
+    }
+    let cancelled = false
+    async function loadItems() {
+      const rows: LiveTestItem[] = []
+      for (const blockId of liveTestBlockIds) {
+        const result = await listLiveTestItems(blockId)
+        if (result.ok) rows.push(...result.data)
+      }
+      if (!cancelled) setLiveTestItems(rows)
+    }
+    void loadItems()
+    return () => {
+      cancelled = true
+    }
+  }, [liveTestBlockIds])
 
   const window = useMemo(() => {
     try {
@@ -219,45 +297,125 @@ export function ProgressAnalysisView({
     return ledger.filter((r) => r.courseId === courseId && r.classId === classId)
   }, [ledger, courseId, classId])
 
-  const focusLearnerId = mode === 'learner' ? learnerUserId : selectedLearner || undefined
+  const analysisLedger = useMemo(() => {
+    return scopedLedger.filter((record) => {
+      const session = sessionById.get(record.learningSessionId)
+      if (!session) return true
+      const format = session.sessionFormat ?? 'lesson'
+      const sessionKind = session.sessionKind ?? 'regular'
+      if (formatFilter !== 'all' && format !== formatFilter) return false
+      if (kindFilter !== 'all' && sessionKind !== kindFilter) return false
+      if (promptLanguageFilter !== 'all' && session.promptLanguage !== promptLanguageFilter) return false
+      if (resourceFilter !== 'all' && session.liveTestResourceId !== resourceFilter) return false
+      if (blockFilter !== 'all' && session.liveTestBlockId !== blockFilter) return false
+      return true
+    })
+  }, [scopedLedger, sessionById, formatFilter, kindFilter, promptLanguageFilter, resourceFilter, blockFilter])
+
+  const focusLearnerId = mode === 'learner' ? learnerUserId : (selectedLearnerIds.length === 1 ? selectedLearnerIds[0] : undefined)
   const focusLearner = focusLearnerId
     ? users.find((u) => u.id === focusLearnerId)
     : undefined
 
   const courseReport = useMemo(() => {
     if (!window || mode === 'learner' || focusLearnerId) return null
-    const learnerIds = learners.map((u) => u.id)
-    return buildCourseProgressReport(scopedLedger, courseId, window, { learnerIds })
-  }, [window, mode, focusLearnerId, scopedLedger, courseId, learners])
+    const learnerIds = selectedLearnerIds.length > 0 ? selectedLearnerIds : learners.map((u) => u.id)
+    return buildCourseProgressReport(analysisLedger, courseId, window, { learnerIds })
+  }, [window, mode, focusLearnerId, analysisLedger, courseId, learners, selectedLearnerIds] )
 
   const learnerReport = useMemo(() => {
     if (!window || !focusLearnerId) return null
-    return buildLearnerProgressReport(scopedLedger, focusLearnerId, window, {
+    return buildLearnerProgressReport(analysisLedger, focusLearnerId, window, {
       courseId,
       classId,
     })
-  }, [window, focusLearnerId, scopedLedger, courseId, classId])
+  }, [window, focusLearnerId, analysisLedger, courseId, classId])
 
   const comparison = learnerReport?.comparison ?? courseReport?.overall ?? null
 
-  const windowRecords = useMemo(() => {
+  const baseWindowRecords = useMemo(() => {
     if (!window) return []
-    return filterResults(scopedLedger, window, {
+    const records = filterResults(analysisLedger, window, {
       courseId,
       classId,
       learnerUserId: focusLearnerId,
     })
-  }, [window, scopedLedger, courseId, classId, focusLearnerId])
+    if (selectedLearnerIds.length > 1) {
+      return records.filter((r) => selectedLearnerIds.includes(r.learnerUserId))
+    }
+    return records
+  }, [window, analysisLedger, courseId, classId, focusLearnerId, selectedLearnerIds])
+
+  const itemById = useMemo(
+    () => new Map(liveTestItems.map((item) => [item.id, item])),
+    [liveTestItems],
+  )
+  const windowRecords = useMemo(() => {
+    if (cciBandFilter === 'all' && cvrBandFilter === 'all' && cpdBandFilter === 'all') {
+      return baseWindowRecords
+    }
+    return baseWindowRecords.filter((record) => {
+      const itemId = liveTestItemIdFromExternalRef(record.externalRef)
+      const item = itemId ? itemById.get(itemId) : null
+      return (
+        numericBand(item?.cciValue, cciBandFilter) &&
+        numericBand(item?.cvrValue, cvrBandFilter) &&
+        numericBand(item?.cpdValue, cpdBandFilter)
+      )
+    })
+  }, [baseWindowRecords, itemById, cciBandFilter, cvrBandFilter, cpdBandFilter])
+
+  const liveTestRows = useMemo(
+    () => joinLiveTestResults({ records: windowRecords, itemById, promptLanguage: 'vi' }),
+    [windowRecords, itemById],
+  )
+  const itemDifficultyRows = useMemo(() => {
+    const byItem = new Map<string, typeof liveTestRows>()
+    for (const row of liveTestRows) {
+      const list = byItem.get(row.liveTestItemId) ?? []
+      list.push(row)
+      byItem.set(row.liveTestItemId, list)
+    }
+    return [...byItem.entries()]
+      .map(([id, rows]) => {
+        const sample = rows.length
+        const redYellow = rows.filter((row) => row.effectiveColor === 'red' || row.effectiveColor === 'yellow').length
+        const greenPurple = sample - redYellow
+        const nCount = rows.filter((row) => row.enteredProbeFlow).length
+        const nDepthAvg = nCount > 0 ? rows.reduce((sum, row) => sum + row.probeEventCount, 0) / nCount : null
+        const first = rows[0]!
+        return {
+          id,
+          itemNumber: first.itemNumber,
+          prompt: first.prompt,
+          cci: first.cciValue,
+          cvr: first.cvrValue,
+          cpd: first.cpdValue,
+          sample,
+          rfc: sample > 0 ? redYellow / sample : null,
+          rac: sample > 0 ? greenPurple / sample : null,
+          nCount,
+          nDepthAvg,
+        }
+      })
+      .sort((a, b) => (b.rfc ?? 0) - (a.rfc ?? 0) || (b.cpd ?? 0) - (a.cpd ?? 0))
+  }, [liveTestRows])
 
   const counts = colorCounts(windowRecords)
   const total = windowRecords.length
   const maxBar = Math.max(1, ...Object.values(counts))
 
+  const pieData = useMemo(() => {
+    return [
+      { name: 'Red', value: counts.red, color: '#ef4444' },
+      { name: 'Yellow', value: counts.yellow, color: '#eab308' },
+      { name: 'Green', value: counts.green, color: '#22c55e' },
+      { name: 'Purple', value: counts.purple, color: '#a855f7' },
+    ].filter((d) => d.value > 0)
+  }, [counts])
+
   const rfc = comparison ? pickMetric(comparison.current, 'rfc', metricSettings) : null
   const rac = comparison ? pickMetric(comparison.current, 'rac', metricSettings) : null
-  const avg = comparison
-    ? pickMetric(comparison.current, 'average_performance', metricSettings)
-    : null
 
   const rfcDelta = comparison?.deltas.rfc
   const racDelta = comparison?.deltas.rac
@@ -324,7 +482,9 @@ export function ProgressAnalysisView({
   /** Per-day series for class or focused learner — all enabled metrics from real ledger */
   const sessionSeries = useMemo(() => {
     return buildSessionMetricSeries({
-      ledger: scopedLedger,
+      ledger: selectedLearnerIds.length > 0
+        ? analysisLedger.filter((r) => selectedLearnerIds.includes(r.learnerUserId))
+        : analysisLedger,
       learningSessions: orderedSessions.map((s) => ({
         id: s.id,
         classId: classId ?? '',
@@ -337,7 +497,11 @@ export function ProgressAnalysisView({
         sessionNumber: s.sessionNumber ?? null,
         ownerUserId: null,
         lockExpiresAt: null,
-        sessionKind: 'regular' as const,
+        sessionKind: s.sessionKind ?? ('regular' as const),
+        sessionFormat: s.sessionFormat ?? ('lesson' as const),
+        promptLanguage: s.promptLanguage ?? null,
+        liveTestResourceId: s.liveTestResourceId ?? null,
+        liveTestBlockId: s.liveTestBlockId ?? null,
         participantLearnerIds: null,
       })),
       courseId,
@@ -345,7 +509,7 @@ export function ProgressAnalysisView({
       learnerUserId: focusLearnerId,
       metricKeys: dayMetricOptions,
     })
-  }, [scopedLedger, orderedSessions, courseId, classId, focusLearnerId, dayMetricOptions])
+  }, [analysisLedger, orderedSessions, courseId, classId, focusLearnerId, dayMetricOptions, selectedLearnerIds])
 
   function metricLabel(key: MetricKey): string {
     return metricSettings?.metrics.find((m) => m.key === key)?.label ?? key
@@ -389,7 +553,7 @@ export function ProgressAnalysisView({
     return sessionLabel(num, s.startedAt, totalDays)
   }, [orderedSessions, sessionId, totalDays])
 
-  if (scopedLedger.length === 0) {
+  if (analysisLedger.length === 0) {
     return (
       <div className="empty-state analysis-empty">
         <p>
@@ -445,27 +609,149 @@ export function ProgressAnalysisView({
                 <Users className="h-3.5 w-3.5" aria-hidden />
                 Who
               </span>
-              <label className="analysis-select-wrap">
-                <span className="sr-only">Learner</span>
-                <select
-                  className="analysis-select"
-                  value={selectedLearner}
-                  onChange={(e) => {
-                    setSelectedLearner(e.target.value)
-                    if (e.target.value) setTab('overview')
-                  }}
+              <div className="relative">
+                <button
+                  type="button"
+                  className="analysis-select flex items-center justify-between gap-2 text-left w-full min-w-[140px] px-3 py-1.5 rounded-lg border border-white/10 bg-slate-900 text-xs text-white cursor-pointer"
+                  onClick={() => setWhoOpen((o) => !o)}
                 >
-                  <option value="">Whole class</option>
-                  {learners.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.displayName}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  <span className="truncate">
+                    {selectedLearnerIds.length === 0
+                      ? 'Whole class'
+                      : selectedLearnerIds.length === 1
+                        ? (learners.find((u) => u.id === selectedLearnerIds[0])?.displayName ?? '1 Learner')
+                        : `${selectedLearnerIds.length} learners`}
+                  </span>
+                  <ChevronRight className={`h-3 w-3 transform transition-transform shrink-0 ${whoOpen ? 'rotate-90' : ''}`} />
+                </button>
+                {whoOpen && (
+                  <>
+                    <div className="fixed inset-0 z-30" onClick={() => setWhoOpen(false)} />
+                    <div className="absolute left-0 mt-1 z-40 w-56 rounded-xl border border-white/10 bg-slate-900 p-2 shadow-2xl">
+                      <div className="flex items-center justify-between border-b border-white/5 pb-1.5 mb-1.5 px-2">
+                        <button
+                          type="button"
+                          className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold border-0 bg-transparent cursor-pointer"
+                          onClick={() => {
+                            setSelectedLearnerIds([])
+                            setWhoOpen(false)
+                          }}
+                        >
+                          Clear (Whole class)
+                        </button>
+                        <button
+                          type="button"
+                          className="text-[10px] text-slate-400 hover:text-white font-semibold border-0 bg-transparent cursor-pointer"
+                          onClick={() => setWhoOpen(false)}
+                        >
+                          Done
+                        </button>
+                      </div>
+                      <div className="max-h-60 overflow-y-auto flex flex-col gap-0.5 hide-scrollbar">
+                        {learners.map((u) => {
+                          const checked = selectedLearnerIds.includes(u.id)
+                          return (
+                            <label
+                              key={u.id}
+                              className="flex items-center gap-2 px-2 py-1 hover:bg-white/5 rounded-lg cursor-pointer text-xs text-slate-300 hover:text-white"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                className="rounded bg-slate-950 border-white/10 text-indigo-500 cursor-pointer"
+                                onChange={() => {
+                                  setSelectedLearnerIds((prev) => {
+                                    const next = prev.includes(u.id)
+                                      ? prev.filter((id) => id !== u.id)
+                                      : [...prev, u.id]
+                                    if (next.length > 0) setTab('overview')
+                                    return next
+                                  })
+                                }}
+                              />
+                              <span className="truncate">{u.displayName}</span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           ) : null}
         </div>
+
+        <div className="analysis-filter-row analysis-dates">
+          <label className="analysis-select-wrap">
+            <span className="analysis-filter-label">Format</span>
+            <select className="analysis-select" value={formatFilter} onChange={(e) => setFormatFilter(e.target.value as typeof formatFilter)}>
+              <option value="all">All</option>
+              <option value="lesson">Lesson</option>
+              <option value="test">Live Test</option>
+            </select>
+          </label>
+          <label className="analysis-select-wrap">
+            <span className="analysis-filter-label">Kind</span>
+            <select className="analysis-select" value={kindFilter} onChange={(e) => setKindFilter(e.target.value as typeof kindFilter)}>
+              <option value="all">All</option>
+              <option value="regular">Regular</option>
+              <option value="pretest">Pretest</option>
+              <option value="posttest">Posttest</option>
+            </select>
+          </label>
+          <label className="analysis-select-wrap">
+            <span className="analysis-filter-label">Prompt</span>
+            <select className="analysis-select" value={promptLanguageFilter} onChange={(e) => setPromptLanguageFilter(e.target.value as typeof promptLanguageFilter)}>
+              <option value="all">All</option>
+              <option value="vi">Vietnamese</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+          {liveTestResourceIds.length > 0 ? (
+            <label className="analysis-select-wrap">
+              <span className="analysis-filter-label">Resource</span>
+              <select className="analysis-select" value={resourceFilter} onChange={(e) => setResourceFilter(e.target.value)}>
+                <option value="all">All</option>
+                {liveTestResourceIds.map((id) => (
+                  <option key={id} value={id}>{id.slice(0, 8)}</option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          {liveTestBlockIds.length > 0 ? (
+            <label className="analysis-select-wrap">
+              <span className="analysis-filter-label">Block</span>
+              <select className="analysis-select" value={blockFilter} onChange={(e) => setBlockFilter(e.target.value)}>
+                <option value="all">All</option>
+                {liveTestBlockIds.map((id) => (
+                  <option key={id} value={id}>{id.slice(0, 8)}</option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+        </div>
+
+        {liveTestBlockIds.length > 0 ? (
+          <div className="analysis-filter-row analysis-dates">
+            {([
+              ['CCI band', cciBandFilter, setCciBandFilter],
+              ['CVR band', cvrBandFilter, setCvrBandFilter],
+              ['CPD band', cpdBandFilter, setCpdBandFilter],
+            ] as const).map(([label, value, setter]) => (
+              <label className="analysis-select-wrap" key={label}>
+                <span className="analysis-filter-label">{label}</span>
+                <select className="analysis-select" value={value} onChange={(e) => setter(e.target.value as typeof value)}>
+                  <option value="all">All</option>
+                  <option value="missing">Missing</option>
+                  <option value="low">Low ≤ 1</option>
+                  <option value="medium">Medium 1–3</option>
+                  <option value="high">High &gt; 3</option>
+                </select>
+              </label>
+            ))}
+          </div>
+        ) : null}
 
         {kind === 'session' && orderedSessions.length > 0 ? (
           <div className="analysis-filter-row">
@@ -521,7 +807,13 @@ export function ProgressAnalysisView({
         <p className="analysis-filter-meta">
           {courseCode}
           {className ? ` · ${className}` : ''}
-          {focusLearner ? ` · ${focusLearner.displayName}` : mode === 'teacher' ? ' · class' : ''}
+          {selectedLearnerIds.length > 0
+            ? selectedLearnerIds.length === 1
+              ? ` · ${focusLearner?.displayName}`
+              : ` · ${selectedLearnerIds.length} learners`
+            : mode === 'teacher'
+              ? ' · class'
+              : ''}
           {kind === 'session' ? ` · ${selectedSessionLabel}` : window ? ` · ${window.label}` : ''}
           {' · '}
           <strong>{total} finalized</strong>
@@ -530,7 +822,51 @@ export function ProgressAnalysisView({
       </section>
 
       {/* Focused learner strip */}
-      {focusLearner ? (
+      {selectedLearnerIds.length > 1 ? (
+        <div className="analysis-person-strip flex items-center justify-between gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl">
+          <div className="flex items-center gap-3">
+            <div className="flex -space-x-2 overflow-hidden py-1">
+              {selectedLearnerIds.slice(0, 3).map((id) => {
+                const u = learners.find((x) => x.id === id)
+                return (
+                  <UserAvatar
+                    key={id}
+                    name={u?.displayName ?? ''}
+                    avatarUrl={u?.avatarUrl}
+                    size="sm"
+                    className="ring-2 ring-slate-950"
+                  />
+                )
+              })}
+              {selectedLearnerIds.length > 3 && (
+                <div className="flex items-center justify-center h-8 w-8 rounded-full bg-slate-800 text-[10px] font-bold text-white ring-2 ring-slate-950">
+                  +{selectedLearnerIds.length - 3}
+                </div>
+              )}
+            </div>
+            <div className="analysis-person-copy">
+              <p className="analysis-person-name text-sm font-bold text-white">
+                {selectedLearnerIds.length} Learners Selected
+              </p>
+              <p className="meta text-xs text-slate-400">
+                {selectedLearnerIds
+                  .map((id) => learners.find((x) => x.id === id)?.displayName)
+                  .filter(Boolean)
+                  .join(', ')}
+              </p>
+            </div>
+          </div>
+          {mode === 'teacher' ? (
+            <button
+              type="button"
+              className="ghost analysis-person-clear"
+              onClick={() => setSelectedLearnerIds([])}
+            >
+              Class view
+            </button>
+          ) : null}
+        </div>
+      ) : focusLearner ? (
         <div className="analysis-person-strip">
           <UserAvatar
             name={focusLearner.displayName}
@@ -547,7 +883,7 @@ export function ProgressAnalysisView({
             <button
               type="button"
               className="ghost analysis-person-clear"
-              onClick={() => setSelectedLearner('')}
+              onClick={() => setSelectedLearnerIds([])}
             >
               Class view
             </button>
@@ -571,18 +907,17 @@ export function ProgressAnalysisView({
       {/* ——— Overview ——— */}
       {tab === 'overview' && (
         <div className="analysis-tab-body">
-          <p className="analysis-plain-hint">
-            <strong>Struggle (RFC)</strong> = (Red + Yellow) ÷ finalized sample in the{' '}
-            <em>current filter</em> (course / one day / date range × class or one learner). Source:
-            assessment ledger only — no mock.
-            {' · '}
-            <strong>RAC</strong> = (Green + Purple) ÷ sample. Lower RFC is better.
-          </p>
-
           <div className="stat-grid analysis-kpis">
             <div className={`stat-card analysis-kpi-rfc${rfcTone === 'up' ? ' is-good' : rfcTone === 'down' ? ' is-warn' : ''}`}>
-              <p className="stat-label">
-                <Activity className="inline h-3.5 w-3.5" aria-hidden /> Struggle (RFC)
+              <p className="stat-label flex items-center gap-1">
+                <Activity className="h-3.5 w-3.5" aria-hidden />
+                <span>Struggle (RFC)</span>
+                <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
+                  <Info className="h-3.5 w-3.5" />
+                  <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
+                    <strong>Struggle (RFC)</strong> = (Red + Yellow) ÷ finalized sample. Lower RFC is better. Source: assessment ledger only (no mock).
+                  </span>
+                </span>
               </p>
               <p className="stat-value">{rfc ? formatMetricValue(rfc) : '—'}</p>
               <p className={`analysis-delta is-${rfcTone}`}>
@@ -596,7 +931,15 @@ export function ProgressAnalysisView({
               </p>
             </div>
             <div className={`stat-card analysis-kpi-rac${racTone === 'up' ? ' is-good' : racTone === 'down' ? ' is-warn' : ''}`}>
-              <p className="stat-label">Success (RAC)</p>
+              <p className="stat-label flex items-center gap-1">
+                <span>Success (RAC)</span>
+                <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
+                  <Info className="h-3.5 w-3.5" />
+                  <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
+                    <strong>Success (RAC)</strong> = (Green + Purple) ÷ sample. Higher RAC is better.
+                  </span>
+                </span>
+              </p>
               <p className="stat-value">{rac ? formatMetricValue(rac) : '—'}</p>
               <p className={`analysis-delta is-${racTone}`}>
                 {racTone === 'up' ? (
@@ -607,11 +950,6 @@ export function ProgressAnalysisView({
                 {formatDelta('rac', racDelta)}
                 <span className="analysis-delta-note"> vs prior window</span>
               </p>
-            </div>
-            <div className="stat-card">
-              <p className="stat-label">Avg score</p>
-              <p className="stat-value">{avg ? formatMetricValue(avg) : '—'}</p>
-              <p className="meta">0–3 scale · {total} samples</p>
             </div>
             <div className="stat-card">
               <p className="stat-label">Results</p>
@@ -626,18 +964,20 @@ export function ProgressAnalysisView({
             <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
               Probe metrics (from finalized ledger)
             </h3>
-            <p className="analysis-plain-hint" style={{ marginBottom: 12 }}>
-              <strong>n count</strong> = times teacher selected Green (2).{' '}
-              <strong>n depth</strong> = probe steps on one question (Pass/Continue).{' '}
-              Peak example: Green + Pass×8 + Done → n depth 9. Values below use real observations
-              only.
-            </p>
             <div className="stat-grid" style={{ marginBottom: 24 }}>
               <div
                 className="stat-card"
                 title="Number of finalized attempts where teacher selected Green (2) and entered probe"
               >
-                <p className="stat-label">n count</p>
+                <p className="stat-label flex items-center gap-1">
+                  <span>n count</span>
+                  <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
+                    <Info className="h-3.5 w-3.5" />
+                    <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
+                      <strong>n count</strong> = number of times the teacher selected Green (2). Values use real observations only.
+                    </span>
+                  </span>
+                </p>
                 <p className="stat-value">{probeStats.count}</p>
                 <p className="meta">Green (2) entries · sample={total}</p>
               </div>
@@ -645,7 +985,15 @@ export function ProgressAnalysisView({
                 className="stat-card"
                 title="Mean probeCount among probed attempts"
               >
-                <p className="stat-label">n depth avg</p>
+                <p className="stat-label flex items-center gap-1">
+                  <span>n depth avg</span>
+                  <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
+                    <Info className="h-3.5 w-3.5" />
+                    <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
+                      <strong>n depth avg</strong> = mean probe steps on probed questions (Pass/Continue). Peak example: Green + Pass×8 + Done → n depth 9.
+                    </span>
+                  </span>
+                </p>
                 <p className="stat-value">
                   {probeStats.count > 0 ? probeStats.avg.toFixed(1) : '—'}
                 </p>
@@ -655,7 +1003,15 @@ export function ProgressAnalysisView({
                 className="stat-card"
                 title="Max probeCount among probed attempts (observed peak, not session ceiling)"
               >
-                <p className="stat-label">n depth max</p>
+                <p className="stat-label flex items-center gap-1">
+                  <span>n depth max</span>
+                  <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
+                    <Info className="h-3.5 w-3.5" />
+                    <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
+                      <strong>n depth max</strong> = maximum observed probe steps on one question. Peak example: Green + Pass×8 + Done → n depth 9.
+                    </span>
+                  </span>
+                </p>
                 <p className="stat-value">{probeStats.count > 0 ? probeStats.max : '—'}</p>
                 <p className="meta">Peak observed depth</p>
               </div>
@@ -715,23 +1071,46 @@ export function ProgressAnalysisView({
                 {total === 0 ? (
                   <p className="meta">No data in this filter.</p>
                 ) : (
-                  <div className="dist-bars">
-                    {(['red', 'yellow', 'green', 'purple'] as ResultColor[]).map((color) => {
-                      const n = counts[color]
-                      const p = pct(n, total)
-                      const width = `${Math.max(n ? 8 : 0, (n / Math.max(maxBar, 1)) * 100)}%`
-                      return (
-                        <div key={color} className="dist-row">
-                          <span className={`capture-dot ${color}`}>{color}</span>
-                          <div className="dist-track">
-                            <div className={`dist-fill dist-${color}`} style={{ width }} />
+                  <div className="flex flex-col sm:flex-row gap-6 items-center w-full">
+                    <div className="dist-bars flex-1 w-full">
+                      {(['red', 'yellow', 'green', 'purple'] as ResultColor[]).map((color) => {
+                        const n = counts[color]
+                        const p = pct(n, total)
+                        const width = `${Math.max(n ? 8 : 0, (n / Math.max(maxBar, 1)) * 100)}%`
+                        return (
+                          <div key={color} className="dist-row">
+                            <span className={`capture-dot ${color}`}>{color}</span>
+                            <div className="dist-track">
+                              <div className={`dist-fill dist-${color}`} style={{ width }} />
+                            </div>
+                            <span className="dist-count">
+                              {n} · {p}%
+                            </span>
                           </div>
-                          <span className="dist-count">
-                            {n} · {p}%
-                          </span>
-                        </div>
-                      )
-                    })}
+                        )
+                      })}
+                    </div>
+                    {pieData.length > 0 && (
+                      <div className="flex-shrink-0" style={{ width: 140, height: 140 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={pieData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={30}
+                              outerRadius={55}
+                              paddingAngle={3}
+                              dataKey="value"
+                            >
+                              {pieData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -808,7 +1187,7 @@ export function ProgressAnalysisView({
             Respects <strong>Who</strong> filter (class or one learner) above.
           </p>
           <AnalysisChartsPanel
-            ledger={scopedLedger}
+            ledger={analysisLedger}
             learningSessions={orderedSessions}
             courseId={courseId}
             classId={classId}
@@ -822,28 +1201,48 @@ export function ProgressAnalysisView({
       {/* ——— By day (session series + Δ RFC) ——— */}
       {tab === 'sessions' && (
         <div className="analysis-tab-body">
-          <p className="analysis-plain-hint">
-            Each row is one live day from the <strong>finalized ledger</strong> (not mock).{' '}
-            <strong>RFC</strong> = (Red+Yellow) / sample that day. <strong>Δ RFC</strong> = change
-            vs previous day (negative pp = less struggle = improvement).
-          </p>
-          <div className="analysis-chip-row" style={{ marginBottom: 12 }} role="group" aria-label="Day table columns">
-            <span className="analysis-filter-label">Columns</span>
-            {dayMetricOptions.map((key) => {
-              const on = visibleDayColumns.includes(key)
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  className={`analysis-chip${on ? ' is-active' : ''}`}
-                  aria-pressed={on}
-                  title={metricSettings?.metrics.find((m) => m.key === key)?.definition ?? key}
-                  onClick={() => toggleDayColumn(key)}
-                >
-                  {metricLabel(key)}
-                </button>
-              )
-            })}
+          <div className="analysis-columns-selector mb-3 border border-white/5 bg-white/[0.02] rounded-xl p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                <CalendarDays className="h-3.5 w-3.5 text-indigo-400" />
+                <span>Table Columns ({visibleDayColumns.length} active)</span>
+                <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
+                  <Info className="h-3.5 w-3.5" />
+                  <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
+                    Each row is one live day from the <strong>finalized ledger</strong> (no mock).
+                    <br />
+                    <strong>RFC</strong> = (Red+Yellow) / sample. <strong>Δ RFC</strong> = change vs previous day (negative pp = improvement).
+                  </span>
+                </span>
+              </span>
+              <button
+                type="button"
+                className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold border-0 bg-transparent cursor-pointer flex items-center gap-0.5"
+                onClick={() => setColumnsPanelOpen(!columnsPanelOpen)}
+              >
+                {columnsPanelOpen ? 'Hide columns config' : 'Show columns config'}
+                <ChevronRight className={`h-3 w-3 transform transition-transform ${columnsPanelOpen ? 'rotate-90' : ''}`} />
+              </button>
+            </div>
+            {columnsPanelOpen && (
+              <div className="mt-2.5 pt-2.5 border-t border-white/5 flex flex-wrap gap-1.5">
+                {dayMetricOptions.map((key) => {
+                  const on = visibleDayColumns.includes(key)
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      className={`analysis-chip${on ? ' is-active' : ''} text-[10px] py-1 px-2.5 cursor-pointer`}
+                      aria-pressed={on}
+                      title={metricSettings?.metrics.find((m) => m.key === key)?.definition ?? key}
+                      onClick={() => toggleDayColumn(key)}
+                    >
+                      {metricLabel(key)}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
           {sessionSeries.length === 0 ? (
             <p className="empty-state">No session results yet.</p>
@@ -914,17 +1313,40 @@ export function ProgressAnalysisView({
                           </td>
                         ) : null}
                         <td>
-                          <button
-                            type="button"
-                            className="ghost"
-                            onClick={() => {
-                              setKind('session')
-                              setSessionId(p.learningSessionId)
-                              setTab('overview')
-                            }}
-                          >
-                            Open
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              className="ghost"
+                              onClick={() => {
+                                setKind('session')
+                                setSessionId(p.learningSessionId)
+                                setTab('overview')
+                              }}
+                            >
+                              Open
+                            </button>
+                             {mode === 'teacher' && onEditSessionNumber && (
+                              <button
+                                type="button"
+                                className="ghost text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 px-2 py-1 rounded"
+                                onClick={() => {
+                                  setEditSessionId(p.learningSessionId)
+                                  setEditSessionNumberInput(String(p.sessionNumber ?? ''))
+                                }}
+                              >
+                                Edit Day
+                              </button>
+                            )}
+                            {mode === 'teacher' && onDeleteSession && (
+                              <button
+                                type="button"
+                                className="ghost text-red-400 hover:text-red-300 hover:bg-red-500/10 px-2 py-1 rounded"
+                                onClick={() => setDeleteSessionIdConfirm(p.learningSessionId)}
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     )
@@ -933,6 +1355,44 @@ export function ProgressAnalysisView({
               </table>
             </div>
           )}
+
+          {itemDifficultyRows.length > 0 ? (
+            <div className="table-wrap mt-4">
+              <p className="panel-title mb-2">Live-test item difficulty</p>
+              <table aria-label="Live-test item difficulty by CPD">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Prompt</th>
+                    <th>CCI</th>
+                    <th>CVR</th>
+                    <th>CPD</th>
+                    <th>sample</th>
+                    <th>RFC</th>
+                    <th>RAC</th>
+                    <th>n count</th>
+                    <th>n depth avg</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {itemDifficultyRows.map((row) => (
+                    <tr key={row.id}>
+                      <td>#{String(row.itemNumber).padStart(2, '0')}</td>
+                      <td className="def">{row.prompt ?? '—'}</td>
+                      <td>{row.cci ?? '—'}</td>
+                      <td>{row.cvr ?? '—'}</td>
+                      <td>{row.cpd ?? '—'}</td>
+                      <td>{row.sample}</td>
+                      <td>{row.rfc == null ? '—' : `${(row.rfc * 100).toFixed(1)}%`}</td>
+                      <td>{row.rac == null ? '—' : `${(row.rac * 100).toFixed(1)}%`}</td>
+                      <td>{row.nCount}</td>
+                      <td>{row.nDepthAvg == null ? '—' : row.nDepthAvg.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
         </div>
       )}
 
@@ -989,7 +1449,7 @@ export function ProgressAnalysisView({
                           type="button"
                           className="primary"
                           onClick={() => {
-                            setSelectedLearner(row.learnerUserId)
+                            setSelectedLearnerIds([row.learnerUserId])
                             setTab('overview')
                           }}
                         >
@@ -1035,7 +1495,7 @@ export function ProgressAnalysisView({
                               type="button"
                               className="ghost cell-with-avatar"
                               onClick={() => {
-                                setSelectedLearner(r.learnerUserId)
+                                setSelectedLearnerIds([r.learnerUserId])
                                 setTab('overview')
                               }}
                             >
@@ -1060,6 +1520,86 @@ export function ProgressAnalysisView({
                 </tbody>
               </table>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Custom Delete Confirmation Modal */}
+      {deleteSessionIdConfirm && (
+        <div className="observe-modal-container">
+          <div className="observe-modal-backdrop" onClick={() => setDeleteSessionIdConfirm(null)} />
+          <div className="observe-modal-card text-left max-w-md p-6 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl relative z-50">
+            <h3 className="text-lg font-bold text-white mb-2">Delete Live Session?</h3>
+            <p className="text-sm text-slate-300 mb-6">
+              Are you sure you want to delete this live session? All question captures and attendance for this session will be permanently deleted from the database.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                className="btn secondary px-4 py-2 text-xs font-semibold rounded-lg"
+                onClick={() => setDeleteSessionIdConfirm(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn primary bg-red-600 hover:bg-red-500 text-white px-4 py-2 text-xs font-semibold rounded-lg shadow-lg hover:shadow-red-500/20"
+                onClick={() => {
+                  if (onDeleteSession) onDeleteSession(deleteSessionIdConfirm)
+                  setDeleteSessionIdConfirm(null)
+                }}
+              >
+                Yes, Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Edit Session Number Modal */}
+      {editSessionId && (
+        <div className="observe-modal-container">
+          <div className="observe-modal-backdrop" onClick={() => setEditSessionId(null)} />
+          <div className="observe-modal-card text-left max-w-sm p-6 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl relative z-50">
+            <h3 className="text-lg font-bold text-white mb-2">Edit Session Day</h3>
+            <p className="text-xs text-slate-400 mb-4">
+              Enter the correct day number sequence for this session record.
+            </p>
+            <div className="mb-6">
+              <input
+                type="number"
+                min="1"
+                required
+                className="w-full text-center bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-2xl font-black text-white focus:outline-none focus:border-indigo-500 font-mono tracking-wider"
+                value={editSessionNumberInput}
+                onChange={(e) => setEditSessionNumberInput(e.target.value)}
+                placeholder="Day Number"
+              />
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                className="btn secondary px-4 py-2 text-xs font-semibold rounded-lg"
+                onClick={() => setEditSessionId(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn primary bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 text-xs font-semibold rounded-lg shadow-lg"
+                onClick={() => {
+                  const newNum = parseInt(editSessionNumberInput, 10)
+                  if (!isNaN(newNum) && newNum > 0) {
+                    if (onEditSessionNumber) onEditSessionNumber(editSessionId, newNum)
+                    setEditSessionId(null)
+                  } else {
+                    alert('Invalid session number. Must be a positive integer.')
+                  }
+                }}
+              >
+                Save Changes
+              </button>
+            </div>
           </div>
         </div>
       )}

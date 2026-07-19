@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   FlaskConical,
   Languages,
@@ -11,6 +12,7 @@ import {
   ShieldCheck,
   FileText,
   PlusCircle,
+  Database,
 } from 'lucide-react'
 import { PageHeader } from '../../components/PageHeader'
 import { EmptyState, Panel, StatCard } from '../../components/ui'
@@ -811,6 +813,12 @@ export function AdminLiveTestsPage() {
         kicker="Admin"
         title="Live Tests"
         subtitle="Manage flexible package versions, measurement catalog overrides, prompt narrations, and review queues."
+        actions={
+          <Link className="btn-primary" to="/admin/resources">
+            <Database className="h-4 w-4" aria-hidden />
+            Edit/delete resources
+          </Link>
+        }
       />
 
       <div className="btn-row" style={{ marginBottom: '1.5rem', display: 'flex', gap: '0.5rem' }}>

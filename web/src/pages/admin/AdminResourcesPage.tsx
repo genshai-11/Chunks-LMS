@@ -88,6 +88,20 @@ function statusLabel(status: string) {
   )
 }
 
+function draftActionHint(
+  kind: 'CVR item' | 'CCI category' | 'Session resource',
+  editable: boolean,
+) {
+  if (editable) return `Draft ${kind}: edit/delete available.`
+  return `Locked ${kind}: published, active, archived, or history-linked rows must be archived/superseded instead of edited in place.`
+}
+
+function actionTitle(editable: boolean) {
+  return editable
+    ? 'Edit/delete is enabled for this draft row.'
+    : 'This row is immutable from the UI. Create a new draft/version or use archive/supersede instead.'
+}
+
 async function countLearningSessionsForSection(sectionId: string): Promise<number> {
   const sb = getSupabase() as any
   if (!sb) return 0
@@ -106,6 +120,7 @@ export function AdminResourcesPage() {
   const [activeTab, setActiveTab] = useState<ResourceTab>('cvr')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [showEditableOnly, setShowEditableOnly] = useState(false)
 
   const [cvrRows, setCvrRows] = useState<CvrRow[]>([])
   const [cciRows, setCciRows] = useState<CciRow[]>([])
@@ -221,10 +236,11 @@ export function AdminResourcesPage() {
       ].join(' ')
       return (
         textMatch(haystack, search) &&
-        (statusFilter === 'all' || row.versionStatus === statusFilter)
+        (statusFilter === 'all' || row.versionStatus === statusFilter) &&
+        (!showEditableOnly || row.versionStatus === 'draft')
       )
     })
-  }, [cvrRows, search, statusFilter])
+  }, [cvrRows, search, statusFilter, showEditableOnly])
 
   const filteredCciRows = useMemo(() => {
     return cciRows.filter((row) => {
@@ -233,10 +249,11 @@ export function AdminResourcesPage() {
       )
       return (
         textMatch(haystack, search) &&
-        (statusFilter === 'all' || row.profileStatus === statusFilter)
+        (statusFilter === 'all' || row.profileStatus === statusFilter) &&
+        (!showEditableOnly || row.profileStatus === 'draft')
       )
     })
-  }, [cciRows, search, statusFilter])
+  }, [cciRows, search, statusFilter, showEditableOnly])
 
   const filteredSessionRows = useMemo(() => {
     return sessionRows.filter((row) => {
@@ -248,12 +265,27 @@ export function AdminResourcesPage() {
       ].join(' ')
       return (
         textMatch(haystack, search) &&
-        (statusFilter === 'all' || row.versionStatus === statusFilter)
+        (statusFilter === 'all' || row.versionStatus === statusFilter) &&
+        (!showEditableOnly || row.versionStatus === 'draft')
       )
     })
-  }, [sessionRows, search, statusFilter])
+  }, [sessionRows, search, statusFilter, showEditableOnly])
+
+  const editableCounts = {
+    cvr: cvrRows.filter((row) => row.versionStatus === 'draft').length,
+    cci: cciRows.filter((row) => row.profileStatus === 'draft').length,
+    sessions: sessionRows.filter((row) => row.versionStatus === 'draft').length,
+  }
+  const activeTotalCount =
+    activeTab === 'cvr' ? cvrRows.length : activeTab === 'cci' ? cciRows.length : sessionRows.length
+  const activeEditableCount = editableCounts[activeTab]
+  const activeLockedCount = Math.max(0, activeTotalCount - activeEditableCount)
 
   function beginCvrEdit(row: CvrRow) {
+    if (row.versionStatus !== 'draft') {
+      err(draftActionHint('CVR item', false))
+      return
+    }
     setEditingItemId(row.id)
     setCvrDraft({
       promptVi: row.promptVi,
@@ -283,6 +315,10 @@ export function AdminResourcesPage() {
   }
 
   async function deleteCvrRow(row: CvrRow) {
+    if (row.versionStatus !== 'draft') {
+      err(draftActionHint('CVR item', false))
+      return
+    }
     if (
       !window.confirm(
         'Delete this draft Test Item? This is allowed only when it is unlinked to Session Questions.',
@@ -306,6 +342,10 @@ export function AdminResourcesPage() {
   }
 
   function beginCciEdit(row: CciRow) {
+    if (row.profileStatus !== 'draft') {
+      err(draftActionHint('CCI category', false))
+      return
+    }
     setEditingCategoryId(row.id)
     setCciDraft({ label: row.label, value: row.value, description: row.description })
   }
@@ -329,6 +369,10 @@ export function AdminResourcesPage() {
   }
 
   async function deleteCciRow(row: CciRow) {
+    if (row.profileStatus !== 'draft') {
+      err(draftActionHint('CCI category', false))
+      return
+    }
     if (!window.confirm('Delete this draft CCI Category? Referenced categories cannot be deleted.'))
       return
     const result = await deleteDraftCciCategory({ categoryId: row.id, profileId: row.profileId })
@@ -355,6 +399,10 @@ export function AdminResourcesPage() {
   }
 
   function beginSessionEdit(row: SessionRow) {
+    if (row.versionStatus !== 'draft') {
+      err(draftActionHint('Session resource', false))
+      return
+    }
     setEditingSectionId(row.id)
     setSessionDraft({ title: row.title, sectionOrder: row.sectionOrder })
   }
@@ -385,6 +433,16 @@ export function AdminResourcesPage() {
   }
 
   async function deleteSessionRow(row: SessionRow) {
+    if (row.versionStatus !== 'draft') {
+      err(draftActionHint('Session resource', false))
+      return
+    }
+    if (row.learningSessionCount > 0) {
+      err(
+        'This Session resource is linked to Learning Sessions. Create a new draft/version instead of deleting history-linked rows.',
+      )
+      return
+    }
     if (
       !window.confirm(
         'Delete this draft Test Section and its draft items/snapshots? Linked sections cannot be deleted.',
@@ -429,6 +487,18 @@ export function AdminResourcesPage() {
         <StatCard label="Sessions" value={sessionRows.length} icon={ListChecks} />
         <StatCard label="CVR items" value={cvrRows.length} icon={Gauge} />
         <StatCard label="CCI categories" value={cciRows.length} icon={Database} />
+        <StatCard
+          label="Editable now"
+          value={activeEditableCount}
+          hint={`Current ${activeTab} tab`}
+          icon={Pencil}
+        />
+        <StatCard
+          label="Locked"
+          value={activeLockedCount}
+          hint="Archive/supersede instead"
+          icon={FileText}
+        />
       </div>
 
       <Panel icon={Search} title="Resource filters" collapsible={false}>
@@ -458,8 +528,9 @@ export function AdminResourcesPage() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'minmax(14rem, 1fr) 12rem',
+            gridTemplateColumns: 'minmax(14rem, 1fr) 12rem minmax(12rem, 16rem)',
             gap: '0.75rem',
+            alignItems: 'end',
           }}
         >
           <label className="field" style={{ margin: 0 }}>
@@ -483,7 +554,19 @@ export function AdminResourcesPage() {
               <option value="archived">Archived</option>
             </select>
           </label>
+          <label className="field field-inline" style={{ margin: 0, justifyContent: 'flex-start' }}>
+            <input
+              type="checkbox"
+              checked={showEditableOnly}
+              onChange={(event) => setShowEditableOnly(event.target.checked)}
+            />
+            Editable/deletable now
+          </label>
         </div>
+        <p className="meta" style={{ margin: '0.75rem 0 0' }}>
+          Draft rows can be edited/deleted. Published, active, archived, or history-linked rows stay
+          immutable; use archive, supersede, or create a new draft/version instead.
+        </p>
       </Panel>
 
       {state === 'error' ? (
@@ -513,6 +596,7 @@ export function AdminResourcesPage() {
               <tbody>
                 {filteredCvrRows.map((row) => {
                   const editing = editingItemId === row.id && cvrDraft
+                  const editable = row.versionStatus === 'draft'
                   const displayedCvr = editing ? measuredCvr(cvrDraft) : row.measuredCvr
                   return (
                     <tr key={row.id}>
@@ -600,25 +684,31 @@ export function AdminResourcesPage() {
                             </button>
                           </div>
                         ) : (
-                          <div className="btn-row" style={{ margin: 0 }}>
-                            <button
-                              type="button"
-                              className="ghost"
-                              onClick={() => beginCvrEdit(row)}
-                              disabled={row.versionStatus !== 'draft'}
-                            >
-                              <Pencil className="h-4 w-4" aria-hidden />
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              className="ghost"
-                              onClick={() => void deleteCvrRow(row)}
-                              disabled={row.versionStatus !== 'draft'}
-                            >
-                              <Trash2 className="h-4 w-4" aria-hidden />
-                              Delete
-                            </button>
+                          <div>
+                            <div className="btn-row" style={{ margin: 0 }}>
+                              <button
+                                type="button"
+                                className="ghost"
+                                onClick={() => beginCvrEdit(row)}
+                                title={actionTitle(editable)}
+                              >
+                                <Pencil className="h-4 w-4" aria-hidden />
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                className="ghost"
+                                onClick={() => void deleteCvrRow(row)}
+                                title={actionTitle(editable)}
+                                style={editable ? { color: '#b91c1c' } : undefined}
+                              >
+                                <Trash2 className="h-4 w-4" aria-hidden />
+                                Delete
+                              </button>
+                            </div>
+                            <div className="meta" style={{ margin: '0.25rem 0 0' }}>
+                              {draftActionHint('CVR item', editable)}
+                            </div>
                           </div>
                         )}
                       </td>
@@ -659,6 +749,7 @@ export function AdminResourcesPage() {
               <tbody>
                 {filteredCciRows.map((row) => {
                   const editing = editingCategoryId === row.id && cciDraft
+                  const editable = row.profileStatus === 'draft'
                   return (
                     <tr key={row.id}>
                       <td>
@@ -731,33 +822,40 @@ export function AdminResourcesPage() {
                             </button>
                           </div>
                         ) : (
-                          <div className="btn-row" style={{ margin: 0 }}>
-                            <button
-                              type="button"
-                              className="ghost"
-                              onClick={() => beginCciEdit(row)}
-                              disabled={row.profileStatus !== 'draft'}
-                            >
-                              <Pencil className="h-4 w-4" aria-hidden />
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              className="ghost"
-                              onClick={() => void deleteCciRow(row)}
-                              disabled={row.profileStatus !== 'draft'}
-                            >
-                              <Trash2 className="h-4 w-4" aria-hidden />
-                              Delete
-                            </button>
-                            <button
-                              type="button"
-                              className="ghost"
-                              onClick={() => void archiveProfile(row.profileId)}
-                              disabled={row.profileStatus === 'archived'}
-                            >
-                              Archive profile
-                            </button>
+                          <div>
+                            <div className="btn-row" style={{ margin: 0 }}>
+                              <button
+                                type="button"
+                                className="ghost"
+                                onClick={() => beginCciEdit(row)}
+                                title={actionTitle(editable)}
+                              >
+                                <Pencil className="h-4 w-4" aria-hidden />
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                className="ghost"
+                                onClick={() => void deleteCciRow(row)}
+                                title={actionTitle(editable)}
+                                style={editable ? { color: '#b91c1c' } : undefined}
+                              >
+                                <Trash2 className="h-4 w-4" aria-hidden />
+                                Delete
+                              </button>
+                              <button
+                                type="button"
+                                className="ghost"
+                                onClick={() => void archiveProfile(row.profileId)}
+                                disabled={row.profileStatus === 'archived'}
+                                title="Archive keeps existing measurement snapshots historically reproducible."
+                              >
+                                Archive profile
+                              </button>
+                            </div>
+                            <div className="meta" style={{ margin: '0.25rem 0 0' }}>
+                              {draftActionHint('CCI category', editable)}
+                            </div>
                           </div>
                         )}
                       </td>
@@ -799,6 +897,7 @@ export function AdminResourcesPage() {
               <tbody>
                 {filteredSessionRows.map((row) => {
                   const editing = editingSectionId === row.id && sessionDraft
+                  const editable = row.versionStatus === 'draft'
                   return (
                     <tr key={row.id}>
                       <td>
@@ -877,25 +976,37 @@ export function AdminResourcesPage() {
                             </button>
                           </div>
                         ) : (
-                          <div className="btn-row" style={{ margin: 0 }}>
-                            <button
-                              type="button"
-                              className="ghost"
-                              onClick={() => beginSessionEdit(row)}
-                              disabled={row.versionStatus !== 'draft'}
-                            >
-                              <Pencil className="h-4 w-4" aria-hidden />
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              className="ghost"
-                              onClick={() => void deleteSessionRow(row)}
-                              disabled={row.versionStatus !== 'draft'}
-                            >
-                              <Trash2 className="h-4 w-4" aria-hidden />
-                              Delete
-                            </button>
+                          <div>
+                            <div className="btn-row" style={{ margin: 0 }}>
+                              <button
+                                type="button"
+                                className="ghost"
+                                onClick={() => beginSessionEdit(row)}
+                                title={actionTitle(editable)}
+                              >
+                                <Pencil className="h-4 w-4" aria-hidden />
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                className="ghost"
+                                onClick={() => void deleteSessionRow(row)}
+                                title={
+                                  row.learningSessionCount > 0
+                                    ? 'Delete is blocked because Learning Sessions reference this section.'
+                                    : actionTitle(editable)
+                                }
+                                style={editable ? { color: '#b91c1c' } : undefined}
+                              >
+                                <Trash2 className="h-4 w-4" aria-hidden />
+                                Delete
+                              </button>
+                            </div>
+                            <div className="meta" style={{ margin: '0.25rem 0 0' }}>
+                              {row.learningSessionCount > 0
+                                ? 'History-linked: edit/delete is guarded; create a new draft/version for changes.'
+                                : draftActionHint('Session resource', editable)}
+                            </div>
                           </div>
                         )}
                       </td>

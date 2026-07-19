@@ -1,16 +1,16 @@
 import { PageHeader } from '../../components/PageHeader'
-import { SessionProgressAnalysisView } from '../../components/SessionProgressAnalysisView'
+import { LiveTestAnalysisView } from '../../components/LiveTestAnalysisView'
 import { useLearnerClassContext } from '../../hooks/useLearnerClassContext'
 import { useAppState } from '../../state/useAppState'
 
-export function LearnerAnalysisPage() {
+export function LearnerLiveTestAnalysisPage() {
   const { roster, scheduling, ledger, metricSettings } = useAppState()
   const { learner, classRow, course } = useLearnerClassContext()
 
   if (!learner || !course) {
     return (
       <>
-        <PageHeader kicker="Learner" title="Analysis & progress" />
+        <PageHeader kicker="Learner" title="Live Test Analysis" />
         <div className="empty-state">No enrollment or course yet.</div>
       </>
     )
@@ -19,10 +19,10 @@ export function LearnerAnalysisPage() {
   return (
     <>
       <PageHeader
-        title="Your progress"
-        subtitle={`${course.code}${classRow ? ` · ${classRow.name}` : ''} · how focus changes day by day`}
+        title="Your Live Test results"
+        subtitle={`${course.code}${classRow ? ` · ${classRow.name}` : ''} · standardized pre/post tests`}
       />
-      <SessionProgressAnalysisView
+      <LiveTestAnalysisView
         mode="learner"
         courseId={course.id}
         courseCode={course.code}
@@ -47,7 +47,7 @@ export function LearnerAnalysisPage() {
             liveTestResourceId: s.liveTestResourceId,
             liveTestBlockId: s.liveTestBlockId,
           }))}
-        emptyHint="After your teacher finishes sessions, progress appears here."
+        emptyHint="After your teacher finishes test sessions, results appear here."
         metricSettings={metricSettings}
       />
     </>

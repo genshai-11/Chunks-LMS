@@ -1,4 +1,4 @@
-import { BookMarked, ChartColumn, Home } from 'lucide-react'
+import { BookMarked, ChartColumn, Home, TrendingUp } from 'lucide-react'
 import { Navigate } from 'react-router-dom'
 import { ClassContextSelect } from '../../components/ClassContextSelect'
 import { RoleWorkspace } from '../../components/RoleWorkspace'
@@ -10,7 +10,8 @@ import { updateUserProfile } from '../../modules/roster/service'
 const ITEMS = [
   { to: '/learner', label: 'Home', icon: Home, end: true },
   { to: '/learner/enrollments', label: 'My classes', icon: BookMarked },
-  { to: '/learner/analysis', label: 'Analysis', icon: ChartColumn },
+  { to: '/learner/analysis', label: 'Progress Analysis', icon: ChartColumn },
+  { to: '/learner/test-analysis', label: 'Live Test Analysis', icon: TrendingUp },
 ]
 
 export function LearnerLayout() {

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { PageHeader } from '../../components/PageHeader'
-import { ProgressAnalysisView } from '../../components/ProgressAnalysisView'
+import { SessionProgressAnalysisView } from '../../components/SessionProgressAnalysisView'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import { activeEnrollmentsForClass } from '../../modules/roster/service'
 import { useAppState } from '../../state/useAppState'
@@ -93,7 +93,7 @@ export function TeacherAnalysisPage() {
   return (
     <>
       <PageHeader
-        title="Analysis"
+        title="Progress Analysis"
         subtitle={`${course.code} · ${classRow.name} · focus on RFC/RAC by day & learner`}
         actions={
           <Link to="/teacher/session" className="btn ghost">
@@ -101,7 +101,7 @@ export function TeacherAnalysisPage() {
           </Link>
         }
       />
-      <ProgressAnalysisView
+      <SessionProgressAnalysisView
         mode="teacher"
         courseId={course.id}
         courseCode={course.code}

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { ChartColumn } from 'lucide-react'
 import { ClassContextSelect } from '../../components/ClassContextSelect'
 import { PageHeader } from '../../components/PageHeader'
-import { SessionProgressAnalysisView } from '../../components/SessionProgressAnalysisView'
+import { LiveTestAnalysisView } from '../../components/LiveTestAnalysisView'
 import { EmptyState } from '../../components/ui'
 import {
   listAdminClassOptions,
@@ -11,10 +11,7 @@ import {
 import { activeEnrollmentsForClass } from '../../modules/roster/service'
 import { useAppState } from '../../state/useAppState'
 
-/**
- * Org-wide progress: pick any class, reuse teacher analysis stack.
- */
-export function AdminAnalysisPage() {
+export function AdminLiveTestAnalysisPage() {
   const { roster, scheduling, ledger, metricSettings } = useAppState()
   const options = useMemo(() => listAdminClassOptions(roster), [roster])
   const [selectedId, setSelectedId] = useState<string | null>(() =>
@@ -44,7 +41,7 @@ export function AdminAnalysisPage() {
         <PageHeader
           icon={ChartColumn}
           kicker="Admin"
-          title="Analysis"
+          title="Live Test Analysis"
           subtitle="Pick a class after courses and enrollments exist."
         />
         <EmptyState
@@ -61,8 +58,8 @@ export function AdminAnalysisPage() {
       <PageHeader
         icon={ChartColumn}
         kicker="Admin"
-        title="Analysis"
-        subtitle={`${course.code} · ${classRow.name} · any class in the organization`}
+        title="Live Test Analysis"
+        subtitle={`${course.code} · ${classRow.name} · pre-test & post-test benchmark outcomes`}
         actions={
           <ClassContextSelect
             variant="admin"
@@ -72,8 +69,8 @@ export function AdminAnalysisPage() {
           />
         }
       />
-      <SessionProgressAnalysisView
-        mode="teacher"
+      <LiveTestAnalysisView
+        mode="teacher" // uses teacher/staff style view layout
         courseId={course.id}
         courseCode={course.code}
         courseStart={classRow.startsOn ?? '2026-07-01'}
@@ -99,7 +96,7 @@ export function AdminAnalysisPage() {
             liveTestResourceId: s.liveTestResourceId,
             liveTestBlockId: s.liveTestBlockId,
           }))}
-        emptyHint="No finalized results for this class yet."
+        emptyHint="No finalized test results for this class yet."
         metricSettings={metricSettings}
       />
     </>

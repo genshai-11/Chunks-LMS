@@ -92,6 +92,7 @@ export function AdminLiveTestsPage() {
   const [csvPreviewItems, setCsvPreviewItems] = useState<any[]>([])
 
   const generator = useMemo(() => new SupabaseLiveTestGeneration(), [])
+  const [ttsStatus, setTtsStatus] = useState<string>('')
 
   // Load V1 legacy resources
   useEffect(() => {
@@ -286,6 +287,54 @@ export function AdminLiveTestsPage() {
     setNarrationStatus('Reject is not wired yet. Leave this variant generated, or approve it after review.')
   }
 
+  const handleGenerateSectionIntro = async (sectionId: string, lang: 'vi' | 'en' = 'vi') => {
+    if (!selectedVerId) return
+    setTtsStatus(`Generating section intro narration (${lang.toUpperCase()})...`)
+    try {
+      const activeVoice = lang === 'vi' ? 'vi-VN-Standard-A' : 'en-US-Standard-C'
+      const receipt = await generator.generateNarration({
+        packageVersionId: selectedVerId,
+        target: 'section_intro',
+        testSectionId: sectionId,
+        language: lang,
+        voiceId: activeVoice,
+      })
+      if (receipt.status === 'succeeded') {
+        setTtsStatus(`Section intro narration (${lang.toUpperCase()}) generated! (Job ID: ${receipt.jobId})`)
+      } else {
+        setTtsStatus(`Section intro narration generation failed: ${receipt.error?.message || 'Unknown error'}`)
+      }
+    } catch (e: any) {
+      setTtsStatus(`Error: ${e.message}`)
+    }
+  }
+
+  const handleGenerateItemNarration = async (itemId: string, lang: 'vi' | 'en') => {
+    if (!selectedVerId) return
+    setTtsStatus(`Generating item narration (${lang.toUpperCase()})...`)
+    try {
+      const activeVoice = lang === 'vi' ? 'vi-VN-Standard-A' : 'en-US-Standard-C'
+      const receipt = await generator.generateNarration({
+        packageVersionId: selectedVerId,
+        target: 'test_item',
+        testItemId: itemId,
+        language: lang,
+        voiceId: activeVoice,
+      })
+      if (receipt.status === 'succeeded') {
+        setTtsStatus(`Item narration (${lang.toUpperCase()}) generated! (Job ID: ${receipt.jobId})`)
+        if (selectedItemIdForNarration === itemId) {
+          const r = await listNarrationVariants(itemId)
+          if (r.ok) setNarrationVariants(r.data)
+        }
+      } else {
+        setTtsStatus(`Item narration generation failed: ${receipt.error?.message || 'Unknown error'}`)
+      }
+    } catch (e: any) {
+      setTtsStatus(`Error: ${e.message}`)
+    }
+  }
+
   // Mock CSV parsing
   const handleParseCsv = () => {
     if (!csvContent.trim()) return
@@ -457,6 +506,11 @@ export function AdminLiveTestsPage() {
             {/* Right details view */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <Panel icon={FileText} title="Active Section Snapshot & Items" collapsible={false}>
+                {ttsStatus && (
+                  <div style={{ marginBottom: '1rem', padding: '0.5rem 0.75rem', backgroundColor: '#2b6cb0', color: '#fff', borderRadius: '4px', fontSize: '0.85rem' }}>
+                    {ttsStatus}
+                  </div>
+                )}
                 {selectedSnapshot ? (
                   <div style={{ marginBottom: '1.25rem', padding: '0.75rem', backgroundColor: '#2d3748', borderRadius: '4px' }}>
                     <div style={{ fontWeight: 'bold', fontSize: '0.95rem' }}>
@@ -473,6 +527,23 @@ export function AdminLiveTestsPage() {
                         Override Reason: {selectedSnapshot.overrideReason}
                       </div>
                     )}
+                    <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #4a5568', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.85rem', color: '#a0aec0' }}>TTS Narration:</span>
+                      <button 
+                        className="primary" 
+                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
+                        onClick={() => handleGenerateSectionIntro(selectedSnapshot.sectionId, 'vi')}
+                      >
+                        Gen Intro (VI)
+                      </button>
+                      <button 
+                        className="primary" 
+                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
+                        onClick={() => handleGenerateSectionIntro(selectedSnapshot.sectionId, 'en')}
+                      >
+                        Gen Intro (EN)
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <p className="meta" style={{ marginBottom: '1rem' }}>No measurement snapshot active for this section.</p>
@@ -489,6 +560,7 @@ export function AdminLiveTestsPage() {
                         <th>LC</th>
                         <th>TL</th>
                         <th>Target CVR</th>
+                        <th>Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -501,11 +573,29 @@ export function AdminLiveTestsPage() {
                           <td>{item.lc ?? '—'}</td>
                           <td>{item.tl ?? '—'}</td>
                           <td>{item.measuredCvr ?? '—'}</td>
+                          <td>
+                            <div style={{ display: 'flex', gap: '0.25rem' }}>
+                              <button 
+                                className="ghost" 
+                                style={{ padding: '0.15rem 0.3rem', fontSize: '0.75rem' }}
+                                onClick={() => handleGenerateItemNarration(item.id, 'vi')}
+                              >
+                                Gen VI
+                              </button>
+                              <button 
+                                className="ghost" 
+                                style={{ padding: '0.15rem 0.3rem', fontSize: '0.75rem' }}
+                                onClick={() => handleGenerateItemNarration(item.id, 'en')}
+                              >
+                                Gen EN
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                       {v2Items.length === 0 && (
                         <tr>
-                          <td colSpan={7} className="meta" style={{ textAlign: 'center' }}>
+                          <td colSpan={8} className="meta" style={{ textAlign: 'center' }}>
                             No items exist in this section.
                           </td>
                         </tr>

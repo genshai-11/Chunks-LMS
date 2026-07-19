@@ -121,6 +121,15 @@ export async function audioUrl(assetId: string | null | undefined): Promise<stri
     .eq('id', assetId)
     .maybeSingle()
   if (error || !data) return null
+
+  if (data.storage_bucket === 'narration-audio') {
+    const { data: signed, error: signedError } = await sb.storage
+      .from(data.storage_bucket)
+      .createSignedUrl(data.storage_path, 3600)
+    if (signedError || !signed) return null
+    return signed.signedUrl
+  }
+
   const pub = sb.storage.from(data.storage_bucket).getPublicUrl(data.storage_path)
   return pub.data.publicUrl ?? null
 }

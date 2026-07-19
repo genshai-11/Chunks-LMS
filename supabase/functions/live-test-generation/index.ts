@@ -296,35 +296,58 @@ async function resolveNarrationText(
   if (body.target === "section_intro") {
     if (!body.testSectionId || body.testItemId)
       throw new Error("Invalid parameters for section_intro narration target.");
-    const { data, error } = await admin
+    const { data: section, error: sectionError } = await admin
       .from("test_sections")
-      .select("title")
+      .select("section_order, title")
       .eq("id", body.testSectionId)
       .eq("package_version_id", body.packageVersionId)
       .maybeSingle();
-    if (error)
-      throw new Error(`Section narration lookup failed: ${error.message}`);
-    if (!data?.title)
+    if (sectionError)
+      throw new Error(`Section narration lookup failed: ${sectionError.message}`);
+    if (!section)
       throw new Error("Invalid testSectionId: Section text was not found.");
-    return String(data.title);
+
+    // Fetch the latest snapshot for this section
+    const { data: snapshot, error: snapshotError } = await admin
+      .from("section_measurement_snapshots")
+      .select("target_cvr_ohm, cci_value, cci_category_label")
+      .eq("test_section_id", body.testSectionId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (snapshotError)
+      throw new Error(`Snapshot lookup failed: ${snapshotError.message}`);
+
+    const targetCvr = snapshot ? snapshot.target_cvr_ohm : 0;
+    const cciValue = snapshot ? snapshot.cci_value : 0;
+    const cciLabel = snapshot ? snapshot.cci_category_label : "CCI Pending";
+
+    // Text: Session <order>. <cvr> ohm. <cci> Ampe. <label>.
+    return `Session ${section.section_order}. ${targetCvr} ohm. ${cciValue} Ampe. ${cciLabel}.`;
   }
 
   if (!body.testItemId || body.testSectionId)
     throw new Error("Invalid parameters for test_item narration target.");
-  const { data, error } = await admin
+  const { data: item, error: itemError } = await admin
     .from("test_items")
-    .select("prompt_vi, prompt_en")
+    .select("item_order, prompt_vi, prompt_en")
     .eq("id", body.testItemId)
     .eq("package_version_id", body.packageVersionId)
     .maybeSingle();
-  if (error) throw new Error(`Item narration lookup failed: ${error.message}`);
-  const text = body.language === "vi" ? data?.prompt_vi : data?.prompt_en;
-  if (!text)
+  if (itemError) throw new Error(`Item narration lookup failed: ${itemError.message}`);
+  if (!item)
+    throw new Error("Invalid testItemId: Item was not found.");
+
+  const rawText = body.language === "vi" ? item.prompt_vi : item.prompt_en;
+  if (!rawText)
     throw new Error(
       "Invalid testItemId: Item text was not found for requested language.",
     );
-  return String(text);
+
+  const orderStr = String(item.item_order).padStart(2, "0");
+  return `Number ${orderStr}. ${rawText}`;
 }
+
 
 async function generateNarration(
   body: GenerateNarrationBody,

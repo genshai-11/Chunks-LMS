@@ -289,7 +289,10 @@ export function AdminResourcesPage() {
       setSessionRows(nextSessionRows)
       setNewCciDraft((draft) => ({
         ...draft,
-        profileId: draft.profileId || profilesRes.data.find((profile) => profile.status === 'draft')?.id || '',
+        profileId:
+          draft.profileId ||
+          profilesRes.data.find((profile) => profile.status === 'draft')?.id ||
+          '',
       }))
       setState('ready')
     } catch (e) {
@@ -356,7 +359,10 @@ export function AdminResourcesPage() {
   }, [sessionRows, search, statusFilter, showEditableOnly])
 
   const sectionOptions = useMemo(() => {
-    const byId = new Map<string, Pick<CvrRow, 'sectionId' | 'sectionOrder' | 'sectionTitle' | 'packageTitle' | 'versionLabel'>>()
+    const byId = new Map<
+      string,
+      Pick<CvrRow, 'sectionId' | 'sectionOrder' | 'sectionTitle' | 'packageTitle' | 'versionLabel'>
+    >()
     for (const row of cvrRows) {
       byId.set(row.sectionId, {
         sectionId: row.sectionId,
@@ -382,7 +388,9 @@ export function AdminResourcesPage() {
   const selectableCciProfiles = cciProfiles.filter((profile) => profile.status !== 'archived')
   const selectedNewCciProfile = cciProfiles.find((profile) => profile.id === newCciDraft.profileId)
   const cciCategoriesForMapping = (profileId: string) =>
-    cciRows.filter((row) => row.profileId === profileId).sort((a, b) => a.categoryOrder - b.categoryOrder)
+    cciRows
+      .filter((row) => row.profileId === profileId)
+      .sort((a, b) => a.categoryOrder - b.categoryOrder)
 
   function switchTab(tab: ResourceTab) {
     setActiveTab(tab)
@@ -504,7 +512,8 @@ export function AdminResourcesPage() {
     const requestedProfile = cciProfiles.find((candidate) => candidate.id === newCciDraft.profileId)
     let profile = requestedProfile
     if (!profile) {
-      if (!newCciDraft.profileName.trim()) return err('Choose a draft CCI Profile or enter a new profile name.')
+      if (!newCciDraft.profileName.trim())
+        return err('Choose a draft CCI Profile or enter a new profile name.')
       const profileResult = await createDraftCciProfile({
         name: newCciDraft.profileName.trim(),
         versionLabel: 'draft',
@@ -538,12 +547,17 @@ export function AdminResourcesPage() {
   }
 
   async function publishProfile(profileId: string) {
-    if (!window.confirm('Publish this CCI Profile? Once active it can no longer be edited directly.')) return
+    if (
+      !window.confirm('Publish this CCI Profile? Once active it can no longer be edited directly.')
+    )
+      return
     const result = await publishCciProfile(profileId)
     if (!result.ok) return err(result.error)
     setCciProfiles((rows) => rows.map((row) => (row.id === profileId ? result.data : row)))
     setCciRows((rows) =>
-      rows.map((row) => (row.profileId === profileId ? { ...row, profileStatus: result.data.status } : row)),
+      rows.map((row) =>
+        row.profileId === profileId ? { ...row, profileStatus: result.data.status } : row,
+      ),
     )
     ok('Published CCI Profile as active.')
   }
@@ -627,7 +641,8 @@ export function AdminResourcesPage() {
   }
 
   function beginMapping(row: SessionRow) {
-    if (row.versionStatus !== 'draft') return err('Only draft Session resources can change CCI/CVR mapping.')
+    if (row.versionStatus !== 'draft')
+      return err('Only draft Session resources can change CCI/CVR mapping.')
     const firstProfileId = row.activeCciProfileId ?? selectableCciProfiles[0]?.id ?? ''
     const firstCategory = row.activeCciCategoryId
       ? cciRows.find((category) => category.id === row.activeCciCategoryId)
@@ -646,7 +661,8 @@ export function AdminResourcesPage() {
     const category = cciRows.find((candidate) => candidate.id === mappingDraft.cciCategoryId)
     if (!category) return err('Choose a CCI Category for this Session mapping.')
     if (mappingDraft.targetCvrOhm <= 0) return err('Target CVR must be greater than 0.')
-    if (row.activeSnapshotId && !mappingDraft.reason.trim()) return err('Reason is required when overriding an existing mapping.')
+    if (row.activeSnapshotId && !mappingDraft.reason.trim())
+      return err('Reason is required when overriding an existing mapping.')
     const result = await createSnapshotOverride({
       sectionId: row.id,
       packageVersionId: row.packageVersionId,
@@ -681,7 +697,8 @@ export function AdminResourcesPage() {
   }
 
   async function createPackageFromBuilder() {
-    if (cciRows.length === 0) return err('Create at least one CCI Category before creating a Test Package.')
+    if (cciRows.length === 0)
+      return err('Create at least one CCI Category before creating a Test Package.')
     const defaults = [3, 5, 7, 9, 11, 13, 15, 17]
     const categories = [...cciRows].sort((a, b) => a.categoryOrder - b.categoryOrder)
     const sessions = Array.from({ length: packageDraft.sessionCount }, (_, idx) => {
@@ -698,7 +715,9 @@ export function AdminResourcesPage() {
     })
     const result = await createDraftTestPackage({ ...packageDraft, sessions })
     if (!result.ok) return err(result.error)
-    ok(`Created ${result.data.package.title} with ${packageDraft.sessionCount} sessions × ${packageDraft.itemsPerSession} CVR sentence slots.`)
+    ok(
+      `Created ${result.data.package.title} with ${packageDraft.sessionCount} sessions × ${packageDraft.itemsPerSession} CVR sentence slots.`,
+    )
     await loadResources()
     setActiveTab('sessions')
   }
@@ -808,7 +827,8 @@ export function AdminResourcesPage() {
               <option value="all">All sections</option>
               {sectionOptions.map((section) => (
                 <option key={section.sectionId} value={section.sectionId}>
-                  {section.packageTitle} · {section.versionLabel} · Session {section.sectionOrder}: {section.sectionTitle ?? 'Untitled'}
+                  {section.packageTitle} · {section.versionLabel} · Session {section.sectionOrder}:{' '}
+                  {section.sectionTitle ?? 'Untitled'}
                 </option>
               ))}
             </select>
@@ -991,369 +1011,394 @@ export function AdminResourcesPage() {
         <>
           <Panel
             icon={Database}
-          title={`CCI categories (${filteredCciRows.length})`}
-          collapsible={false}
-        >
-          <div style={{ marginBottom: '1rem', display: 'grid', gap: '0.75rem' }}>
-            <strong>Create CCI</strong>
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 0.75fr 1fr 1.5fr auto', gap: '0.75rem', alignItems: 'end' }}>
-              <label className="field" style={{ margin: 0 }}>
-                Draft profile
-                <select
-                  value={newCciDraft.profileId}
-                  onChange={(event) => setNewCciDraft({ ...newCciDraft, profileId: event.target.value })}
-                >
-                  <option value="">New profile…</option>
-                  {draftCciProfiles.map((profile) => (
-                    <option key={profile.id} value={profile.id}>
-                      {profile.name} ({profile.versionLabel})
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field" style={{ margin: 0 }}>
-                New profile name
-                <input
-                  value={newCciDraft.profileName}
-                  onChange={(event) => setNewCciDraft({ ...newCciDraft, profileName: event.target.value })}
-                  placeholder="Chunks CCI Profile"
-                  disabled={Boolean(selectedNewCciProfile)}
-                />
-              </label>
-              <label className="field" style={{ margin: 0 }}>
-                Name
-                <input
-                  value={newCciDraft.name}
-                  onChange={(event) => setNewCciDraft({ ...newCciDraft, name: event.target.value })}
-                  placeholder="Give it a shot"
-                />
-              </label>
-              <label className="field" style={{ margin: 0 }}>
-                Category
-                <select
-                  value={newCciDraft.mainCategory}
-                  onChange={(event) => setNewCciDraft({ ...newCciDraft, mainCategory: event.target.value as MainCciCategory | '' })}
-                >
-                  <option value="">Choose…</option>
-                  <option value="Blow">Blow</option>
-                  <option value="Flow">Flow</option>
-                  <option value="Chunks">Chunks</option>
-                </select>
-              </label>
-              <label className="field" style={{ margin: 0 }}>
-                Unit (Ampe)
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={newCciDraft.value}
-                  onChange={(event) => setNewCciDraft({ ...newCciDraft, value: Number(event.target.value) })}
-                />
-              </label>
-              <button type="button" className="primary" onClick={() => void createCciCategory()}>
-                Create
-              </button>
-            </div>
-            <label className="field" style={{ margin: 0 }}>
-              Description
-              <input
-                value={newCciDraft.description}
-                onChange={(event) => setNewCciDraft({ ...newCciDraft, description: event.target.value })}
-                placeholder="Linear 1 on 1 as Blow"
-              />
-            </label>
-          </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Profile</th>
-                  <th>Action label</th>
-                  <th>Main category</th>
-                  <th>Ampe</th>
-                  <th>Description</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredCciRows.map((row) => {
-                  const editing = editingCategoryId === row.id && cciDraft
-                  const editable = row.profileStatus === 'draft'
-                  return (
-                    <tr key={row.id}>
-                      <td>
-                        <strong>{row.profileName}</strong>
-                        <div className="meta" style={{ margin: 0 }}>
-                          {row.profileVersion}
-                        </div>
-                      </td>
-                      <td>
-                        {editing ? (
-                          <input
-                            value={cciDraft.label}
-                            onChange={(event) =>
-                              setCciDraft({ ...cciDraft, label: event.target.value })
-                            }
-                          />
-                        ) : (
-                          row.label
-                        )}
-                      </td>
-                      <td>
-                        {editing ? (
-                          <select
-                            value={cciDraft.mainCategory}
-                            onChange={(event) =>
-                              setCciDraft({
-                                ...cciDraft,
-                                mainCategory: event.target.value as MainCciCategory | '',
-                              })
-                            }
-                          >
-                            <option value="">Unmapped</option>
-                            <option value="Blow">Blow</option>
-                            <option value="Flow">Flow</option>
-                            <option value="Chunks">Chunks</option>
-                          </select>
-                        ) : cciMainCategory(row) ? (
-                          <span className="badge">{cciMainCategory(row)}</span>
-                        ) : (
-                          <span className="meta">Unmapped</span>
-                        )}
-                      </td>
-                      <td style={{ width: 96 }}>
-                        {editing ? (
-                          <input
-                            type="number"
-                            min={0}
-                            step="0.01"
-                            value={cciDraft.value}
-                            onChange={(event) =>
-                              setCciDraft({ ...cciDraft, value: Number(event.target.value) })
-                            }
-                          />
-                        ) : (
-                          row.value
-                        )}
-                      </td>
-                      <td>
-                        {editing ? (
-                          <input
-                            value={cciDraft.description ?? ''}
-                            onChange={(event) =>
-                              setCciDraft({ ...cciDraft, description: event.target.value || null })
-                            }
-                          />
-                        ) : (
-                          (row.description ?? '—')
-                        )}
-                      </td>
-                      <td>{statusLabel(row.profileStatus)}</td>
-                      <td>
-                        {editing ? (
-                          <div className="btn-row" style={{ margin: 0 }}>
-                            <button
-                              type="button"
-                              className="primary"
-                              onClick={() => void saveCciEdit(row)}
-                            >
-                              <Save className="h-4 w-4" aria-hidden />
-                              Save
-                            </button>
-                            <button
-                              type="button"
-                              className="ghost"
-                              onClick={() => {
-                                setEditingCategoryId(null)
-                                setCciDraft(null)
-                              }}
-                            >
-                              <X className="h-4 w-4" aria-hidden />
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <div>
-                            <div className="btn-row" style={{ margin: 0 }}>
-                              <button
-                                type="button"
-                                className="ghost"
-                                onClick={() => beginCciEdit(row)}
-                                title={actionTitle(editable)}
-                              >
-                                <Pencil className="h-4 w-4" aria-hidden />
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                className="ghost"
-                                onClick={() => void deleteCciRow(row)}
-                                title={actionTitle(editable)}
-                                style={editable ? { color: '#b91c1c' } : undefined}
-                              >
-                                <Trash2 className="h-4 w-4" aria-hidden />
-                                Delete
-                              </button>
-                              <button
-                                type="button"
-                                className="ghost"
-                                onClick={() => void publishProfile(row.profileId)}
-                                disabled={row.profileStatus !== 'draft'}
-                                title="Publish draft profile to active so it can be selected for sessions."
-                              >
-                                Publish profile
-                              </button>
-                              <button
-                                type="button"
-                                className="ghost"
-                                onClick={() => void archiveProfile(row.profileId)}
-                                disabled={row.profileStatus === 'archived'}
-                                title="Archive keeps existing measurement snapshots historically reproducible."
-                              >
-                                Archive profile
-                              </button>
-                              {row.profileStatus === 'draft' ? (
-                                <>
-                                  <button
-                                    type="button"
-                                    className="ghost"
-                                    onClick={() => void publishProfile(row.profileId)}
-                                    title="Publish profile to active. Once active, direct edits are disabled."
-                                  >
-                                    Publish profile
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="ghost"
-                                    onClick={() => {
-                                      setNewCciDraft((d) => ({
-                                        ...d,
-                                        profileId: row.profileId,
-                                        profileName: row.profileName,
-                                        name: '',
-                                        value: 2,
-                                        description: '',
-                                        mainCategory: '',
-                                      }))
-                                    }}
-                                    title="Pre-fill the Add Category form below for this draft profile."
-                                  >
-                                    Add category
-                                  </button>
-                                </>
-                              ) : null}
-                            </div>
-                            <div className="meta" style={{ margin: '0.25rem 0 0' }}>
-                              {draftActionHint('CCI category', editable)}
-                            </div>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-                {filteredCciRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="meta" style={{ textAlign: 'center' }}>
-                      No CCI categories match the current filters.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
-        {/* T7: inline create-category form, shown when "Add category" is clicked on a draft profile row */}
-        {newCciDraft.profileId ? (
-          <div
-            style={{
-              marginTop: '0.75rem',
-              padding: '0.75rem 1rem',
-              background: 'var(--bg-card)',
-              borderRadius: '0.5rem',
-              border: '1px solid var(--border)',
-            }}
+            title={`CCI categories (${filteredCciRows.length})`}
+            collapsible={false}
           >
-            <strong style={{ display: 'block', marginBottom: '0.5rem' }}>
-              Add CCI Category to: {newCciDraft.profileName}
-            </strong>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(10rem, 1fr))',
-                gap: '0.5rem',
-              }}
-            >
-              <label className="field" style={{ margin: 0 }}>
-                Name / Label
-                <input
-                  value={newCciDraft.name}
-                  onChange={(e) => setNewCciDraft((d) => ({ ...d, name: e.target.value }))}
-                  placeholder="e.g. Current 5"
-                />
-              </label>
-              <label className="field" style={{ margin: 0 }}>
-                Ampe / Value
-                <input
-                  type="number"
-                  step="0.01"
-                  value={newCciDraft.value}
-                  onChange={(e) =>
-                    setNewCciDraft((d) => ({ ...d, value: Number(e.target.value) }))
-                  }
-                />
-              </label>
-              <label className="field" style={{ margin: 0 }}>
-                Main Category
-                <select
-                  value={newCciDraft.mainCategory}
-                  onChange={(e) =>
-                    setNewCciDraft((d) => ({
-                      ...d,
-                      mainCategory: e.target.value as MainCciCategory | '',
-                    }))
-                  }
-                >
-                  <option value="">Unmapped</option>
-                  <option value="Blow">Blow</option>
-                  <option value="Flow">Flow</option>
-                  <option value="Chunks">Chunks</option>
-                </select>
-              </label>
+            <div style={{ marginBottom: '1rem', display: 'grid', gap: '0.75rem' }}>
+              <strong>Create CCI</strong>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1.2fr 1fr 0.75fr 1fr 1.5fr auto',
+                  gap: '0.75rem',
+                  alignItems: 'end',
+                }}
+              >
+                <label className="field" style={{ margin: 0 }}>
+                  Draft profile
+                  <select
+                    value={newCciDraft.profileId}
+                    onChange={(event) =>
+                      setNewCciDraft({ ...newCciDraft, profileId: event.target.value })
+                    }
+                  >
+                    <option value="">New profile…</option>
+                    {draftCciProfiles.map((profile) => (
+                      <option key={profile.id} value={profile.id}>
+                        {profile.name} ({profile.versionLabel})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field" style={{ margin: 0 }}>
+                  New profile name
+                  <input
+                    value={newCciDraft.profileName}
+                    onChange={(event) =>
+                      setNewCciDraft({ ...newCciDraft, profileName: event.target.value })
+                    }
+                    placeholder="Chunks CCI Profile"
+                    disabled={Boolean(selectedNewCciProfile)}
+                  />
+                </label>
+                <label className="field" style={{ margin: 0 }}>
+                  Name
+                  <input
+                    value={newCciDraft.name}
+                    onChange={(event) =>
+                      setNewCciDraft({ ...newCciDraft, name: event.target.value })
+                    }
+                    placeholder="Give it a shot"
+                  />
+                </label>
+                <label className="field" style={{ margin: 0 }}>
+                  Category
+                  <select
+                    value={newCciDraft.mainCategory}
+                    onChange={(event) =>
+                      setNewCciDraft({
+                        ...newCciDraft,
+                        mainCategory: event.target.value as MainCciCategory | '',
+                      })
+                    }
+                  >
+                    <option value="">Choose…</option>
+                    <option value="Blow">Blow</option>
+                    <option value="Flow">Flow</option>
+                    <option value="Chunks">Chunks</option>
+                  </select>
+                </label>
+                <label className="field" style={{ margin: 0 }}>
+                  Unit (Ampe)
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={newCciDraft.value}
+                    onChange={(event) =>
+                      setNewCciDraft({ ...newCciDraft, value: Number(event.target.value) })
+                    }
+                  />
+                </label>
+                <button type="button" className="primary" onClick={() => void createCciCategory()}>
+                  Create
+                </button>
+              </div>
               <label className="field" style={{ margin: 0 }}>
                 Description
                 <input
                   value={newCciDraft.description}
-                  onChange={(e) => setNewCciDraft((d) => ({ ...d, description: e.target.value }))}
-                  placeholder="Optional"
+                  onChange={(event) =>
+                    setNewCciDraft({ ...newCciDraft, description: event.target.value })
+                  }
+                  placeholder="Linear 1 on 1 as Blow"
                 />
               </label>
             </div>
-            <div className="btn-row" style={{ marginTop: '0.5rem' }}>
-              <button type="button" className="primary" onClick={() => void createCciCategory()}>
-                <Save className="h-4 w-4" aria-hidden />
-                Save category
-              </button>
-              <button
-                type="button"
-                className="ghost"
-                onClick={() =>
-                  setNewCciDraft((d) => ({
-                    ...d,
-                    profileId: '',
-                    name: '',
-                    description: '',
-                    mainCategory: '',
-                  }))
-                }
-              >
-                <X className="h-4 w-4" aria-hidden />
-                Cancel
-              </button>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Profile</th>
+                    <th>Action label</th>
+                    <th>Main category</th>
+                    <th>Ampe</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredCciRows.map((row) => {
+                    const editing = editingCategoryId === row.id && cciDraft
+                    const editable = row.profileStatus === 'draft'
+                    return (
+                      <tr key={row.id}>
+                        <td>
+                          <strong>{row.profileName}</strong>
+                          <div className="meta" style={{ margin: 0 }}>
+                            {row.profileVersion}
+                          </div>
+                        </td>
+                        <td>
+                          {editing ? (
+                            <input
+                              value={cciDraft.label}
+                              onChange={(event) =>
+                                setCciDraft({ ...cciDraft, label: event.target.value })
+                              }
+                            />
+                          ) : (
+                            row.label
+                          )}
+                        </td>
+                        <td>
+                          {editing ? (
+                            <select
+                              value={cciDraft.mainCategory}
+                              onChange={(event) =>
+                                setCciDraft({
+                                  ...cciDraft,
+                                  mainCategory: event.target.value as MainCciCategory | '',
+                                })
+                              }
+                            >
+                              <option value="">Unmapped</option>
+                              <option value="Blow">Blow</option>
+                              <option value="Flow">Flow</option>
+                              <option value="Chunks">Chunks</option>
+                            </select>
+                          ) : cciMainCategory(row) ? (
+                            <span className="badge">{cciMainCategory(row)}</span>
+                          ) : (
+                            <span className="meta">Unmapped</span>
+                          )}
+                        </td>
+                        <td style={{ width: 96 }}>
+                          {editing ? (
+                            <input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={cciDraft.value}
+                              onChange={(event) =>
+                                setCciDraft({ ...cciDraft, value: Number(event.target.value) })
+                              }
+                            />
+                          ) : (
+                            row.value
+                          )}
+                        </td>
+                        <td>
+                          {editing ? (
+                            <input
+                              value={cciDraft.description ?? ''}
+                              onChange={(event) =>
+                                setCciDraft({
+                                  ...cciDraft,
+                                  description: event.target.value || null,
+                                })
+                              }
+                            />
+                          ) : (
+                            (row.description ?? '—')
+                          )}
+                        </td>
+                        <td>{statusLabel(row.profileStatus)}</td>
+                        <td>
+                          {editing ? (
+                            <div className="btn-row" style={{ margin: 0 }}>
+                              <button
+                                type="button"
+                                className="primary"
+                                onClick={() => void saveCciEdit(row)}
+                              >
+                                <Save className="h-4 w-4" aria-hidden />
+                                Save
+                              </button>
+                              <button
+                                type="button"
+                                className="ghost"
+                                onClick={() => {
+                                  setEditingCategoryId(null)
+                                  setCciDraft(null)
+                                }}
+                              >
+                                <X className="h-4 w-4" aria-hidden />
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <div>
+                              <div className="btn-row" style={{ margin: 0 }}>
+                                <button
+                                  type="button"
+                                  className="ghost"
+                                  onClick={() => beginCciEdit(row)}
+                                  title={actionTitle(editable)}
+                                >
+                                  <Pencil className="h-4 w-4" aria-hidden />
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  className="ghost"
+                                  onClick={() => void deleteCciRow(row)}
+                                  title={actionTitle(editable)}
+                                  style={editable ? { color: '#b91c1c' } : undefined}
+                                >
+                                  <Trash2 className="h-4 w-4" aria-hidden />
+                                  Delete
+                                </button>
+                                <button
+                                  type="button"
+                                  className="ghost"
+                                  onClick={() => void publishProfile(row.profileId)}
+                                  disabled={row.profileStatus !== 'draft'}
+                                  title="Publish draft profile to active so it can be selected for sessions."
+                                >
+                                  Publish profile
+                                </button>
+                                <button
+                                  type="button"
+                                  className="ghost"
+                                  onClick={() => void archiveProfile(row.profileId)}
+                                  disabled={row.profileStatus === 'archived'}
+                                  title="Archive keeps existing measurement snapshots historically reproducible."
+                                >
+                                  Archive profile
+                                </button>
+                                {row.profileStatus === 'draft' ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="ghost"
+                                      onClick={() => void publishProfile(row.profileId)}
+                                      title="Publish profile to active. Once active, direct edits are disabled."
+                                    >
+                                      Publish profile
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="ghost"
+                                      onClick={() => {
+                                        setNewCciDraft((d) => ({
+                                          ...d,
+                                          profileId: row.profileId,
+                                          profileName: row.profileName,
+                                          name: '',
+                                          value: 2,
+                                          description: '',
+                                          mainCategory: '',
+                                        }))
+                                      }}
+                                      title="Pre-fill the Add Category form below for this draft profile."
+                                    >
+                                      Add category
+                                    </button>
+                                  </>
+                                ) : null}
+                              </div>
+                              <div className="meta" style={{ margin: '0.25rem 0 0' }}>
+                                {draftActionHint('CCI category', editable)}
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {filteredCciRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="meta" style={{ textAlign: 'center' }}>
+                        No CCI categories match the current filters.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
             </div>
-          </div>
-        ) : null}
+          </Panel>
+          {/* T7: inline create-category form, shown when "Add category" is clicked on a draft profile row */}
+          {newCciDraft.profileId ? (
+            <div
+              style={{
+                marginTop: '0.75rem',
+                padding: '0.75rem 1rem',
+                background: 'var(--bg-card)',
+                borderRadius: '0.5rem',
+                border: '1px solid var(--border)',
+              }}
+            >
+              <strong style={{ display: 'block', marginBottom: '0.5rem' }}>
+                Add CCI Category to: {newCciDraft.profileName}
+              </strong>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(10rem, 1fr))',
+                  gap: '0.5rem',
+                }}
+              >
+                <label className="field" style={{ margin: 0 }}>
+                  Name / Label
+                  <input
+                    value={newCciDraft.name}
+                    onChange={(e) => setNewCciDraft((d) => ({ ...d, name: e.target.value }))}
+                    placeholder="e.g. Current 5"
+                  />
+                </label>
+                <label className="field" style={{ margin: 0 }}>
+                  Ampe / Value
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={newCciDraft.value}
+                    onChange={(e) =>
+                      setNewCciDraft((d) => ({ ...d, value: Number(e.target.value) }))
+                    }
+                  />
+                </label>
+                <label className="field" style={{ margin: 0 }}>
+                  Main Category
+                  <select
+                    value={newCciDraft.mainCategory}
+                    onChange={(e) =>
+                      setNewCciDraft((d) => ({
+                        ...d,
+                        mainCategory: e.target.value as MainCciCategory | '',
+                      }))
+                    }
+                  >
+                    <option value="">Unmapped</option>
+                    <option value="Blow">Blow</option>
+                    <option value="Flow">Flow</option>
+                    <option value="Chunks">Chunks</option>
+                  </select>
+                </label>
+                <label className="field" style={{ margin: 0 }}>
+                  Description
+                  <input
+                    value={newCciDraft.description}
+                    onChange={(e) => setNewCciDraft((d) => ({ ...d, description: e.target.value }))}
+                    placeholder="Optional"
+                  />
+                </label>
+              </div>
+              <div className="btn-row" style={{ marginTop: '0.5rem' }}>
+                <button type="button" className="primary" onClick={() => void createCciCategory()}>
+                  <Save className="h-4 w-4" aria-hidden />
+                  Save category
+                </button>
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() =>
+                    setNewCciDraft((d) => ({
+                      ...d,
+                      profileId: '',
+                      name: '',
+                      description: '',
+                      mainCategory: '',
+                    }))
+                  }
+                >
+                  <X className="h-4 w-4" aria-hidden />
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
         </>
       ) : null}
 
@@ -1365,12 +1410,21 @@ export function AdminResourcesPage() {
         >
           <div style={{ marginBottom: '1rem', display: 'grid', gap: '0.75rem' }}>
             <strong>Create Test Package</strong>
-            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 0.75fr 0.75fr auto', gap: '0.75rem', alignItems: 'end' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1.5fr 1fr 0.75fr 0.75fr auto',
+                gap: '0.75rem',
+                alignItems: 'end',
+              }}
+            >
               <label className="field" style={{ margin: 0 }}>
                 Package name
                 <input
                   value={packageDraft.title}
-                  onChange={(event) => setPackageDraft({ ...packageDraft, title: event.target.value })}
+                  onChange={(event) =>
+                    setPackageDraft({ ...packageDraft, title: event.target.value })
+                  }
                   placeholder="Pre-test"
                 />
               </label>
@@ -1378,7 +1432,9 @@ export function AdminResourcesPage() {
                 Version
                 <input
                   value={packageDraft.versionLabel}
-                  onChange={(event) => setPackageDraft({ ...packageDraft, versionLabel: event.target.value })}
+                  onChange={(event) =>
+                    setPackageDraft({ ...packageDraft, versionLabel: event.target.value })
+                  }
                   placeholder="draft-v1"
                 />
               </label>
@@ -1389,7 +1445,12 @@ export function AdminResourcesPage() {
                   min={1}
                   max={12}
                   value={packageDraft.sessionCount}
-                  onChange={(event) => setPackageDraft({ ...packageDraft, sessionCount: Number(event.target.value) || 8 })}
+                  onChange={(event) =>
+                    setPackageDraft({
+                      ...packageDraft,
+                      sessionCount: Number(event.target.value) || 8,
+                    })
+                  }
                 />
               </label>
               <label className="field" style={{ margin: 0 }}>
@@ -1399,15 +1460,26 @@ export function AdminResourcesPage() {
                   min={1}
                   max={50}
                   value={packageDraft.itemsPerSession}
-                  onChange={(event) => setPackageDraft({ ...packageDraft, itemsPerSession: Number(event.target.value) || 10 })}
+                  onChange={(event) =>
+                    setPackageDraft({
+                      ...packageDraft,
+                      itemsPerSession: Number(event.target.value) || 10,
+                    })
+                  }
                 />
               </label>
-              <button type="button" className="primary" onClick={() => void createPackageFromBuilder()}>
+              <button
+                type="button"
+                className="primary"
+                onClick={() => void createPackageFromBuilder()}
+              >
                 Create package
               </button>
             </div>
             <p className="meta" style={{ margin: 0 }}>
-              Creates a draft package with {packageDraft.sessionCount} sessions × {packageDraft.itemsPerSession} CVR sentence slots. Each session is mapped to CCI by order and default target CVR sequence 3,5,7,9,11,13,15,17 for CPD calculation.
+              Creates a draft package with {packageDraft.sessionCount} sessions ×{' '}
+              {packageDraft.itemsPerSession} CVR sentence slots. Each session is mapped to CCI by
+              order and default target CVR sequence 3,5,7,9,11,13,15,17 for CPD calculation.
             </p>
           </div>
           <div className="table-wrap">
@@ -1487,9 +1559,7 @@ export function AdminResourcesPage() {
                           className="ghost"
                           style={{ padding: '0.1rem 0.3rem', fontSize: '0.8rem' }}
                           onClick={() =>
-                            setExpandedSectionId(
-                              expandedSectionId === row.id ? null : row.id,
-                            )
+                            setExpandedSectionId(expandedSectionId === row.id ? null : row.id)
                           }
                         >
                           {row.itemCount} items ▾

@@ -10,9 +10,11 @@ import {
   Settings,
   ShieldCheck,
   FileText,
+  PlusCircle,
 } from 'lucide-react'
 import { PageHeader } from '../../components/PageHeader'
 import { EmptyState, Panel, StatCard } from '../../components/ui'
+import { getSupabase } from '../../lib/supabase'
 import type { LiveTestBlock, LiveTestItem, LiveTestResource } from '../../modules/assessment/live-test'
 import { blockSummary } from '../../modules/assessment/live-test'
 import { listLiveTestBlocks, listLiveTestItems, listLiveTestResources, audioUrl } from '../../lib/live-test-resources'
@@ -93,6 +95,38 @@ export function AdminLiveTestsPage() {
 
   const generator = useMemo(() => new SupabaseLiveTestGeneration(), [])
   const [ttsStatus, setTtsStatus] = useState<string>('')
+
+  // Package Builder State
+  const [packageTitle, setPackageTitle] = useState<string>('')
+  const [versionLabel, setVersionLabel] = useState<string>('')
+  const [numSessions, setNumSessions] = useState<number>(8)
+  const [defaultCvr, setDefaultCvr] = useState<number>(3)
+  const [defaultProfileId, setDefaultProfileId] = useState<string>('')
+  const [defaultCategoryId, setDefaultCategoryId] = useState<string>('')
+  const [defaultCategories, setDefaultCategories] = useState<CciCategory[]>([])
+  const [builderStatus, setBuilderStatus] = useState<string>('')
+  const [publishStatus, setPublishStatus] = useState<string>('')
+  const [importStatus, setImportStatus] = useState<string>('')
+
+  // Sync default profile with categories
+  useEffect(() => {
+    if (!defaultProfileId) return
+    void listCciCategories(defaultProfileId).then((res) => {
+      if (res.ok) {
+        setDefaultCategories(res.data)
+        if (res.data[0]) {
+          setDefaultCategoryId(res.data[0].id)
+        }
+      }
+    })
+  }, [defaultProfileId])
+
+  // Sync defaultProfileId when cciProfiles loads
+  useEffect(() => {
+    if (cciProfiles.length > 0 && !defaultProfileId) {
+      setDefaultProfileId(cciProfiles[0].id)
+    }
+  }, [cciProfiles, defaultProfileId])
 
   // Load V1 legacy resources
   useEffect(() => {
@@ -335,6 +369,224 @@ export function AdminLiveTestsPage() {
     }
   }
 
+  const handleCreatePackageVersion = async () => {
+    if (!packageTitle.trim()) {
+      setBuilderStatus('Error: Package title is required.')
+      return
+    }
+    if (!versionLabel.trim()) {
+      setBuilderStatus('Error: Version label is required.')
+      return
+    }
+    if (!defaultCategoryId) {
+      setBuilderStatus('Error: Default CCI category is required.')
+      return
+    }
+
+    setBuilderStatus('Creating package and version draft...')
+    const sb = getSupabase()
+    if (!sb) {
+      setBuilderStatus('Error: Supabase is not configured.')
+      return
+    }
+
+    try {
+      // 1. Get singleton org id
+      const { data: orgs, error: orgErr } = await sb.from('organizations').select('id').limit(1)
+      if (orgErr) throw new Error(orgErr.message)
+      const orgId = orgs?.[0]?.id || '00000000-0000-0000-0000-000000000000'
+
+      // 2. Insert or get package
+      let pkgId = ''
+      const existingPkg = packages.find(p => p.title.toLowerCase() === packageTitle.toLowerCase())
+      if (existingPkg) {
+        pkgId = existingPkg.id
+      } else {
+        const { data: newPkg, error: pkgErr } = await sb
+          .from('test_packages')
+          .insert({
+            organization_id: orgId,
+            title: packageTitle.trim(),
+            slug: packageTitle.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          })
+          .select()
+          .single()
+        if (pkgErr) throw new Error(pkgErr.message)
+        pkgId = newPkg.id
+      }
+
+      // 3. Create version draft
+      const { data: newVer, error: verErr } = await sb
+        .from('test_package_versions')
+        .insert({
+          package_id: pkgId,
+          version_label: versionLabel.trim(),
+          status: 'draft',
+        })
+        .select()
+        .single()
+      if (verErr) throw new Error(verErr.message)
+      const verId = newVer.id
+
+      // 4. Create sections & snapshots
+      const selectedCat = defaultCategories.find(c => c.id === defaultCategoryId)
+      const catLabel = selectedCat?.label || 'Default CCI'
+      const catValue = selectedCat?.value || 3.0
+
+      for (let i = 1; i <= numSessions; i++) {
+        const { data: section, error: secErr } = await sb
+          .from('test_sections')
+          .insert({
+            package_version_id: verId,
+            section_order: i,
+            title: `Session ${i}`,
+          })
+          .select()
+          .single()
+        if (secErr) throw new Error(secErr.message)
+
+        // Insert default snapshot
+        const { error: snapErr } = await sb
+          .from('section_measurement_snapshots')
+          .insert({
+            test_section_id: section.id,
+            package_version_id: verId,
+            target_cvr_ohm: defaultCvr,
+            cci_profile_id: defaultProfileId,
+            cci_category_id: defaultCategoryId,
+            cci_category_label: catLabel,
+            cci_value: catValue,
+            override_reason: 'Default provisioned snapshot template',
+          })
+        if (snapErr) throw new Error(snapErr.message)
+      }
+
+      setBuilderStatus(`Successfully created package version draft! Created ${numSessions} sections with target CVR = ${defaultCvr} ohm and CCI = ${catValue} (${catLabel}).`)
+      
+      // Clear inputs
+      setPackageTitle('')
+      setVersionLabel('')
+
+      // Reload packages
+      const pkgsRes = await listTestPackages()
+      if (pkgsRes.ok) {
+        setPackages(pkgsRes.data)
+        setSelectedPkgId(pkgId)
+      }
+    } catch (e: any) {
+      setBuilderStatus(`Error: ${e.message}`)
+    }
+  }
+
+  const handlePublishVersion = async () => {
+    if (!selectedVerId) return
+    if (!window.confirm('Are you sure you want to PUBLISH this version? Once published, it will be frozen and cannot be modified.')) {
+      return
+    }
+
+    setPublishStatus('Publishing...')
+    const sb = getSupabase()
+    if (!sb) {
+      setPublishStatus('Supabase not configured')
+      return
+    }
+
+    const { error } = await sb
+      .from('test_package_versions')
+      .update({ status: 'published', published_at: new Date().toISOString() })
+      .eq('id', selectedVerId)
+
+    if (error) {
+      setPublishStatus(`Error: ${error.message}`)
+    } else {
+      setPublishStatus('Published successfully!')
+      // Reload versions
+      if (selectedPkgId) {
+        const res = await listTestPackageVersions(selectedPkgId)
+        if (res.ok) {
+          setVersions(res.data)
+          setSelectedVerId(selectedVerId)
+        }
+      }
+    }
+  }
+
+  const handleSaveImportedItems = async () => {
+    if (!selectedVerId) {
+      setImportStatus('Error: Please select a Package Version under the Test Packages (V2) tab first.')
+      return
+    }
+    if (csvPreviewItems.length === 0) {
+      setImportStatus('Error: No items to import. Paste CSV and preview first.')
+      return
+    }
+
+    setImportStatus('Saving items...')
+    const sb = getSupabase()
+    if (!sb) {
+      setImportStatus('Error: Supabase not configured.')
+      return
+    }
+
+    try {
+      // 1. Check if the selected version is a draft
+      const { data: ver, error: verErr } = await sb
+        .from('test_package_versions')
+        .select('status')
+        .eq('id', selectedVerId)
+        .maybeSingle()
+      if (verErr || !ver) {
+        throw new Error(verErr?.message || 'Selected version not found')
+      }
+      if (ver.status !== 'draft') {
+        throw new Error('You can only import items into a DRAFT package version.')
+      }
+
+      // 2. Fetch all sections for the selected version to map sectionOrder
+      const { data: dbSections, error: secErr } = await sb
+        .from('test_sections')
+        .select('id, section_order')
+        .eq('package_version_id', selectedVerId)
+      if (secErr) throw new Error(secErr.message)
+
+      // 3. Loop and insert items
+      let count = 0
+      for (const item of csvPreviewItems) {
+        const matchSec = dbSections?.find(s => s.section_order === item.sectionOrder)
+        if (!matchSec) {
+          console.warn(`Section order ${item.sectionOrder} not found in this package version. Skipping.`)
+          continue
+        }
+
+        const { error: itemErr } = await sb
+          .from('test_items')
+          .insert({
+            package_version_id: selectedVerId,
+            section_id: matchSec.id,
+            item_order: item.itemNumber,
+            prompt_vi: item.promptVi,
+            prompt_en: item.promptEn,
+            term_vi: item.termVi,
+            term_en: item.termEn,
+            tc: item.tc,
+            lc: item.lc,
+            tl: item.tl,
+            measured_cvr: item.cvrValue,
+          })
+        if (itemErr) throw new Error(itemErr.message)
+        count++
+      }
+
+      setImportStatus(`Successfully saved ${count} items into the draft package version!`)
+      if (selectedSecId) {
+        const r = await listV2Items(selectedSecId)
+        if (r.ok) setV2Items(r.data)
+      }
+    } catch (e: any) {
+      setImportStatus(`Error: ${e.message}`)
+    }
+  }
+
   // Mock CSV parsing
   const handleParseCsv = () => {
     if (!csvContent.trim()) return
@@ -353,6 +605,7 @@ export function AdminLiveTestsPage() {
         lc: parseFloat(cols[6]) || 1.0,
         tl: parseFloat(cols[7]) || 1.0,
         cvrValue: parseFloat(cols[8]) || 1.0,
+        sectionOrder: parseInt(cols[9]) || 1,
       })
     }
     setCsvPreviewItems(parsed)
@@ -433,6 +686,103 @@ export function AdminLiveTestsPage() {
                       ))}
                     </select>
                   </label>
+                </div>
+              </Panel>
+
+              {/* Publish/Status panel */}
+              {versions.find(v => v.id === selectedVerId)?.status === 'draft' && (
+                <Panel icon={ShieldCheck} title="Publish Gói Test" collapsible={false}>
+                  {publishStatus && (
+                    <div style={{ marginBottom: '0.75rem', padding: '0.5rem', backgroundColor: '#2d3748', color: '#f6ad55', fontSize: '0.85rem' }}>
+                      {publishStatus}
+                    </div>
+                  )}
+                  <button className="primary" style={{ width: '100%', backgroundColor: '#d69e2e', color: '#fff' }} onClick={handlePublishVersion}>
+                    Publish Phiên bản này (Khóa đề)
+                  </button>
+                </Panel>
+              )}
+
+              {/* Package Builder Panel */}
+              <Panel icon={PlusCircle} title="Tạo Gói Test Mới (Draft)" collapsible={true}>
+                {builderStatus && (
+                  <div style={{ marginBottom: '0.75rem', padding: '0.5rem', backgroundColor: '#2b6cb0', color: '#fff', borderRadius: '4px', fontSize: '0.85rem' }}>
+                    {builderStatus}
+                  </div>
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <label>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Tên Gói (Package Title)</span>
+                    <input 
+                      type="text" 
+                      placeholder="Ví dụ: Pretest Package"
+                      value={packageTitle}
+                      onChange={(e) => setPackageTitle(e.target.value)}
+                      style={{ width: '100%', padding: '0.4rem', marginTop: '0.25rem' }}
+                    />
+                  </label>
+                  <label>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Nhãn Phiên Bản (Version)</span>
+                    <input 
+                      type="text" 
+                      placeholder="Ví dụ: v1.0.0"
+                      value={versionLabel}
+                      onChange={(e) => setVersionLabel(e.target.value)}
+                      style={{ width: '100%', padding: '0.4rem', marginTop: '0.25rem' }}
+                    />
+                  </label>
+                  <label>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Số lượng Session</span>
+                    <input 
+                      type="number" 
+                      min={1} 
+                      max={12} 
+                      value={numSessions}
+                      onChange={(e) => setNumSessions(parseInt(e.target.value) || 8)}
+                      style={{ width: '100%', padding: '0.4rem', marginTop: '0.25rem' }}
+                    />
+                  </label>
+                  <label>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Default CVR (Ohm)</span>
+                    <input 
+                      type="number" 
+                      min={1} 
+                      value={defaultCvr}
+                      onChange={(e) => setDefaultCvr(parseInt(e.target.value) || 3)}
+                      style={{ width: '100%', padding: '0.4rem', marginTop: '0.25rem' }}
+                    />
+                  </label>
+                  <label>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Default CCI Profile</span>
+                    <select
+                      style={{ width: '100%', padding: '0.4rem', marginTop: '0.25rem' }}
+                      value={defaultProfileId}
+                      onChange={(e) => setDefaultProfileId(e.target.value)}
+                    >
+                      {cciProfiles.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Default CCI Category</span>
+                    <select
+                      style={{ width: '100%', padding: '0.4rem', marginTop: '0.25rem' }}
+                      value={defaultCategoryId}
+                      onChange={(e) => setDefaultCategoryId(e.target.value)}
+                    >
+                      {defaultCategories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.label} ({c.value} Ampe)
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button className="primary" style={{ marginTop: '0.5rem' }} onClick={handleCreatePackageVersion}>
+                    Khởi tạo Gói Test & Sessions
+                  </button>
                 </div>
               </Panel>
 
@@ -725,15 +1075,62 @@ export function AdminLiveTestsPage() {
       {activeTab === 'import' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
           <Panel icon={Upload} title="Paste CSV Data" collapsible={false}>
+            {importStatus && (
+              <div style={{ marginBottom: '1rem', padding: '0.5rem', backgroundColor: '#2d3748', borderLeft: '4px solid #63b3ed', fontStyle: 'italic', fontSize: '0.85rem' }}>
+                {importStatus}
+              </div>
+            )}
             <textarea
               style={{ width: '100%', height: '200px', padding: '0.5rem', fontFamily: 'monospace', fontSize: '0.85rem' }}
-              placeholder="item_number,term_vi,term_en,prompt_vi,prompt_en,tc,lc,tl,cvr_value&#10;1,Chữ A,Letter A,Nhấn màu xanh...,Press green...,1.0,1.2,1.1,1.32"
+              placeholder="item_number,term_vi,term_en,prompt_vi,prompt_en,tc,lc,tl,cvr_value,section_order&#10;1,Chữ A,Letter A,Nhấn màu xanh...,Press green...,1.0,1.2,1.1,3.0,1"
               value={csvContent}
               onChange={(e) => setCsvContent(e.target.value)}
             />
             <button className="primary" style={{ width: '100%', marginTop: '0.75rem' }} onClick={handleParseCsv}>
               Preview CSV Items
             </button>
+
+            <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid #4a5568' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 'bold', display: 'block', marginBottom: '0.5rem' }}>
+                Import into Draft Version
+              </span>
+              <label style={{ display: 'block', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.8rem', color: '#a0aec0' }}>Package</span>
+                <select
+                  style={{ width: '100%', padding: '0.4rem', marginTop: '0.25rem' }}
+                  value={selectedPkgId}
+                  onChange={(e) => setSelectedPkgId(e.target.value)}
+                >
+                  {packages.map((pkg) => (
+                    <option key={pkg.id} value={pkg.id}>
+                      {pkg.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label style={{ display: 'block', marginBottom: '0.75rem' }}>
+                <span style={{ fontSize: '0.8rem', color: '#a0aec0' }}>Version</span>
+                <select
+                  style={{ width: '100%', padding: '0.4rem', marginTop: '0.25rem' }}
+                  value={selectedVerId}
+                  onChange={(e) => setSelectedVerId(e.target.value)}
+                >
+                  {versions.map((ver) => (
+                    <option key={ver.id} value={ver.id}>
+                      {ver.versionLabel} ({ver.status})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button 
+                className="primary" 
+                style={{ width: '100%', backgroundColor: '#38a169', color: '#fff' }} 
+                onClick={handleSaveImportedItems}
+                disabled={!selectedVerId || csvPreviewItems.length === 0 || versions.find(v => v.id === selectedVerId)?.status !== 'draft'}
+              >
+                Save Items to Draft Version
+              </button>
+            </div>
           </Panel>
 
           <Panel icon={FileText} title="CSV Import Preview" collapsible={false}>

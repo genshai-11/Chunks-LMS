@@ -4,6 +4,7 @@
 -- backup/PITR restore evidence, dry-run report review, and explicit approval.
 
 create extension if not exists "pgcrypto";
+SET search_path TO public, extensions;
 
 -- ---------------------------------------------------------------------------
 -- Additive audit/mapping tables. These do not rewrite hosted assessment history.

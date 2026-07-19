@@ -2,6 +2,7 @@
 -- Local-only migration artifact: do not apply to remote production without the release-control ticket.
 
 create extension if not exists "pgcrypto";
+SET search_path TO public, extensions;
 
 -- ---------------------------------------------------------------------------
 -- Staff identity mapping: preserve public users.id UUIDs and keep Clerk IDs only

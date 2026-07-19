@@ -4,6 +4,7 @@
 -- ---------------------------------------------------------------------------
 -- Staging and Job Helpers
 -- ---------------------------------------------------------------------------
+SET search_path TO public, extensions;
 
 create or replace function public.live_test_v2_current_user_id()
 returns uuid

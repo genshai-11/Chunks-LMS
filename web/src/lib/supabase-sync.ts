@@ -202,15 +202,15 @@ export async function deleteWorkspaceLearningDataFromSupabase(
   return { ok: true }
 }
 
-export type ClerkWorkspaceIdentity = {
-  clerkUserId: string
+export type SupabaseStaffWorkspaceIdentity = {
+  authUserId: string
   email: string | null
   displayName: string
   roles: Array<'admin' | 'teacher'>
 }
 
-export async function ensureClerkWorkspace(
-  identity: ClerkWorkspaceIdentity,
+export async function ensureSupabaseStaffWorkspace(
+  identity: SupabaseStaffWorkspaceIdentity,
 ): Promise<{ ok: true; organizationId: string } | { ok: false; error: string }> {
   const sb = db()
   if (!sb) return { ok: false, error: 'Supabase not configured' }
@@ -218,7 +218,7 @@ export async function ensureClerkWorkspace(
   const existingUser = await sb
     .from('users')
     .select('id')
-    .eq('clerk_user_id', identity.clerkUserId)
+    .eq('auth_user_id', identity.authUserId)
     .maybeSingle()
   if (existingUser.error) return { ok: false, error: existingUser.error.message }
 
@@ -227,7 +227,9 @@ export async function ensureClerkWorkspace(
     const inserted = await sb
       .from('users')
       .insert({
-        clerk_user_id: identity.clerkUserId,
+        auth_user_id: identity.authUserId,
+        legacy_clerk_user_id: null,
+        clerk_user_id: null,
         display_name: identity.displayName,
         email: identity.email,
       })
@@ -243,33 +245,24 @@ export async function ensureClerkWorkspace(
     if (updated.error) return { ok: false, error: updated.error.message }
   }
 
-  const memberships = await sb
-    .from('organization_memberships')
-    .select('organization_id')
-    .eq('user_id', userId)
-  if (memberships.error) return { ok: false, error: memberships.error.message }
+  const orgs = await sb.from('organizations').select('id').order('created_at', { ascending: true })
+  if (orgs.error) return { ok: false, error: orgs.error.message }
 
-  let organizationId = memberships.data?.[0]?.organization_id as string | undefined
+  let organizationId =
+    (orgs.data ?? []).find((org) => org.id === LOCAL_ORG_ID)?.id as string | undefined
+  organizationId ??= orgs.data?.[0]?.id as string | undefined
   if (!organizationId) {
-    const clerkOrgId = `personal:${identity.clerkUserId}`
-    const existingOrg = await sb
+    const insertedOrg = await sb
       .from('organizations')
+      .insert({ id: LOCAL_ORG_ID, name: 'Chunks Workspace', clerk_org_id: null })
       .select('id')
-      .eq('clerk_org_id', clerkOrgId)
-      .maybeSingle()
-    if (existingOrg.error) return { ok: false, error: existingOrg.error.message }
-    organizationId = existingOrg.data?.id as string | undefined
-    if (!organizationId) {
-      const insertedOrg = await sb
-        .from('organizations')
-        .insert({ name: `${identity.displayName} Workspace`, clerk_org_id: clerkOrgId })
-        .select('id')
-        .single()
-      if (insertedOrg.error) return { ok: false, error: insertedOrg.error.message }
-      organizationId = insertedOrg.data.id as string
-    }
+      .single()
+    if (insertedOrg.error) return { ok: false, error: insertedOrg.error.message }
+    organizationId = insertedOrg.data.id as string
   }
 
+  // Keep legacy organization_memberships in sync for existing roster UI/domain role reads.
+  // Authorization is granted from staff_roles; this compatibility row is not authoritative.
   const roles = identity.roles.length > 0 ? identity.roles : ['teacher' as const]
   const membershipRows = roles.map((role) => ({
     organization_id: organizationId!,
@@ -660,13 +653,21 @@ export async function saveWorkspaceToSupabase(
     // 2) Users — upsert only (never delete users; other browser may still reference)
     if (roster.users.length > 0) {
       const ids = roster.users.map((u) => u.id)
-      // Preserve real Clerk ids so re-login does not create duplicate staff rows.
+      // Preserve Supabase Auth links and legacy Clerk ids so identity migration never
+      // changes public domain User UUIDs or duplicates staff rows.
       const { data: existingUsers } = await sb
         .from('users')
-        .select('id, clerk_user_id')
+        .select('id, auth_user_id, clerk_user_id, legacy_clerk_user_id')
         .in('id', ids)
-      const clerkById = new Map(
-        (existingUsers ?? []).map((row) => [row.id as string, row.clerk_user_id as string]),
+      const identityById = new Map(
+        (existingUsers ?? []).map((row) => [
+          row.id as string,
+          {
+            authUserId: (row as { auth_user_id?: string | null }).auth_user_id ?? null,
+            clerkUserId: (row as { clerk_user_id?: string | null }).clerk_user_id ?? null,
+            legacyClerkUserId: (row as { legacy_clerk_user_id?: string | null }).legacy_clerk_user_id ?? null,
+          },
+        ]),
       )
 
       const compactAvatar = (url: string | null) => {
@@ -678,14 +679,13 @@ export async function saveWorkspaceToSupabase(
       }
 
       const baseRows = roster.users.map((u) => {
-        const existingClerk = clerkById.get(u.id)
-        const clerkUserId =
-          existingClerk && !existingClerk.startsWith('local_')
-            ? existingClerk
-            : existingClerk || `local_${u.id}`
+        const existingIdentity = identityById.get(u.id)
+        const legacyClerkUserId = existingIdentity?.legacyClerkUserId ?? existingIdentity?.clerkUserId ?? null
         return {
           id: u.id,
-          clerk_user_id: clerkUserId,
+          auth_user_id: existingIdentity?.authUserId ?? null,
+          legacy_clerk_user_id: legacyClerkUserId,
+          clerk_user_id: existingIdentity?.clerkUserId ?? null,
           display_name: u.displayName,
           email: u.email,
           avatar_url: compactAvatar(u.avatarUrl),

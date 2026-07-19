@@ -308,62 +308,18 @@ export function countDuplicateEmailGroups(state: RosterState): number {
   return n
 }
 
-/** Invite URL so a learner can open their portal by email. */
-export function learnerInviteUrl(
-  learner: DomainUser,
-  origin = typeof window !== 'undefined' ? window.location.origin : '',
-): string | null {
-  if (!learner.email?.trim()) return null
-  const base = origin || ''
-  return `${base}/access?email=${encodeURIComponent(learner.email.trim())}`
-}
-
-/** mailto: so staff can send the invite from their mail client. */
-export function learnerInviteMailto(
-  learner: DomainUser,
-  origin = typeof window !== 'undefined' ? window.location.origin : '',
-): string | null {
-  const url = learnerInviteUrl(learner, origin)
-  if (!url || !learner.email?.trim()) return null
-  const subject = encodeURIComponent('Your Chunks LMS progress link')
-  const body = encodeURIComponent(
-    `Hi ${learner.displayName},\n\nOpen your learning portal (attendance & progress):\n\n${url}\n\nUse the email your teacher registered for you.\n`,
-  )
-  return `mailto:${learner.email.trim()}?subject=${subject}&body=${body}`
-}
-
-export type ClassInviteLine = {
+export type ClassInviteCandidate = {
   learner: DomainUser
-  url: string
-  mailto: string
 }
 
-/** Active seats that have an invite-ready email. */
-export function classInviteLines(
-  state: RosterState,
-  classId: string,
-  origin = typeof window !== 'undefined' ? window.location.origin : '',
-): ClassInviteLine[] {
-  const lines: ClassInviteLine[] = []
+/** Active seats with learner emails that can receive signed learner access. */
+export function classInviteCandidates(state: RosterState, classId: string): ClassInviteCandidate[] {
+  const candidates: ClassInviteCandidate[] = []
   for (const e of activeEnrollmentsForClass(state, classId)) {
     const learner = state.users.find((u) => u.id === e.learnerUserId)
-    if (!learner) continue
-    const url = learnerInviteUrl(learner, origin)
-    const mailto = learnerInviteMailto(learner, origin)
-    if (url && mailto) lines.push({ learner, url, mailto })
+    if (learner?.email?.trim()) candidates.push({ learner })
   }
-  return lines
-}
-
-/** Plain text block of all invite URLs for clipboard. */
-export function formatClassInviteClipboard(
-  state: RosterState,
-  classId: string,
-  origin = typeof window !== 'undefined' ? window.location.origin : '',
-): string {
-  return classInviteLines(state, classId, origin)
-    .map((l) => `${l.learner.displayName} <${l.learner.email}>: ${l.url}`)
-    .join('\n')
+  return candidates
 }
 
 export function archiveCourse(state: RosterState, courseId: string): RosterResult<Course> {
@@ -781,7 +737,7 @@ export function addTeacherProfile(
   if (!displayName) return { ok: false, error: 'Teacher name is required' }
 
   const email = input.email?.trim() || null
-  if (!email) return { ok: false, error: 'Teacher email is required (matches Clerk sign-in)' }
+  if (!email) return { ok: false, error: 'Teacher email is required (matches Supabase Auth sign-in)' }
   if (isEmailTaken(state, email)) {
     return { ok: false, error: 'An account with this email already exists' }
   }

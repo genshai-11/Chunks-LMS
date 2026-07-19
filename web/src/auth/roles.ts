@@ -6,7 +6,7 @@ export type StaffRoute = {
   label: string
 }
 
-/** Staff workspaces only — learner portal is /access, not a Clerk role. */
+/** Staff workspaces only — learner portal is /access, not a staff role. */
 export const STAFF_ROUTES: StaffRoute[] = [
   { role: 'admin', path: '/admin', label: 'Admin' },
   { role: 'teacher', path: '/teacher', label: 'Teacher' },

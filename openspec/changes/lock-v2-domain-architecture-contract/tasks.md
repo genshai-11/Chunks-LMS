@@ -12,11 +12,11 @@
 
 ## 1. Identity and signed learner access (#5, depends on #4)
 
-- [ ] 1.1 Add Supabase Auth staff account mapping while preserving existing public User UUIDs
-- [ ] 1.2 Add database-owned Admin/Teacher role grants and routing checks
-- [ ] 1.3 Implement revocable expiring signed learner access without learner Auth accounts
-- [ ] 1.4 Replace Clerk authorization paths and retain legacy identifiers only for migration/rollback evidence
-- [ ] 1.5 Add RLS tests for Admin, Teacher, signed learner token, anon, and cross-scope denial
+- [x] 1.1 Add Supabase Auth staff account mapping while preserving existing public User UUIDs
+- [x] 1.2 Add database-owned Admin/Teacher role grants and routing checks
+- [x] 1.3 Implement revocable expiring signed learner access without learner Auth accounts
+- [x] 1.4 Replace Clerk authorization paths and retain legacy identifiers only for migration/rollback evidence
+- [x] 1.5 Add RLS tests for Admin, Teacher, signed learner token, anon, and cross-scope denial
 
 ## 2. Flexible packages and measurement catalogs (#6, depends on #4; implementation should coordinate with #5 RLS seams)
 

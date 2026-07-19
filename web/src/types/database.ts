@@ -25,23 +25,70 @@ export type Database = {
       users: {
         Row: {
           id: string
-          clerk_user_id: string
+          auth_user_id: string | null
+          clerk_user_id: string | null
+          legacy_clerk_user_id: string | null
           display_name: string
           email: string | null
           avatar_url: string | null
+          account_status: 'active' | 'inactive'
+          allow_multi_class: boolean
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: string
-          clerk_user_id: string
+          auth_user_id?: string | null
+          clerk_user_id?: string | null
+          legacy_clerk_user_id?: string | null
           display_name: string
           email?: string | null
           avatar_url?: string | null
+          account_status?: 'active' | 'inactive'
+          allow_multi_class?: boolean
           created_at?: string
           updated_at?: string
         }
         Update: Partial<Database['public']['Tables']['users']['Insert']>
+      }
+      staff_roles: {
+        Row: {
+          id: string
+          user_id: string
+          role: 'admin' | 'teacher'
+          active: boolean
+          granted_by_user_id: string | null
+          created_at: string
+          updated_at: string
+          revoked_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          role: 'admin' | 'teacher'
+          active?: boolean
+          granted_by_user_id?: string | null
+          created_at?: string
+          updated_at?: string
+          revoked_at?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['staff_roles']['Insert']>
+      }
+      learner_access_tokens: {
+        Row: {
+          id: string
+          token_hash: string
+          learner_user_id: string
+          class_id: string | null
+          issued_by_user_id: string
+          issued_at: string
+          expires_at: string
+          revoked_at: string | null
+          last_used_at: string | null
+          created_at: string
+        }
+        Insert: Record<string, unknown>
+        Update: Record<string, unknown>
       }
       organization_memberships: {
         Row: {
@@ -249,7 +296,32 @@ export type Database = {
       }
     }
     Views: Record<string, never>
-    Functions: Record<string, never>
+    Functions: {
+      issue_learner_access_token: {
+        Args: { p_learner_user_id: string; p_class_id: string; p_ttl_seconds?: number }
+        Returns: Array<{ token_id: string; url_token: string; expires_at: string }>
+      }
+      verify_learner_access: {
+        Args: { p_url_token: string }
+        Returns: Array<{
+          token_id: string
+          learner_user_id: string
+          class_id: string | null
+          expires_at: string
+          learner_display_name: string
+          learner_email: string | null
+          class_name: string | null
+        }>
+      }
+      learner_access_snapshot: {
+        Args: { p_url_token: string }
+        Returns: Json
+      }
+      revoke_learner_access_token: {
+        Args: { p_token_id: string }
+        Returns: undefined
+      }
+    }
     Enums: {
       app_role: 'admin' | 'teacher' | 'learner'
       result_color: 'red' | 'yellow' | 'green' | 'purple'

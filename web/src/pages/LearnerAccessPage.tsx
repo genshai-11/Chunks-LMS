@@ -1,51 +1,70 @@
 import { useEffect, useState } from 'react'
-import { GraduationCap, LogIn, Mail } from 'lucide-react'
+import { GraduationCap, LogIn, ShieldCheck } from 'lucide-react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { PageHeader } from '../components/PageHeader'
 import { UserAvatar } from '../components/UserAvatar'
 import { EmptyState, Panel } from '../components/ui'
-import { findLearnerByEmail } from '../modules/roster/service'
+import { loadLearnerAccessSnapshot } from '../modules/identity/learner-access'
 import { useAppState } from '../state/useAppState'
 
 /**
- * Learner portal entry (V1): share link `/access?email=` or type registered email.
- * No Clerk / no org membership for learners — staff copies invite from class roster.
- * Admin & Teacher use Clerk separately. Clerk learner accounts are deferred.
+ * Learner portal entry (V2): signed, expiring, revocable `/access?token=` link.
+ * Learners do not receive Supabase Auth accounts and cannot enter with email alone.
  */
 export function LearnerAccessPage() {
-  const { roster, setActiveLearnerUserId, activeLearnerUserId, backendStatus } = useAppState()
+  const {
+    roster,
+    setRoster,
+    setScheduling,
+    setLedger,
+    setActiveLearnerUserId,
+    setActiveLearnerClassId,
+    activeLearnerUserId,
+    backendStatus,
+  } = useAppState()
   const [params] = useSearchParams()
   const navigate = useNavigate()
-  const [email, setEmail] = useState(params.get('email') ?? '')
+  const [token, setToken] = useState(params.get('token') ?? '')
   const [error, setError] = useState<string | null>(null)
-  const [linkMiss, setLinkMiss] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
   const booting = backendStatus === 'booting'
 
-  useEffect(() => {
-    const fromQuery = params.get('email')
-    if (!fromQuery) {
-      setLinkMiss(false)
+  async function openWithToken(rawToken: string) {
+    const trimmed = rawToken.trim()
+    if (!trimmed) {
+      setError('Paste the signed learner access token from your invite link.')
       return
     }
-    // Wait until workspace boot finishes so cloud roster is available.
-    if (booting) return
-    const learner = findLearnerByEmail(roster, fromQuery)
-    if (learner) {
-      setActiveLearnerUserId(learner.id)
-      setLinkMiss(false)
-      navigate('/learner/enrollments', { replace: true })
-    } else {
-      setEmail(fromQuery)
-      setLinkMiss(true)
+    setLoading(true)
+    setError(null)
+    setMessage(null)
+    const result = await loadLearnerAccessSnapshot(trimmed)
+    setLoading(false)
+    if (!result.ok) {
+      setError(result.error)
+      return
     }
-  }, [params, roster, setActiveLearnerUserId, navigate, booting])
+    setRoster(result.value.roster)
+    setScheduling(result.value.scheduling)
+    setLedger(result.value.ledger)
+    setActiveLearnerUserId(result.value.grant.learnerUserId)
+    setActiveLearnerClassId(result.value.grant.classId)
+    setMessage(`Access verified for ${result.value.grant.learnerDisplayName}.`)
+    navigate('/learner/enrollments', { replace: true })
+  }
 
-  const current =
-    activeLearnerUserId
-      ? roster.users.find(
-          (u) => u.id === activeLearnerUserId && u.roles.includes('learner'),
-        )
-      : null
+  useEffect(() => {
+    const fromQuery = params.get('token')
+    if (!fromQuery || booting) return
+    setToken(fromQuery)
+    void openWithToken(fromQuery)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params, booting])
+
+  const current = activeLearnerUserId
+    ? roster.users.find((u) => u.id === activeLearnerUserId && u.roles.includes('learner'))
+    : null
 
   return (
     <div className="access-page">
@@ -53,7 +72,7 @@ export function LearnerAccessPage() {
         icon={GraduationCap}
         kicker="Learner"
         title="Open your portal"
-        subtitle="Use the invite link from your teacher, or type the exact email on your learner profile. Do not sign in with Clerk — that is for staff only."
+        subtitle="Use the signed learner access link from your teacher. Learners do not sign in with Supabase Auth accounts."
       />
 
       {current ? (
@@ -71,75 +90,62 @@ export function LearnerAccessPage() {
             <button
               type="button"
               className="ghost"
-              onClick={() => setActiveLearnerUserId(null)}
+              onClick={() => {
+                setActiveLearnerUserId(null)
+                setActiveLearnerClassId(null)
+              }}
             >
-              Use a different email
+              Use a different link
             </button>
           </div>
         </Panel>
       ) : null}
 
       <Panel
-        icon={Mail}
-        title="Enter with email"
-        description="Must match the email on your learner profile (from the invite link)."
+        icon={ShieldCheck}
+        title="Enter with signed access"
+        description="Signed learner links expire and can be revoked by staff. Email-only access is no longer accepted."
       >
         {booting ? (
           <p className="meta" role="status">
-            Loading class roster…
-          </p>
-        ) : null}
-        {linkMiss && !booting ? (
-          <p className="banner err" role="alert">
-            No learner matches that invite email. Check the link or ask your teacher to re-send it
-            (email must match the learner profile exactly).
+            Loading portal…
           </p>
         ) : null}
         <form
           className="form-grid"
           onSubmit={(e) => {
             e.preventDefault()
-            setError(null)
-            setLinkMiss(false)
             if (booting) {
-              setError('Still loading roster — try again in a moment.')
+              setError('Still loading portal — try again in a moment.')
               return
             }
-            const learner = findLearnerByEmail(roster, email)
-            if (!learner) {
-              setError(
-                'No learner found with that email. Ask your teacher to share the invite link (must match the email on your profile).',
-              )
-              return
-            }
-            setActiveLearnerUserId(learner.id)
-            navigate('/learner/enrollments')
+            void openWithToken(token)
           }}
         >
           <label className="form-span-full">
-            Email
+            Signed access token
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@school.edu"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              placeholder="lat_…"
               required
-              autoComplete="email"
+              autoComplete="off"
             />
           </label>
-          <button type="submit" className="primary">
+          <button type="submit" className="primary" disabled={loading}>
             <LogIn className="h-4 w-4" aria-hidden />
-            <span>Open my portal</span>
+            <span>{loading ? 'Verifying…' : 'Open my portal'}</span>
           </button>
         </form>
+        {message ? <p className="banner ok mt-3" role="status">{message}</p> : null}
         {error ? <p className="banner err mt-3" role="alert">{error}</p> : null}
       </Panel>
 
       {roster.users.filter((u) => u.roles.includes('learner')).length === 0 ? (
         <EmptyState
           icon={GraduationCap}
-          title="No learners yet"
-          description="Staff creates learners under Classes → Students (with email), then shares the invite link."
+          title="No learner portal is open"
+          description="Ask your teacher to issue a fresh signed learner access link."
         />
       ) : null}
     </div>

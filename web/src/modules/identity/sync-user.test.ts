@@ -1,30 +1,36 @@
 import { describe, expect, it } from 'vitest'
-import { mapClerkUserToDomain, mergeUserUpsert } from './sync-user'
+import { mapSupabaseAuthUserToDomain, mergeUserUpsert } from './sync-user'
 
-describe('Clerk user sync', () => {
-  it('maps clerk payload to domain user', () => {
-    const row = mapClerkUserToDomain({
-      id: 'user_abc',
-      first_name: 'Ada',
-      last_name: 'Lovelace',
-      email_addresses: [{ email_address: 'ada@example.com' }],
+describe('Supabase Auth user sync', () => {
+  it('maps Supabase Auth payload to staff domain user without Clerk authorization data', () => {
+    const row = mapSupabaseAuthUserToDomain({
+      id: '00000000-0000-4000-8000-000000000001',
+      email: 'ada@example.com',
+      user_metadata: { full_name: 'Ada Lovelace', chunksRole: 'admin' },
     })
     expect(row).toEqual({
-      clerk_user_id: 'user_abc',
+      auth_user_id: '00000000-0000-4000-8000-000000000001',
+      legacy_clerk_user_id: null,
       display_name: 'Ada Lovelace',
       email: 'ada@example.com',
     })
   })
 
-  it('is idempotent across duplicate deliveries', () => {
-    const incoming = mapClerkUserToDomain({
-      id: 'user_abc',
-      first_name: 'Ada',
-      last_name: 'Lovelace',
-      email_addresses: [{ email_address: 'ada@example.com' }],
+  it('is idempotent across duplicate deliveries and preserves legacy Clerk reference', () => {
+    const existing = {
+      auth_user_id: '00000000-0000-4000-8000-000000000001',
+      legacy_clerk_user_id: 'user_legacy',
+      display_name: 'Ada',
+      email: 'old@example.com',
+    }
+    const incoming = mapSupabaseAuthUserToDomain({
+      id: '00000000-0000-4000-8000-000000000001',
+      email: 'ada@example.com',
+      user_metadata: { full_name: 'Ada Lovelace' },
     })
-    const once = mergeUserUpsert(null, incoming)
+    const once = mergeUserUpsert(existing, incoming)
     const twice = mergeUserUpsert(once, incoming)
     expect(twice).toEqual(once)
+    expect(twice.legacy_clerk_user_id).toBe('user_legacy')
   })
 })

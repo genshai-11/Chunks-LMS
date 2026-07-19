@@ -39,25 +39,14 @@ type Draft = { displayName: string; email: string; avatarUrl?: string; allowMult
 
 const emptyDraft = (): Draft => ({ displayName: '', email: '', avatarUrl: '', allowMultiClass: false })
 
-function invitationUrl(user: DomainUser): string {
-  const origin = window.location.origin
-  if (user.roles.includes('learner') && user.email) {
-    return `${origin}/access?email=${encodeURIComponent(user.email)}`
-  }
-  return `${origin}/teacher`
+function staffInvitationUrl(): string {
+  return `${window.location.origin}/teacher`
 }
 
-function invitationMailto(user: DomainUser): string {
-  const link = invitationUrl(user)
-  const isLearner = user.roles.includes('learner')
-  const subject = encodeURIComponent(
-    isLearner ? 'Chunks LMS learner invite' : 'Chunks LMS teacher invite',
-  )
-  const body = encodeURIComponent(
-    isLearner
-      ? `Hi ${user.displayName},\n\nOpen your portal:\n${link}\n`
-      : `Hi ${user.displayName},\n\nSign in as Teacher:\n${link}\n`,
-  )
+function staffInvitationMailto(user: DomainUser): string {
+  const link = staffInvitationUrl()
+  const subject = encodeURIComponent('Chunks LMS teacher invite')
+  const body = encodeURIComponent(`Hi ${user.displayName},\n\nSign in as Teacher with Supabase Auth:\n${link}\n`)
   return `mailto:${encodeURIComponent(user.email ?? '')}?subject=${subject}&body=${body}`
 }
 
@@ -127,7 +116,7 @@ export function AdminPeoplePage() {
         icon={Users}
         kicker="Admin"
         title="Accounts"
-        subtitle="One row per email · teacher (Clerk) · learner (invite link)"
+        subtitle="One row per email · teacher (Supabase Auth) · learner (signed access)"
         actions={
           <button
             type="button"
@@ -202,8 +191,8 @@ export function AdminPeoplePage() {
           title={tab === 'teachers' ? 'New teacher' : 'New learner'}
           description={
             tab === 'teachers'
-              ? 'Email must match Clerk staff sign-in. Unique across all accounts.'
-              : 'Email is the portal invite identity. Unique across all accounts.'
+              ? 'Email must match Supabase Auth staff sign-in. Unique across all accounts.'
+              : 'Email receives signed learner access links from Class rosters. Unique across all accounts.'
           }
         >
           <form
@@ -453,18 +442,18 @@ export function AdminPeoplePage() {
                       </td>
                       <td>
                         <div className="row-actions accounts-actions">
-                          {u.email ? (
+                          {u.email && u.roles.includes('teacher') ? (
                             <>
                               <button
                                 type="button"
                                 className="ghost"
-                                title="Copy invite link"
+                                title="Copy staff sign-in link"
                                 onClick={async () => {
                                   try {
-                                    await navigator.clipboard.writeText(invitationUrl(u))
-                                    ok('Invite copied')
+                                    await navigator.clipboard.writeText(staffInvitationUrl())
+                                    ok('Staff sign-in link copied')
                                   } catch {
-                                    ok(invitationUrl(u))
+                                    ok(staffInvitationUrl())
                                   }
                                 }}
                               >
@@ -472,12 +461,15 @@ export function AdminPeoplePage() {
                               </button>
                               <a
                                 className="btn ghost"
-                                href={invitationMailto(u)}
-                                title="Send invite email"
+                                href={staffInvitationMailto(u)}
+                                title="Send staff sign-in email"
                               >
                                 <Mail className="h-3.5 w-3.5" aria-hidden />
                               </a>
                             </>
+                          ) : null}
+                          {u.email && u.roles.includes('learner') ? (
+                            <span className="meta">Issue learner links from a Class roster</span>
                           ) : null}
                           <button
                             type="button"

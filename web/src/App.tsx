@@ -86,7 +86,7 @@ export default function App() {
                 <Route path="progress" element={<Navigate to="/teacher/analysis" replace />} />
               </Route>
 
-              {/* Learner portal — share link only; no Clerk */}
+              {/* Learner portal — signed learner access only; no staff Auth account */}
               <Route path="/learner" element={<LearnerLayout />}>
                 <Route index element={<LearnerOverviewPage />} />
                 <Route path="enrollments" element={<LearnerEnrollmentsPage />} />

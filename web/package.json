@@ -16,7 +16,6 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
-    "@clerk/react": "^6.12.2",
     "@supabase/supabase-js": "^2.110.2",
     "@tailwindcss/vite": "^4.3.2",
     "lucide-react": "^1.24.0",

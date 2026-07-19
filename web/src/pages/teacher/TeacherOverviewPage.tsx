@@ -17,12 +17,8 @@ import { UserAvatar } from '../../components/UserAvatar'
 import { EmptyState, Panel } from '../../components/ui'
 import { useFlash } from '../../hooks/useFlash'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
-import {
-  enrollLearner,
-  formatClassInviteClipboard,
-  learnerInviteUrl,
-  listActiveLearners,
-} from '../../modules/roster/service'
+import { enrollLearner, listActiveLearners } from '../../modules/roster/service'
+import { issueLearnerAccess } from '../../modules/identity/learner-access'
 import {
   formatPercent,
   learnerRfcStats,
@@ -110,7 +106,7 @@ export function TeacherOverviewPage() {
         name: user.displayName,
         avatarUrl: user.avatarUrl ?? null,
         email: user.email ?? null,
-        invite: learnerInviteUrl(user),
+        canIssueInvite: Boolean(user.email?.trim()),
         accountStatus: user.accountStatus ?? 'active',
         classIds: activeEnrollmentRows.map((e) => e.classId),
         assignedToActiveClass,
@@ -134,7 +130,7 @@ export function TeacherOverviewPage() {
     return mapped.filter((learner) => learner.assignedToSelectedClasses)
   }, [classRow, ledger, roster, scheduling, selectedClassIds])
 
-  const inviteReady = learners.filter((learner) => learner.invite).length
+  const inviteReady = learners.filter((learner) => learner.canIssueInvite).length
   const selectedLearner =
     learners.find((learner) => learner.id === activeLearnerUserId) ?? learners[0] ?? null
 
@@ -313,12 +309,17 @@ export function TeacherOverviewPage() {
               type="button"
               className="ghost"
               onClick={async () => {
-                const text = formatClassInviteClipboard(roster, classRow.id)
+                const lines: string[] = []
+                for (const learner of learners.filter((l) => l.canIssueInvite && l.preferredClassId === classRow.id)) {
+                  const issued = await issueLearnerAccess({ learnerUserId: learner.id, classId: classRow.id })
+                  if (!issued.ok) return err(issued.error)
+                  lines.push(`${learner.name} <${learner.email}>: ${issued.value.url}`)
+                }
                 try {
-                  await navigator.clipboard.writeText(text)
-                  ok(`Copied ${inviteReady} invite link(s)`)
+                  await navigator.clipboard.writeText(lines.join('\n'))
+                  ok(`Issued and copied ${lines.length} signed access link(s)`)
                 } catch {
-                  err('Could not copy — copy links from the learner cards')
+                  err('Could not copy — issue links from the learner cards')
                 }
               }}
             >
@@ -484,7 +485,7 @@ function LearnerCard({
     name: string
     avatarUrl: string | null
     email: string | null
-    invite: string | null
+    canIssueInvite: boolean
     sessions: number
     finalized: number
     rfcMin: number | null
@@ -557,19 +558,24 @@ function LearnerCard({
             {starting ? 'Starting…' : 'Start now'}
           </button>
         )}
-        {learner.invite ? (
+        {learner.canIssueInvite && learner.preferredClassId ? (
           <button
             type="button"
             className="ghost"
             onClick={async () => {
+              const issued = await issueLearnerAccess({
+                learnerUserId: learner.id,
+                classId: learner.preferredClassId!,
+              })
+              if (!issued.ok) return onCopied(issued.error)
               try {
-                await navigator.clipboard.writeText(learner.invite!)
-                onCopied(`Invite copied for ${learner.name}`)
+                await navigator.clipboard.writeText(issued.value.url)
+                onCopied(`Signed access link copied for ${learner.name}`)
               } catch {
-                onCopied(learner.invite!)
+                onCopied(issued.value.url)
               }
             }}
-            title="Copy learner portal invite link"
+            title="Issue and copy signed learner access link"
           >
             <Link2 className="h-4 w-4" aria-hidden />
           </button>

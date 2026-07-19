@@ -185,4 +185,68 @@ describe('SupabaseLiveTestGeneration', () => {
     expect(approval.approved).toBe(true)
     expect(approval.approvedByUserId).toBe('admin-id')
   })
+
+  it('generates mock CVR item previews correctly in deterministic mock mode', async () => {
+    const generator = new SupabaseLiveTestGeneration({ useDeterministicMock: true })
+    const res = await generator.generateCVRPreview({
+      packageVersionId: 'pkg-1',
+      sectionId: 'sec-1',
+      topic: 'Day 11',
+      targetOhm: 10,
+      count: 3,
+    })
+
+    expect(res.items).toHaveLength(3)
+    expect(res.items[0].termVi).toBe('Từ vựng 1')
+    expect(res.items[0].measuredCvr).toBe(10)
+    expect(res.items[0].tc).toBe(3)
+    expect(res.items[0].lc).toBe(1.5)
+    expect(res.items[0].tl).toBe(Math.round((10 / 4.5) * 100) / 100)
+  })
+
+  it('delegates generateCVRPreview to the Edge Function in online mode', async () => {
+    const mockInvoke = vi.fn().mockResolvedValue({
+      data: {
+        items: [
+          {
+            termVi: 'Hợp đồng',
+            termEn: 'Contract',
+            promptVi: 'Câu mẫu',
+            promptEn: 'Sample sentence',
+            tc: 3,
+            lc: 1.67,
+            tl: 2.0,
+            measuredCvr: 10,
+          },
+        ],
+      },
+      error: null,
+    })
+
+    vi.spyOn(supabaseLib, 'getSupabase').mockReturnValue({
+      functions: { invoke: mockInvoke },
+    } as any)
+    const generator = new SupabaseLiveTestGeneration({ useDeterministicMock: false })
+
+    const res = await generator.generateCVRPreview({
+      packageVersionId: 'real-pkg-id',
+      sectionId: 'real-sec-id',
+      topic: 'Day 11',
+      targetOhm: 10,
+      count: 1,
+    })
+
+    expect(mockInvoke).toHaveBeenCalledWith('live-test-generation', {
+      body: {
+        action: 'generateCVRPreview',
+        packageVersionId: 'real-pkg-id',
+        sectionId: 'real-sec-id',
+        topic: 'Day 11',
+        targetOhm: 10,
+        count: 1,
+      },
+    })
+    expect(res.items).toHaveLength(1)
+    expect(res.items[0].termVi).toBe('Hợp đồng')
+  })
 })

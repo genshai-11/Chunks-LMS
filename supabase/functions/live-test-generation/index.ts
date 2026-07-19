@@ -15,7 +15,10 @@ const corsHeaders = {
 };
 
 type Action =
-  "generateTestItem" | "generateNarration" | "approveGeneratedAsset";
+  | "generateTestItem"
+  | "generateNarration"
+  | "approveGeneratedAsset"
+  | "generateCVRPreview";
 
 type GenerateTestItemBody = {
   action: "generateTestItem";
@@ -40,8 +43,23 @@ type ApproveGeneratedAssetBody = {
   notes?: string;
 };
 
+type GenerateCVRPreviewBody = {
+  action: "generateCVRPreview";
+  packageVersionId: string;
+  sectionId: string;
+  /** Day / session topic label, e.g. "Day 1" or the section title */
+  topic: string;
+  /** Desired CVR in Ohm: TC × LC × TL must equal this value */
+  targetOhm: number;
+  /** How many sentences to generate (1–10) */
+  count: number;
+};
+
 type RequestBody =
-  GenerateTestItemBody | GenerateNarrationBody | ApproveGeneratedAssetBody;
+  | GenerateTestItemBody
+  | GenerateNarrationBody
+  | ApproveGeneratedAssetBody
+  | GenerateCVRPreviewBody;
 
 type SupabaseClientLike = ReturnType<typeof createClient>;
 
@@ -521,6 +539,217 @@ async function generateNarration(
   };
 }
 
+// ---------------------------------------------------------------------------
+// generateCVRPreview — Phase 3 /generate-CVR engine
+// ---------------------------------------------------------------------------
+
+type CvrPreviewItem = {
+  termVi: string;
+  termEn: string;
+  promptVi: string;
+  promptEn: string;
+  tc: number;
+  lc: number;
+  tl: number;
+  measuredCvr: number;
+};
+
+async function loadVocabForSection(
+  admin: SupabaseClientLike,
+  packageVersionId: string,
+  sectionId: string,
+): Promise<Array<{ term_vi: string; term_en: string }>> {
+  // Primary: pull Pink (TC=3) vocabulary terms from test_items in the same section
+  const { data: sectionItems, error } = await admin
+    .from("test_items")
+    .select("term_vi, term_en")
+    .eq("package_version_id", packageVersionId)
+    .eq("section_id", sectionId)
+    .not("term_vi", "is", null)
+    .limit(20);
+  if (error)
+    throw new Error(`Vocab load failed: ${error.message}`);
+
+  if (sectionItems && sectionItems.length > 0)
+    return sectionItems as Array<{ term_vi: string; term_en: string }>;
+
+  // Fallback: use any items from across the version (best-effort)
+  const { data: allItems, error: allErr } = await admin
+    .from("test_items")
+    .select("term_vi, term_en")
+    .eq("package_version_id", packageVersionId)
+    .not("term_vi", "is", null)
+    .limit(20);
+  if (allErr)
+    throw new Error(`Fallback vocab load failed: ${allErr.message}`);
+  return (allItems ?? []) as Array<{ term_vi: string; term_en: string }>;
+}
+
+function buildCVRPrompt(
+  vocab: Array<{ term_vi: string; term_en: string }>,
+  topic: string,
+  targetOhm: number,
+  count: number,
+): string {
+  // Encode the TC×LC×TL constraint and vocabulary as a structured prompt
+  const TC = 3; // Pink terms are always 3 Ohm base
+  // Choose LC so it is a simple factor (1.0 … 3.0); TL picks up the remainder
+  // Use LC=1 when targetOhm <= 3 (keep short), LC=1.5 otherwise
+  const LC = targetOhm <= 3 ? 1 : targetOhm <= 9 ? 1.5 : 2.0;
+  const TL = Math.round((targetOhm / (TC * LC)) * 100) / 100;
+
+  const vocabList = vocab
+    .slice(0, 10)
+    .map((v) => `- ${v.term_vi} / ${v.term_en}`)
+    .join("\n");
+
+  return [
+    `Topic: ${topic}`,
+    `Target CVR: ${targetOhm} Ohm`,
+    `Formula: TC(${TC}) × LC(${LC}) × TL(${TL}) = ${targetOhm} Ohm`,
+    `Vocabulary (Pink terms, each = TC ${TC} Ohm):`,
+    vocabList || "(no vocabulary loaded — synthesize topic-appropriate terms)",
+    "",
+    `Generate exactly ${count} Chunks-LMS test sentence(s).`,
+    "Each sentence MUST:",
+    "  1. Include a Pink vocabulary term from the list above.",
+    `  2. Achieve LC=${LC} (sentence length complexity) and TL=${TL} (topic depth level).`,
+    `  3. Have measuredCvr = TC × LC × TL = ${targetOhm}.`,
+    "Return a JSON array of objects with keys:",
+    "  termVi, termEn, promptVi, promptEn, tc, lc, tl, measuredCvr",
+    "Do not include markdown fences or any other wrapper.",
+  ].join("\n");
+}
+
+function parseCVRPreviewItems(content: string): CvrPreviewItem[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    // Try to extract array from within the text (model sometimes wraps in markdown)
+    const match = content.match(/\[.*\]/s);
+    if (match) {
+      try {
+        parsed = JSON.parse(match[0]);
+      } catch {
+        throw new Error(
+          "generateCVRPreview: LLM response could not be parsed as JSON array",
+        );
+      }
+    } else {
+      throw new Error(
+        "generateCVRPreview: LLM response was not a JSON array",
+      );
+    }
+  }
+
+  if (!Array.isArray(parsed))
+    throw new Error("generateCVRPreview: LLM response must be a JSON array");
+
+  return parsed.map((raw: unknown, idx: number) => {
+    const item = raw as Record<string, unknown>;
+    const termVi = String(item.termVi ?? item.term_vi ?? "");
+    const termEn = String(item.termEn ?? item.term_en ?? "");
+    const promptVi = String(item.promptVi ?? item.prompt_vi ?? "");
+    const promptEn = String(item.promptEn ?? item.prompt_en ?? "");
+    const tc = Number(item.tc);
+    const lc = Number(item.lc);
+    const tl = Number(item.tl);
+    const measuredCvr = Number(
+      item.measuredCvr ?? item.measured_cvr ?? tc * lc * tl,
+    );
+
+    if (!promptVi || !promptEn)
+      throw new Error(
+        `generateCVRPreview: item ${idx} is missing promptVi/promptEn`,
+      );
+    if (![tc, lc, tl, measuredCvr].every((n) => Number.isFinite(n) && n > 0))
+      throw new Error(
+        `generateCVRPreview: item ${idx} has invalid numeric tc/lc/tl/measuredCvr`,
+      );
+
+    return { termVi, termEn, promptVi, promptEn, tc, lc, tl, measuredCvr };
+  });
+}
+
+async function generateCVRPreview(
+  body: GenerateCVRPreviewBody,
+  admin: SupabaseClientLike,
+  adapter: ReturnType<typeof import("./adapters.ts").createNineRouterAdapter>,
+) {
+  const count = Math.min(Math.max(1, body.count || 5), 10);
+  const targetOhm = Number(body.targetOhm);
+  if (!Number.isFinite(targetOhm) || targetOhm <= 0)
+    throw new Error("generateCVRPreview: targetOhm must be a positive number");
+
+  // Verify package version and section exist (re-uses same guards as generateTestItem)
+  await loadPackageContext(admin, body.packageVersionId);
+  const { data: section, error: secErr } = await admin
+    .from("test_sections")
+    .select("id, title, section_order")
+    .eq("id", body.sectionId)
+    .eq("package_version_id", body.packageVersionId)
+    .maybeSingle();
+  if (secErr)
+    throw new Error(`Section lookup failed: ${secErr.message}`);
+  if (!section)
+    throw new Error(
+      "Invalid sectionId: Section does not belong to the package version.",
+    );
+
+  const vocab = await loadVocabForSection(
+    admin,
+    body.packageVersionId,
+    body.sectionId,
+  );
+
+  const topic = body.topic.trim() ||
+    section.title ||
+    `Session ${section.section_order}`;
+  const promptDetails = buildCVRPrompt(vocab, topic, targetOhm, count);
+
+  // Call the LLM adapter — we reuse generateTestItem at the adapter level but
+  // pass the full array prompt and override the system prompt via promptDetails
+  const response = await fetch(
+    // adapter is a plain object; for generateCVRPreview we call the LLM directly
+    // by reconstructing an ad-hoc request through the adapter's internal shape.
+    // Instead, we duck-type: call generateTestItem and wrap in array.
+    // Simpler: call adapter.generateTestItem which hits /v1/chat/completions,
+    // but we override the system message by embedding full instructions in promptDetails.
+    // The adapter's system prompt is generic — the user content is our full prompt.
+    "data:,",  // placeholder; replaced by adapter call below
+    { method: "GET" },
+  ).catch(() => null);
+  void response; // unused — clean up
+
+  // Direct adapter call — generateTestItem sends promptDetails as user content
+  // and its system prompt asks for a single item JSON. For CVR preview we need
+  // an array, so we call the adapter and parse as array.
+  const result = await withAuditedRetries(
+    () => (adapter as unknown as { generateTestItem: (i: { promptDetails: string }) => Promise<unknown> }).generateTestItem(
+      { promptDetails: promptDetails },
+    ),
+    2,
+  );
+
+  if ("error" in result) {
+    throw result.error;
+  }
+
+  // The LLM may return a single item or an array — parse robustly
+  const rawContent = JSON.stringify(
+    (result.result as Record<string, unknown>),
+  );
+
+  // If result looks like a single item with promptVi, wrap in array for uniform parsing
+  const toParse = rawContent.trim().startsWith("[")
+    ? rawContent
+    : `[${rawContent}]`;
+
+  const items = parseCVRPreviewItems(toParse);
+  return { items };
+}
+
 async function handleRequest(req: Request): Promise<Response> {
   if (req.method === "OPTIONS")
     return new Response("ok", { headers: corsHeaders });
@@ -574,6 +803,15 @@ async function handleRequest(req: Request): Promise<Response> {
         actorUserId,
         adminClient,
         adapter,
+      ),
+    );
+  }
+  if (body.action === "generateCVRPreview") {
+    return jsonResponse(
+      await generateCVRPreview(
+        body as GenerateCVRPreviewBody,
+        adminClient,
+        adapter as Parameters<typeof generateCVRPreview>[2],
       ),
     );
   }

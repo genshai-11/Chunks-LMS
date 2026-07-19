@@ -63,7 +63,7 @@ export function AdminLiveTestsPage() {
   const [bundles, setBundles] = useState<ResourceBundle[]>([])
 
   // Tab state: 'v2' (new package catalog) or 'legacy' (v1 resources)
-  const [activeTab, setActiveTab] = useState<'v2' | 'legacy' | 'narrations' | 'import'>('v2')
+  const [activeTab, setActiveTab] = useState<'v2' | 'legacy' | 'narrations' | 'import' | 'generate'>('v2')
 
   // V2 Catalog State
   const [packages, setPackages] = useState<TestPackage[]>([])
@@ -94,6 +94,26 @@ export function AdminLiveTestsPage() {
 
   const generator = useMemo(() => new SupabaseLiveTestGeneration(), [])
   const [ttsStatus, setTtsStatus] = useState<string>('')
+
+  // Generate CVR State (Phase 4)
+  type CvrGeneratedItem = {
+    termVi: string
+    termEn: string
+    promptVi: string
+    promptEn: string
+    tc: number
+    lc: number
+    tl: number
+    measuredCvr: number
+    approved: boolean
+  }
+  const [cvrTopic, setCvrTopic] = useState<string>('')
+  const [cvrTargetOhm, setCvrTargetOhm] = useState<number>(9)
+  const [cvrCount, setCvrCount] = useState<number>(5)
+  const [cvrGenStatus, setCvrGenStatus] = useState<string>('')
+  const [cvrPreviewItems, setCvrPreviewItems] = useState<CvrGeneratedItem[]>([]
+  )
+  const [cvrSaveStatus, setCvrSaveStatus] = useState<string>('')
 
   // Package Builder State
   const [packageTitle, setPackageTitle] = useState<string>('')
@@ -666,6 +686,124 @@ export function AdminLiveTestsPage() {
     setCsvPreviewItems(parsed)
   }
 
+  // ---- Generate CVR handlers (Phase 4) ----
+
+  const handleGenerateCVR = async () => {
+    if (!selectedVerId || !selectedSecId) {
+      setCvrGenStatus('Error: Please select a Package Version and Section first (use the Test Packages tab).')
+      return
+    }
+    if (cvrTargetOhm <= 0) {
+      setCvrGenStatus('Error: Target Ohm must be a positive number.')
+      return
+    }
+    setCvrGenStatus(`Generating ${cvrCount} sentence(s) at ${cvrTargetOhm} Ohm for "${cvrTopic || 'selected section'}"…`)
+    setCvrPreviewItems([])
+    setCvrSaveStatus('')
+    try {
+      const result = await generator.generateCVRPreview({
+        packageVersionId: selectedVerId,
+        sectionId: selectedSecId,
+        topic: cvrTopic.trim() || `Section ${sections.find(s => s.id === selectedSecId)?.sectionOrder ?? ''}`,
+        targetOhm: cvrTargetOhm,
+        count: cvrCount,
+      })
+      const items: CvrGeneratedItem[] = result.items.map(item => ({ ...item, approved: true }))
+      setCvrPreviewItems(items)
+      setCvrGenStatus(`Generated ${items.length} sentence(s). Review below, edit if needed, then save.`)
+    } catch (e: any) {
+      setCvrGenStatus(`Error: ${e.message}`)
+    }
+  }
+
+  const handleRegenerateItem = async (idx: number) => {
+    if (!selectedVerId || !selectedSecId) return
+    const item = cvrPreviewItems[idx]
+    setCvrGenStatus(`Regenerating item ${idx + 1}…`)
+    try {
+      const result = await generator.generateCVRPreview({
+        packageVersionId: selectedVerId,
+        sectionId: selectedSecId,
+        topic: cvrTopic.trim() || `Section ${sections.find(s => s.id === selectedSecId)?.sectionOrder ?? ''}`,
+        targetOhm: item.measuredCvr,
+        count: 1,
+      })
+      if (result.items[0]) {
+        const updated = [...cvrPreviewItems]
+        updated[idx] = { ...result.items[0], approved: true }
+        setCvrPreviewItems(updated)
+        setCvrGenStatus(`Item ${idx + 1} regenerated.`)
+      }
+    } catch (e: any) {
+      setCvrGenStatus(`Regenerate error: ${e.message}`)
+    }
+  }
+
+  const handleSaveCVRItems = async () => {
+    if (!selectedVerId || !selectedSecId) {
+      setCvrSaveStatus('Error: No version/section selected.')
+      return
+    }
+    const toSave = cvrPreviewItems.filter(i => i.approved)
+    if (toSave.length === 0) {
+      setCvrSaveStatus('Error: No approved items to save.')
+      return
+    }
+    setCvrSaveStatus('Saving…')
+    const sb = getSupabase() as any
+    if (!sb) {
+      setCvrSaveStatus('Error: Supabase not configured.')
+      return
+    }
+    try {
+      // Check version is draft
+      const { data: ver, error: verErr } = await sb
+        .from('test_package_versions')
+        .select('status')
+        .eq('id', selectedVerId)
+        .maybeSingle()
+      if (verErr || !ver) throw new Error(verErr?.message || 'Version not found')
+      if (ver.status !== 'draft') throw new Error('Can only save to a DRAFT package version.')
+
+      // Get existing item count for ordering
+      const { data: existingItems } = await sb
+        .from('test_items')
+        .select('item_order')
+        .eq('section_id', selectedSecId)
+        .order('item_order', { ascending: false })
+        .limit(1)
+      const nextOrder = (existingItems?.[0]?.item_order ?? 0) + 1
+
+      let saved = 0
+      for (let i = 0; i < toSave.length; i++) {
+        const item = toSave[i]
+        const { error: itemErr } = await sb
+          .from('test_items')
+          .insert({
+            package_version_id: selectedVerId,
+            section_id: selectedSecId,
+            item_order: nextOrder + i,
+            term_vi: item.termVi,
+            term_en: item.termEn,
+            prompt_vi: item.promptVi,
+            prompt_en: item.promptEn,
+            tc: item.tc,
+            lc: item.lc,
+            tl: item.tl,
+          })
+        if (itemErr) throw new Error(itemErr.message)
+        saved++
+      }
+      setCvrSaveStatus(`Saved ${saved} item(s) into the draft section!`)
+      setCvrPreviewItems([])
+      // Refresh V2 items in main tab
+      const r = await listV2Items(selectedSecId)
+      if (r.ok) setV2Items(r.data)
+    } catch (e: any) {
+      setCvrSaveStatus(`Error: ${e.message}`)
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -684,6 +822,9 @@ export function AdminLiveTestsPage() {
         </button>
         <button className={activeTab === 'import' ? 'primary' : 'ghost'} onClick={() => setActiveTab('import')}>
           CSV Package Preview
+        </button>
+        <button className={activeTab === 'generate' ? 'primary' : 'ghost'} onClick={() => setActiveTab('generate')}>
+          ⚡ Generate CVR
         </button>
         <button className={activeTab === 'legacy' ? 'primary' : 'ghost'} onClick={() => setActiveTab('legacy')}>
           Legacy Resources (V1)
@@ -1196,6 +1337,214 @@ export function AdminLiveTestsPage() {
             </div>
           </Panel>
         </div>
+      )}
+
+      {activeTab === 'generate' && (
+        <>
+          {/* Generate CVR Form */}
+          <Panel icon={Play} title="Generate CVR Sentences" collapsible={false}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Context summary */}
+              <div style={{ padding: '0.6rem 0.9rem', backgroundColor: '#1a2035', borderRadius: '6px', fontSize: '0.85rem', borderLeft: '3px solid #63b3ed' }}>
+                <strong>Section:</strong>{' '}
+                {selectedSecId
+                  ? `${sections.find(s => s.id === selectedSecId)?.title ?? 'Untitled'} (${sections.find(s => s.id === selectedSecId)?.sectionOrder ?? '?'})`
+                  : <span style={{ color: '#fc8181' }}>No section selected — go to Test Packages tab first</span>}
+                {' · '}
+                <strong>Version:</strong>{' '}
+                {selectedVerId
+                  ? versions.find(v => v.id === selectedVerId)?.versionLabel ?? selectedVerId
+                  : <span style={{ color: '#fc8181' }}>None</span>}
+              </div>
+
+              {/* Parameters */}
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '0.75rem' }}>
+                <label>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Topic / Day (optional)</span>
+                  <input
+                    type="text"
+                    placeholder="e.g. Day 1, Session 3, Travel vocabulary"
+                    value={cvrTopic}
+                    onChange={e => setCvrTopic(e.target.value)}
+                    style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
+                  />
+                </label>
+                <label>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Target Ohm (CVR)</span>
+                  <select
+                    value={cvrTargetOhm}
+                    onChange={e => setCvrTargetOhm(Number(e.target.value))}
+                    style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
+                  >
+                    {[3, 5, 7, 9, 11, 13, 15, 17].map(ohm => (
+                      <option key={ohm} value={ohm}>{ohm} Ohm</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>Count</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={cvrCount}
+                    onChange={e => setCvrCount(Math.min(10, Math.max(1, parseInt(e.target.value) || 5)))}
+                    style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
+                  />
+                </label>
+              </div>
+
+              {/* CVR formula hint */}
+              <div style={{ fontSize: '0.8rem', color: '#90cdf4', padding: '0.4rem 0.6rem', backgroundColor: '#162032', borderRadius: '4px' }}>
+                TC(3) × LC({cvrTargetOhm <= 3 ? 1 : cvrTargetOhm <= 9 ? 1.5 : 2.0}) × TL({Math.round((cvrTargetOhm / (3 * (cvrTargetOhm <= 3 ? 1 : cvrTargetOhm <= 9 ? 1.5 : 2.0))) * 100) / 100}) = <strong>{cvrTargetOhm} Ohm</strong>
+              </div>
+
+              <button
+                className="primary"
+                onClick={handleGenerateCVR}
+                disabled={!selectedVerId || !selectedSecId}
+                style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <Play className="h-4 w-4" aria-hidden />
+                Generate {cvrCount} Sentence(s) at {cvrTargetOhm} Ohm
+              </button>
+
+              {cvrGenStatus && (
+                <div style={{
+                  padding: '0.6rem 0.9rem',
+                  backgroundColor: cvrGenStatus.startsWith('Error') ? '#742a2a' : '#1a365d',
+                  color: cvrGenStatus.startsWith('Error') ? '#feb2b2' : '#bee3f8',
+                  borderRadius: '4px',
+                  fontSize: '0.85rem',
+                }}>
+                  {cvrGenStatus}
+                </div>
+              )}
+            </div>
+          </Panel>
+
+          {/* Preview and approval table */}
+          {cvrPreviewItems.length > 0 && (
+            <Panel icon={ListChecks} title={`Review Generated Items (${cvrPreviewItems.filter(i => i.approved).length}/${cvrPreviewItems.length} approved)`} collapsible={false}>
+              <div style={{ marginBottom: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button
+                  className="primary"
+                  onClick={handleSaveCVRItems}
+                  disabled={cvrPreviewItems.filter(i => i.approved).length === 0}
+                >
+                  <Check className="h-4 w-4 inline" style={{ marginRight: '0.3rem' }} aria-hidden />
+                  Save {cvrPreviewItems.filter(i => i.approved).length} Approved Items
+                </button>
+                <button
+                  className="ghost"
+                  onClick={() => setCvrPreviewItems(items => items.map(i => ({ ...i, approved: true })))}
+                >
+                  Approve All
+                </button>
+                <button
+                  className="ghost"
+                  onClick={() => setCvrPreviewItems([])}
+                >
+                  Clear
+                </button>
+              </div>
+
+              {cvrSaveStatus && (
+                <div style={{
+                  marginBottom: '0.75rem',
+                  padding: '0.6rem 0.9rem',
+                  backgroundColor: cvrSaveStatus.startsWith('Error') ? '#742a2a' : '#22543d',
+                  color: cvrSaveStatus.startsWith('Error') ? '#feb2b2' : '#c6f6d5',
+                  borderRadius: '4px',
+                  fontSize: '0.85rem',
+                }}>
+                  {cvrSaveStatus}
+                </div>
+              )}
+
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th style={{ width: '2rem' }}>✓</th>
+                      <th>#</th>
+                      <th>Term VI / EN</th>
+                      <th>Câu tiếng Việt (promptVi)</th>
+                      <th>English Sentence (promptEn)</th>
+                      <th style={{ whiteSpace: 'nowrap' }}>TC × LC × TL</th>
+                      <th>Ohm</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cvrPreviewItems.map((item, idx) => (
+                      <tr key={idx} style={{ opacity: item.approved ? 1 : 0.45 }}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={item.approved}
+                            onChange={e => {
+                              const updated = [...cvrPreviewItems]
+                              updated[idx] = { ...updated[idx], approved: e.target.checked }
+                              setCvrPreviewItems(updated)
+                            }}
+                          />
+                        </td>
+                        <td style={{ fontSize: '0.8rem', color: '#a0aec0' }}>{idx + 1}</td>
+                        <td style={{ fontSize: '0.8rem' }}>
+                          <div style={{ fontWeight: 'bold' }}>{item.termVi}</div>
+                          <div style={{ color: '#718096' }}>{item.termEn}</div>
+                        </td>
+                        <td>
+                          <textarea
+                            value={item.promptVi}
+                            rows={2}
+                            style={{ width: '100%', fontSize: '0.8rem', padding: '0.3rem', backgroundColor: '#1a202c', color: '#e2e8f0', border: '1px solid #2d3748', borderRadius: '3px', resize: 'vertical' }}
+                            onChange={e => {
+                              const updated = [...cvrPreviewItems]
+                              updated[idx] = { ...updated[idx], promptVi: e.target.value }
+                              setCvrPreviewItems(updated)
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <textarea
+                            value={item.promptEn}
+                            rows={2}
+                            style={{ width: '100%', fontSize: '0.8rem', padding: '0.3rem', backgroundColor: '#1a202c', color: '#e2e8f0', border: '1px solid #2d3748', borderRadius: '3px', resize: 'vertical' }}
+                            onChange={e => {
+                              const updated = [...cvrPreviewItems]
+                              updated[idx] = { ...updated[idx], promptEn: e.target.value }
+                              setCvrPreviewItems(updated)
+                            }}
+                          />
+                        </td>
+                        <td style={{ fontSize: '0.8rem', whiteSpace: 'nowrap', color: '#a0aec0' }}>
+                          {item.tc} × {item.lc} × {item.tl}
+                        </td>
+                        <td>
+                          <span className="badge" style={{ backgroundColor: item.measuredCvr >= 9 ? '#2b6cb0' : '#276749' }}>
+                            {item.measuredCvr} Ω
+                          </span>
+                        </td>
+                        <td>
+                          <button
+                            className="ghost"
+                            style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}
+                            title="Regenerate this item"
+                            onClick={() => handleRegenerateItem(idx)}
+                          >
+                            ↺
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Panel>
+          )}
+        </>
       )}
 
       {activeTab === 'legacy' && (

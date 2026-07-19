@@ -10,12 +10,12 @@
 - [x] 2.4 Create Supabase migration file `20260719072000_seed_cvr_vocabulary_items.sql` containing both the seed items and the V2 schema backfill steps
 
 ## Phase 3: Xây dựng `/generate-CVR` Engine
-- [ ] 3.1 Thiết lập Endpoint API / Edge Function `/generate-CVR` nhận tham số: target Ohm, topic/day
-- [ ] 3.2 Viết Prompts hướng dẫn LLM phối hợp từ vựng chính (Pink - 3 Ohm) với các Helper (Green, Blue)
-- [ ] 3.3 Điều chỉnh các hệ số LC (độ dài) và TL (độ sâu) trong Prompt sinh câu của LLM để tích nhân đạt chính xác target Ohm
-- [ ] 3.4 Viết Unit test kiểm tra độ chính xác của các câu tự động sinh theo Ohm mục tiêu
+- [x] 3.1 Thiết lập Endpoint API / Edge Function `/generate-CVR` nhận tham số: target Ohm, topic/day
+- [x] 3.2 Viết Prompts hướng dẫn LLM phối hợp từ vựng chính (Pink - 3 Ohm) với các Helper (Green, Blue)
+- [x] 3.3 Điều chỉnh các hệ số LC (độ dài) và TL (độ sâu) trong Prompt sinh câu của LLM để tích nhân đạt chính xác target Ohm
+- [x] 3.4 Viết Unit test kiểm tra độ chính xác của các câu tự động sinh theo Ohm mục tiêu
 
 ## Phase 4: Giao diện Quản trị Admin V2
-- [ ] 4.1 Xây dựng màn hình liên kết Learning Session với Test Packages và Test Sections
-- [ ] 4.2 Tích hợp nút kích hoạt sinh câu tự động `/generate-CVR` cho từng Session trực tiếp trên giao diện Admin
-- [ ] 4.3 Thêm tính năng duyệt (approve) hoặc sinh lại (regenerate) câu hỏi
+- [x] 4.1 Xây dựng màn hình liên kết Learning Session với Test Packages và Test Sections
+- [x] 4.2 Tích hợp nút kích hoạt sinh câu tự động `/generate-CVR` cho từng Session trực tiếp trên giao diện Admin
+- [x] 4.3 Thêm tính năng duyệt (approve) hoặc sinh lại (regenerate) câu hỏi

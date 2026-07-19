@@ -31,8 +31,8 @@ function StaffSignInForm({ compact = false }: { compact?: boolean }) {
           .finally(() => setSubmitting(false))
       }}
     >
-      <label className={compact ? 'sr-only' : undefined}>
-        Staff email
+      <label>
+        <span className={compact ? 'sr-only' : undefined}>Staff email</span>
         <input
           type="email"
           value={email}

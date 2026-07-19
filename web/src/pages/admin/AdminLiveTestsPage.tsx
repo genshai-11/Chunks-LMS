@@ -552,7 +552,7 @@ export function AdminLiveTestsPage() {
       // 3. Loop and insert items
       let count = 0
       for (const item of csvPreviewItems) {
-        const matchSec = dbSections?.find(s => s.section_order === item.sectionOrder)
+        const matchSec = dbSections?.find((s: any) => s.section_order === item.sectionOrder)
         if (!matchSec) {
           console.warn(`Section order ${item.sectionOrder} not found in this package version. Skipping.`)
           continue

@@ -1,0 +1,10 @@
+begin;
+select plan(6);
+select ok((select position('extensions.digest' in pg_get_functiondef('public.learner_access_token_hash(text)'::regprocedure))>0),'token hash qualifies digest');
+select ok((select position('extensions.gen_random_bytes' in pg_get_functiondef('public.issue_learner_access_token(uuid,uuid,integer)'::regprocedure))>0),'token issue qualifies random bytes');
+select ok((select position('with eligible as' in lower(pg_get_functiondef('public.verify_learner_access(text)'::regprocedure)))>0),'learner verification uses eligible CTE');
+select ok((select position('left join public.classes cl on cl.id = lat.class_id' in lower(pg_get_functiondef('public.verify_learner_access(text)'::regprocedure)))>0),'class join occurs in valid token select scope');
+select ok((select proconfig::text like '%extensions%' from pg_proc where oid='public.learner_access_snapshot(text)'::regprocedure),'learner snapshot resolves extensions');
+select ok((select proconfig::text like '%extensions%' from pg_proc where oid='public.stage_live_test_v2_csv_rows(text,jsonb)'::regprocedure),'legacy staging resolves extensions');
+select * from finish();
+rollback;

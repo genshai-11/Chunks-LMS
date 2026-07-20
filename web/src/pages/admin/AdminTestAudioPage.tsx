@@ -304,6 +304,9 @@ export function AdminTestAudioPage() {
     return result
   }, [hashes, introDraft, items, language, promptDrafts, records, selectedSection])
   const readiness = audioReadiness(rows.map((row) => row.bundleStatus))
+  const generationTargets = rows.filter((row) =>
+    ['missing', 'stale', 'failed', 'rejected'].includes(row.bundleStatus),
+  )
   const dirty =
     introDraft !== savedIntro ||
     items.some((item) => (promptDrafts[item.id] ?? '') !== (savedPrompts[item.id] ?? ''))
@@ -383,7 +386,7 @@ export function AdminTestAudioPage() {
     try {
       for (const row of targets) {
         setBusyKey(row.key)
-        await generateNarration({
+        const receipt = await generateNarration({
           packageVersionId: selectedScope.version.id,
           target: row.target,
           testSectionId: row.target === 'section_intro' ? row.sectionId : undefined,
@@ -391,6 +394,9 @@ export function AdminTestAudioPage() {
           language,
           voiceId,
         })
+        if (receipt.status === 'failed') {
+          throw new Error(receipt.errorMessage ?? `Generation failed for ${row.label}`)
+        }
         completed += 1
         setBatchProgress({ done: completed, total: targets.length })
       }
@@ -408,7 +414,7 @@ export function AdminTestAudioPage() {
   }
 
   const generateRow = (row: PreparedRow) => generateRows([row])
-  const generateMissing = () => generateRows(rows.filter((row) => row.bundleStatus !== 'approved'))
+  const generateMissing = () => generateRows(generationTargets)
   const generateSelected = () => generateRows(rows.filter((row) => selectedKeys.includes(row.key)))
 
   async function play(row: PreparedRow) {
@@ -601,7 +607,7 @@ export function AdminTestAudioPage() {
               className="ghost"
               onClick={() =>
                 setSelectedKeys(
-                  rows.filter((row) => row.bundleStatus !== 'approved').map((row) => row.key),
+                  generationTargets.map((row) => row.key),
                 )
               }
             >
@@ -784,7 +790,7 @@ export function AdminTestAudioPage() {
               !edgeReady ||
               dirty ||
               invalid ||
-              rows.every((row) => row.bundleStatus === 'approved') ||
+              generationTargets.length === 0 ||
               batchProgress !== null
             }
             onClick={() => void generateMissing()}

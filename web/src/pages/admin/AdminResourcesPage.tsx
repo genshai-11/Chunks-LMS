@@ -12,6 +12,7 @@ import {
 } from '../../lib/standalone-tests'
 import { useAppState } from '../../state/useAppState'
 import { listActiveLearners } from '../../modules/roster/service'
+import { getSupabase } from '../../lib/supabase'
 import {
   getSectionSnapshot,
   getTestPackagePublicationReadiness,
@@ -317,6 +318,69 @@ export function AdminResourcesPage() {
     })()
   }, [items, language, selectedScope, selectedSection, voiceId])
 
+  const [sectionsReadiness, setSectionsReadiness] = useState<Record<string, { vi: number; en: number }>>({})
+
+  useEffect(() => {
+    if (!versionId || !voiceId) {
+      setSectionsReadiness({})
+      return
+    }
+    let active = true
+    void (async () => {
+      const sb = getSupabase()
+      if (!sb) return
+      
+      // 1. Fetch all items for the package version to map item -> section
+      const { data: allItems, error: itemsError } = await sb
+        .from('test_items')
+        .select('id, section_id')
+        .eq('package_version_id', versionId)
+        
+      if (itemsError || !allItems) return
+      
+      // 2. Fetch all approved variants for the package version and voice
+      const { data: variants, error: variantsError } = await sb
+        .from('narration_variants')
+        .select('test_section_id, test_item_id, language')
+        .eq('package_version_id', versionId)
+        .eq('voice_id', voiceId)
+        .eq('approval_status', 'approved')
+        .not('audio_asset_id', 'is', null)
+        
+      if (variantsError || !variants || !active) return
+
+      const itemToSection = new Map<string, string>()
+      for (const item of allItems) {
+        if (item.section_id) itemToSection.set(item.id, item.section_id)
+      }
+
+      const readinessMap: Record<string, { vi: number; en: number }> = {}
+      for (const section of sections) {
+        const secId = section.id
+        
+        // Count for VI
+        const introVi = variants.some(v => v.test_section_id === secId && v.language === 'vi')
+        const itemsVi = variants.filter(v => v.test_item_id && itemToSection.get(v.test_item_id) === secId && v.language === 'vi').length
+        
+        // Count for EN
+        const introEn = variants.some(v => v.test_section_id === secId && v.language === 'en')
+        const itemsEn = variants.filter(v => v.test_item_id && itemToSection.get(v.test_item_id) === secId && v.language === 'en').length
+
+        readinessMap[secId] = {
+          vi: (introVi ? 1 : 0) + itemsVi,
+          en: (introEn ? 1 : 0) + itemsEn,
+        }
+      }
+      
+      if (active) {
+        setSectionsReadiness(readinessMap)
+      }
+    })()
+    return () => {
+      active = false
+    }
+  }, [versionId, voiceId, sections])
+
   const loadPublicationReadiness = useCallback(async () => {
     if (!selectedScope) {
       setPublication(null)
@@ -443,7 +507,7 @@ export function AdminResourcesPage() {
                 <div className="meta">
                   {selectedScope?.version.status === 'published'
                     ? 'Published Package Versions are immutable. Create a new draft to make changes.'
-                    : `Publication requires all 8 Sessions ready in both languages. VI ${publication?.readyVietnameseSections ?? 0}/8 · EN ${publication?.readyEnglishSections ?? 0}/8.`}
+                    : `Publication requires all 8 Sessions ready (in either Vietnamese or English). VI ${publication?.readyVietnameseSections ?? 0}/8 · EN ${publication?.readyEnglishSections ?? 0}/8 · Ready ${publication?.readyEitherSections ?? 0}/8.`}
                 </div>
               </div>
               {selectedScope?.version.status === 'draft' ? (
@@ -609,15 +673,20 @@ export function AdminResourcesPage() {
                           </td>
                           <td>10</td>
                           <td>
-                            {section.id === selectedSectionId ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                               <span
-                                className={`badge ${readiness.ready ? 'success' : 'experimental'}`}
+                                className={`badge ${sectionsReadiness[section.id]?.vi === 11 ? 'success' : 'experimental'}`}
+                                style={{ fontSize: '10px', padding: '0.125rem 0.375rem' }}
                               >
-                                {readiness.approved}/11
+                                VI: {sectionsReadiness[section.id]?.vi ?? 0}/11
                               </span>
-                            ) : (
-                              <span className="meta">Select to inspect</span>
-                            )}
+                              <span
+                                className={`badge ${sectionsReadiness[section.id]?.en === 11 ? 'success' : 'experimental'}`}
+                                style={{ fontSize: '10px', padding: '0.125rem 0.375rem' }}
+                              >
+                                EN: {sectionsReadiness[section.id]?.en ?? 0}/11
+                              </span>
+                            </div>
                           </td>
                           <td>
                             {selectedScope?.version.status === 'draft' ? (

@@ -139,6 +139,7 @@ export type TestPackagePublicationReadiness = {
   voiceEn: string
   readyVietnameseSections: number
   readyEnglishSections: number
+  readyEitherSections?: number
   canPublish: boolean
   snapshotHash?: string
   publishedAt?: string

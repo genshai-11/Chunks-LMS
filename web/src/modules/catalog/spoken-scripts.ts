@@ -35,6 +35,16 @@ export function buildItemSpokenScript(input: {
   return `${prefix} ${normalizeSpokenText(input.prompt)}`
 }
 
+export function resolveItemSpokenScript(input: {
+  itemOrder: number
+  prompt: string
+  language: AudioLanguage
+  override?: string | null
+}): string {
+  const override = normalizeSpokenText(input.override ?? '')
+  return override || buildItemSpokenScript(input)
+}
+
 export async function narrationSourceHash(
   spokenText: string,
   language: AudioLanguage,
@@ -71,15 +81,26 @@ export function resolveNarrationRecord(
   currentHash: string | undefined,
 ): NarrationReviewRecord | undefined {
   const candidates = records.filter((record) => {
-    const key = record.variant.narrationTarget === 'section_intro'
-      ? `section:${record.variant.testSectionId}`
-      : `item:${record.variant.testItemId}`
+    const key =
+      record.variant.narrationTarget === 'section_intro'
+        ? `section:${record.variant.testSectionId}`
+        : `item:${record.variant.testItemId}`
     return key === targetKey
   })
   if (!currentHash) return candidates[0]
-  return candidates.find((record) => record.variant.sourceTextHash === currentHash && record.variant.approvalStatus === 'approved')
-    ?? candidates.find((record) => record.variant.sourceTextHash === currentHash && record.variant.approvalStatus !== 'archived')
-    ?? candidates[0]
+  return (
+    candidates.find(
+      (record) =>
+        record.variant.sourceTextHash === currentHash &&
+        record.variant.approvalStatus === 'approved',
+    ) ??
+    candidates.find(
+      (record) =>
+        record.variant.sourceTextHash === currentHash &&
+        record.variant.approvalStatus !== 'archived',
+    ) ??
+    candidates[0]
+  )
 }
 
 export function audioTargetStatus(

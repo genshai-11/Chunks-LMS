@@ -14,9 +14,7 @@ import { AdminMetricsPage } from './pages/admin/AdminMetricsPage'
 import { AdminAnalysisPage } from './pages/admin/AdminAnalysisPage'
 import { AdminOpsPage } from './pages/admin/AdminOpsPage'
 import { AdminAuditPage } from './pages/admin/AdminAuditPage'
-import { AdminIntegrityPage } from './pages/admin/AdminIntegrityPage'
 import { AdminResourcesPage } from './pages/admin/AdminResourcesPage'
-import { AdminResourcesAdvancedPage } from './pages/admin/AdminResourcesAdvancedPage'
 import { AdminTestAudioPage } from './pages/admin/AdminTestAudioPage'
 import { TeacherLayout } from './pages/teacher/TeacherLayout'
 import { TeacherOverviewPage } from './pages/teacher/TeacherOverviewPage'
@@ -60,7 +58,6 @@ export default function App() {
                 <Route path="ops" element={<AdminOpsPage />} />
                 <Route path="attendance" element={<Navigate to="/admin/ops" replace />} />
                 <Route path="audit" element={<AdminAuditPage />} />
-                <Route path="integrity" element={<AdminIntegrityPage />} />
                 <Route path="courses" element={<AdminCoursesPage />} />
                 <Route path="classes" element={<AdminClassesPage />} />
                 <Route path="people" element={<AdminPeoplePage />} />
@@ -68,7 +65,6 @@ export default function App() {
                 <Route path="analysis" element={<AdminAnalysisPage />} />
                 <Route path="metrics" element={<AdminMetricsPage />} />
                 <Route path="resources" element={<AdminResourcesPage />} />
-                <Route path="resources/advanced" element={<AdminResourcesAdvancedPage />} />
                 <Route path="resources/audio" element={<AdminTestAudioPage />} />
               </Route>
 

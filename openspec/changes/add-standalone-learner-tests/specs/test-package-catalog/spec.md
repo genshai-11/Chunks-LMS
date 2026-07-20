@@ -65,6 +65,21 @@ The system SHALL persist generation jobs, variants, private audio metadata, appr
 - **WHEN** an Admin chooses a different model or voice ID
 - **THEN** readiness is recalculated independently because the model ID is part of the narration source hash
 
+#### Scenario: Edit exact item narration
+- **WHEN** an Admin changes `Số 1` to `Câu 1` directly in the Audio Preparation table
+- **THEN** the canonical source sentence remains unchanged while generation, staleness, approval, and runtime readiness use the exact edited script
+
+### Requirement: Guarded Package publication
+The system SHALL keep draft resources editable and SHALL publish the Package Version for one-to-one Tests only after every Session has an approved current 11-asset bundle for both Vietnamese and English using the selected publication models.
+
+#### Scenario: Audio preparation is incomplete
+- **WHEN** fewer than eight Vietnamese-ready Sessions or eight English-ready Sessions exist
+- **THEN** Publish is disabled and the UI reports language-specific ready Session counts
+
+#### Scenario: Publish an audio-ready Package Version
+- **WHEN** all eight Sessions are ready in Vietnamese and English and an Admin confirms publication
+- **THEN** the system records an immutable snapshot hash, changes status to published, and exposes the Package Version to one-to-one Test setup
+
 #### Scenario: Request playback
 - **WHEN** authorized staff plays narration
 - **THEN** the system returns a short-lived signed URL without making the narration bucket public

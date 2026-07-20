@@ -38,8 +38,8 @@ import {
   audioReadiness,
   audioTargetStatus,
   buildIntroSpokenScript,
-  buildItemSpokenScript,
   latestNarrationByTarget,
+  resolveItemSpokenScript,
   narrationSourceHash,
   resolveNarrationRecord,
   type AudioLanguage,
@@ -86,8 +86,8 @@ export function AdminTestAudioPage() {
   const [cciCategory, setCciCategory] = useState<CciCategory | null>(null)
   const [introDraft, setIntroDraft] = useState('')
   const [savedIntro, setSavedIntro] = useState('')
-  const [promptDrafts, setPromptDrafts] = useState<Record<string, string>>({})
-  const [savedPrompts, setSavedPrompts] = useState<Record<string, string>>({})
+  const [scriptDrafts, setScriptDrafts] = useState<Record<string, string>>({})
+  const [savedScripts, setSavedScripts] = useState<Record<string, string>>({})
   const [records, setRecords] = useState<NarrationReviewRecord[]>([])
   const [hashes, setHashes] = useState<Record<string, string>>({})
   const [playbackUrls, setPlaybackUrls] = useState<Record<string, string>>({})
@@ -207,14 +207,23 @@ export function AdminTestAudioPage() {
       : persisted
     setSavedIntro(persisted)
     setIntroDraft(persisted === suggested ? persisted : suggested)
-    const nextPrompts = Object.fromEntries(
-      itemResult.data.map((item) => [
-        item.id,
-        (language === 'vi' ? item.promptVi : item.promptEn) ?? '',
-      ]),
+    const nextScripts = Object.fromEntries(
+      itemResult.data.map((item) => {
+        const prompt = (language === 'vi' ? item.promptVi : item.promptEn) ?? ''
+        const override = language === 'vi' ? item.spokenScriptVi : item.spokenScriptEn
+        return [
+          item.id,
+          resolveItemSpokenScript({
+            itemOrder: item.itemOrder,
+            prompt,
+            language,
+            override,
+          }),
+        ]
+      }),
     )
-    setSavedPrompts(nextPrompts)
-    setPromptDrafts(nextPrompts)
+    setSavedScripts(nextScripts)
+    setScriptDrafts(nextScripts)
   }, [language, sectionId, selectedSection])
   useEffect(() => {
     void loadSection()
@@ -246,17 +255,12 @@ export function AdminTestAudioPage() {
           voiceId,
         )
       for (const item of items) {
-        const prompt = promptDrafts[item.id] ?? ''
-        if (prompt)
-          next[`item:${item.id}`] = await narrationSourceHash(
-            buildItemSpokenScript({ itemOrder: item.itemOrder, prompt, language }),
-            language,
-            voiceId,
-          )
+        const script = scriptDrafts[item.id] ?? ''
+        if (script) next[`item:${item.id}`] = await narrationSourceHash(script, language, voiceId)
       }
       setHashes(next)
     })()
-  }, [introDraft, items, language, promptDrafts, selectedSection, voiceId])
+  }, [introDraft, items, language, scriptDrafts, selectedSection, voiceId])
 
   useEffect(() => {
     setParams(
@@ -285,7 +289,7 @@ export function AdminTestAudioPage() {
     ]
     for (const item of items) {
       const key = `item:${item.id}`
-      const prompt = promptDrafts[item.id] ?? ''
+      const script = scriptDrafts[item.id] ?? ''
       const itemRecord = newest.get(key)
       const itemBundleRecord = resolveNarrationRecord(records, key, hashes[key])
       result.push({
@@ -293,27 +297,25 @@ export function AdminTestAudioPage() {
         label: String(item.itemOrder),
         target: 'test_item',
         item,
-        spokenScript: prompt
-          ? buildItemSpokenScript({ itemOrder: item.itemOrder, prompt, language })
-          : '',
+        spokenScript: script,
         record: itemRecord,
         status: audioTargetStatus(itemRecord, hashes[key]),
         bundleStatus: audioTargetStatus(itemBundleRecord, hashes[key]),
       })
     }
     return result
-  }, [hashes, introDraft, items, language, promptDrafts, records, selectedSection])
+  }, [hashes, introDraft, items, scriptDrafts, records, selectedSection])
   const readiness = audioReadiness(rows.map((row) => row.bundleStatus))
   const generationTargets = rows.filter((row) =>
     ['missing', 'stale', 'failed', 'rejected'].includes(row.bundleStatus),
   )
   const dirty =
     introDraft !== savedIntro ||
-    items.some((item) => (promptDrafts[item.id] ?? '') !== (savedPrompts[item.id] ?? ''))
+    items.some((item) => (scriptDrafts[item.id] ?? '') !== (savedScripts[item.id] ?? ''))
   const invalid =
     !introDraft.trim() ||
     items.length !== 10 ||
-    items.some((item) => !(promptDrafts[item.id] ?? '').trim())
+    items.some((item) => !(scriptDrafts[item.id] ?? '').trim())
 
   async function saveScripts() {
     if (!selectedScope || !selectedSection) return
@@ -331,16 +333,17 @@ export function AdminTestAudioPage() {
       return setError(sectionResult.error)
     }
     for (const item of items) {
-      const nextPrompt = promptDrafts[item.id] ?? ''
-      if (nextPrompt === (savedPrompts[item.id] ?? '')) continue
+      const nextScript = scriptDrafts[item.id] ?? ''
+      if (nextScript === (savedScripts[item.id] ?? '')) continue
       const result = await updateDraftTestItem({
         itemId: item.id,
         packageVersionId: selectedScope.version.id,
-        promptVi: language === 'vi' ? nextPrompt : item.promptVi,
-        promptEn: language === 'en' ? nextPrompt : item.promptEn,
+        promptVi: item.promptVi,
+        promptEn: item.promptEn,
         tc: item.tc,
         lc: item.lc,
         tl: item.tl,
+        ...(language === 'vi' ? { spokenScriptVi: nextScript } : { spokenScriptEn: nextScript }),
       })
       if (!result.ok) {
         setBusyKey(null)
@@ -348,7 +351,7 @@ export function AdminTestAudioPage() {
       }
     }
     setSavedIntro(introDraft)
-    setSavedPrompts(promptDrafts)
+    setSavedScripts(scriptDrafts)
     setSections((current) =>
       current.map((section) =>
         section.id === selectedSection.id
@@ -363,8 +366,8 @@ export function AdminTestAudioPage() {
       current.map((item) => ({
         ...item,
         ...(language === 'vi'
-          ? { promptVi: promptDrafts[item.id] ?? item.promptVi }
-          : { promptEn: promptDrafts[item.id] ?? item.promptEn }),
+          ? { spokenScriptVi: scriptDrafts[item.id] ?? item.spokenScriptVi }
+          : { spokenScriptEn: scriptDrafts[item.id] ?? item.spokenScriptEn }),
       })),
     )
     setBusyKey(null)
@@ -605,11 +608,7 @@ export function AdminTestAudioPage() {
           <div className="btn-row">
             <button
               className="ghost"
-              onClick={() =>
-                setSelectedKeys(
-                  generationTargets.map((row) => row.key),
-                )
-              }
+              onClick={() => setSelectedKeys(generationTargets.map((row) => row.key))}
             >
               Select missing / stale
             </button>
@@ -687,15 +686,19 @@ export function AdminTestAudioPage() {
                       <>
                         <textarea
                           rows={2}
-                          value={promptDrafts[row.item!.id] ?? ''}
+                          aria-label={`Exact spoken script ${row.label}`}
+                          value={scriptDrafts[row.item!.id] ?? ''}
                           onChange={(event) =>
-                            setPromptDrafts((current) => ({
+                            setScriptDrafts((current) => ({
                               ...current,
                               [row.item!.id]: event.target.value,
                             }))
                           }
                         />
-                        <div className="meta">Spoken: {row.spokenScript}</div>
+                        <div className="meta">
+                          Source sentence:{' '}
+                          {language === 'vi' ? row.item?.promptVi : row.item?.promptEn}
+                        </div>
                       </>
                     )}
                   </td>

@@ -4,6 +4,7 @@ import {
   buildIntroSpokenScript,
   buildItemSpokenScript,
   narrationSourceHash,
+  resolveItemSpokenScript,
   resolveNarrationRecord,
 } from './spoken-scripts'
 
@@ -30,6 +31,17 @@ describe('spoken test scripts', () => {
     )
   })
 
+  it('uses a directly edited Câu ordinal as the exact spoken script', () => {
+    expect(
+      resolveItemSpokenScript({
+        itemOrder: 1,
+        prompt: 'Xin chào.',
+        language: 'vi',
+        override: '  Câu 1.  Xin chào. ',
+      }),
+    ).toBe('Câu 1. Xin chào.')
+  })
+
   it('hashes final spoken text with language and voice', async () => {
     const one = await narrationSourceHash('Number 1. Hello.', 'en', 'alloy')
     const two = await narrationSourceHash('Number 2. Hello.', 'en', 'alloy')
@@ -43,19 +55,23 @@ describe('spoken test scripts', () => {
   })
 
   it('prefers an approved current variant over a newer rejected variant', () => {
-    const record = (id: string, hash: string, status: string) => ({
-      variant: {
-        id,
-        narrationTarget: 'test_item',
-        testItemId: 'item-1',
-        sourceTextHash: hash,
-        approvalStatus: status,
-      },
-      audio: null,
-      job: null,
-    }) as any
+    const record = (id: string, hash: string, status: string) =>
+      ({
+        variant: {
+          id,
+          narrationTarget: 'test_item',
+          testItemId: 'item-1',
+          sourceTextHash: hash,
+          approvalStatus: status,
+        },
+        audio: null,
+        job: null,
+      }) as any
     const resolved = resolveNarrationRecord(
-      [record('rejected-new', 'current', 'rejected'), record('approved-old', 'current', 'approved')],
+      [
+        record('rejected-new', 'current', 'rejected'),
+        record('approved-old', 'current', 'approved'),
+      ],
       'item:item-1',
       'current',
     )

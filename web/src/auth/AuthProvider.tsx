@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { LogIn } from 'lucide-react'
+import { LogIn, LogOut, UserRound } from 'lucide-react'
 import { useStaffSession } from './useStaffSession'
 
 type Props = { children?: ReactNode }
@@ -204,18 +204,25 @@ export function AuthChrome({ children }: Props) {
   return (
     <div className="auth-chrome">
       {session.signedIn ? (
-        <div className="auth-actions">
-          {session.staffRoles.length > 0 ? (
-            <span className="meta auth-role-pill" title="Database staff roles">
-              {session.staffRoles.join(' · ')}
-            </span>
-          ) : null}
-          <span className="meta">{session.email}</span>
-          <button type="button" className="ghost" onClick={() => void session.signOut()}>
-            Sign out
-          </button>
-          {children}
-        </div>
+        <details className="auth-account-menu">
+          <summary title={session.email ?? 'Account'}>
+            <UserRound className="h-4 w-4" aria-hidden />
+            <span>Account</span>
+          </summary>
+          <div className="auth-account-popover">
+            <strong>{session.email}</strong>
+            {session.staffRoles.length > 0 ? (
+              <span className="meta auth-role-pill" title="Database staff roles">
+                {session.staffRoles.join(' · ')}
+              </span>
+            ) : null}
+            <button type="button" className="ghost" onClick={() => void session.signOut()}>
+              <LogOut className="h-4 w-4" aria-hidden />
+              Sign out
+            </button>
+            {children}
+          </div>
+        </details>
       ) : (
         <>
           <Link

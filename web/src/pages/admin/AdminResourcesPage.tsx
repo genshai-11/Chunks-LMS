@@ -1,20 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import {
-  Database,
-  Gauge,
-  ListChecks,
-  Pencil,
-  RefreshCw,
-  Search,
-  Settings2,
-  Volume2,
-} from 'lucide-react'
+import { Database, Gauge, ListChecks, Pencil, RefreshCw, Search, Volume2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Flash } from '../../components/Flash'
 import { PageHeader } from '../../components/PageHeader'
 import { EmptyState, Panel } from '../../components/ui'
 import {
   getSectionSnapshot,
+  getTestPackagePublicationReadiness,
   listCciCategories,
   listCciProfiles,
   listSectionNarrationReview,
@@ -22,13 +14,15 @@ import {
   listTestPackages,
   listTestPackageVersions,
   listTestSections,
+  publishTestPackageVersion,
   updateDraftTestItem,
+  type TestPackagePublicationReadiness,
 } from '../../lib/test-packages'
 import {
   audioReadiness,
   audioTargetStatus,
-  buildItemSpokenScript,
   narrationSourceHash,
+  resolveItemSpokenScript,
   resolveNarrationRecord,
   type AudioLanguage,
   type AudioTargetStatus,
@@ -62,7 +56,11 @@ export function AdminResourcesPage() {
   const [activeTab, setActiveTab] = useState<ResourceTab>('sessions')
   const [search, setSearch] = useState('')
   const [language, setLanguage] = useState<AudioLanguage>('vi')
-  const [voiceId, setVoiceId] = useState('alloy')
+  const [voiceId, setVoiceId] = useState('gemini/gemini-2.5-flash-preview-tts')
+  const [publishVoiceVi, setPublishVoiceVi] = useState('gemini/gemini-2.5-flash-preview-tts')
+  const [publishVoiceEn, setPublishVoiceEn] = useState('gemini/gemini-2.5-flash-preview-tts')
+  const [publication, setPublication] = useState<TestPackagePublicationReadiness | null>(null)
+  const [publishing, setPublishing] = useState(false)
   const [audioStatuses, setAudioStatuses] = useState<AudioTargetStatus[]>(Array(11).fill('missing'))
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null)
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
@@ -189,18 +187,51 @@ export function AdminResourcesPage() {
       ]
       for (const item of items) {
         const prompt = language === 'vi' ? item.promptVi : item.promptEn
+        const override = language === 'vi' ? item.spokenScriptVi : item.spokenScriptEn
         const script = prompt
-          ? buildItemSpokenScript({ itemOrder: item.itemOrder, prompt, language })
+          ? resolveItemSpokenScript({ itemOrder: item.itemOrder, prompt, language, override })
           : ''
         const hash = script ? await narrationSourceHash(script, language, voiceId) : undefined
         const itemKey = `item:${item.id}`
-        statuses.push(
-          audioTargetStatus(resolveNarrationRecord(review.data, itemKey, hash), hash),
-        )
+        statuses.push(audioTargetStatus(resolveNarrationRecord(review.data, itemKey, hash), hash))
       }
       setAudioStatuses(statuses)
     })()
   }, [items, language, selectedScope, selectedSection, voiceId])
+
+  const loadPublicationReadiness = useCallback(async () => {
+    if (!selectedScope) {
+      setPublication(null)
+      return
+    }
+    const result = await getTestPackagePublicationReadiness({
+      packageVersionId: selectedScope.version.id,
+      voiceVi: publishVoiceVi,
+      voiceEn: publishVoiceEn,
+    })
+    if (result.ok) setPublication(result.data)
+    else setError(result.error)
+  }, [publishVoiceEn, publishVoiceVi, selectedScope])
+
+  useEffect(() => {
+    void loadPublicationReadiness()
+  }, [loadPublicationReadiness])
+
+  async function publishPackage() {
+    if (!selectedScope || !publication?.canPublish) return
+    if (!window.confirm('Publish this Package Version? Scripts and audio become immutable.')) return
+    setPublishing(true)
+    setError(null)
+    const result = await publishTestPackageVersion({
+      packageVersionId: selectedScope.version.id,
+      voiceVi: publishVoiceVi,
+      voiceEn: publishVoiceEn,
+    })
+    setPublishing(false)
+    if (!result.ok) return setError(result.error)
+    setMessage('Package Version published. It is now available in one-to-one Test setup.')
+    await loadRoot()
+  }
 
   const readiness = audioReadiness(audioStatuses)
   const filteredItems = useMemo(() => {
@@ -238,16 +269,10 @@ export function AdminResourcesPage() {
         title="Test Resources"
         subtitle="Package-first workspace for Sessions, Items/CVR, CCI, and Audio preparation."
         actions={
-          <div className="btn-row">
-            <Link className="btn ghost" to="/admin/resources/advanced">
-              <Settings2 className="h-4 w-4" />
-              Advanced editor
-            </Link>
-            <button className="primary" onClick={() => void loadRoot()}>
-              <RefreshCw className="h-4 w-4" />
-              Refresh
-            </button>
-          </div>
+          <button className="primary" onClick={() => void loadRoot()}>
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </button>
         }
       />
       <Flash message={message} error={error} />
@@ -289,6 +314,48 @@ export function AdminResourcesPage() {
                   Audio {readiness.approved}/{readiness.expected || 11}
                 </span>
               </div>
+            </div>
+            <div className="resource-publication-gate">
+              <div>
+                <strong>
+                  {selectedScope?.version.status === 'published'
+                    ? 'Published · available for one-to-one Tests'
+                    : 'Draft · editable before audio generation'}
+                </strong>
+                <div className="meta">
+                  {selectedScope?.version.status === 'published'
+                    ? 'Published Package Versions are immutable. Create a new draft to make changes.'
+                    : `Publication requires all 8 Sessions ready in both languages. VI ${publication?.readyVietnameseSections ?? 0}/8 · EN ${publication?.readyEnglishSections ?? 0}/8.`}
+                </div>
+              </div>
+              {selectedScope?.version.status === 'draft' ? (
+                <div className="resource-publication-actions">
+                  <label className="field">
+                    Vietnamese model
+                    <input
+                      value={publishVoiceVi}
+                      onChange={(event) => setPublishVoiceVi(event.target.value)}
+                    />
+                  </label>
+                  <label className="field">
+                    English model
+                    <input
+                      value={publishVoiceEn}
+                      onChange={(event) => setPublishVoiceEn(event.target.value)}
+                    />
+                  </label>
+                  <button className="ghost" onClick={() => void loadPublicationReadiness()}>
+                    Check readiness
+                  </button>
+                  <button
+                    className="primary"
+                    disabled={!publication?.canPublish || publishing}
+                    onClick={() => void publishPackage()}
+                  >
+                    {publishing ? 'Publishing…' : 'Publish for Tests 1-to-1'}
+                  </button>
+                </div>
+              ) : null}
             </div>
             <div className="resource-tabs">
               {(['sessions', 'items', 'cci', 'audio'] as ResourceTab[]).map((tab) => (
@@ -536,13 +603,8 @@ export function AdminResourcesPage() {
                   ? `${selectedProfile.name} · ${selectedProfile.versionLabel}`
                   : 'CCI'
               }
-              description="Profile context and actions appear once; eight definitions stay compact."
+              description="Eight canonical CCI definitions used by the selected Package Version."
               collapsible={false}
-              actions={
-                <Link className="btn ghost" to="/admin/resources/advanced">
-                  Manage profile
-                </Link>
-              }
             >
               <div className="table-wrap compact-resource-table">
                 <table>

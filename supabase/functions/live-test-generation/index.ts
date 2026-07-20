@@ -346,7 +346,7 @@ async function resolveNarrationText(
     throw new Error("Invalid parameters for test_item narration target.");
   const { data: item, error: itemError } = await admin
     .from("test_items")
-    .select("item_order, prompt_vi, prompt_en")
+    .select("item_order, prompt_vi, prompt_en, spoken_script_vi, spoken_script_en")
     .eq("id", body.testItemId)
     .eq("package_version_id", body.packageVersionId)
     .maybeSingle();
@@ -355,6 +355,10 @@ async function resolveNarrationText(
     throw new Error("Invalid testItemId: Item was not found.");
 
   const rawText = body.language === "vi" ? item.prompt_vi : item.prompt_en;
+  const override = body.language === "vi"
+    ? item.spoken_script_vi
+    : item.spoken_script_en;
+  if (override) return String(override).trim().replace(/\s+/g, " ");
   if (!rawText)
     throw new Error(
       "Invalid testItemId: Item text was not found for requested language.",

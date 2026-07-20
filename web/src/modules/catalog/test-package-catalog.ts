@@ -41,6 +41,8 @@ export type TestItem = {
   termEn?: string | null
   promptVi: string | null
   promptEn: string | null
+  spokenScriptVi?: string | null
+  spokenScriptEn?: string | null
   tc: number | null
   lc: number | null
   tl: number | null

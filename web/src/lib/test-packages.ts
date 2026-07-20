@@ -61,6 +61,8 @@ function mapTestItem(row: any): TestItem {
     termEn: row.term_en ?? null,
     promptVi: row.prompt_vi,
     promptEn: row.prompt_en,
+    spokenScriptVi: row.spoken_script_vi ?? null,
+    spokenScriptEn: row.spoken_script_en ?? null,
     tc: row.tc ? Number(row.tc) : null,
     lc: row.lc ? Number(row.lc) : null,
     tl: row.tl ? Number(row.tl) : null,
@@ -126,6 +128,52 @@ export async function listTestPackageVersions(
     .order('published_at', { ascending: false, nullsFirst: true })
   if (error) return { ok: false, error: error.message }
   return { ok: true, data: (data ?? []).map(mapTestPackageVersion) }
+}
+
+export type TestPackagePublicationReadiness = {
+  packageVersionId: string
+  status: 'draft' | 'published' | 'archived'
+  sectionCount: number
+  itemCount: number
+  voiceVi: string
+  voiceEn: string
+  readyVietnameseSections: number
+  readyEnglishSections: number
+  canPublish: boolean
+  snapshotHash?: string
+  publishedAt?: string
+}
+
+export async function getTestPackagePublicationReadiness(input: {
+  packageVersionId: string
+  voiceVi: string
+  voiceEn: string
+}): Promise<Result<TestPackagePublicationReadiness>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { data, error } = await sb.rpc('get_test_package_publication_readiness', {
+    p_package_version_id: input.packageVersionId,
+    p_voice_vi: input.voiceVi,
+    p_voice_en: input.voiceEn,
+  })
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: data as TestPackagePublicationReadiness }
+}
+
+export async function publishTestPackageVersion(input: {
+  packageVersionId: string
+  voiceVi: string
+  voiceEn: string
+}): Promise<Result<TestPackagePublicationReadiness>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { data, error } = await sb.rpc('publish_test_package_version', {
+    p_package_version_id: input.packageVersionId,
+    p_voice_vi: input.voiceVi,
+    p_voice_en: input.voiceEn,
+  })
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: data as TestPackagePublicationReadiness }
 }
 
 export async function listTestSections(versionId: string): Promise<Result<TestSection[]>> {
@@ -501,20 +549,25 @@ export async function updateDraftTestItem(input: {
   tc: number | null
   lc: number | null
   tl: number | null
+  spokenScriptVi?: string | null
+  spokenScriptEn?: string | null
 }): Promise<Result<TestItem>> {
   const draft = await assertDraftPackageVersion(input.packageVersionId)
   if (!draft.ok) return draft
   const sb = client()
   if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const values: Record<string, unknown> = {
+    prompt_vi: input.promptVi,
+    prompt_en: input.promptEn,
+    tc: input.tc,
+    lc: input.lc,
+    tl: input.tl,
+  }
+  if ('spokenScriptVi' in input) values.spoken_script_vi = input.spokenScriptVi ?? null
+  if ('spokenScriptEn' in input) values.spoken_script_en = input.spokenScriptEn ?? null
   const { data, error } = await sb
     .from('test_items')
-    .update({
-      prompt_vi: input.promptVi,
-      prompt_en: input.promptEn,
-      tc: input.tc,
-      lc: input.lc,
-      tl: input.tl,
-    })
+    .update(values)
     .eq('id', input.itemId)
     .eq('package_version_id', input.packageVersionId)
     .select()

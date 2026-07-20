@@ -1,0 +1,11 @@
+begin;
+select plan(7);
+select has_function('private','catalog_reset_allows_profile_delete',array['uuid'],'profile reset allowlist helper exists');
+select ok((select prosecdef from pg_proc where oid='public.ensure_section_parent_version_is_draft()'::regprocedure),'section delete trigger is security definer');
+select ok((select prosecdef from pg_proc where oid='public.ensure_item_parent_version_is_draft()'::regprocedure),'item delete trigger is security definer');
+select ok((select prosecdef from pg_proc where oid='public.prevent_measurement_snapshot_rewrite()'::regprocedure),'snapshot delete trigger is security definer');
+select ok((select prosecdef from pg_proc where oid='public.ensure_cci_profile_is_draft()'::regprocedure),'CCI delete trigger is security definer');
+select ok((select position('catalog_reset_allows_version_delete' in pg_get_functiondef('public.prevent_measurement_snapshot_rewrite()'::regprocedure))>0),'snapshot delete checks version allowlist');
+select ok((select position('catalog_reset_allows_profile_delete' in pg_get_functiondef('public.ensure_cci_profile_is_draft()'::regprocedure))>0),'CCI delete checks profile allowlist');
+select * from finish();
+rollback;

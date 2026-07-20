@@ -1,39 +1,39 @@
-/**
- * Idempotent domain User upsert from a Clerk user payload.
- * Intended for webhook handlers (Edge Function / server) — pure merge logic here.
- */
-export type ClerkUserPayload = {
+/** Pure mapping used by native Supabase Auth provisioning tests/server adapters. */
+export type SupabaseAuthUserPayload = {
   id: string
-  first_name?: string | null
-  last_name?: string | null
-  email_addresses?: Array<{ email_address: string }>
+  email?: string | null
+  user_metadata?: Record<string, unknown> | null
 }
 
 export type DomainUserWrite = {
-  clerk_user_id: string
+  auth_user_id: string
   display_name: string
   email: string | null
 }
 
-export function mapClerkUserToDomain(payload: ClerkUserPayload): DomainUserWrite {
-  const name = [payload.first_name, payload.last_name].filter(Boolean).join(' ').trim()
+function metadataName(metadata: Record<string, unknown> | null | undefined): string | null {
+  const fullName = typeof metadata?.full_name === 'string' ? metadata.full_name.trim() : ''
+  const name = typeof metadata?.name === 'string' ? metadata.name.trim() : ''
+  return fullName || name || null
+}
+
+export function mapSupabaseAuthUserToDomain(payload: SupabaseAuthUserPayload): DomainUserWrite {
+  const email = payload.email?.trim().toLowerCase() || null
   return {
-    clerk_user_id: payload.id,
-    display_name: name || payload.email_addresses?.[0]?.email_address || payload.id,
-    email: payload.email_addresses?.[0]?.email_address ?? null,
+    auth_user_id: payload.id,
+    display_name: metadataName(payload.user_metadata) ?? email ?? payload.id,
+    email,
   }
 }
 
-/**
- * Apply a webhook delivery twice → same domain row (idempotent by clerk_user_id).
- */
+/** Duplicate Auth deliveries retain one stable auth identity while refreshing profile fields. */
 export function mergeUserUpsert(
   existing: DomainUserWrite | null,
   incoming: DomainUserWrite,
 ): DomainUserWrite {
   if (!existing) return incoming
   return {
-    clerk_user_id: existing.clerk_user_id,
+    auth_user_id: existing.auth_user_id,
     display_name: incoming.display_name || existing.display_name,
     email: incoming.email ?? existing.email,
   }

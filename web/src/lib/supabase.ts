@@ -3,39 +3,34 @@ import { env } from '../env'
 import type { Database } from '../types/database'
 
 let client: SupabaseClient<Database> | null = null
-let accessTokenProvider: (() => Promise<string | null>) | null = null
-
-export function setSupabaseAccessTokenProvider(
-  provider: (() => Promise<string | null>) | null,
-): void {
-  accessTokenProvider = provider
-}
 
 export function getSupabase(): SupabaseClient<Database> | null {
   if (!env.supabaseUrl || !env.supabaseAnonKey) return null
   if (!client) {
     client = createClient<Database>(env.supabaseUrl, env.supabaseAnonKey, {
-      accessToken: async () => (env.supabaseClerkAuth ? (accessTokenProvider?.() ?? null) : null),
       auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
       },
     })
   }
   return client
 }
 
-/**
- * Attach Clerk session JWT for Supabase third-party auth.
- * Call after Clerk session is ready: supabase.realtime.setAuth(token)
- */
-export async function setSupabaseAccessToken(token: string | null): Promise<void> {
-  const supabase = getSupabase()
-  if (!supabase) return
-  if (token && env.supabaseClerkAuth) {
-    await supabase.realtime.setAuth(token)
-  } else {
-    await supabase.realtime.setAuth()
+export type SupabaseAuthCapabilities = { googleOAuth: boolean }
+
+/** Read public GoTrue provider settings so disabled OAuth buttons are never shown. */
+export async function getSupabaseAuthCapabilities(): Promise<SupabaseAuthCapabilities> {
+  if (!env.supabaseUrl || !env.supabaseAnonKey) return { googleOAuth: false }
+  try {
+    const response = await fetch(`${env.supabaseUrl}/auth/v1/settings`, {
+      headers: { apikey: env.supabaseAnonKey },
+    })
+    if (!response.ok) return { googleOAuth: false }
+    const settings = (await response.json()) as { external?: { google?: boolean } }
+    return { googleOAuth: settings.external?.google === true }
+  } catch {
+    return { googleOAuth: false }
   }
 }

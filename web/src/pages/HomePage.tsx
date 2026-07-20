@@ -110,8 +110,8 @@ export function HomePage() {
 
       {!session.signedIn && !session.authBypass ? (
         <p className="meta" style={{ textAlign: 'center', marginTop: 16 }}>
-          Admin and Teacher require a Clerk staff account. Learners never use Clerk — share their
-          invite link from the class roster.
+          Admin and Teacher use Supabase staff accounts. Learners use scoped invite links from the
+          class roster instead of staff sign-in.
         </p>
       ) : null}
     </div>

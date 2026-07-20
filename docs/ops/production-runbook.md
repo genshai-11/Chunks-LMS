@@ -6,8 +6,8 @@
 
 | Role | Access |
 |------|--------|
-| Admin / Teacher | Clerk sign-in |
-| Learner | Share link `/access?email=…` (profile email registered by staff) |
+| Admin / Teacher | Native Supabase Auth + active database `staff_roles` |
+| Learner | Scoped share link `/access?email=…` (profile email registered by staff) |
 
 **Live app (typical):** https://chunks-lms.vercel.app  
 **Repo:** https://github.com/genshai-11/Chunks-LMS
@@ -23,16 +23,14 @@
 
 | Variable | Required | Notes |
 |----------|----------|--------|
-| `VITE_CLERK_PUBLISHABLE_KEY` | Yes | Staff sign-in |
 | `VITE_SUPABASE_URL` | Yes | Hosted project URL |
-| `VITE_SUPABASE_ANON_KEY` | Yes | Anon key |
+| `VITE_SUPABASE_ANON_KEY` | Yes | Browser-safe publishable/anon key |
 | `VITE_AUTH_BYPASS` | **No** / false | Must be **off** in production |
-| `VITE_STAFF_ADMIN_EMAILS` | Recommended | Comma-separated admin emails |
-| `VITE_STAFF_TEACHER_EMAILS` | Recommended | Comma-separated teacher emails |
 
-Or set Clerk `publicMetadata`: `{ "chunksRole": "admin" }` / `"teacher"` / `"staff"`.
+Roles are active rows in `public.staff_roles`; Auth metadata and frontend allowlists do not authorize.
 
-- [ ] Clerk dashboard: production domain allowed; sign-in/up enabled for staff
+- [ ] Supabase Auth: email sign-in/up enabled; Site URL and redirects include the production domain
+- [ ] Optional Google OAuth: approved client configured and Preview validated first
 - [ ] Migrations **never** auto-run on deploy — use [ci-cd.md](./ci-cd.md) promote checklist
 
 ---
@@ -58,7 +56,7 @@ Details: [vercel-deploy.md](./vercel-deploy.md).
 ### After deploy
 
 1. Open production URL (no `VITE_AUTH_BYPASS`).  
-2. Staff **Sign in** with Clerk.  
+2. Staff signs in with Supabase email/password, magic link, or an enabled OAuth provider.  
 3. Confirm top bar shows only roles you hold (Admin / Teacher).  
 4. Admin → **Integrity** → “Reload workspace” (optional) then “Run reconciliation”.
 
@@ -71,7 +69,7 @@ Details: [vercel-deploy.md](./vercel-deploy.md).
 
 ### Preferred: create in the UI (safest)
 
-1. Staff signs in (Clerk) → Admin.  
+1. Role-granted staff signs in with Supabase Auth → Admin.  
 2. **Courses** → create course (e.g. `ERE-Level-B`) + auto-schedule if desired.  
 3. **Classes** → create class, assign teacher, set capacity.  
 4. **Students** on the class → add learners with **email** (required for portal).  
@@ -126,7 +124,7 @@ Use [hosted-e2e-checklist.md](./hosted-e2e-checklist.md). Minimum gate for “fi
 
 | # | Step | Pass? |
 |---|------|-------|
-| 1 | Production URL loads; staff can Clerk sign-in | |
+| 1 | Production URL loads; staff can Supabase sign-in and refresh without losing session | |
 | 2 | Admin creates/uses one course + class + ≥1 learner with email | |
 | 3 | Teacher starts Learning Session, marks attendance, records ≥1 final color | |
 | 4 | Analysis shows finalized count / metrics with sample size | |
@@ -145,7 +143,7 @@ Automated domain path (local CI): `web` Vitest `seeded-flow` + ops tests still c
 | Bad deploy | Vercel → previous deployment → Promote |
 | Bad migration | Do **not** auto-revert destructive SQL; restore from Supabase backup; open ADR if events were touched |
 | Empty UI after reload | Prefer **Reload workspace** / rebuild ledger — not Clear data |
-| Wrong staff role | Fix Clerk metadata or `VITE_STAFF_*_EMAILS`; redeploy if env-only |
+| Wrong staff role | Verify `public.users.auth_user_id`, account status, and active `public.staff_roles`; do not grant through Auth metadata |
 | Learner wrong data | Confirm invite email uniqueness; clear browser portal session → re-open invite |
 
 ---
@@ -154,6 +152,7 @@ Automated domain path (local CI): `web` Vitest `seeded-flow` + ops tests still c
 
 | Doc | Use |
 |-----|-----|
+| [supabase-auth.md](./supabase-auth.md) | Staff account, OAuth, redirect, and rollback operations |
 | [ci-cd.md](./ci-cd.md) | Secrets, CD, migration promote |
 | [vercel-deploy.md](./vercel-deploy.md) | First-time Vercel |
 | [hosted-e2e-checklist.md](./hosted-e2e-checklist.md) | Smoke checklist |

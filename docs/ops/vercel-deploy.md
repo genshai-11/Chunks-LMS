@@ -63,15 +63,13 @@ This creates `.vercel/project.json` with `orgId` and `projectId` (gitignored).
 
 ## Step 4 — Environment variables
 
-App can boot without secrets (auth bypass / local mode). For real Clerk + Supabase:
+App can boot in local auth-bypass mode. For native Supabase Auth:
 
 ```powershell
-vercel env add VITE_CLERK_PUBLISHABLE_KEY production
 vercel env add VITE_SUPABASE_URL production
 vercel env add VITE_SUPABASE_ANON_KEY production
 
-# Also for Preview if needed
-vercel env add VITE_CLERK_PUBLISHABLE_KEY preview
+# Also for Preview
 vercel env add VITE_SUPABASE_URL preview
 vercel env add VITE_SUPABASE_ANON_KEY preview
 ```
@@ -146,12 +144,15 @@ GitHub → repo **Settings → Secrets and variables → Actions**:
 
 Then pushes to `main` use `.github/workflows/cd.yml`.
 
-## Step 8 — Clerk allowed origins
+## Step 8 — Supabase Auth redirects
 
-In Clerk dashboard, add:
+In Supabase Dashboard → Authentication → URL Configuration, add:
 
-- `https://chunks-lms.vercel.app`
-- `http://localhost:5173` (dev)
+- `https://chunks-lms.vercel.app/**`
+- the exact Vercel Preview branch alias
+- `http://localhost:5173/**`
+
+If Google is enabled, configure the Supabase callback URL in the approved Google OAuth client and validate Preview before production.
 
 ## Troubleshooting
 

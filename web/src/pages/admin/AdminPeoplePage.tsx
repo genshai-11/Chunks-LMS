@@ -37,7 +37,12 @@ import { useAppState } from '../../state/useAppState'
 type Tab = 'teachers' | 'learners'
 type Draft = { displayName: string; email: string; avatarUrl?: string; allowMultiClass?: boolean }
 
-const emptyDraft = (): Draft => ({ displayName: '', email: '', avatarUrl: '', allowMultiClass: false })
+const emptyDraft = (): Draft => ({
+  displayName: '',
+  email: '',
+  avatarUrl: '',
+  allowMultiClass: false,
+})
 
 function invitationUrl(user: DomainUser): string {
   const origin = window.location.origin
@@ -127,7 +132,7 @@ export function AdminPeoplePage() {
         icon={Users}
         kicker="Admin"
         title="Accounts"
-        subtitle="One row per email · teacher (Clerk) · learner (invite link)"
+        subtitle="One row per email · teacher (Supabase Auth) · learner (invite link)"
         actions={
           <button
             type="button"
@@ -202,7 +207,7 @@ export function AdminPeoplePage() {
           title={tab === 'teachers' ? 'New teacher' : 'New learner'}
           description={
             tab === 'teachers'
-              ? 'Email must match Clerk staff sign-in. Unique across all accounts.'
+              ? 'Email must match the Supabase staff account. Unique across all accounts.'
               : 'Email is the portal invite identity. Unique across all accounts.'
           }
         >
@@ -239,7 +244,9 @@ export function AdminPeoplePage() {
                   checked={draft.allowMultiClass ?? false}
                   onChange={(e) => setDraft((d) => ({ ...d, allowMultiClass: e.target.checked }))}
                 />
-                <span className="text-xs text-slate-600 font-medium">Allow multi-class (Cho phép học nhiều lớp)</span>
+                <span className="text-xs text-slate-600 font-medium">
+                  Allow multi-class (Cho phép học nhiều lớp)
+                </span>
               </label>
             )}
             <div className="avatar-field">

@@ -9,8 +9,12 @@ The administrative scope that owns users, metric templates, and reports.
 _Avoid_: Tenant, school account
 
 **User**:
-A person authenticated to access an Organization (or a learner profile reached by invite link).
-_Avoid_: Account, profile
+A stable domain person. Staff may link to one native Supabase Auth identity through `auth_user_id`; a Learner may remain profile-only and use a scoped invite link.
+_Avoid_: Auth account, transient session
+
+**Staff Auth Identity**:
+A native Supabase `auth.users` account linked to one domain User. It authenticates but does not authorize; active database `staff_roles` grant Admin/Teacher access.
+_Avoid_: Clerk subject, metadata role, frontend allowlist
 
 **Account Status**:
 Active or inactive for a Teacher or Learner profile. Admin may deactivate without deleting history.
@@ -21,7 +25,7 @@ A User who owns classes/programs for their learners, starts sessions (selecting 
 _Avoid_: Instructor, assessor
 
 **Learner**:
-A User whose Focus and Awareness progress is observed across a Course (program label). Access via email invite, not Clerk in V1.
+A User whose Focus and Awareness progress is observed across a Course (program label). Access uses a scoped learner invite rather than staff Supabase Auth in V1.
 _Avoid_: Student, participant
 
 ## Learning structure

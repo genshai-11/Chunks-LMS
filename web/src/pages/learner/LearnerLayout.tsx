@@ -25,7 +25,7 @@ export function LearnerLayout() {
     hasMultiple,
   } = useLearnerClassContext()
 
-  // Share-link session required — no Clerk for learners
+  // Scoped learner-link session required — separate from staff Supabase Auth
   if (!learner) {
     return <Navigate to="/access" replace />
   }

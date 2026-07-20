@@ -632,7 +632,8 @@ export function enrollLearner(
   if (otherActive.length > 0 && !learner.allowMultiClass) {
     return {
       ok: false,
-      error: 'Learner is already enrolled in another active class. Enable multi-class in Admin settings if needed.',
+      error:
+        'Learner is already enrolled in another active class. Enable multi-class in Admin settings if needed.',
     }
   }
 
@@ -704,7 +705,12 @@ export function endEnrollment(
 
 export function addLearnerProfile(
   state: RosterState,
-  input: { displayName: string; email?: string | null; avatarUrl?: string | null; allowMultiClass?: boolean },
+  input: {
+    displayName: string
+    email?: string | null
+    avatarUrl?: string | null
+    allowMultiClass?: boolean
+  },
 ): RosterResult<DomainUser> {
   const displayName = input.displayName.trim()
   if (!displayName) return { ok: false, error: 'Learner name is required' }
@@ -781,7 +787,7 @@ export function addTeacherProfile(
   if (!displayName) return { ok: false, error: 'Teacher name is required' }
 
   const email = input.email?.trim() || null
-  if (!email) return { ok: false, error: 'Teacher email is required (matches Clerk sign-in)' }
+  if (!email) return { ok: false, error: 'Teacher email is required (matches Supabase sign-in)' }
   if (isEmailTaken(state, email)) {
     return { ok: false, error: 'An account with this email already exists' }
   }
@@ -833,7 +839,8 @@ export function updateUserProfile(
     email: nextEmail,
     avatarUrl: input.avatarUrl !== undefined ? input.avatarUrl || null : user.avatarUrl,
     accountStatus: input.accountStatus ?? user.accountStatus ?? 'active',
-    allowMultiClass: input.allowMultiClass !== undefined ? input.allowMultiClass : (user.allowMultiClass ?? false),
+    allowMultiClass:
+      input.allowMultiClass !== undefined ? input.allowMultiClass : (user.allowMultiClass ?? false),
   }
 
   return {

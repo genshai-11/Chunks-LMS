@@ -70,10 +70,7 @@ export default function App() {
                 <Route path="resources/audio" element={<AdminTestAudioPage />} />
               </Route>
 
-              <Route
-                path="/teacher/observe"
-                element={<TeacherObservePage />}
-              />
+              <Route path="/teacher/observe" element={<TeacherObservePage />} />
 
               <Route
                 path="/teacher"
@@ -86,9 +83,15 @@ export default function App() {
                 <Route index element={<TeacherOverviewPage />} />
                 <Route path="classes" element={<TeacherClassesPage />} />
                 <Route path="tests" element={<TeacherTestsPage />} />
-                <Route path="tests/:assignmentId/sections/:sectionId/setup" element={<TeacherTestSetupPage />} />
+                <Route
+                  path="tests/:assignmentId/sections/:sectionId/setup"
+                  element={<TeacherTestSetupPage />}
+                />
                 <Route path="test-runs/:runId" element={<TeacherTestRunPage />} />
-                <Route path="learner/:learnerId/tests" element={<TeacherLearnerTestResultsPage />} />
+                <Route
+                  path="learner/:learnerId/tests"
+                  element={<TeacherLearnerTestResultsPage />}
+                />
                 <Route path="learner/:learnerId" element={<TeacherLearnerProfilePage />} />
                 <Route path="session" element={<TeacherSessionPage />} />
                 <Route path="archive" element={<TeacherArchivePage />} />
@@ -96,7 +99,7 @@ export default function App() {
                 <Route path="progress" element={<Navigate to="/teacher/analysis" replace />} />
               </Route>
 
-              {/* Learner portal — share link only; no Clerk */}
+              {/* Learner portal — scoped share link, separate from staff Supabase Auth */}
               <Route path="/learner" element={<LearnerLayout />}>
                 <Route index element={<LearnerOverviewPage />} />
                 <Route path="enrollments" element={<LearnerEnrollmentsPage />} />

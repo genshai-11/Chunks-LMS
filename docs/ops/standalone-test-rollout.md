@@ -147,6 +147,32 @@ The generated SQL artifact calls preview only. The only write path is the review
 - Edge v3 was not deployed; preview capability detection therefore disables Generate and Play.
 - No paid TTS, package publication, or narration approval was invoked.
 
+## TTS v4 production receipt — 2026-07-20 19:54 GMT+7
+
+- Source commits:
+  - `554f382f3674e868c8f469e3a75355362b67d6f4` — live 9Router model discovery and one/selected/all generation
+  - `5b0870634a5682eb6ba461ef22834dfa447f989c` — duplicate paid-generation guard
+- Rollback tags:
+  - `standalone-test-tts-v4-rc.1`
+  - `standalone-test-tts-v4.1-rc.1`
+- Database migration `20260720113000_current_narration_readiness.sql`: **applied**, local/remote migration parity confirmed, remote error-level lint passed.
+- `live-test-generation`: capability contract v4 deployed as active Supabase platform Function version 3; capability smoke passed exact scripts, signed playback, model discovery, selected batch generation, and explicit paid-generation flags.
+- 9Router secrets were present by name; no secret value was displayed.
+- Live 9Router discovery returned 16 current model IDs for the canary. Selected model: `gemini/gemini-2.5-flash-preview-tts`.
+- Bilingual Session 1 intro canaries:
+  - Vietnamese variant `2038c469-96b5-4774-a1ef-3c0ab068b8df`
+  - English variant `1dd70d93-f73f-4b82-95e4-15cfe114355b`
+  - Both generated successfully as private WAV assets and played through short-lived signed URLs.
+  - Both remain `generated`, not approved; human listening/approval remains mandatory.
+- Production audio state after canary: 2 variants, 2 generated assets, 2 successful current canary jobs. Historical job records also contain 11 failed OpenAI-provider attempts from before this canary.
+- Cost-control canary passed: with one generated intro, **Select missing / stale** selected exactly 10 items and excluded the generated intro.
+- Preview deployments:
+  - TTS v4: `dpl_uzxPqUC6dBBSJF1JaygMSfesZXKP`
+  - paid-cost guard: `dpl_HvAvSYFyKiEpE2NzYvT1uAWuMAFj`
+- Production Vercel deployment: `dpl_9wnuyY5qj2TKAzWkymJTSjVoVR3h`, status **Ready**, aliased to `https://chunks-lms.vercel.app`.
+- Authenticated production canary passed: 16 models loaded, English generated state persisted, and signed playback was active.
+- Canonical Package Version remains `draft`; bulk generation, human approvals, and publication intentionally remain open so narration is not frozen before review.
+
 ## Rollback outline
 
 - Preview rollback: keep production untouched; remove or ignore deployment `dpl_FeHYfMQq6NyqSkMKuTHqSKwwzpm1` and return to tag `standalone-test-audio-rc.1`.

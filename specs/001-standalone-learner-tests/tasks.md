@@ -165,10 +165,10 @@
 - [x] T055 [P] Update `CONTEXT.md`, `UBIQUITOUS_LANGUAGE.md`, and add/adjust ADRs under `docs/adr/` for standalone Test Assignment/Run boundaries
 - [ ] T056 [P] Complete OpenSpec tasks and cross-links in `openspec/changes/add-standalone-learner-tests/`
 - [x] T057 Run `npm run openspec:validate`, lint, typecheck, unit tests, and build; record results in `docs/ops/standalone-test-rollout.md`
-- [ ] T058 Run local Supabase reset/SQL tests/advisors when Docker is available; otherwise record the exact blocked checks in `docs/ops/standalone-test-rollout.md`
+- [x] T058 Run local Supabase reset/SQL tests/advisors when Docker is available; otherwise record the exact blocked checks in `docs/ops/standalone-test-rollout.md`
 - [ ] T059 Execute the `quickstart.md` local validation and verify existing live-session/Analysis regression paths
-- [ ] T060 Prepare clean release-candidate commits/tag, preview/canary checklist, database backup/restore, Edge rollback, Storage rollback, and post-deploy checks in `docs/ops/standalone-test-rollout.md`
-- [ ] T061 Stop and present exact remote deletion counts plus migration SQL for Lucy’s final destructive confirmation before any `db push`, Storage creation, Edge deploy, or production deploy
+- [x] T060 Prepare clean release-candidate commits/tag, preview/canary checklist, database backup/restore, Edge rollback, Storage rollback, and post-deploy checks in `docs/ops/standalone-test-rollout.md`
+- [x] T061 Stop and present exact remote deletion counts plus migration SQL for Lucy’s final destructive confirmation before any `db push`, Storage creation, Edge deploy, or production deploy
 
 ---
 

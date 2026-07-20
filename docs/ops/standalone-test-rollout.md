@@ -99,6 +99,29 @@ The generated SQL artifact calls preview only. The only write path is the review
 - SQL/RLS migration replay: **blocked — Docker/Supabase local stack unavailable**.
 - Remote migration/apply/deploy: **not run**.
 
+## Production migration receipt — 2026-07-20 18:09–18:24 GMT+7
+
+- User authorized production backup, full schema migration, and real canonical data replacement.
+- Logical backup: `chunks-lms-pre-migration-20260720-1809-logical.json` in the Craft session data folder.
+  - Schemas: `public`, `auth`, `storage`
+  - Tables: 66
+  - Rows: 8,468
+  - Export errors: 0
+  - SHA-256: `c053a333e93ce11581e0aefbab56a475d25589509c4013808e02ba2f596deff6`
+- Hosted PITR was unavailable; CLI reported `PITR=false` and no backup timestamps.
+- Applied the seven reviewed migrations through `20260720100012_native_auth_account_role_linking.sql`.
+- First guarded replacement run `979fbb37-d195-4a4d-b4d0-b0260d615f8f` failed safely with `Package Version not found`; the inner transaction rolled back all catalog/history changes.
+- Added/applied tagged hotfix `20260720111613_fix_guarded_catalog_reset_triggers.sql` so only active allowlisted reset IDs can bypass child immutability triggers.
+- Fresh guarded run `69579d88-ccb6-4f0c-a2c2-a88379ecb1e7` succeeded:
+  - Deleted obsolete test-only graph: 1 package/version, 8 sections, 80 items, 8 measurement snapshots, 1 Learning Session, 10 questions, 10 attempts, 60 events, 10 snapshots, and legacy/mapping rows.
+  - Inserted canonical draft `Pre-test / draft-v1`: 8 sessions, 80 items, 8 CCI Name/Ampe definitions.
+  - Retained warning: Session 1 / Item 10 source CCI is `cci-002` while Session 1 uses `cci-001`.
+- Post-check preserved 22 Users, 5 Organizations, 14 Classes, and 20 Enrollments exactly. Assessment totals changed only by the previewed test-only rows.
+- Applied `20260720111950_fix_learner_access_and_extension_paths.sql` after remote lint exposed pre-existing learner-token SQL errors.
+- Rolled-back learner-link smoke test: 1 issued token, 1 valid verification row.
+- Final remote lint: no errors; only two unused-variable warnings remain in legacy generation RPCs.
+- Narration bucket exists and is private; narration variants/assets remain 0 pending explicit generation/approval.
+
 ## Rollback outline
 
 - Disable standalone routes before reverting data.

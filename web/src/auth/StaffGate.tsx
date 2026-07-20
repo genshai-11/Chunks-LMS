@@ -40,7 +40,7 @@ export function StaffGate({ role, children }: Props) {
           <Panel
             icon={Lock}
             title={role === 'admin' ? 'Admin Sign In' : 'Teacher Sign In'}
-            description="Sign in using your email magic link or Google OAuth."
+            description="Sign in with email/password, create an account, or use a magic link."
             collapsible={false}
           >
             {session.authEnabled ? (

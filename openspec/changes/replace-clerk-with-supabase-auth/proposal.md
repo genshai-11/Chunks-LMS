@@ -5,7 +5,7 @@ The web client still authenticates staff with Clerk and conditionally bridges Cl
 ## What Changes
 
 - **BREAKING (authentication provider)**: remove Clerk runtime/dependency/environment configuration and use native Supabase Auth.
-- Add email/password account creation and sign-in, magic-link sign-in, Google OAuth entry, persistent refreshable sessions, and sign-out.
+- Add email/password account creation and sign-in, magic-link sign-in, persistent refreshable sessions, and sign-out. External OAuth providers are deferred.
 - Resolve Admin/Teacher authorization only from database-owned active `staff_roles` linked by `auth_user_id`.
 - Keep newly created no-role accounts signed in but denied protected staff workspaces with a clear message.
 - Preserve signed learner-link access and stable domain user UUIDs.

@@ -20,22 +20,17 @@ Clerk and `VITE_STAFF_*_EMAILS` variables are not used. Never put a Supabase sec
 4. Authentication alone does not grant a workspace. An active `staff_roles` row must grant `admin` or `teacher`.
 5. Admin implies Teacher surface access; disabled/no-role accounts remain denied.
 
-## OAuth
+## Authentication scope
 
-The login UI reads `/auth/v1/settings` and displays Google only when the hosted provider is enabled.
+Current runtime authentication is Supabase email/password account creation/sign-in plus magic links. Email confirmation is required by hosted Auth settings.
 
-Current verification on 2026-07-20: email enabled, signup enabled, confirmation required, Google disabled.
+External OAuth providers, including Google, are intentionally deferred and have no UI or session API. A future OAuth change must separately approve credentials, provider configuration, redirects, and Preview validation.
 
-Before enabling Google in Supabase Dashboard → Authentication → Providers:
+Allowed magic-link origins must include:
 
-1. Obtain the approved Google OAuth client ID and secret; never invent or commit them.
-2. Configure the Google callback URL shown by Supabase in Google Cloud.
-3. Add allowed application redirect origins in Supabase URL Configuration:
-   - `http://localhost:5173/**`
-   - the exact Vercel preview branch alias
-   - `https://chunks-lms.vercel.app/**`
-4. Test a no-role account and a role-granted account in Preview first.
-5. Record previous provider and redirect values before mutation.
+- `http://localhost:5173/**`
+- the exact Vercel Preview branch alias
+- `https://chunks-lms.vercel.app/**`
 
 ## Preview alias
 
@@ -60,4 +55,4 @@ A new push may receive a different immutable deployment URL while retaining the 
 
 - Web: redeploy tag `preview-standalone-tests-20260719-2302` / commit `13e3dab`.
 - Auth data: no rollback is needed; native identities and domain links are preserved.
-- OAuth settings: restore the recorded provider toggle and redirect list.
+- Auth settings: no provider change is part of this release; restore recorded redirect values if they are changed later.

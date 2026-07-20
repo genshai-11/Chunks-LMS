@@ -107,7 +107,7 @@ Promote steps (authoring):
 1. Configure email signup/confirmation and exact Preview/Production redirects in Supabase Auth.  
 2. The browser client persists and refreshes the native session.  
 3. RLS evaluates `auth.uid()` through the linked domain User and active `staff_roles`.  
-4. Enable Google only with approved client credentials and Preview validation.
+4. External OAuth providers are deferred and require a separate reviewed change.
 
 See `docs/adr/0007-native-supabase-auth-for-staff.md` and `docs/ops/supabase-auth.md`.
 

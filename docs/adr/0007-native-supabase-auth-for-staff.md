@@ -20,11 +20,11 @@ Staff authorization remains database-owned:
 - Auth metadata, frontend email allowlists, and retained Clerk columns never authorize.
 - Signup may create/link an account, but a no-role account receives no staff workspace.
 
-Email/password, confirmation, magic link, and configured OAuth are supported. OAuth controls appear only for enabled hosted providers. Learners remain profile-only and use scoped signed links in V1.
+Email/password account creation/sign-in, confirmation, and magic links are supported. External OAuth providers are deferred and have no runtime controls. Learners remain profile-only and use scoped signed links in V1.
 
 ## Consequences
 
 - `@clerk/react`, Clerk environment settings, providers, hooks, and token bridges are removed.
 - Legacy Clerk identifiers remain migration and rollback evidence until a separately reviewed cleanup.
-- OAuth redirects must allow each deployed origin.
+- Magic-link redirects must allow each deployed origin; external OAuth requires a future reviewed change.
 - Rolling back the web app does not require rewriting identity rows.

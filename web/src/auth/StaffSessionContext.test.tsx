@@ -3,11 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { StaffSession } from './StaffSessionContext'
 import { SupabaseStaffSessionProvider, useStaffSession } from './StaffSessionContext'
 
-const mocks = vi.hoisted(() => ({ getSupabase: vi.fn(), getCapabilities: vi.fn() }))
-vi.mock('../lib/supabase', () => ({
-  getSupabase: mocks.getSupabase,
-  getSupabaseAuthCapabilities: mocks.getCapabilities,
-}))
+const mocks = vi.hoisted(() => ({ getSupabase: vi.fn() }))
+vi.mock('../lib/supabase', () => ({ getSupabase: mocks.getSupabase }))
 
 let latest: StaffSession | undefined
 function CaptureSession() {
@@ -43,7 +40,6 @@ function fakeClient(options?: {
         data: { session: options?.signUpSession ?? null },
         error: null,
       }),
-      signInWithOAuth: vi.fn().mockResolvedValue({ error: null }),
       signOut: vi.fn().mockResolvedValue({ error: null }),
     },
     from: vi.fn((table: string) => {
@@ -77,7 +73,6 @@ describe('Supabase staff session', () => {
   beforeEach(() => {
     latest = undefined
     mocks.getSupabase.mockReset()
-    mocks.getCapabilities.mockResolvedValue({ googleOAuth: false })
   })
 
   it('restores the native user and database-owned active roles', async () => {

@@ -17,20 +17,3 @@ export function getSupabase(): SupabaseClient<Database> | null {
   }
   return client
 }
-
-export type SupabaseAuthCapabilities = { googleOAuth: boolean }
-
-/** Read public GoTrue provider settings so disabled OAuth buttons are never shown. */
-export async function getSupabaseAuthCapabilities(): Promise<SupabaseAuthCapabilities> {
-  if (!env.supabaseUrl || !env.supabaseAnonKey) return { googleOAuth: false }
-  try {
-    const response = await fetch(`${env.supabaseUrl}/auth/v1/settings`, {
-      headers: { apikey: env.supabaseAnonKey },
-    })
-    if (!response.ok) return { googleOAuth: false }
-    const settings = (await response.json()) as { external?: { google?: boolean } }
-    return { googleOAuth: settings.external?.google === true }
-  } catch {
-    return { googleOAuth: false }
-  }
-}

@@ -7,14 +7,13 @@ Hosted Supabase already has `public.users.auth_user_id`, `staff_roles`, `auth.ui
 1. One browser `SupabaseClient` owns Auth and data access with persisted, refreshed sessions and URL callback detection.
 2. Staff roles come only from active `staff_roles`; Auth metadata and frontend email allowlists never authorize.
 3. Signup creates/links a domain user through the existing trigger. Only explicit database grants authorize a workspace.
-4. Google OAuth redirects to the current origin and requires that origin in Supabase Auth redirect configuration.
+4. External OAuth providers are deferred; the runtime exposes only Supabase email/password and magic-link flows.
 5. Learners remain outside staff Auth and use signed access links.
 6. Clerk columns remain rollback evidence but have no runtime call site.
 
 ## Risks and mitigations
 
 - **No-role signup**: show a clear access-denied state and never provision a workspace.
-- **OAuth provider disabled**: surface the Supabase error; email/password and magic link remain available.
 - **Identity duplication**: lookup/provision by `auth_user_id` and preserve stable `public.users.id`.
 - **Preview redirect mismatch**: document and verify exact Vercel branch alias before any remote Auth setting change.
 

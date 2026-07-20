@@ -29,15 +29,11 @@ The system SHALL maintain one stable domain User linked by `auth_user_id` to the
 ## ADDED Requirements
 
 ### Requirement: Native account actions
-The system SHALL support email/password sign-in and account creation, magic-link sign-in, configured Google OAuth, and sign-out through Supabase Auth.
+The system SHALL support email/password sign-in and account creation, magic-link sign-in, and sign-out through Supabase Auth.
 
 #### Scenario: Password signup requires confirmation
 - **WHEN** Supabase accepts a signup but does not return an active session
 - **THEN** the UI tells the user to confirm the account by email
-
-#### Scenario: OAuth provider unavailable
-- **WHEN** Google OAuth is not enabled or its redirect is rejected
-- **THEN** the UI displays the Supabase error and does not grant fallback access
 
 ### Requirement: Database-owned staff authorization
 The system SHALL derive Admin and Teacher permissions only from active database `staff_roles` linked to the current `auth.uid()`.

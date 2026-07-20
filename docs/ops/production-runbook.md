@@ -30,7 +30,6 @@
 Roles are active rows in `public.staff_roles`; Auth metadata and frontend allowlists do not authorize.
 
 - [ ] Supabase Auth: email sign-in/up enabled; Site URL and redirects include the production domain
-- [ ] Optional Google OAuth: approved client configured and Preview validated first
 - [ ] Migrations **never** auto-run on deploy — use [ci-cd.md](./ci-cd.md) promote checklist
 
 ---
@@ -56,7 +55,7 @@ Details: [vercel-deploy.md](./vercel-deploy.md).
 ### After deploy
 
 1. Open production URL (no `VITE_AUTH_BYPASS`).  
-2. Staff signs in with Supabase email/password, magic link, or an enabled OAuth provider.  
+2. Staff signs in with Supabase email/password or magic link.  
 3. Confirm top bar shows only roles you hold (Admin / Teacher).  
 4. Admin → **Integrity** → “Reload workspace” (optional) then “Run reconciliation”.
 

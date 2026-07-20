@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { getSupabase, getSupabaseAuthCapabilities } from '../lib/supabase'
+import { getSupabase } from '../lib/supabase'
 import {
   canAccessStaffRole,
   normalizeStaffRole,
@@ -21,7 +21,6 @@ export type StaffSession = {
   signedIn: boolean
   authBypass: boolean
   authEnabled: boolean
-  googleOAuthEnabled: boolean
   userId: string | null
   email: string | null
   displayName: string | null
@@ -37,7 +36,6 @@ export type StaffSession = {
     email: string,
     password: string,
   ) => Promise<{ ok: true; message: string } | { ok: false; error: string }>
-  signInWithGoogle: () => Promise<{ ok: true } | { ok: false; error: string }>
   signOut: () => Promise<void>
 }
 
@@ -51,17 +49,9 @@ function buildSession(
     | 'signInWithEmail'
     | 'signInWithPassword'
     | 'signUpWithPassword'
-    | 'signInWithGoogle'
     | 'signOut'
   > &
-    Pick<
-      StaffSession,
-      | 'signInWithEmail'
-      | 'signInWithPassword'
-      | 'signUpWithPassword'
-      | 'signInWithGoogle'
-      | 'signOut'
-    >,
+    Pick<StaffSession, 'signInWithEmail' | 'signInWithPassword' | 'signUpWithPassword' | 'signOut'>,
 ): StaffSession {
   return {
     ...partial,
@@ -110,10 +100,6 @@ const noopSignUpPassword: StaffSession['signUpWithPassword'] = async () => ({
   ok: false,
   error: 'Supabase Auth is not configured',
 })
-const noopSignInGoogle: StaffSession['signInWithGoogle'] = async () => ({
-  ok: false,
-  error: 'Supabase Auth is not configured',
-})
 const noopSignOut: StaffSession['signOut'] = async () => {}
 
 const BYPASS_SESSION = buildSession({
@@ -121,7 +107,6 @@ const BYPASS_SESSION = buildSession({
   signedIn: true,
   authBypass: true,
   authEnabled: false,
-  googleOAuthEnabled: false,
   userId: 'bypass-staff',
   email: null,
   displayName: 'Local staff',
@@ -129,7 +114,6 @@ const BYPASS_SESSION = buildSession({
   signInWithEmail: noopSignIn,
   signInWithPassword: noopSignInPassword,
   signUpWithPassword: noopSignUpPassword,
-  signInWithGoogle: noopSignInGoogle,
   signOut: noopSignOut,
 })
 
@@ -155,7 +139,6 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
   const [user, setUser] = useState<User | null>(null)
   const [staffRoles, setStaffRoles] = useState<StaffRole[]>([])
   const [rolesLoading, setRolesLoading] = useState(false)
-  const [googleOAuthEnabled, setGoogleOAuthEnabled] = useState(false)
 
   const signInWithEmail = useCallback<StaffSession['signInWithEmail']>(
     async (email) => {
@@ -199,29 +182,9 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
     [sb],
   )
 
-  const signInWithGoogle = useCallback<StaffSession['signInWithGoogle']>(async () => {
-    if (!sb) return { ok: false, error: 'Supabase Auth is not configured' }
-    const redirectTo = typeof window !== 'undefined' ? window.location.origin : undefined
-    const { error } = await sb.auth.signInWithOAuth({
-      provider: 'google',
-      options: redirectTo ? { redirectTo } : undefined,
-    })
-    return error ? { ok: false, error: error.message } : { ok: true }
-  }, [sb])
-
   const signOut = useCallback(async () => {
     if (sb) await sb.auth.signOut()
   }, [sb])
-
-  useEffect(() => {
-    let cancelled = false
-    void getSupabaseAuthCapabilities().then((capabilities) => {
-      if (!cancelled) setGoogleOAuthEnabled(capabilities.googleOAuth)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   useEffect(() => {
     if (!sb) {
@@ -272,7 +235,6 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
         signedIn: Boolean(user),
         authBypass: false,
         authEnabled: Boolean(sb),
-        googleOAuthEnabled,
         userId: user?.id ?? null,
         email: user?.email ?? null,
         displayName: displayNameFor(user),
@@ -280,7 +242,6 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
         signInWithEmail,
         signInWithPassword,
         signUpWithPassword,
-        signInWithGoogle,
         signOut,
       }),
     [
@@ -289,11 +250,9 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
       user,
       sb,
       staffRoles,
-      googleOAuthEnabled,
       signInWithEmail,
       signInWithPassword,
       signUpWithPassword,
-      signInWithGoogle,
       signOut,
     ],
   )

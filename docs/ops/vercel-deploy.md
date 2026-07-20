@@ -152,7 +152,7 @@ In Supabase Dashboard → Authentication → URL Configuration, add:
 - the exact Vercel Preview branch alias
 - `http://localhost:5173/**`
 
-If Google is enabled, configure the Supabase callback URL in the approved Google OAuth client and validate Preview before production.
+External OAuth providers are deferred; these origins currently support Supabase magic-link callbacks only.
 
 ## Troubleshooting
 

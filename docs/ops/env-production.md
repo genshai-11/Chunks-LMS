@@ -32,8 +32,8 @@ VITE_AUTH_BYPASS=false
 
 - Email signup/sign-in and magic links are native Supabase Auth operations.
 - Email confirmation follows hosted Auth settings.
-- Google login is displayed only when `/auth/v1/settings` reports Google enabled.
-- Configure exact local/Preview/Production redirects before enabling an OAuth provider.
+- External OAuth providers are intentionally deferred and are not shown in the application.
+- Configure exact local/Preview/Production redirects for magic links.
 - Authentication creates/links the domain User; authorization requires an active database `staff_roles` grant.
 
 See [supabase-auth.md](./supabase-auth.md).

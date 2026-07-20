@@ -135,8 +135,21 @@ The generated SQL artifact calls preview only. The only write path is the review
 - Final remote lint: no errors; only two unused-variable warnings remain in legacy generation RPCs.
 - Narration bucket exists and is private; narration variants/assets remain 0 pending explicit generation/approval.
 
+## Audio workflow preview receipt — 2026-07-20 19:10 GMT+7
+
+- Source commit: `858460de6ecfc37a8a67107f2329aa4e8278518c`
+- Annotated rollback tag: `standalone-test-audio-rc.1`
+- Vercel deployment: `dpl_FeHYfMQq6NyqSkMKuTHqSKwwzpm1`
+- Preview URL: `https://chunks-2v5atkq1x-genshai-11s-projects.vercel.app`
+- Status: **Ready**, target **preview**; access is protected by Vercel SSO.
+- Production Hosting was not changed.
+- Migration `20260720113000_current_narration_readiness.sql` was not applied.
+- Edge v3 was not deployed; preview capability detection therefore disables Generate and Play.
+- No paid TTS, package publication, or narration approval was invoked.
+
 ## Rollback outline
 
+- Preview rollback: keep production untouched; remove or ignore deployment `dpl_FeHYfMQq6NyqSkMKuTHqSKwwzpm1` and return to tag `standalone-test-audio-rc.1`.
 - Disable standalone routes before reverting data.
 - Restore deleted test-only rows from the reviewed backup.
 - Redeploy the downloaded Edge v2 source above.

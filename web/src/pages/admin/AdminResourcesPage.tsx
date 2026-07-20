@@ -4,6 +4,14 @@ import { Link } from 'react-router-dom'
 import { Flash } from '../../components/Flash'
 import { PageHeader } from '../../components/PageHeader'
 import { EmptyState, Panel } from '../../components/ui'
+import { generateNarration } from '../../modules/catalog/live-test-generation'
+import {
+  createStandaloneAssignment,
+  prepareStandaloneRun,
+  startStandaloneRun,
+} from '../../lib/standalone-tests'
+import { useAppState } from '../../state/useAppState'
+import { listActiveLearners } from '../../modules/roster/service'
 import {
   getSectionSnapshot,
   getTestPackagePublicationReadiness,
@@ -67,6 +75,116 @@ export function AdminResourcesPage() {
   const [promptDraft, setPromptDraft] = useState({ vi: '', en: '' })
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const { roster } = useAppState()
+  const learners = listActiveLearners(roster)
+  
+  const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>([])
+  const [simLearnerId, setSimLearnerId] = useState('')
+  const [startingSim, setStartingSim] = useState(false)
+  const [generatingSectionId, setGeneratingSectionId] = useState<string | null>(null)
+  const [genProgress, setGenProgress] = useState<{ done: number; total: number } | null>(null)
+
+  useEffect(() => {
+    if (learners.length > 0 && !simLearnerId) {
+      setSimLearnerId(learners[0].id)
+    }
+  }, [learners, simLearnerId])
+
+  async function startSimulation() {
+    if (!simLearnerId || !versionId || selectedSessionIds.length === 0) {
+      setError('Please select a learner and at least one session.')
+      return
+    }
+    setStartingSim(true)
+    setError(null)
+    setMessage(null)
+    try {
+      let firstRunId = ''
+      for (const secId of selectedSessionIds) {
+        // 1. Create assignment
+        const assignResult = await createStandaloneAssignment(simLearnerId, versionId)
+        if (!assignResult.ok) throw new Error(assignResult.error)
+        const assignmentId = assignResult.data
+
+        // 2. Prepare run (will auto-use selected language/voice)
+        const prepResult = await prepareStandaloneRun(assignmentId, secId, language, voiceId)
+        if (!prepResult.ok) throw new Error(prepResult.error)
+        
+        if (!prepResult.data.canStart) {
+          throw new Error(`Session is not ready: requires approved intro + 10 approved item audios. Current approved: ${prepResult.data.approvedItemAudioCount}/10. Please generate and approve audio first.`)
+        }
+
+        // 3. Start run
+        const startResult = await startStandaloneRun(prepResult.data.runId, prepResult.data.readinessToken)
+        if (!startResult.ok) throw new Error(startResult.error)
+        
+        if (!firstRunId) {
+          firstRunId = prepResult.data.runId
+        }
+      }
+      
+      setMessage(`Successfully created simulation run(s) for ${selectedSessionIds.length} session(s).`)
+      setSelectedSessionIds([])
+      if (firstRunId) {
+        window.location.href = `/teacher/test-runs/${firstRunId}`
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Simulation failed')
+    } finally {
+      setStartingSim(false)
+    }
+  }
+
+  async function generateSessionAudio(secId: string) {
+    if (!selectedScope) return
+    setGeneratingSectionId(secId)
+    setGenProgress({ done: 0, total: 11 })
+    setError(null)
+    setMessage(null)
+    try {
+      const section = sections.find((s) => s.id === secId)
+      if (!section) throw new Error('Session not found')
+      
+      const itemResult = await listTestItems(secId)
+      if (!itemResult.ok) throw new Error(itemResult.error)
+      const secItems = itemResult.data
+      if (secItems.length !== 10) {
+        throw new Error(`Session must have exactly 10 items. Found ${secItems.length}.`)
+      }
+
+      let done = 0
+      await generateNarration({
+        packageVersionId: selectedScope.version.id,
+        target: 'section_intro',
+        testSectionId: secId,
+        language,
+        voiceId,
+      })
+      done += 1
+      setGenProgress({ done, total: 11 })
+
+      for (const item of secItems) {
+        await generateNarration({
+          packageVersionId: selectedScope.version.id,
+          target: 'test_item',
+          testItemId: item.id,
+          language,
+          voiceId,
+        })
+        done += 1
+        setGenProgress({ done, total: 11 })
+      }
+
+      setMessage(`Successfully generated 11 audio assets for Session ${section.sectionOrder} (${language.toUpperCase()})`)
+      await loadPublicationReadiness()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Batch generation failed')
+    } finally {
+      setGeneratingSectionId(null)
+      setGenProgress(null)
+    }
+  }
 
   const selectedScope = scopes.find((scope) => scope.version.id === versionId) ?? null
   const selectedSection = sections.find((section) => section.id === selectedSectionId) ?? null
@@ -379,16 +497,70 @@ export function AdminResourcesPage() {
               title="Sessions"
               description="One row per test session; details no longer repeat package/version context."
               collapsible={false}
+              actions={
+                <div className="btn-row">
+                  <select
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value as AudioLanguage)}
+                  >
+                    <option value="vi">Vietnamese</option>
+                    <option value="en">English</option>
+                  </select>
+                  <label className="field-inline">
+                    Voice:
+                    <input
+                      style={{ width: '12rem', padding: '0.25rem 0.5rem', fontSize: '0.875rem' }}
+                      value={voiceId}
+                      onChange={(e) => setVoiceId(e.target.value)}
+                    />
+                  </label>
+                </div>
+              }
             >
+              {selectedSessionIds.length > 0 ? (
+                <div className="audio-batch-toolbar" style={{ marginBottom: '1rem', padding: '0.75rem', background: '#f8fafc', borderRadius: '0.5rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                  <label className="field-inline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    Learner:
+                    <select value={simLearnerId} onChange={(e) => setSimLearnerId(e.target.value)}>
+                      <option value="">Select Learner</option>
+                      {learners.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.displayName}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    className="primary"
+                    disabled={startingSim || !simLearnerId}
+                    onClick={() => void startSimulation()}
+                  >
+                    {startingSim ? 'Starting Live Test Sim…' : `Start Live Test Sim (${selectedSessionIds.length})`}
+                  </button>
+                  <button className="ghost" onClick={() => setSelectedSessionIds([])}>
+                    Cancel
+                  </button>
+                </div>
+              ) : null}
               <div className="table-wrap compact-resource-table">
                 <table>
                   <thead>
                     <tr>
+                      <th>
+                        <input
+                          type="checkbox"
+                          checked={sections.length > 0 && selectedSessionIds.length === sections.length}
+                          onChange={(e) =>
+                            setSelectedSessionIds(e.target.checked ? sections.map((s) => s.id) : [])
+                          }
+                        />
+                      </th>
                       <th>Session</th>
                       <th>Measurement</th>
                       <th>CPD</th>
                       <th>Items</th>
                       <th>Audio</th>
+                      <th>Batch Actions</th>
                       <th></th>
                     </tr>
                   </thead>
@@ -403,6 +575,19 @@ export function AdminResourcesPage() {
                           key={section.id}
                           className={selectedSectionId === section.id ? 'is-selected' : undefined}
                         >
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={selectedSessionIds.includes(section.id)}
+                              onChange={(e) =>
+                                setSelectedSessionIds((current) =>
+                                  e.target.checked
+                                    ? [...new Set([...current, section.id])]
+                                    : current.filter((id) => id !== section.id),
+                                )
+                              }
+                            />
+                          </td>
                           <td>
                             <strong>Session {section.sectionOrder}</strong>
                             <div className="meta">{section.title}</div>
@@ -432,6 +617,21 @@ export function AdminResourcesPage() {
                               </span>
                             ) : (
                               <span className="meta">Select to inspect</span>
+                            )}
+                          </td>
+                          <td>
+                            {selectedScope?.version.status === 'draft' ? (
+                              <button
+                                className="ghost"
+                                disabled={generatingSectionId !== null}
+                                onClick={() => void generateSessionAudio(section.id)}
+                              >
+                                {generatingSectionId === section.id
+                                  ? `Generating ${genProgress?.done}/${genProgress?.total}…`
+                                  : 'Generate Audio'}
+                              </button>
+                            ) : (
+                              <span className="meta">Immutable (Published)</span>
                             )}
                           </td>
                           <td>

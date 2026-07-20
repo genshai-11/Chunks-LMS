@@ -382,13 +382,70 @@ export function AdminTestAudioPage() {
       )
       return
     }
-    if (!selectedScope || dirty || invalid || !voiceId || targets.length === 0) return
+    if (!selectedScope || invalid || !voiceId || targets.length === 0) return
     setBatchProgress({ done: 0, total: targets.length })
     setError(null)
     let completed = 0
     try {
       for (const row of targets) {
         setBusyKey(row.key)
+
+        // Auto-save if dirty
+        if (row.target === 'section_intro') {
+          if (introDraft !== savedIntro && selectedSection) {
+            const sectionResult = await updateDraftTestSection({
+              sectionId: selectedSection.id,
+              packageVersionId: selectedScope.version.id,
+              title: selectedSection.title,
+              sectionOrder: selectedSection.sectionOrder,
+              ...(language === 'vi' ? { introTextVi: introDraft } : { introTextEn: introDraft }),
+            })
+            if (!sectionResult.ok) throw new Error(sectionResult.error)
+            setSavedIntro(introDraft)
+            setSections((current) =>
+              current.map((section) =>
+                section.id === selectedSection.id
+                  ? {
+                      ...section,
+                      ...(language === 'vi' ? { introTextVi: introDraft } : { introTextEn: introDraft }),
+                    }
+                  : section,
+              ),
+            )
+          }
+        } else if (row.target === 'test_item' && row.item) {
+          const nextScript = scriptDrafts[row.item.id] ?? ''
+          if (nextScript !== (savedScripts[row.item.id] ?? '')) {
+            const result = await updateDraftTestItem({
+              itemId: row.item.id,
+              packageVersionId: selectedScope.version.id,
+              promptVi: row.item.promptVi,
+              promptEn: row.item.promptEn,
+              tc: row.item.tc,
+              lc: row.item.lc,
+              tl: row.item.tl,
+              ...(language === 'vi' ? { spokenScriptVi: nextScript } : { spokenScriptEn: nextScript }),
+            })
+            if (!result.ok) throw new Error(result.error)
+            setSavedScripts((current) => ({
+              ...current,
+              [row.item!.id]: nextScript,
+            }))
+            setItems((current) =>
+              current.map((item) =>
+                item.id === row.item!.id
+                  ? {
+                      ...item,
+                      ...(language === 'vi'
+                        ? { spokenScriptVi: nextScript }
+                        : { spokenScriptEn: nextScript }),
+                    }
+                  : item,
+              ),
+            )
+          }
+        }
+
         const receipt = await generateNarration({
           packageVersionId: selectedScope.version.id,
           target: row.target,
@@ -419,6 +476,29 @@ export function AdminTestAudioPage() {
   const generateRow = (row: PreparedRow) => generateRows([row])
   const generateMissing = () => generateRows(generationTargets)
   const generateSelected = () => generateRows(rows.filter((row) => selectedKeys.includes(row.key)))
+
+  async function approveRows(targets: PreparedRow[]) {
+    setBusyKey('approve_batch')
+    setError(null)
+    let completed = 0
+    try {
+      for (const row of targets) {
+        const jobId = row.record?.variant.generationJobId
+        if (!jobId) continue
+        setBusyKey(`approve:${row.key}`)
+        await approveGeneratedAsset(jobId, 'Listened and approved in Audio Preparation')
+        completed += 1
+      }
+      setMessage(`Approved ${completed} audio asset${completed === 1 ? '' : 's'}.`)
+      setSelectedKeys([])
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Approval failed')
+    } finally {
+      setBusyKey(null)
+      await loadReview()
+    }
+  }
+  const approveSelected = () => approveRows(rows.filter((row) => selectedKeys.includes(row.key) && row.record && row.status !== 'stale' && row.record.variant.approvalStatus !== 'approved'))
 
   async function play(row: PreparedRow) {
     if (!row.record) return
@@ -623,21 +703,40 @@ export function AdminTestAudioPage() {
               Clear
             </button>
           </div>
-          <button
-            className="primary"
-            disabled={
-              !edgeReady ||
-              dirty ||
-              invalid ||
-              !voiceId ||
-              selectedKeys.length === 0 ||
-              batchProgress !== null
-            }
-            onClick={() => void generateSelected()}
-          >
-            <WandSparkles className="h-4 w-4" />
-            Generate selected ({selectedKeys.length})
-          </button>
+          <div className="btn-row">
+            <button
+              className="primary"
+              disabled={
+                !edgeReady ||
+                invalid ||
+                !voiceId ||
+                selectedKeys.length === 0 ||
+                batchProgress !== null
+              }
+              onClick={() => void generateSelected()}
+            >
+              <WandSparkles className="h-4 w-4" />
+              Generate selected ({selectedKeys.length})
+            </button>
+            <button
+              className="primary"
+              disabled={
+                selectedKeys.length === 0 ||
+                !rows.some(
+                  (row) =>
+                    selectedKeys.includes(row.key) &&
+                    row.record &&
+                    row.status !== 'stale' &&
+                    row.record.variant.approvalStatus !== 'approved'
+                ) ||
+                busyKey !== null
+              }
+              onClick={() => void approveSelected()}
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Approve selected
+            </button>
+          </div>
         </div>
         <div className="table-wrap audio-prep-table">
           <table>
@@ -681,7 +780,12 @@ export function AdminTestAudioPage() {
                   </td>
                   <td>
                     {row.target === 'section_intro' ? (
-                      <div>{row.spokenScript}</div>
+                      <textarea
+                        rows={3}
+                        aria-label="Exact spoken script Intro"
+                        value={introDraft}
+                        onChange={(event) => setIntroDraft(event.target.value)}
+                      />
                     ) : (
                       <>
                         <textarea
@@ -716,25 +820,28 @@ export function AdminTestAudioPage() {
                     ) : null}
                   </td>
                   <td>
-                    <div className="audio-row-actions">
+                    <div className="audio-row-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', minWidth: 'auto' }}>
                       <button
-                        className="ghost"
-                        disabled={!edgeReady || dirty || invalid || busyKey === row.key}
+                        className="ghost compact-action-btn"
+                        style={{ padding: '0.25rem', height: '1.75rem', width: '1.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        disabled={!edgeReady || invalid || busyKey === row.key}
                         onClick={() => void generateRow(row)}
+                        title={row.record ? 'Regenerate audio' : 'Generate audio'}
                       >
-                        <WandSparkles className="h-4 w-4" />
-                        {row.record ? 'Regenerate' : 'Generate'}
+                        <WandSparkles className="h-3.5 w-3.5" />
                       </button>
                       <button
-                        className="ghost"
+                        className="ghost compact-action-btn"
+                        style={{ padding: '0.25rem', height: '1.75rem', width: '1.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         disabled={!edgeReady || !row.record?.audio || busyKey === `play:${row.key}`}
                         onClick={() => void play(row)}
+                        title="Play audio"
                       >
-                        <Play className="h-4 w-4" />
-                        Play
+                        <Play className="h-3.5 w-3.5" />
                       </button>
                       <button
-                        className="ghost"
+                        className="ghost compact-action-btn"
+                        style={{ padding: '0.25rem', height: '1.75rem', width: '1.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         disabled={
                           !row.record ||
                           row.status === 'stale' ||
@@ -742,17 +849,18 @@ export function AdminTestAudioPage() {
                           busyKey === `approve:${row.key}`
                         }
                         onClick={() => void approve(row)}
+                        title="Approve audio"
                       >
-                        <CheckCircle2 className="h-4 w-4" />
-                        Approve
+                        <CheckCircle2 className="h-3.5 w-3.5" />
                       </button>
                       <button
-                        className="ghost"
+                        className="ghost compact-action-btn"
+                        style={{ padding: '0.25rem', height: '1.75rem', width: '1.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         disabled={!row.record}
                         onClick={() => void reject(row)}
+                        title="Reject audio"
                       >
-                        <XCircle className="h-4 w-4" />
-                        Reject
+                        <XCircle className="h-3.5 w-3.5" />
                       </button>
                     </div>
                     {playbackUrls[row.key] ? (
@@ -791,7 +899,6 @@ export function AdminTestAudioPage() {
             className="primary"
             disabled={
               !edgeReady ||
-              dirty ||
               invalid ||
               generationTargets.length === 0 ||
               batchProgress !== null

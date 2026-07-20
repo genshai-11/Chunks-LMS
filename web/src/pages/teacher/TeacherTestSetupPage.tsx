@@ -70,7 +70,7 @@ export function TeacherTestSetupPage() {
     const started = await startStandaloneRun(run.data.runId, run.data.readinessToken)
     setBusy(false)
     if (!started.ok) return setError(started.error)
-    navigate(`/teacher/tests/run/${run.data.runId}`)
+    navigate(`/teacher/test-runs/${run.data.runId}`)
   }
 
   return (

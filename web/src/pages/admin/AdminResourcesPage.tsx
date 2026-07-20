@@ -331,15 +331,16 @@ export function AdminResourcesPage() {
       if (!sb) return
       
       // 1. Fetch all items for the package version to map item -> section
-      const { data: allItems, error: itemsError } = await sb
+      const { data: allItemsRaw, error: itemsError } = await sb
         .from('test_items')
         .select('id, section_id')
         .eq('package_version_id', versionId)
         
-      if (itemsError || !allItems) return
+      if (itemsError || !allItemsRaw) return
+      const allItems = allItemsRaw as Array<{ id: string; section_id: string | null }>
       
       // 2. Fetch all approved variants for the package version and voice
-      const { data: variants, error: variantsError } = await sb
+      const { data: variantsRaw, error: variantsError } = await sb
         .from('narration_variants')
         .select('test_section_id, test_item_id, language')
         .eq('package_version_id', versionId)
@@ -347,7 +348,8 @@ export function AdminResourcesPage() {
         .eq('approval_status', 'approved')
         .not('audio_asset_id', 'is', null)
         
-      if (variantsError || !variants || !active) return
+      if (variantsError || !variantsRaw || !active) return
+      const variants = variantsRaw as Array<{ test_section_id: string | null; test_item_id: string | null; language: string }>
 
       const itemToSection = new Map<string, string>()
       for (const item of allItems) {

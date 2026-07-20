@@ -19,7 +19,8 @@ type Action =
   | "generateNarration"
   | "approveGeneratedAsset"
   | "getNarrationPlaybackUrl"
-  | "getCapabilities";
+  | "getCapabilities"
+  | "listTtsModels";
 
 type GenerateTestItemBody = {
   action: "generateTestItem";
@@ -49,13 +50,26 @@ type GetNarrationPlaybackUrlBody = {
   narrationVariantId: string;
 };
 
+type ListTtsModelsBody = {
+  action: "listTtsModels";
+  language?: "vi" | "en";
+};
+
+type GetCapabilitiesBody = {
+  action: "getCapabilities";
+};
+
 type RequestBody =
   | GenerateTestItemBody
   | GenerateNarrationBody
   | ApproveGeneratedAssetBody
-  | GetNarrationPlaybackUrlBody;
+  | GetNarrationPlaybackUrlBody
+  | ListTtsModelsBody
+  | GetCapabilitiesBody;
 
-type SupabaseClientLike = ReturnType<typeof createClient>;
+// Supabase Edge functions intentionally use dynamic table names without generated DB types.
+// deno-lint-ignore no-explicit-any
+type SupabaseClientLike = any;
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -117,7 +131,8 @@ function makeAdapter(): LiveTestGenerationAdapter {
 async function sha256Hex(input: string | Uint8Array): Promise<string> {
   const bytes =
     typeof input === "string" ? new TextEncoder().encode(input) : input;
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const digestBytes = new Uint8Array(bytes).buffer;
+  const digest = await crypto.subtle.digest("SHA-256", digestBytes);
   return Array.from(new Uint8Array(digest), (b) =>
     b.toString(16).padStart(2, "0"),
   ).join("");
@@ -524,6 +539,62 @@ async function generateNarration(
   };
 }
 
+async function listTtsModels(body: ListTtsModelsBody) {
+  const baseUrl = (getEnv("NINEROUTER_URL") ?? "").replace(/\/+$/, "");
+  if (!baseUrl) throw new Error("NINEROUTER_URL is not configured.");
+  const apiKey = getEnv("NINEROUTER_KEY");
+  const headers: Record<string, string> = apiKey
+    ? { Authorization: `Bearer ${apiKey}` }
+    : {};
+  const modelResponse = await fetch(`${baseUrl}/v1/models/tts`, { headers });
+  const modelPayload = await modelResponse.json().catch(() => null) as {
+    data?: Array<{ id?: string; owned_by?: string }>;
+  } | null;
+  if (!modelResponse.ok) {
+    throw new Error(`9Router TTS model discovery failed (${modelResponse.status}).`);
+  }
+
+  const models = new Map<string, { id: string; provider: string; label: string }>();
+  for (const model of modelPayload?.data ?? []) {
+    if (!model.id) continue;
+    models.set(model.id, {
+      id: model.id,
+      provider: model.owned_by ?? model.id.split("/")[0] ?? "unknown",
+      label: model.id,
+    });
+  }
+
+  if (body.language === "vi" || body.language === "en") {
+    const languageTag = body.language === "vi" ? "vi" : "en";
+    const voiceResponse = await fetch(
+      `${baseUrl}/v1/audio/voices?provider=edge-tts&lang=${languageTag}`,
+      { headers },
+    );
+    if (voiceResponse.ok) {
+      const voicePayload = await voiceResponse.json().catch(() => null) as {
+        data?: Array<{ model?: string; id?: string; name?: string }>;
+      } | null;
+      for (const voice of voicePayload?.data ?? []) {
+        const rawId = voice.model ?? voice.id;
+        if (!rawId) continue;
+        const id = rawId.startsWith("edge-tts/") ? rawId : `edge-tts/${rawId}`;
+        models.set(id, {
+          id,
+          provider: "edge-tts",
+          label: voice.name ? `${voice.name} · ${id}` : id,
+        });
+      }
+    }
+  }
+
+  return {
+    language: body.language ?? null,
+    models: [...models.values()].sort((a, b) =>
+      a.provider.localeCompare(b.provider) || a.label.localeCompare(b.label)
+    ),
+  };
+}
+
 async function getNarrationPlaybackUrl(
   body: GetNarrationPlaybackUrlBody,
   userClient: SupabaseClientLike,
@@ -609,14 +680,20 @@ async function handleRequest(req: Request): Promise<Response> {
 
   if (body.action === "getCapabilities") {
     return jsonResponse({
-      version: 3,
+      version: 4,
       exactSpokenScripts: true,
       signedNarrationPlayback: true,
+      ttsModelDiscovery: true,
+      selectedBatchGeneration: true,
       paidGenerationRequiresExplicitAction: true,
     });
   }
 
   const actorUserId = await requireAdmin(userClient);
+
+  if (body.action === "listTtsModels") {
+    return jsonResponse(await listTtsModels(body as ListTtsModelsBody));
+  }
 
   if (body.action === "approveGeneratedAsset") {
     const { data, error } = await userClient.rpc("approve_generated_asset", {

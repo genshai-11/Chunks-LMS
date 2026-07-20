@@ -21,9 +21,18 @@ export function getLiveTestGenerationCapabilities(): Promise<{
   version: number
   exactSpokenScripts: boolean
   signedNarrationPlayback: boolean
+  ttsModelDiscovery: boolean
+  selectedBatchGeneration: boolean
   paidGenerationRequiresExplicitAction: boolean
 }> {
   return invoke({ action: 'getCapabilities' })
+}
+
+export function listTtsModels(language: 'vi' | 'en'): Promise<{
+  language: 'vi' | 'en'
+  models: Array<{ id: string; provider: string; label: string }>
+}> {
+  return invoke({ action: 'listTtsModels', language })
 }
 
 export function generateNarration(input: {

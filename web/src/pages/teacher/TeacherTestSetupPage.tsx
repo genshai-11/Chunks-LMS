@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Flash } from '../../components/Flash'
 import { PageHeader } from '../../components/PageHeader'
 import { Panel } from '../../components/ui'
-import { listTestSections } from '../../lib/test-packages'
+import { listApprovedSectionVoiceIds, listTestSections } from '../../lib/test-packages'
 import {
   listStandaloneAssignments,
   prepareStandaloneRun,
@@ -17,7 +17,8 @@ export function TeacherTestSetupPage() {
   const [sections, setSections] = useState<Array<any>>([])
   const [sectionId, setSectionId] = useState(initialSectionId ?? '')
   const [language, setLanguage] = useState<'vi' | 'en'>('vi')
-  const [voiceId, setVoiceId] = useState('alloy')
+  const [voiceId, setVoiceId] = useState('')
+  const [approvedVoiceIds, setApprovedVoiceIds] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -39,6 +40,15 @@ export function TeacherTestSetupPage() {
       )
     })()
   }, [assignmentId])
+
+  useEffect(() => {
+    if (!sectionId) return
+    void listApprovedSectionVoiceIds(sectionId, language).then((result) => {
+      if (!result.ok) return setError(result.error)
+      setApprovedVoiceIds(result.data)
+      setVoiceId((current) => (result.data.includes(current) ? current : (result.data[0] ?? '')))
+    })
+  }, [language, sectionId])
 
   async function prepareAndStart() {
     if (!assignmentId || !sectionId) return
@@ -100,8 +110,15 @@ export function TeacherTestSetupPage() {
             </select>
           </label>
           <label className="field">
-            Approved voice
-            <input value={voiceId} onChange={(event) => setVoiceId(event.target.value)} />
+            Approved TTS model / voice
+            <select value={voiceId} onChange={(event) => setVoiceId(event.target.value)}>
+              <option value="">Select approved bundle</option>
+              {approvedVoiceIds.map((id) => (
+                <option key={id} value={id}>
+                  {id}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
         <p className="banner-inline">
@@ -115,10 +132,16 @@ export function TeacherTestSetupPage() {
             No Session is available in the assigned published Package Version.
           </p>
         ) : null}
+        {sectionId && approvedVoiceIds.length === 0 ? (
+          <p className="banner-inline warning">
+            <AlertTriangle className="h-4 w-4" />
+            No approved {language.toUpperCase()} audio model is available for this Session.
+          </p>
+        ) : null}
         <div className="btn-row">
           <button
             className="primary"
-            disabled={busy || !assignmentId || !sectionId}
+            disabled={busy || !assignmentId || !sectionId || !voiceId}
             onClick={() => void prepareAndStart()}
           >
             {busy ? 'Checking 11/11 readiness…' : 'Check readiness & start'}

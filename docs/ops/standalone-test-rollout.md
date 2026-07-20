@@ -1,6 +1,6 @@
 # Standalone learner test rollout
 
-**Status:** canonical database replacement and private Storage baseline are applied. Package-first Resources, Audio Preparation, current-hash readiness, signed playback, and runner sequencing are implemented locally. Migration `20260720113000_current_narration_readiness.sql`, Edge v3, paid generation, preview promotion, and production Hosting remain separately gated.
+**Status:** canonical database replacement and private Storage baseline are applied. Package-first Resources, Audio Preparation, current-hash readiness, signed playback, and runner sequencing are implemented locally. Migration `20260720113000_current_narration_readiness.sql`, Edge v4, paid generation, preview promotion, and production Hosting remain separately gated.
 
 ## Baseline
 
@@ -95,9 +95,9 @@ The generated SQL artifact calls preview only. The only write path is the review
 - TypeScript typecheck: **passed**.
 - Production build: **passed**; existing bundle-size/dynamic-import warnings remain.
 - Native Oxlint: no new errors; three pre-existing warnings remain in `StaffSessionContext.tsx`, `main.tsx`, and `TeacherObservePage.tsx`.
-- Edge source check: **blocked — Deno is not installed** (`deno: command not found`).
+- Edge v4 source check: **passed** with `npx deno check --node-modules-dir=auto`; v4 adds server-side 9Router model discovery and explicit one/selected/all generation controls.
 - SQL/RLS migration replay and the new current-hash pgTAP test: **blocked — Docker/Supabase local stack unavailable**.
-- Open deployment gates: new readiness migration, Edge v3, paid TTS, package publication, and production Hosting.
+- Open deployment gates: new readiness migration, Edge v4, paid TTS, package publication, and production Hosting.
 - Preview safety: Audio Preparation probes Edge capabilities and disables Generate/Play against deployed Edge v2, so saving scripts cannot accidentally invoke old paid generation behavior.
 
 ## Earlier local validation results — 2026-07-19

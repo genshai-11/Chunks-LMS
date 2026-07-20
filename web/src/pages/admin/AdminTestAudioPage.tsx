@@ -32,6 +32,7 @@ import {
   generateNarration,
   getLiveTestGenerationCapabilities,
   getNarrationPlaybackUrl,
+  listTtsModels,
 } from '../../modules/catalog/live-test-generation'
 import {
   audioReadiness,
@@ -75,7 +76,11 @@ export function AdminTestAudioPage() {
   const [language, setLanguage] = useState<AudioLanguage>(
     params.get('language') === 'en' ? 'en' : 'vi',
   )
-  const [voiceId, setVoiceId] = useState(params.get('voice') ?? 'alloy')
+  const [voiceId, setVoiceId] = useState(params.get('voice') ?? '')
+  const [ttsModels, setTtsModels] = useState<
+    Array<{ id: string; provider: string; label: string }>
+  >([])
+  const [modelsLoading, setModelsLoading] = useState(false)
   const [items, setItems] = useState<TestItem[]>([])
   const [snapshot, setSnapshot] = useState<SectionMeasurementSnapshot | null>(null)
   const [cciCategory, setCciCategory] = useState<CciCategory | null>(null)
@@ -87,6 +92,7 @@ export function AdminTestAudioPage() {
   const [hashes, setHashes] = useState<Record<string, string>>({})
   const [playbackUrls, setPlaybackUrls] = useState<Record<string, string>>({})
   const [edgeReady, setEdgeReady] = useState<boolean | null>(null)
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([])
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [batchProgress, setBatchProgress] = useState<{ done: number; total: number } | null>(null)
   const [message, setMessage] = useState<string | null>(null)
@@ -98,13 +104,41 @@ export function AdminTestAudioPage() {
     void getLiveTestGenerationCapabilities()
       .then((capabilities) =>
         setEdgeReady(
-          capabilities.version >= 3 &&
+          capabilities.version >= 4 &&
             capabilities.exactSpokenScripts &&
-            capabilities.signedNarrationPlayback,
+            capabilities.signedNarrationPlayback &&
+            capabilities.ttsModelDiscovery,
         ),
       )
       .catch(() => setEdgeReady(false))
   }, [])
+
+  useEffect(() => {
+    if (!edgeReady) return
+    setModelsLoading(true)
+    void listTtsModels(language)
+      .then((result) => {
+        setTtsModels(result.models)
+        setVoiceId((current) => {
+          if (result.models.some((model) => model.id === current)) return current
+          const languageNeedle = language === 'vi' ? 'vi-' : 'en-'
+          return (
+            result.models.find((model) => model.id.toLowerCase().includes(languageNeedle))?.id ??
+            result.models.find((model) => model.id.toLowerCase().includes('multilingual'))?.id ??
+            result.models[0]?.id ??
+            ''
+          )
+        })
+      })
+      .catch((cause) =>
+        setError(cause instanceof Error ? cause.message : 'TTS model discovery failed'),
+      )
+      .finally(() => setModelsLoading(false))
+  }, [edgeReady, language])
+
+  useEffect(() => {
+    setSelectedKeys([])
+  }, [language, sectionId, voiceId])
 
   useEffect(() => {
     void (async () => {
@@ -317,9 +351,7 @@ export function AdminTestAudioPage() {
         section.id === selectedSection.id
           ? {
               ...section,
-              ...(language === 'vi'
-                ? { introTextVi: introDraft }
-                : { introTextEn: introDraft }),
+              ...(language === 'vi' ? { introTextVi: introDraft } : { introTextEn: introDraft }),
             }
           : section,
       ),
@@ -337,42 +369,47 @@ export function AdminTestAudioPage() {
     await loadReview()
   }
 
-  async function generateRow(row: PreparedRow) {
+  async function generateRows(targets: PreparedRow[]) {
     if (!edgeReady) {
-      setError('Paid generation is disabled until live-test-generation v3 is deployed and verified.')
+      setError(
+        'Paid generation is disabled until live-test-generation v4 is deployed and verified.',
+      )
       return
     }
-    if (!selectedScope || dirty || !row.spokenScript.trim()) return
-    setBusyKey(row.key)
+    if (!selectedScope || dirty || invalid || !voiceId || targets.length === 0) return
+    setBatchProgress({ done: 0, total: targets.length })
     setError(null)
+    let completed = 0
     try {
-      await generateNarration({
-        packageVersionId: selectedScope.version.id,
-        target: row.target,
-        testSectionId: row.target === 'section_intro' ? row.sectionId : undefined,
-        testItemId: row.target === 'test_item' ? row.item?.id : undefined,
-        language,
-        voiceId,
-      })
-      setMessage(`Generated ${row.label}. Listen and approve it.`)
-      await loadReview()
+      for (const row of targets) {
+        setBusyKey(row.key)
+        await generateNarration({
+          packageVersionId: selectedScope.version.id,
+          target: row.target,
+          testSectionId: row.target === 'section_intro' ? row.sectionId : undefined,
+          testItemId: row.target === 'test_item' ? row.item?.id : undefined,
+          language,
+          voiceId,
+        })
+        completed += 1
+        setBatchProgress({ done: completed, total: targets.length })
+      }
+      setMessage(
+        `Generated ${completed} audio asset${completed === 1 ? '' : 's'} with ${voiceId}. Listen before approval.`,
+      )
+      setSelectedKeys([])
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Generation failed')
     } finally {
       setBusyKey(null)
+      setBatchProgress(null)
+      await loadReview()
     }
   }
 
-  async function generateMissing() {
-    const targets = rows.filter((row) => row.bundleStatus !== 'approved')
-    setBatchProgress({ done: 0, total: targets.length })
-    for (let index = 0; index < targets.length; index += 1) {
-      await generateRow(targets[index]!)
-      setBatchProgress({ done: index + 1, total: targets.length })
-    }
-    setBatchProgress(null)
-    await loadReview()
-  }
+  const generateRow = (row: PreparedRow) => generateRows([row])
+  const generateMissing = () => generateRows(rows.filter((row) => row.bundleStatus !== 'approved'))
+  const generateSelected = () => generateRows(rows.filter((row) => selectedKeys.includes(row.key)))
 
   async function play(row: PreparedRow) {
     if (!row.record) return
@@ -473,8 +510,23 @@ export function AdminTestAudioPage() {
             </select>
           </label>
           <label className="field">
-            Voice ID
-            <input value={voiceId} onChange={(event) => setVoiceId(event.target.value)} />
+            9Router TTS model / voice
+            <input
+              list="tts-model-options"
+              value={voiceId}
+              onChange={(event) => setVoiceId(event.target.value)}
+              placeholder={modelsLoading ? 'Loading 9Router models…' : 'Select or enter model ID'}
+            />
+            <datalist id="tts-model-options">
+              {ttsModels.map((model) => (
+                <option key={model.id} value={model.id}>
+                  {model.label}
+                </option>
+              ))}
+            </datalist>
+            <span className="meta">
+              {ttsModels.length} live model/voice options · model ID is part of readiness
+            </span>
           </label>
         </div>
         <div className="audio-prep-metrics">
@@ -518,7 +570,8 @@ export function AdminTestAudioPage() {
         {edgeReady === false ? (
           <p className="banner-inline warning">
             <AlertTriangle className="h-4 w-4" />
-            Script preparation is available, but Generate and Play are disabled until the separately gated live-test-generation v3 deployment.
+            Script preparation is available, but model discovery, Generate, and Play are disabled
+            until the separately gated live-test-generation v4 deployment.
           </p>
         ) : null}
         {dirty ? (
@@ -542,10 +595,59 @@ export function AdminTestAudioPage() {
             {cciCategory?.description ? `Description: ${cciCategory.description}` : ''}
           </div>
         </div>
+        <div className="audio-batch-toolbar">
+          <div className="btn-row">
+            <button
+              className="ghost"
+              onClick={() =>
+                setSelectedKeys(
+                  rows.filter((row) => row.bundleStatus !== 'approved').map((row) => row.key),
+                )
+              }
+            >
+              Select missing / stale
+            </button>
+            <button className="ghost" onClick={() => setSelectedKeys(rows.map((row) => row.key))}>
+              Select all 11
+            </button>
+            <button
+              className="ghost"
+              onClick={() => setSelectedKeys([])}
+              disabled={selectedKeys.length === 0}
+            >
+              Clear
+            </button>
+          </div>
+          <button
+            className="primary"
+            disabled={
+              !edgeReady ||
+              dirty ||
+              invalid ||
+              !voiceId ||
+              selectedKeys.length === 0 ||
+              batchProgress !== null
+            }
+            onClick={() => void generateSelected()}
+          >
+            <WandSparkles className="h-4 w-4" />
+            Generate selected ({selectedKeys.length})
+          </button>
+        </div>
         <div className="table-wrap audio-prep-table">
           <table>
             <thead>
               <tr>
+                <th>
+                  <input
+                    type="checkbox"
+                    aria-label="Select all audio scripts"
+                    checked={rows.length > 0 && selectedKeys.length === rows.length}
+                    onChange={(event) =>
+                      setSelectedKeys(event.target.checked ? rows.map((row) => row.key) : [])
+                    }
+                  />
+                </th>
                 <th>#</th>
                 <th>Exact spoken script</th>
                 <th>Status</th>
@@ -555,6 +657,20 @@ export function AdminTestAudioPage() {
             <tbody>
               {rows.map((row) => (
                 <tr key={row.key}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${row.label}`}
+                      checked={selectedKeys.includes(row.key)}
+                      onChange={(event) =>
+                        setSelectedKeys((current) =>
+                          event.target.checked
+                            ? [...new Set([...current, row.key])]
+                            : current.filter((key) => key !== row.key),
+                        )
+                      }
+                    />
+                  </td>
                   <td>
                     <strong>{row.label}</strong>
                   </td>

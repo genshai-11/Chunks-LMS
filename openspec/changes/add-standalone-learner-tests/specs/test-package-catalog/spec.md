@@ -57,6 +57,14 @@ The system SHALL persist generation jobs, variants, private audio metadata, appr
 - **WHEN** an Admin reloads Audio Preparation
 - **THEN** generated, approved, rejected, failed, and stale variants remain available for listen, regenerate, approve, or reject actions
 
+#### Scenario: Discover and test 9Router models
+- **WHEN** an Admin selects Vietnamese or English in Audio Preparation
+- **THEN** the system fetches current 9Router TTS model/voice IDs server-side and allows generation for one row, multiple selected rows, or all missing/stale rows in that Session
+
+#### Scenario: Change the selected TTS model
+- **WHEN** an Admin chooses a different model or voice ID
+- **THEN** readiness is recalculated independently because the model ID is part of the narration source hash
+
 #### Scenario: Request playback
 - **WHEN** authorized staff plays narration
 - **THEN** the system returns a short-lived signed URL without making the narration bucket public

@@ -284,6 +284,27 @@ function mapNarrationVariant(row: any): NarrationVariant {
   }
 }
 
+export async function listApprovedSectionVoiceIds(
+  sectionId: string,
+  language: 'vi' | 'en',
+): Promise<Result<string[]>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { data, error } = await sb
+    .from('narration_variants')
+    .select('voice_id')
+    .eq('test_section_id', sectionId)
+    .eq('narration_target', 'section_intro')
+    .eq('language', language)
+    .eq('approval_status', 'approved')
+    .not('audio_asset_id', 'is', null)
+  if (error) return { ok: false, error: error.message }
+  const voiceIds: string[] = (data ?? [])
+    .map((row: any) => String(row.voice_id ?? ''))
+    .filter((value: string) => value.length > 0)
+  return { ok: true, data: [...new Set<string>(voiceIds)].sort() }
+}
+
 export async function listNarrationVariants(itemId: string): Promise<Result<NarrationVariant[]>> {
   const sb = client()
   if (!sb) return { ok: false, error: 'Supabase is not configured' }

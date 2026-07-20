@@ -173,6 +173,22 @@ The generated SQL artifact calls preview only. The only write path is the review
 - Authenticated production canary passed: 16 models loaded, English generated state persisted, and signed playback was active.
 - Canonical Package Version remains `draft`; bulk generation, human approvals, and publication intentionally remain open so narration is not frozen before review.
 
+## Resources v5 production receipt — 2026-07-20 20:20 GMT+7
+
+- Source commit: `6dc89fc9950ffcb6c625a873121323d0f9baaac6`
+- Rollback tag: `standalone-test-resources-v5-rc.1`
+- Deleted UI surfaces: `/admin/resources/advanced` and `/admin/integrity`; all corresponding imports, routes, navigation links, and page files were removed.
+- Signed-in auth actions were reduced to one compact Account menu; mobile hides extra backend sync icon buttons.
+- Migration `20260720133000_editable_spoken_scripts_and_publish_gate.sql`: **applied**, migration parity confirmed, remote error-level lint passed.
+- Exact item narration is stored independently in `spoken_script_vi` / `spoken_script_en`; canonical source prompts remain unchanged.
+- Edge Function platform version 4 is active and uses exact script overrides before deterministic Số/Number fallbacks.
+- Canary override persisted across reload and production promotion: Session 1 Item 1 Vietnamese is `Câu 1. Cảnh sát giao thông đứng ở ngã tư mỗi buổi sáng.` while its source sentence remains unchanged.
+- Guarded publication requires all eight Sessions ready for both Vietnamese and English using the chosen model IDs, then records an immutable snapshot hash.
+- Current publication blocker is visible and correct: `VI 0/8 · EN 0/8`; Publish remains disabled, so the draft cannot yet appear in one-to-one Test setup.
+- Preview deployment: `dpl_AHPx5JdbxhWJYvYUcbgFsmVDWq1j`, status **Ready**.
+- Production deployment: `dpl_H4KHaexUigg7YxJoKAgtN1w3rudY`, status **Ready**, aliased to `https://chunks-lms.vercel.app`.
+- Authenticated production checks passed: no Advanced/Integrity links, compact Account menu present, publication disabled at 0/8 + 0/8, and Câu 1 override loaded from Supabase.
+
 ## Rollback outline
 
 - Preview rollback: keep production untouched; remove or ignore deployment `dpl_FeHYfMQq6NyqSkMKuTHqSKwwzpm1` and return to tag `standalone-test-audio-rc.1`.

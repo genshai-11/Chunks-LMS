@@ -32,7 +32,16 @@ Intake-driven: each bug report from the owner becomes one **Fix Group** below. N
 > - **Repro**: <steps> | **Expected**: <…> | **Actual**: <…>
 > - [ ] Reproduce → [ ] Fix → [ ] CI parity green → [ ] Commit `<sha>` → [ ] Smoke per quickstart.md
 
-_No bugs reported yet — send the list and each item becomes a Fix Group here._
+### Fix Group UI-001 — Session page: remove Live Test button & Session label picker (P1, severity: major)
+
+- **Reported**: 2026-07-20 | **Route**: `/teacher/session` | **Area**: Teacher
+- **Repro**: Open Start session form → "Session format" panel shows a **Live Test** button; "Session label" panel shows Regular day / Pretest / Posttest.
+- **Expected**: Session page only splits the class (lesson sessions) — no Live Test button (live tests live under `/teacher/tests` standalone module); no session label picker because the default is `regular`.
+- **Actual**: Both pickers visible on the class-session start form.
+- [x] Reproduce → confirmed panels at `TeacherSessionPage.tsx` (Session format / Live-test resource / Session label)
+- [x] Fix → removed 3 panels + live-test state/effects/imports; `startLiveNow` now relies on domain defaults (`regular`/`lesson`); historical sessions still display their `sessionKind` badge
+- [x] CI parity green → oxlint 0 errors · tsc -b exit 0 · vitest 142/142 pass · vite build (see commit)
+- [x] Commit `<see git log>` → [ ] Smoke per quickstart.md (pending owner check on preview)
 
 ## Phase 3 — Batch close-out (per fix batch)
 

@@ -1,14 +1,133 @@
-import { useState } from 'react'
-import { Gauge, Play, Volume2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { AlertTriangle, ClipboardPlus, Volume2 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { Flash } from '../../components/Flash'
 import { PageHeader } from '../../components/PageHeader'
 import { Panel } from '../../components/ui'
-import { prepareStandaloneRun, startStandaloneRun } from '../../lib/standalone-tests'
-import type { PromptLanguage } from '../../modules/standalone-tests/types'
+import { listTestSections } from '../../lib/test-packages'
+import {
+  listStandaloneAssignments,
+  prepareStandaloneRun,
+  startStandaloneRun,
+} from '../../lib/standalone-tests'
 
-export function TeacherTestSetupPage(){
- const {assignmentId,sectionId}=useParams(); const navigate=useNavigate(); const [language,setLanguage]=useState<PromptLanguage>('vi'); const [voice,setVoice]=useState('alloy'); const [preview,setPreview]=useState<Awaited<ReturnType<typeof prepareStandaloneRun>> extends {ok:true;data:infer T}?T:any>(null); const [message,setMessage]=useState('')
- async function check(){if(!assignmentId||!sectionId)return; const r=await prepareStandaloneRun(assignmentId,sectionId,language,voice); if(!r.ok){setMessage(r.error);return} setPreview(r.data);setMessage(r.data.canStart?'Audio ready.':'Start blocked: approve intro and all ten item narrations.')}
- async function start(){if(!preview?.canStart)return; const r=await startStandaloneRun(preview.runId,preview.readinessToken); if(!r.ok)return setMessage(r.error); navigate(`/teacher/test-runs/${preview.runId}`)}
- return <><PageHeader icon={Gauge} kicker="Standalone Test" title="Session setup" subtitle="Choose Complete Vietnamese or Complete English and an approved voice before start."/><Panel icon={Volume2} title="Prompt and audio" description="The introduction reads Session number, CVR, CCI Ampe, and CCI Name."><div className="form-grid"><label>Complete language<select value={language} onChange={e=>{setLanguage(e.target.value as PromptLanguage);setPreview(null)}}><option value="vi">Vietnamese — Complete Sentence</option><option value="en">English — Complete Sentence</option></select></label><label>Voice ID<input value={voice} onChange={e=>{setVoice(e.target.value);setPreview(null)}}/></label></div><div className="btn-row"><button onClick={()=>void check()}>Check readiness</button><button className="primary" disabled={!preview?.canStart} onClick={()=>void start()}><Play className="h-4 w-4"/>Start</button></div>{preview?<div className="stat-grid compact"><div className="stat-card"><strong>Session {preview.sessionNumber}</strong><span>CVR {preview.targetCvrOhm}</span></div><div className="stat-card"><strong>CCI {preview.cciValue}</strong><span>{preview.cciName}</span></div><div className="stat-card"><strong>CPD {preview.itemCpd}</strong><span>Approved audio {preview.approvedItemAudioCount}/10</span></div></div>:null}{message?<p className="meta">{message}</p>:null}</Panel></>
+export function TeacherTestSetupPage() {
+  const { assignmentId, sectionId: initialSectionId } = useParams()
+  const navigate = useNavigate()
+  const [sections, setSections] = useState<Array<any>>([])
+  const [sectionId, setSectionId] = useState(initialSectionId ?? '')
+  const [language, setLanguage] = useState<'vi' | 'en'>('vi')
+  const [voiceId, setVoiceId] = useState('alloy')
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!assignmentId) return
+    void (async () => {
+      const assignments = await listStandaloneAssignments()
+      if (!assignments.ok) return setError(assignments.error)
+      const assignment = assignments.data.find((candidate) => candidate.id === assignmentId)
+      if (!assignment) return setError('Standalone assignment not found')
+      const sectionResult = await listTestSections(assignment.packageVersionId)
+      if (!sectionResult.ok) return setError(sectionResult.error)
+      setSections(sectionResult.data)
+      setSectionId((current) =>
+        sectionResult.data.some((section) => section.id === current)
+          ? current
+          : (sectionResult.data[0]?.id ?? ''),
+      )
+    })()
+  }, [assignmentId])
+
+  async function prepareAndStart() {
+    if (!assignmentId || !sectionId) return
+    setBusy(true)
+    setError(null)
+    setMessage(null)
+    const run = await prepareStandaloneRun(assignmentId, sectionId, language, voiceId)
+    if (!run.ok) {
+      setBusy(false)
+      return setError(run.error)
+    }
+    if (!run.data.canStart) {
+      setBusy(false)
+      setMessage(
+        `Run is not ready: intro approval plus 10/10 current item audios are required. Current item count: ${run.data.approvedItemAudioCount}/10 for ${language.toUpperCase()} / ${voiceId}.`,
+      )
+      return
+    }
+    const started = await startStandaloneRun(run.data.runId, run.data.readinessToken)
+    setBusy(false)
+    if (!started.ok) return setError(started.error)
+    navigate(`/teacher/tests/run/${run.data.runId}`)
+  }
+
+  return (
+    <>
+      <PageHeader
+        icon={ClipboardPlus}
+        kicker="Teacher · One-to-one Tests"
+        title="Prepare Test Run"
+        subtitle="Choose one Session and one approved language/voice bundle for this existing Learner assignment."
+      />
+      <Flash message={message} error={error} />
+      <Panel
+        icon={ClipboardPlus}
+        title="Run setup"
+        description="This standalone flow does not use Classes, Enrollments, or Live Sessions."
+        collapsible={false}
+      >
+        <div className="form-grid">
+          <label className="field">
+            Session
+            <select value={sectionId} onChange={(event) => setSectionId(event.target.value)}>
+              {sections.map((section) => (
+                <option key={section.id} value={section.id}>
+                  Session {section.sectionOrder} · {section.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            Prompt language
+            <select
+              value={language}
+              onChange={(event) => setLanguage(event.target.value as 'vi' | 'en')}
+            >
+              <option value="vi">Vietnamese Complete</option>
+              <option value="en">English Complete</option>
+            </select>
+          </label>
+          <label className="field">
+            Approved voice
+            <input value={voiceId} onChange={(event) => setVoiceId(event.target.value)} />
+          </label>
+        </div>
+        <p className="banner-inline">
+          <Volume2 className="h-4 w-4" />
+          Start requires one approved current intro plus ten approved current item audios for this
+          exact language and voice.
+        </p>
+        {sections.length === 0 ? (
+          <p className="banner-inline warning">
+            <AlertTriangle className="h-4 w-4" />
+            No Session is available in the assigned published Package Version.
+          </p>
+        ) : null}
+        <div className="btn-row">
+          <button
+            className="primary"
+            disabled={busy || !assignmentId || !sectionId}
+            onClick={() => void prepareAndStart()}
+          >
+            {busy ? 'Checking 11/11 readiness…' : 'Check readiness & start'}
+          </button>
+          <button className="ghost" onClick={() => navigate('/teacher/tests')}>
+            Cancel
+          </button>
+        </div>
+      </Panel>
+    </>
+  )
 }

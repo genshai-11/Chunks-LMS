@@ -1,6 +1,6 @@
 # Standalone learner test rollout
 
-**Status:** local implementation only — no remote database, Storage, Edge, or Hosting changes approved.
+**Status:** canonical database replacement and private Storage baseline are applied. Package-first Resources, Audio Preparation, current-hash readiness, signed playback, and runner sequencing are implemented locally. Migration `20260720113000_current_narration_readiness.sql`, Edge v3, paid generation, preview promotion, and production Hosting remain separately gated.
 
 ## Baseline
 
@@ -46,7 +46,7 @@ The deployed source supports stable generation/narration/approval actions. The l
 - Parser: exact-pinned `read-excel-file@9.3.2`
 - Dependency audit: zero known vulnerabilities at installation time.
 
-## Known hosted data impact — discovery only
+## Historical hosted data impact — pre-replacement discovery
 
 Current read-only inspection found:
 
@@ -56,7 +56,7 @@ Current read-only inspection found:
 - zero narration variants and generation jobs;
 - no `narration-audio` bucket.
 
-No deletion has been performed.
+At discovery time no deletion had been performed. The later authorized replacement is recorded in the production receipt below.
 
 ### Exact preflight impact query
 
@@ -87,7 +87,20 @@ The generated SQL artifact calls preview only. The only write path is the review
 6. One learner + one session canary.
 7. Separate preview/production approval.
 
-## Local validation results — 2026-07-19
+## Local validation results — 2026-07-20 19:04 GMT+7
+
+- OpenSpec strict validation: **11 passed, 0 failed**.
+- Import tests: **6 passed**.
+- Web tests: **141 passed across 36 files**.
+- TypeScript typecheck: **passed**.
+- Production build: **passed**; existing bundle-size/dynamic-import warnings remain.
+- Native Oxlint: no new errors; three pre-existing warnings remain in `StaffSessionContext.tsx`, `main.tsx`, and `TeacherObservePage.tsx`.
+- Edge source check: **blocked — Deno is not installed** (`deno: command not found`).
+- SQL/RLS migration replay and the new current-hash pgTAP test: **blocked — Docker/Supabase local stack unavailable**.
+- Open deployment gates: new readiness migration, Edge v3, paid TTS, package publication, and production Hosting.
+- Preview safety: Audio Preparation probes Edge capabilities and disables Generate/Play against deployed Edge v2, so saving scripts cannot accidentally invoke old paid generation behavior.
+
+## Earlier local validation results — 2026-07-19
 
 - OpenSpec strict validation: **10 passed, 0 failed**.
 - Import tests: **6 passed**.

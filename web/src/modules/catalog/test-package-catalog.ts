@@ -25,6 +25,11 @@ export type TestSection = {
   packageVersionId: string
   sectionOrder: number
   title: string | null
+  introTextVi?: string | null
+  introTextEn?: string | null
+  targetCvrOhm?: number | null
+  cciProfileId?: string | null
+  cciCategoryId?: string | null
 }
 
 export type TestItem = {
@@ -32,6 +37,8 @@ export type TestItem = {
   sectionId: string
   packageVersionId: string
   itemOrder: number
+  termVi?: string | null
+  termEn?: string | null
   promptVi: string | null
   promptEn: string | null
   tc: number | null

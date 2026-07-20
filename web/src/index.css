@@ -4113,4 +4113,161 @@
   .mobile-bottom-label {
     @apply text-[10px] font-semibold tracking-wide;
   }
+
+  /* ——— Package-first Resource workspace ——— */
+  .resource-scope-bar {
+    @apply grid gap-3 md:grid-cols-[minmax(16rem,1fr)_auto] md:items-end;
+  }
+
+  .resource-scope-bar .field {
+    @apply m-0;
+  }
+
+  .resource-scope-summary {
+    @apply flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600;
+  }
+
+  .resource-scope-summary strong {
+    @apply text-slate-900;
+  }
+
+  .resource-tabs {
+    @apply mt-3 flex flex-wrap gap-1 border-t border-slate-100 pt-3;
+  }
+
+  .resource-tabs button {
+    @apply min-h-8 px-3 py-1 text-xs;
+  }
+
+  .compact-resource-table table {
+    @apply min-w-[46rem];
+  }
+
+  .compact-resource-table th,
+  .compact-resource-table td {
+    @apply align-top;
+  }
+
+  .compact-resource-table tr.is-selected td {
+    @apply bg-red-50/40;
+  }
+
+  .resource-search {
+    @apply mb-2 flex-row items-center gap-2;
+  }
+
+  .resource-search input {
+    @apply flex-1;
+  }
+
+  .resource-script-edit {
+    @apply grid min-w-[20rem] gap-2;
+  }
+
+  .link-button {
+    @apply mt-1 border-0 bg-transparent p-0 text-[11px] font-semibold text-red-600 shadow-none hover:text-red-700;
+  }
+
+  .resource-row-details {
+    @apply mt-2 grid gap-1 rounded-lg border border-slate-100 bg-slate-50 p-2 text-xs text-slate-600;
+  }
+
+  .audio-readiness-card {
+    @apply flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 lg:flex-row lg:items-center lg:justify-between;
+  }
+
+  .audio-readiness-card .btn-row {
+    @apply m-0;
+  }
+
+  .audio-readiness-card input,
+  .audio-readiness-card select {
+    @apply min-h-9;
+  }
+
+  /* ——— Test Audio Preparation ——— */
+  .audio-prep-scope {
+    @apply grid gap-3 sm:grid-cols-2 xl:grid-cols-4;
+  }
+
+  .audio-prep-scope .field {
+    @apply m-0;
+  }
+
+  .audio-prep-metrics {
+    @apply mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3;
+  }
+
+  .audio-script-intro {
+    @apply mb-3 grid gap-1 rounded-xl border border-red-100 bg-red-50/30 p-3;
+  }
+
+  .audio-script-intro .field {
+    @apply m-0;
+  }
+
+  .audio-prep-table table {
+    @apply min-w-[64rem];
+  }
+
+  .audio-prep-table th:nth-child(1) {
+    @apply w-14;
+  }
+
+  .audio-prep-table th:nth-child(2) {
+    @apply min-w-[24rem];
+  }
+
+  .audio-prep-table th:nth-child(3) {
+    @apply w-28;
+  }
+
+  .audio-prep-table textarea {
+    @apply min-h-14 w-full;
+  }
+
+  .audio-row-actions {
+    @apply flex min-w-[18rem] flex-wrap gap-1;
+  }
+
+  .audio-row-actions button {
+    @apply min-h-8 px-2 py-1 text-[11px];
+  }
+
+  .audio-review-player {
+    @apply mt-2 h-8 w-full max-w-sm;
+  }
+
+  .audio-bundle-gate {
+    @apply flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between;
+  }
+
+  .error-text {
+    @apply mt-1 max-w-xs text-red-600;
+  }
+
+  /* ——— Standalone Test audio sequence ——— */
+  .runner-audio-gate {
+    @apply mb-4 grid gap-3 rounded-xl border border-red-100 bg-red-50/30 p-4;
+  }
+
+  .runner-audio-status {
+    @apply flex items-center gap-3;
+  }
+
+  .runner-audio-status > svg {
+    @apply text-red-600;
+  }
+
+  .runner-audio-gate audio {
+    @apply h-10 w-full max-w-xl;
+  }
+
+  .test-run-actions {
+    @apply flex flex-wrap items-center gap-2;
+  }
+
+  .test-run-actions .meta {
+    @apply inline-flex items-center gap-1;
+  }
 }

@@ -1,5 +1,9 @@
 import { getSupabase } from './supabase'
-import type { PromptLanguage, StandaloneAssignmentStatus, StandaloneRunStatus } from '../modules/standalone-tests/types'
+import type {
+  PromptLanguage,
+  StandaloneAssignmentStatus,
+  StandaloneRunStatus,
+} from '../modules/standalone-tests/types'
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: string }
 
@@ -69,28 +73,46 @@ function run(row: any): StandaloneTestRunRow {
   }
 }
 
-export async function listStandaloneAssignments(learnerUserId?: string): Promise<Result<StandaloneTestAssignmentRow[]>> {
+export async function listStandaloneAssignments(
+  learnerUserId?: string,
+): Promise<Result<StandaloneTestAssignmentRow[]>> {
   const sb = client()
   if (!sb) return { ok: false, error: 'Supabase is not configured' }
-  let query = sb.from('standalone_test_assignments').select('*').order('assigned_at', { ascending: false })
+  let query = sb
+    .from('standalone_test_assignments')
+    .select('*')
+    .order('assigned_at', { ascending: false })
   if (learnerUserId) query = query.eq('learner_user_id', learnerUserId)
   const { data, error } = await query
   if (error) return { ok: false, error: error.message }
   return { ok: true, data: (data ?? []).map(assignment) }
 }
 
-export async function listStandaloneRuns(assignmentId: string): Promise<Result<StandaloneTestRunRow[]>> {
+export async function listStandaloneRuns(
+  assignmentId: string,
+): Promise<Result<StandaloneTestRunRow[]>> {
   const sb = client()
   if (!sb) return { ok: false, error: 'Supabase is not configured' }
-  const { data, error } = await sb.from('standalone_test_runs').select('*').eq('assignment_id', assignmentId).order('session_number').order('attempt_number')
+  const { data, error } = await sb
+    .from('standalone_test_runs')
+    .select('*')
+    .eq('assignment_id', assignmentId)
+    .order('session_number')
+    .order('attempt_number')
   if (error) return { ok: false, error: error.message }
   return { ok: true, data: (data ?? []).map(run) }
 }
 
-export async function getStandaloneRun(runId: string): Promise<Result<StandaloneTestRunRow | null>> {
+export async function getStandaloneRun(
+  runId: string,
+): Promise<Result<StandaloneTestRunRow | null>> {
   const sb = client()
   if (!sb) return { ok: false, error: 'Supabase is not configured' }
-  const { data, error } = await sb.from('standalone_test_runs').select('*').eq('id', runId).maybeSingle()
+  const { data, error } = await sb
+    .from('standalone_test_runs')
+    .select('*')
+    .eq('id', runId)
+    .maybeSingle()
   if (error) return { ok: false, error: error.message }
   return { ok: true, data: data ? run(data) : null }
 }
@@ -104,30 +126,112 @@ async function rpc<T>(name: string, args: Record<string, unknown>): Promise<Resu
 }
 
 export const createStandaloneAssignment = (learnerUserId: string, packageVersionId: string) =>
-  rpc<string>('create_standalone_test_assignment', { p_learner_user_id: learnerUserId, p_package_version_id: packageVersionId })
+  rpc<string>('create_standalone_test_assignment', {
+    p_learner_user_id: learnerUserId,
+    p_package_version_id: packageVersionId,
+  })
 
-export const prepareStandaloneRun = (assignmentId: string, sectionId: string, language: PromptLanguage, voiceId: string) =>
-  rpc<{ runId: string; canStart: boolean; readinessToken: string; approvedItemAudioCount: number; sessionNumber: number; targetCvrOhm: number; cciName: string; cciValue: number; itemCpd: number }>('prepare_standalone_test_run', { p_assignment_id: assignmentId, p_test_section_id: sectionId, p_language: language, p_voice_id: voiceId })
+export const prepareStandaloneRun = (
+  assignmentId: string,
+  sectionId: string,
+  language: PromptLanguage,
+  voiceId: string,
+) =>
+  rpc<{
+    runId: string
+    canStart: boolean
+    readinessToken: string
+    approvedItemAudioCount: number
+    sessionNumber: number
+    targetCvrOhm: number
+    cciName: string
+    cciValue: number
+    itemCpd: number
+  }>('prepare_standalone_test_run', {
+    p_assignment_id: assignmentId,
+    p_test_section_id: sectionId,
+    p_language: language,
+    p_voice_id: voiceId,
+  })
 
 export const startStandaloneRun = (runId: string, readinessToken: string) =>
-  rpc<{ runId: string; status: 'in_progress'; itemCount: number }>('start_standalone_test_run', { p_run_id: runId, p_readiness_token: readinessToken })
+  rpc<{ runId: string; status: 'in_progress'; itemCount: number }>('start_standalone_test_run', {
+    p_run_id: runId,
+    p_readiness_token: readinessToken,
+  })
 
-export const recordStandaloneResult = (runItemId: string, color: 'red' | 'yellow' | 'green' | 'purple') =>
-  rpc<{ attemptId: string; status: string; effectiveColor: string | null; probeCount: number }>('record_standalone_provisional_result', { p_run_item_id: runItemId, p_color: color })
+export const recordStandaloneResult = (
+  runItemId: string,
+  color: 'red' | 'yellow' | 'green' | 'purple',
+) =>
+  rpc<{ attemptId: string; status: string; effectiveColor: string | null; probeCount: number }>(
+    'record_standalone_provisional_result',
+    { p_run_item_id: runItemId, p_color: color },
+  )
 
 export const resolveStandaloneProbe = (attemptId: string, outcome: 'fail' | 'continue' | 'done') =>
-  rpc<{ attemptId: string; status: string; effectiveColor: string | null; probeCount: number }>('resolve_standalone_probe', { p_attempt_id: attemptId, p_outcome: outcome })
+  rpc<{ attemptId: string; status: string; effectiveColor: string | null; probeCount: number }>(
+    'resolve_standalone_probe',
+    { p_attempt_id: attemptId, p_outcome: outcome },
+  )
 
 export const completeStandaloneRun = (runId: string) =>
-  rpc<{ runId: string; status: 'completed'; finalizedItems: number }>('complete_standalone_test_run', { p_run_id: runId })
+  rpc<{ runId: string; status: 'completed'; finalizedItems: number }>(
+    'complete_standalone_test_run',
+    { p_run_id: runId },
+  )
 
 export const getLearnerStandaloneResults = (learnerUserId: string) =>
-  rpc<{ learnerUserId: string; runCount: number; averageLearnerCpdScore: number | null; runs: Array<Record<string, unknown>> }>('get_learner_standalone_test_results', { p_learner_user_id: learnerUserId, p_package_id: null })
+  rpc<{
+    learnerUserId: string
+    runCount: number
+    averageLearnerCpdScore: number | null
+    runs: Array<Record<string, unknown>>
+  }>('get_learner_standalone_test_results', {
+    p_learner_user_id: learnerUserId,
+    p_package_id: null,
+  })
 
-export async function listStandaloneRunItems(runId: string): Promise<Result<Array<Record<string, unknown>>>> {
+export async function getStandaloneRunRuntime(runId: string): Promise<
+  Result<{
+    id: string
+    status: string
+    promptLanguage: 'vi' | 'en'
+    voiceId: string
+    introNarrationVariantId: string | null
+  }>
+> {
   const sb = client()
   if (!sb) return { ok: false, error: 'Supabase is not configured' }
-  const { data, error } = await sb.from('standalone_test_run_items').select('*, standalone_test_attempts(*, standalone_test_attempt_snapshots(*))').eq('run_id', runId).order('item_order')
+  const { data, error } = await sb
+    .from('standalone_test_runs')
+    .select('id, status, prompt_language, voice_id, intro_narration_variant_id')
+    .eq('id', runId)
+    .maybeSingle()
+  if (error) return { ok: false, error: error.message }
+  if (!data) return { ok: false, error: 'Standalone Test Run not found' }
+  return {
+    ok: true,
+    data: {
+      id: data.id,
+      status: data.status,
+      promptLanguage: data.prompt_language,
+      voiceId: data.voice_id,
+      introNarrationVariantId: data.intro_narration_variant_id,
+    },
+  }
+}
+
+export async function listStandaloneRunItems(
+  runId: string,
+): Promise<Result<Array<Record<string, unknown>>>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { data, error } = await sb
+    .from('standalone_test_run_items')
+    .select('*, standalone_test_attempts(*, standalone_test_attempt_snapshots(*))')
+    .eq('run_id', runId)
+    .order('item_order')
   if (error) return { ok: false, error: error.message }
   return { ok: true, data: data ?? [] }
 }

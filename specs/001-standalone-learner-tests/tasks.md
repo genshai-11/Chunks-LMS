@@ -102,9 +102,9 @@
 
 - [x] T032 [US3] Reconcile and harden stable Edge actions without adding `generateCVRPreview` in `supabase/functions/live-test-generation/index.ts` and `supabase/functions/live-test-generation/adapters.ts`
 - [x] T033 [US3] Create a migration via `supabase migration new narration_storage_policies` and add private narration bucket/policies in `supabase/migrations/*_narration_storage_policies.sql`
-- [x] T034 [US3] Implement generation/approval client and readiness calculation in `web/src/modules/catalog/live-test-generation.ts` and `web/src/modules/catalog/narration-readiness.ts`
-- [x] T035 [US3] Build audio generation, playback review, approval/reject, and readiness panels in `web/src/components/test-resources/AudioReadinessPanel.tsx`
-- [x] T036 [US3] Integrate audio review into `web/src/pages/admin/AdminResourcesPage.tsx`
+- [x] T034 [US3] Implement generation/approval/playback clients, exact spoken scripts, source hashing, and readiness calculation in `web/src/modules/catalog/live-test-generation.ts`, `web/src/modules/catalog/spoken-scripts.ts`, and `web/src/modules/catalog/narration-readiness.ts`
+- [x] T035 [US3] Build persistent script preparation, generation, private playback review, approve/reject, retry, stale status, and 11-asset readiness in `web/src/pages/admin/AdminTestAudioPage.tsx`
+- [x] T036 [US3] Integrate package-first Audio Prep entry/readiness into `web/src/pages/admin/AdminResourcesPage.tsx` and preserve dense CRUD under `/admin/resources/advanced`
 
 **Checkpoint**: Audio is private, audited, review-gated, and runtime readiness is deterministic.
 

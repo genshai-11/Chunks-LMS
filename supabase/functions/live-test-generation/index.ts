@@ -15,7 +15,11 @@ const corsHeaders = {
 };
 
 type Action =
-  "generateTestItem" | "generateNarration" | "approveGeneratedAsset";
+  | "generateTestItem"
+  | "generateNarration"
+  | "approveGeneratedAsset"
+  | "getNarrationPlaybackUrl"
+  | "getCapabilities";
 
 type GenerateTestItemBody = {
   action: "generateTestItem";
@@ -40,8 +44,16 @@ type ApproveGeneratedAssetBody = {
   notes?: string;
 };
 
+type GetNarrationPlaybackUrlBody = {
+  action: "getNarrationPlaybackUrl";
+  narrationVariantId: string;
+};
+
 type RequestBody =
-  GenerateTestItemBody | GenerateNarrationBody | ApproveGeneratedAssetBody;
+  | GenerateTestItemBody
+  | GenerateNarrationBody
+  | ApproveGeneratedAssetBody
+  | GetNarrationPlaybackUrlBody;
 
 type SupabaseClientLike = ReturnType<typeof createClient>;
 
@@ -298,7 +310,7 @@ async function resolveNarrationText(
       throw new Error("Invalid parameters for section_intro narration target.");
     const { data: section, error: sectionError } = await admin
       .from("test_sections")
-      .select("section_order, title")
+      .select("section_order, intro_text_vi, intro_text_en")
       .eq("id", body.testSectionId)
       .eq("package_version_id", body.packageVersionId)
       .maybeSingle();
@@ -307,23 +319,12 @@ async function resolveNarrationText(
     if (!section)
       throw new Error("Invalid testSectionId: Section text was not found.");
 
-    // Fetch the latest snapshot for this section
-    const { data: snapshot, error: snapshotError } = await admin
-      .from("section_measurement_snapshots")
-      .select("target_cvr_ohm, cci_value, cci_category_label")
-      .eq("test_section_id", body.testSectionId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (snapshotError)
-      throw new Error(`Snapshot lookup failed: ${snapshotError.message}`);
-
-    const targetCvr = snapshot ? snapshot.target_cvr_ohm : 0;
-    const cciValue = snapshot ? snapshot.cci_value : 0;
-    const cciLabel = snapshot ? snapshot.cci_category_label : "CCI Pending";
-
-    // Text: Session <order>. <cvr> ohm. <cci> Ampe. <label>.
-    return `Session ${section.section_order}. ${targetCvr} ohm. ${cciValue} Ampe. ${cciLabel}.`;
+    const rawText = body.language === "vi"
+      ? section.intro_text_vi
+      : section.intro_text_en;
+    if (!rawText)
+      throw new Error("Section intro text is missing for the requested language.");
+    return String(rawText).trim().replace(/\s+/g, " ");
   }
 
   if (!body.testItemId || body.testSectionId)
@@ -344,8 +345,10 @@ async function resolveNarrationText(
       "Invalid testItemId: Item text was not found for requested language.",
     );
 
-  const orderStr = String(item.item_order).padStart(2, "0");
-  return `Number ${orderStr}. ${rawText}`;
+  const prefix = body.language === "vi"
+    ? `Số ${item.item_order}.`
+    : `Number ${item.item_order}.`;
+  return `${prefix} ${String(rawText).trim().replace(/\s+/g, " ")}`;
 }
 
 
@@ -521,6 +524,55 @@ async function generateNarration(
   };
 }
 
+async function getNarrationPlaybackUrl(
+  body: GetNarrationPlaybackUrlBody,
+  userClient: SupabaseClientLike,
+  admin: SupabaseClientLike,
+) {
+  if (!body.narrationVariantId)
+    throw new Error("narrationVariantId is required.");
+  const [{ data: actorId, error: actorError }, { data: isAdmin, error: adminError }] =
+    await Promise.all([
+      userClient.rpc("current_staff_user_id"),
+      userClient.rpc("current_staff_is_admin"),
+    ]);
+  if (actorError || !actorId)
+    throw new Error(`Staff access required: ${actorError?.message ?? "no active staff role"}`);
+  if (adminError) throw new Error(`Admin check failed: ${adminError.message}`);
+
+  const { data: variant, error: variantError } = await admin
+    .from("narration_variants")
+    .select("id, approval_status, audio_asset_id")
+    .eq("id", body.narrationVariantId)
+    .maybeSingle();
+  if (variantError) throw new Error(`Narration lookup failed: ${variantError.message}`);
+  if (!variant?.audio_asset_id) throw new Error("Narration audio is not available.");
+  if (isAdmin !== true && variant.approval_status !== "approved")
+    throw new Error("Only approved narration can be played by Teachers.");
+
+  const { data: audio, error: audioError } = await admin
+    .from("audio_assets")
+    .select("storage_bucket, storage_path, mime_type, duration_ms")
+    .eq("id", variant.audio_asset_id)
+    .maybeSingle();
+  if (audioError) throw new Error(`Audio lookup failed: ${audioError.message}`);
+  if (!audio) throw new Error("Audio asset was not found.");
+
+  const expiresIn = 600;
+  const { data: signed, error: signedError } = await admin.storage
+    .from(audio.storage_bucket)
+    .createSignedUrl(audio.storage_path, expiresIn);
+  if (signedError || !signed?.signedUrl)
+    throw new Error(`Playback URL failed: ${signedError?.message ?? "missing signed URL"}`);
+  return {
+    narrationVariantId: variant.id,
+    signedUrl: signed.signedUrl,
+    expiresIn,
+    mimeType: audio.mime_type,
+    durationMs: audio.duration_ms,
+  };
+}
+
 async function handleRequest(req: Request): Promise<Response> {
   if (req.method === "OPTIONS")
     return new Response("ok", { headers: corsHeaders });
@@ -544,6 +596,25 @@ async function handleRequest(req: Request): Promise<Response> {
   const adminClient = createClient(supabaseUrl, getSecretKey(), {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  if (body.action === "getNarrationPlaybackUrl") {
+    return jsonResponse(
+      await getNarrationPlaybackUrl(
+        body as GetNarrationPlaybackUrlBody,
+        userClient,
+        adminClient,
+      ),
+    );
+  }
+
+  if (body.action === "getCapabilities") {
+    return jsonResponse({
+      version: 3,
+      exactSpokenScripts: true,
+      signedNarrationPlayback: true,
+      paidGenerationRequiresExplicitAction: true,
+    });
+  }
 
   const actorUserId = await requireAdmin(userClient);
 

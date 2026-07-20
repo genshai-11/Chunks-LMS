@@ -12,16 +12,16 @@
 
 ## 4. Resource and Audio Management
 
-- [ ] 4.1 Complete Spec Kit tasks T022–T028: immutable catalog domain/data access and split Admin Resources workspace
-- [ ] 4.2 Complete Spec Kit tasks T029–T036: private 9Router narration generation, approval, stale-hash/readiness checks, and Admin audio review
+- [ ] 4.1 Complete Spec Kit tasks T022–T028: package-first Resource source is complete; component coverage remains open
+- [ ] 4.2 Complete Spec Kit tasks T029–T036: Audio Prep, signed playback, stale hashes, and approval source are complete; Edge/Storage tests and hosted deployment remain open
 
 ## 5. Standalone Test Execution
 
-- [ ] 5.1 Complete Spec Kit tasks T037–T047 with tests first: one-Learner assignment, setup/readiness, isolated runtime, result/probe/correction RPCs, resume, completion, and routes
+- [ ] 5.1 Complete Spec Kit tasks T037–T047: runtime source and audio sequence are complete; remaining domain/component/SQL test tasks stay open
 
 ## 6. Standalone Test Results
 
-- [ ] 6.1 Complete Spec Kit tasks T048–T054 with tests first: authorized correction-aware CPD reporting and separate learner-profile Test Results tab
+- [ ] 6.1 Complete Spec Kit tasks T048–T054: reporting RPC and separate Test Results UI are complete; dedicated reporting/component/SQL tests stay open
 
 ## 7. Validation and Release Controls
 

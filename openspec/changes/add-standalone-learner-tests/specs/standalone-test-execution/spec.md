@@ -21,6 +21,14 @@ The system SHALL present and read Session number, CVR, CCI Ampe, and CCI Name be
 - **WHEN** Vietnamese is selected
 - **THEN** the introduction metadata and all ten Vietnamese complete sentences use their approved Vietnamese narration
 
+#### Scenario: Runtime audio sequence
+- **WHEN** an audio-ready run starts
+- **THEN** the approved intro plays once, each ordered item narration plays before its result capture, and Pass/Fail remains disabled until that item audio finishes
+
+#### Scenario: Teacher requests unapproved playback
+- **WHEN** a Teacher requests playback for a generated, rejected, or stale narration variant
+- **THEN** the system refuses the request while Admin review playback remains available
+
 ### Requirement: Isolated runtime state
 The system SHALL keep standalone routes, runtime state, persistence, and results separate from live class sessions.
 

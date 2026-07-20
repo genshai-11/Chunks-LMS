@@ -38,3 +38,25 @@ The system SHALL track approved current introduction and item narration independ
 #### Scenario: Incomplete language audio
 - **WHEN** any selected-language introduction or item narration is missing, stale, rejected, or unapproved
 - **THEN** the session is not runtime-ready for that language and voice
+
+### Requirement: Deterministic spoken scripts
+The system SHALL prepare and persist the exact text sent to TTS before any paid generation action.
+
+#### Scenario: Prepare a Session bundle
+- **WHEN** an Admin prepares a language/voice bundle
+- **THEN** the intro includes Session number, CVR, CCI Ampe, CCI Name, optional CCI Description, and `Start` or `Bắt đầu`, while each item begins with `Number n` or `Số n`
+
+#### Scenario: Edit a saved script
+- **WHEN** an Admin changes any intro or item script
+- **THEN** prior audio with a different source hash is stale and cannot satisfy the current 11-asset readiness gate
+
+### Requirement: Persistent private audio review
+The system SHALL persist generation jobs, variants, private audio metadata, approval history, and review state across page reloads.
+
+#### Scenario: Review generated narration
+- **WHEN** an Admin reloads Audio Preparation
+- **THEN** generated, approved, rejected, failed, and stale variants remain available for listen, regenerate, approve, or reject actions
+
+#### Scenario: Request playback
+- **WHEN** authorized staff plays narration
+- **THEN** the system returns a short-lived signed URL without making the narration bucket public

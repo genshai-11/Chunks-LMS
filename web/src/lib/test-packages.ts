@@ -43,6 +43,11 @@ function mapTestSection(row: any): TestSection {
     packageVersionId: row.package_version_id,
     sectionOrder: row.section_order,
     title: row.title,
+    introTextVi: row.intro_text_vi ?? null,
+    introTextEn: row.intro_text_en ?? null,
+    targetCvrOhm: row.target_cvr_ohm == null ? null : Number(row.target_cvr_ohm),
+    cciProfileId: row.cci_profile_id ?? null,
+    cciCategoryId: row.cci_category_id ?? null,
   }
 }
 
@@ -52,6 +57,8 @@ function mapTestItem(row: any): TestItem {
     sectionId: row.section_id,
     packageVersionId: row.package_version_id,
     itemOrder: row.item_order,
+    termVi: row.term_vi ?? null,
+    termEn: row.term_en ?? null,
     promptVi: row.prompt_vi,
     promptEn: row.prompt_en,
     tc: row.tc ? Number(row.tc) : null,
@@ -224,9 +231,37 @@ export type NarrationVariant = {
   language: 'vi' | 'en'
   voiceId: string
   voiceLabel: string | null
+  sourceTextHash: string
   approvalStatus: 'draft' | 'generated' | 'approved' | 'rejected' | 'archived'
   audioAssetId: string | null
   generationJobId: string | null
+  approvedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type NarrationAudioAsset = {
+  id: string
+  storageBucket: string
+  storagePath: string
+  mimeType: string
+  durationMs: number | null
+  bytes: number | null
+  createdAt: string
+}
+
+export type NarrationGenerationJob = {
+  id: string
+  status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
+  errorMessage: string | null
+  requestedAt: string
+  completedAt: string | null
+}
+
+export type NarrationReviewRecord = {
+  variant: NarrationVariant
+  audio: NarrationAudioAsset | null
+  job: NarrationGenerationJob | null
 }
 
 function mapNarrationVariant(row: any): NarrationVariant {
@@ -239,9 +274,13 @@ function mapNarrationVariant(row: any): NarrationVariant {
     language: row.language,
     voiceId: row.voice_id,
     voiceLabel: row.voice_label,
+    sourceTextHash: row.source_text_hash,
     approvalStatus: row.approval_status,
     audioAssetId: row.audio_asset_id,
     generationJobId: row.generation_job_id,
+    approvedAt: row.approved_at ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   }
 }
 
@@ -255,6 +294,102 @@ export async function listNarrationVariants(itemId: string): Promise<Result<Narr
     .order('created_at', { ascending: false })
   if (error) return { ok: false, error: error.message }
   return { ok: true, data: (data ?? []).map(mapNarrationVariant) }
+}
+
+export async function listSectionNarrationReview(input: {
+  packageVersionId: string
+  sectionId: string
+  itemIds: string[]
+  language: 'vi' | 'en'
+  voiceId: string
+}): Promise<Result<NarrationReviewRecord[]>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { data, error } = await sb
+    .from('narration_variants')
+    .select('*')
+    .eq('package_version_id', input.packageVersionId)
+    .eq('language', input.language)
+    .eq('voice_id', input.voiceId)
+    .order('created_at', { ascending: false })
+  if (error) return { ok: false, error: error.message }
+  const itemIds = new Set(input.itemIds)
+  const variants = (data ?? [])
+    .map(mapNarrationVariant)
+    .filter(
+      (variant: NarrationVariant) =>
+        variant.testSectionId === input.sectionId ||
+        (variant.testItemId !== null && itemIds.has(variant.testItemId)),
+    )
+  const audioIds = [
+    ...new Set(variants.map((v: NarrationVariant) => v.audioAssetId).filter(Boolean)),
+  ]
+  const jobIds = [
+    ...new Set(variants.map((v: NarrationVariant) => v.generationJobId).filter(Boolean)),
+  ]
+  const [{ data: audioRows, error: audioError }, { data: jobRows, error: jobError }] =
+    await Promise.all([
+      audioIds.length
+        ? sb.from('audio_assets').select('*').in('id', audioIds)
+        : Promise.resolve({ data: [], error: null }),
+      jobIds.length
+        ? sb.from('generation_jobs').select('*').in('id', jobIds)
+        : Promise.resolve({ data: [], error: null }),
+    ])
+  if (audioError) return { ok: false, error: audioError.message }
+  if (jobError) return { ok: false, error: jobError.message }
+  const audioById = new Map(
+    (audioRows ?? []).map((row: any) => [
+      row.id,
+      {
+        id: row.id,
+        storageBucket: row.storage_bucket,
+        storagePath: row.storage_path,
+        mimeType: row.mime_type,
+        durationMs: row.duration_ms == null ? null : Number(row.duration_ms),
+        bytes: row.bytes == null ? null : Number(row.bytes),
+        createdAt: row.created_at,
+      } satisfies NarrationAudioAsset,
+    ]),
+  )
+  const jobById = new Map(
+    (jobRows ?? []).map((row: any) => [
+      row.id,
+      {
+        id: row.id,
+        status: row.status,
+        errorMessage: row.error_message ?? null,
+        requestedAt: row.requested_at,
+        completedAt: row.completed_at ?? null,
+      } satisfies NarrationGenerationJob,
+    ]),
+  )
+  return {
+    ok: true,
+    data: variants.map((variant: NarrationVariant) => ({
+      variant,
+      audio: variant.audioAssetId
+        ? ((audioById.get(variant.audioAssetId) as NarrationAudioAsset | undefined) ?? null)
+        : null,
+      job: variant.generationJobId
+        ? ((jobById.get(variant.generationJobId) as NarrationGenerationJob | undefined) ?? null)
+        : null,
+    })),
+  }
+}
+
+export async function setNarrationReviewStatus(
+  variantId: string,
+  status: 'rejected' | 'archived',
+): Promise<Result<true>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { error } = await sb
+    .from('narration_variants')
+    .update({ approval_status: status, approved_at: null, approved_by_user_id: null })
+    .eq('id', variantId)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: true }
 }
 
 async function assertDraftPackageVersion(packageVersionId: string): Promise<Result<true>> {
@@ -398,14 +533,19 @@ export async function updateDraftTestSection(input: {
   packageVersionId: string
   title: string | null
   sectionOrder: number
+  introTextVi?: string | null
+  introTextEn?: string | null
 }): Promise<Result<TestSection>> {
   const draft = await assertDraftPackageVersion(input.packageVersionId)
   if (!draft.ok) return draft
   const sb = client()
   if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const values: Record<string, unknown> = { title: input.title, section_order: input.sectionOrder }
+  if ('introTextVi' in input) values.intro_text_vi = input.introTextVi ?? null
+  if ('introTextEn' in input) values.intro_text_en = input.introTextEn ?? null
   const { data, error } = await sb
     .from('test_sections')
-    .update({ title: input.title, section_order: input.sectionOrder })
+    .update(values)
     .eq('id', input.sectionId)
     .eq('package_version_id', input.packageVersionId)
     .select()

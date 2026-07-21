@@ -321,7 +321,7 @@ export function AdminResourcesPage() {
   const [sectionsReadiness, setSectionsReadiness] = useState<Record<string, { vi: number; en: number }>>({})
 
   useEffect(() => {
-    if (!versionId || !voiceId) {
+    if (!versionId) {
       setSectionsReadiness({})
       return
     }
@@ -339,12 +339,12 @@ export function AdminResourcesPage() {
       if (itemsError || !allItemsRaw) return
       const allItems = allItemsRaw as Array<{ id: string; section_id: string | null }>
       
-      // 2. Fetch all approved variants for the package version and voice
+      // 2. Fetch all approved variants for the package version, regardless of voice/model.
+      // The Sessions tab is a dataset/resource overview; model-specific readiness belongs in Audio Prep / Run setup.
       const { data: variantsRaw, error: variantsError } = await sb
         .from('narration_variants')
         .select('test_section_id, test_item_id, language')
         .eq('package_version_id', versionId)
-        .eq('voice_id', voiceId)
         .eq('approval_status', 'approved')
         .not('audio_asset_id', 'is', null)
         
@@ -381,7 +381,7 @@ export function AdminResourcesPage() {
     return () => {
       active = false
     }
-  }, [versionId, voiceId, sections])
+  }, [versionId, sections])
 
   const loadPublicationReadiness = useCallback(async () => {
     if (!selectedScope) {
@@ -572,14 +572,15 @@ export function AdminResourcesPage() {
                     <option value="vi">Vietnamese</option>
                     <option value="en">English</option>
                   </select>
-                  <label className="field-inline">
-                    Voice:
+                  <label className="field-inline" title="Used only when generating new audio; the table badges count approved audio across any model.">
+                    Generate model:
                     <input
                       style={{ width: '12rem', padding: '0.25rem 0.5rem', fontSize: '0.875rem' }}
                       value={voiceId}
                       onChange={(e) => setVoiceId(e.target.value)}
                     />
                   </label>
+                  <span className="meta">Badges count approved audio across any model.</span>
                 </div>
               }
             >
@@ -625,7 +626,7 @@ export function AdminResourcesPage() {
                       <th>Measurement</th>
                       <th>CPD</th>
                       <th>Items</th>
-                      <th>Audio</th>
+                      <th>Audio (any model)</th>
                       <th>Batch Actions</th>
                       <th></th>
                     </tr>
@@ -679,12 +680,14 @@ export function AdminResourcesPage() {
                               <span
                                 className={`badge ${sectionsReadiness[section.id]?.vi === 11 ? 'success' : 'experimental'}`}
                                 style={{ fontSize: '10px', padding: '0.125rem 0.375rem' }}
+                                title="Approved Vietnamese audio across any voice/model"
                               >
                                 VI: {sectionsReadiness[section.id]?.vi ?? 0}/11
                               </span>
                               <span
                                 className={`badge ${sectionsReadiness[section.id]?.en === 11 ? 'success' : 'experimental'}`}
                                 style={{ fontSize: '10px', padding: '0.125rem 0.375rem' }}
+                                title="Approved English audio across any voice/model"
                               >
                                 EN: {sectionsReadiness[section.id]?.en ?? 0}/11
                               </span>

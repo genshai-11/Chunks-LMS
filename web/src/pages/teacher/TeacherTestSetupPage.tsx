@@ -11,7 +11,7 @@ import {
   Sparkles,
   Volume2,
 } from 'lucide-react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Flash } from '../../components/Flash'
 import { PageHeader } from '../../components/PageHeader'
 import { EmptyState, Panel } from '../../components/ui'
@@ -22,7 +22,6 @@ import {
   listTestSections,
 } from '../../lib/test-packages'
 import type { TestItem, TestSection } from '../../modules/catalog/test-package-catalog'
-import { generateNarration } from '../../modules/catalog/live-test-generation'
 import {
   audioReadiness,
   audioTargetStatus,
@@ -45,13 +44,28 @@ type SectionPreview = {
   viVoiceIds: string[]
   enVoiceIds: string[]
 }
+type AudioSummary = ReturnType<typeof audioReadiness> & {
+  generated: number
+  missing: number
+  approvedModelSpecific: boolean
+}
 type AudioStatusSummary = {
-  vi: ReturnType<typeof audioReadiness>
-  en: ReturnType<typeof audioReadiness>
+  vi: AudioSummary
+  en: AudioSummary
 }
 
 function defaultLanguageForSection(section: TestSection): AudioLanguage {
   return section.sectionOrder <= 4 ? 'vi' : 'en'
+}
+
+function summarizeStatuses(statuses: AudioTargetStatus[]): AudioSummary {
+  const readiness = audioReadiness(statuses)
+  return {
+    ...readiness,
+    generated: statuses.filter((status) => status === 'generated').length,
+    missing: statuses.filter((status) => status === 'missing').length,
+    approvedModelSpecific: readiness.ready,
+  }
 }
 
 function intersectVoiceIds(groups: string[][]): string[] {
@@ -106,7 +120,6 @@ export function TeacherTestSetupPage() {
   const [audioSummaryBySection, setAudioSummaryBySection] = useState<Record<string, AudioStatusSummary>>({})
   const [runMode, setRunMode] = useState<RunMode>('full')
   const [busy, setBusy] = useState(false)
-  const [generatingSectionId, setGeneratingSectionId] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -122,8 +135,8 @@ export function TeacherTestSetupPage() {
             sectionAudioStatuses({ packageVersionId: nextPackageVersionId, section, items, language: 'en', voiceId }),
           ])
           summaries[section.id] = {
-            vi: audioReadiness(viStatuses),
-            en: audioReadiness(enStatuses),
+            vi: summarizeStatuses(viStatuses),
+            en: summarizeStatuses(enStatuses),
           }
         }),
       )
@@ -228,36 +241,8 @@ export function TeacherTestSetupPage() {
     })
   }
 
-  async function generateSectionAudio(section: TestSection, language: AudioLanguage) {
-    if (!packageVersionId || !voiceId) return
-    if (!window.confirm(`Generate missing ${language.toUpperCase()} audio prompts for Session ${section.sectionOrder}?`)) return
-    setGeneratingSectionId(section.id)
-    setError(null)
-    setMessage(null)
-    try {
-      await generateNarration({
-        packageVersionId,
-        target: 'section_intro',
-        testSectionId: section.id,
-        language,
-        voiceId,
-      })
-      for (const item of itemsBySection[section.id] ?? []) {
-        await generateNarration({
-          packageVersionId,
-          target: 'test_item',
-          testItemId: item.id,
-          language,
-          voiceId,
-        })
-      }
-      setMessage(`Generated audio prompts for Session ${section.sectionOrder} (${language.toUpperCase()}). Review/approve before starting if required.`)
-      await loadAudioSummary()
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not generate audio prompts')
-    } finally {
-      setGeneratingSectionId(null)
-    }
+  function audioPrepHref(section: TestSection, language: AudioLanguage) {
+    return `/admin/resources/audio?version=${packageVersionId}&section=${section.id}&language=${language}&voice=${encodeURIComponent(voiceId)}`
   }
 
   async function prepareAndStart() {
@@ -278,7 +263,7 @@ export function TeacherTestSetupPage() {
       if (!run.data.canStart) {
         setBusy(false)
         setMessage(
-          `Session ${item.section.sectionOrder} is not ready for ${language.toUpperCase()} / ${voiceId}. Approved item audio: ${run.data.approvedItemAudioCount}/${item.itemCount}.`,
+          `Session ${item.section.sectionOrder} is not ready for ${language.toUpperCase()} with model ${voiceId}. Start requires approved intro + approved item audio for this exact language/model. Approved item audio: ${run.data.approvedItemAudioCount}/${item.itemCount}. Open Audio Prep to generate/review/approve missing prompts.`,
         )
         return
       }
@@ -373,6 +358,7 @@ export function TeacherTestSetupPage() {
                       const summary = audioSummaryBySection[section.id]
                       const currentSummary = summary?.[language]
                       const ready = currentSummary?.ready ?? false
+                      const needsAudioPrep = !ready
                       return (
                         <tr key={section.id} className={selected ? 'is-selected' : ''}>
                           <td>
@@ -399,22 +385,26 @@ export function TeacherTestSetupPage() {
                               <option value="en">EN</option>
                             </select>
                           </td>
-                          <td><span className={summary?.vi.ready ? 'badge success' : 'badge warning'}>{summary?.vi.approved ?? 0}/{summary?.vi.expected ?? itemCount + 1}</span></td>
-                          <td><span className={summary?.en.ready ? 'badge success' : 'badge warning'}>{summary?.en.approved ?? 0}/{summary?.en.expected ?? itemCount + 1}</span></td>
+                          <td>
+                            <span className={summary?.vi.ready ? 'badge success' : 'badge warning'} title="Approved for the selected model / expected prompts">
+                              A {summary?.vi.approved ?? 0}/{summary?.vi.expected ?? itemCount + 1}
+                            </span>
+                            {summary?.vi.generated ? <span className="badge info ml-1">G {summary.vi.generated}</span> : null}
+                          </td>
+                          <td>
+                            <span className={summary?.en.ready ? 'badge success' : 'badge warning'} title="Approved for the selected model / expected prompts">
+                              A {summary?.en.approved ?? 0}/{summary?.en.expected ?? itemCount + 1}
+                            </span>
+                            {summary?.en.generated ? <span className="badge info ml-1">G {summary.en.generated}</span> : null}
+                          </td>
                           <td>
                             {ready ? (
-                              <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-300"><CheckCircle2 className="h-3.5 w-3.5" />Ready</span>
-                            ) : (
-                              <button
-                                type="button"
-                                className="ghost"
-                                disabled={generatingSectionId === section.id}
-                                onClick={() => void generateSectionAudio(section, language)}
-                              >
-                                <Sparkles className="h-4 w-4" />
-                                {generatingSectionId === section.id ? 'Generating…' : 'Generate Audio Prompts'}
-                              </button>
-                            )}
+                              <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Ready</span>
+                            ) : needsAudioPrep ? (
+                              <Link className="btn ghost" to={audioPrepHref(section, language)}>
+                                <Sparkles className="h-4 w-4" /> Audio Prep
+                              </Link>
+                            ) : null}
                           </td>
                         </tr>
                       )

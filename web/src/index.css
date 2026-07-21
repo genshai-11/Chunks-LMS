@@ -4775,3 +4775,132 @@
     }
   }
 }
+
+@layer components {
+  /* Align new standalone-test surfaces with the existing light app palette; avoid introducing dark page blocks. */
+  .standalone-metric-card {
+    @apply border-slate-200 bg-white text-slate-900 shadow-sm;
+  }
+  .standalone-metric-card span {
+    @apply text-slate-500;
+  }
+  .standalone-metric-card strong {
+    @apply text-slate-950;
+  }
+  .standalone-chart-wrap {
+    @apply border-slate-200 bg-white;
+  }
+
+  .test-setup-side,
+  .test-setup-main {
+    @apply border-slate-200 bg-white text-slate-900;
+  }
+  .test-setup-stats div,
+  .test-run-mode-picker {
+    @apply border-slate-200 bg-slate-50 text-slate-900;
+  }
+  .test-run-mode-picker button {
+    @apply text-slate-700 hover:bg-white;
+  }
+  .test-audio-review-head {
+    @apply text-slate-900;
+  }
+  .test-audio-review-head p {
+    @apply text-slate-500;
+  }
+  .test-audio-review-head > span {
+    @apply bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100;
+  }
+  .test-audio-review-table {
+    @apply border-slate-200 bg-white;
+  }
+  .test-audio-review-table th {
+    @apply bg-slate-50 text-slate-600;
+  }
+  .test-audio-review-table td {
+    @apply text-slate-800;
+  }
+  .test-audio-review-table tr.is-selected td {
+    @apply bg-indigo-50/70;
+  }
+  .test-session-cell strong {
+    @apply text-slate-950;
+  }
+  .test-session-cell span {
+    @apply text-slate-500;
+  }
+  .badge.info {
+    @apply border-sky-200 bg-sky-50 text-sky-700;
+  }
+
+  .live-test-audio-panel {
+    @apply border-indigo-100 bg-white/95 text-slate-800 shadow-sm;
+  }
+  .live-test-audio-head {
+    @apply text-indigo-700;
+  }
+  .live-test-audio-head strong,
+  .live-test-audio-label,
+  .live-test-audio-grid {
+    @apply text-slate-500;
+  }
+  .live-test-audio-actions button {
+    @apply border-slate-200 bg-slate-50 text-slate-700 hover:bg-white;
+  }
+  .live-test-audio-toggle {
+    @apply text-slate-700;
+  }
+  .live-test-audio-grid select,
+  .live-test-audio-grid input[type='range'] {
+    @apply border-slate-200 bg-white text-slate-900;
+  }
+  .live-test-focus-card {
+    @apply border-indigo-100 bg-white/95 text-slate-900;
+  }
+  .live-test-wave-play {
+    @apply border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100;
+  }
+  .live-test-wave i {
+    @apply bg-indigo-500;
+  }
+  .live-test-prompt-box {
+    @apply border-slate-200 bg-slate-50;
+  }
+  .live-test-prompt-box p {
+    @apply text-indigo-700;
+  }
+  .live-test-prompt-box strong {
+    @apply text-slate-950;
+  }
+  .live-test-cpd-row span {
+    @apply bg-slate-50 text-slate-700 ring-1 ring-slate-200;
+  }
+  .live-test-cpd-row .is-strong {
+    @apply bg-emerald-50 text-emerald-700 ring-emerald-200;
+  }
+
+  .live-test-probe-dock {
+    @apply border-slate-200 bg-white text-slate-900 shadow-lg;
+  }
+  .live-test-probe-depth {
+    @apply border-amber-200 bg-amber-50 text-amber-700;
+  }
+  .live-test-probe-depth strong {
+    @apply text-amber-900;
+  }
+  .live-test-probe-dock .observe-dock-probe-btn {
+    @apply border-slate-200 bg-white text-slate-900;
+  }
+  .live-test-probe-dock .observe-dock-probe-btn span {
+    @apply text-slate-900;
+  }
+  .live-test-probe-dock .observe-dock-probe-btn.fail {
+    @apply border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100;
+  }
+  .live-test-probe-dock .observe-dock-probe-btn.pass {
+    @apply border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100;
+  }
+  .live-test-probe-dock .observe-dock-probe-btn.done {
+    @apply border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100;
+  }
+}

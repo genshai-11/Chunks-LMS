@@ -204,10 +204,10 @@ export function TeacherTestAnalysisPage() {
         <div className="standalone-chart-wrap">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={rows} margin={{ top: 16, right: 16, bottom: 0, left: -18 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="label" stroke="#cbd5e1" fontSize={11} />
-              <YAxis stroke="#cbd5e1" fontSize={11} />
-              <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid #334155', color: '#fff' }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="label" stroke="#475569" fontSize={11} />
+              <YAxis stroke="#475569" fontSize={11} />
+              <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a' }} />
               <Line type="monotone" dataKey="cpd" stroke="#818cf8" strokeWidth={3} dot={false} />
               <Bar dataKey="cpd" barSize={10} radius={[4, 4, 0, 0]}>
                 {rows.map((row) => (
@@ -228,10 +228,10 @@ export function TeacherTestAnalysisPage() {
         <div className="standalone-chart-wrap is-short">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={sessionRows} margin={{ top: 16, right: 16, bottom: 0, left: -18 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="label" stroke="#cbd5e1" fontSize={12} />
-              <YAxis stroke="#cbd5e1" fontSize={11} />
-              <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid #334155', color: '#fff' }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="label" stroke="#475569" fontSize={12} />
+              <YAxis stroke="#475569" fontSize={11} />
+              <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a' }} />
               <Bar dataKey="avgCpd" fill="#818cf8" name="Avg CPD" radius={[4, 4, 0, 0]} />
               <Bar dataKey="focusLoad" fill="#f59e0b" name="RFC load %" radius={[4, 4, 0, 0]} />
               <Bar dataKey="awareness" fill="#10b981" name="RAC focus %" radius={[4, 4, 0, 0]} />

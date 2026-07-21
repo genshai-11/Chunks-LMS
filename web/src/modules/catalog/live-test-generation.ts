@@ -12,7 +12,8 @@ async function invoke<T>(body: Record<string, unknown>): Promise<T> {
   const sb = getSupabase() as any
   if (!sb) throw new Error('Supabase is not configured')
   const { data, error } = await sb.functions.invoke('live-test-generation', { body })
-  if (error) throw new Error(error.message)
+  const functionMessage = data?.error?.message ?? data?.error?.code
+  if (error) throw new Error(functionMessage ? `${error.message}: ${functionMessage}` : error.message)
   if (data?.error) throw new Error(data.error.message ?? data.error.code ?? 'Generation failed')
   return data as T
 }

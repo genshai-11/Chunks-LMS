@@ -4712,67 +4712,87 @@
     @apply grid gap-4 xl:grid-cols-[minmax(260px,340px)_minmax(0,1fr)];
   }
   .test-setup-side {
-    @apply min-w-0 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950;
+    @apply min-w-0 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-slate-900;
+  }
+  .test-setup-side .field {
+    @apply text-slate-700;
+  }
+  .test-setup-side .field input,
+  .test-setup-side .field select {
+    @apply border-slate-200 bg-white text-slate-900;
   }
   .test-setup-stats {
     @apply grid grid-cols-3 gap-2;
   }
   .test-setup-stats div {
-    @apply rounded-xl border border-slate-200 bg-white p-2 text-slate-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100;
+    @apply rounded-xl border border-slate-200 bg-white p-2 text-slate-900 shadow-3xs;
   }
   .test-setup-stats span {
-    @apply mt-1 block text-[10px] font-extrabold uppercase tracking-wide text-slate-700 dark:text-slate-200;
+    @apply mt-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500;
   }
   .test-setup-stats strong {
-    @apply block truncate font-display text-lg font-black text-slate-950 dark:text-white;
+    @apply block truncate font-display text-lg font-black text-slate-950;
   }
   .test-run-mode-picker {
-    @apply grid gap-1 rounded-2xl border border-slate-200 bg-white p-1 dark:border-slate-800 dark:bg-slate-900;
+    @apply grid gap-1 rounded-2xl border border-slate-200 bg-white p-1;
   }
   .test-run-mode-picker button {
-    @apply min-h-9 rounded-xl border-0 bg-transparent px-3 py-2 text-left text-sm font-bold text-slate-700 shadow-none transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800;
+    @apply min-h-9 rounded-xl border-0 bg-transparent px-3 py-2 text-left text-sm font-bold text-slate-700 shadow-none transition hover:bg-slate-50 hover:text-slate-950;
   }
   .test-run-mode-picker button.is-active {
     @apply bg-indigo-600 text-white hover:bg-indigo-600;
   }
   .test-setup-main {
-    @apply min-w-0 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950;
+    @apply min-w-0 rounded-2xl border border-slate-200 bg-white p-3 text-slate-900;
   }
   .test-audio-review-head {
-    @apply mb-3 flex flex-wrap items-center justify-between gap-2 text-slate-900 dark:text-slate-100;
+    @apply mb-3 flex flex-wrap items-center justify-between gap-2 text-slate-950;
   }
   .test-audio-review-head h3 {
-    @apply m-0 text-base font-black;
+    @apply m-0 text-base font-black text-slate-950;
   }
   .test-audio-review-head p {
-    @apply m-0 text-xs text-slate-500 dark:text-slate-400;
+    @apply m-0 text-xs font-medium text-slate-600;
   }
-  .test-audio-review-head > span {
-    @apply rounded-full bg-slate-900 px-3 py-1 text-xs font-bold text-white dark:bg-white dark:text-slate-950;
+  .test-audio-review-actions {
+    @apply flex flex-wrap items-center justify-end gap-2;
+  }
+  .test-audio-review-actions > span {
+    @apply rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700;
+  }
+  .test-audio-review-actions button {
+    @apply min-h-9;
   }
   .test-audio-review-table {
-    @apply max-h-[min(62dvh,34rem)] overflow-auto rounded-2xl border border-slate-200 dark:border-slate-800;
+    @apply max-h-[min(62dvh,34rem)] overflow-auto rounded-2xl border border-slate-200 bg-white;
   }
   .test-audio-review-table table {
     @apply min-w-[860px];
   }
   .test-audio-review-table th {
-    @apply sticky top-0 z-10 bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-200;
+    @apply sticky top-0 z-10 bg-slate-50 text-slate-600;
   }
   .test-audio-review-table td {
-    @apply align-middle text-slate-800 dark:text-slate-100;
+    @apply align-middle text-slate-800;
   }
   .test-audio-review-table tr.is-selected td {
-    @apply bg-indigo-50 dark:bg-indigo-500/10;
+    @apply bg-indigo-50/70;
   }
   .test-session-cell {
     @apply flex min-h-0 flex-col items-start border-0 bg-transparent p-0 text-left shadow-none;
   }
   .test-session-cell strong {
-    @apply text-sm text-slate-950 dark:text-white;
+    @apply text-sm text-slate-950;
   }
   .test-session-cell span {
-    @apply max-w-[22rem] truncate text-xs text-slate-500 dark:text-slate-400;
+    @apply max-w-[22rem] truncate text-xs text-slate-500;
+  }
+  .test-audio-row-actions {
+    @apply flex flex-wrap items-center justify-end gap-1.5;
+  }
+  .test-audio-row-actions .btn,
+  .test-audio-row-actions button {
+    @apply min-h-9 px-2.5 py-1.5 text-[11px];
   }
 
   @media (max-width: 1024px) {
@@ -4800,7 +4820,9 @@
     @apply border-slate-200 bg-white;
   }
 
-  .test-setup-side,
+  .test-setup-side {
+    @apply border-slate-200 bg-slate-50 text-slate-900;
+  }
   .test-setup-main {
     @apply border-slate-200 bg-white text-slate-900;
   }
@@ -4808,18 +4830,18 @@
     @apply border border-slate-200 bg-white text-slate-900 shadow-2xs;
   }
   .test-run-mode-picker {
-    @apply border-slate-200 bg-slate-50 text-slate-900;
+    @apply border-slate-200 bg-white text-slate-900;
   }
   .test-run-mode-picker button {
-    @apply text-slate-700 hover:bg-white;
+    @apply text-slate-700 hover:bg-slate-50 hover:text-slate-950;
   }
   .test-audio-review-head {
-    @apply text-slate-900;
+    @apply text-slate-950;
   }
   .test-audio-review-head p {
-    @apply text-slate-500;
+    @apply text-slate-600;
   }
-  .test-audio-review-head > span {
+  .test-audio-review-actions > span {
     @apply bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100;
   }
   .test-audio-review-table {

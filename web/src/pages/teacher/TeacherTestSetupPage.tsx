@@ -7,6 +7,7 @@ import {
   Gauge,
   Layers3,
   ListChecks,
+  Loader2,
   Play,
   Sparkles,
   Volume2,
@@ -36,6 +37,7 @@ import {
   prepareStandaloneRun,
   startStandaloneRun,
 } from '../../lib/standalone-tests'
+import { generateNarration } from '../../modules/catalog/live-test-generation'
 
 type RunMode = 'single' | 'multi' | 'full'
 type SectionPreview = {
@@ -120,6 +122,8 @@ export function TeacherTestSetupPage() {
   const [audioSummaryBySection, setAudioSummaryBySection] = useState<Record<string, AudioStatusSummary>>({})
   const [runMode, setRunMode] = useState<RunMode>('full')
   const [busy, setBusy] = useState(false)
+  const [generatingKey, setGeneratingKey] = useState<string | null>(null)
+  const [generationProgress, setGenerationProgress] = useState<{ done: number; total: number } | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -245,6 +249,66 @@ export function TeacherTestSetupPage() {
     return `/admin/resources/audio?version=${packageVersionId}&section=${section.id}&language=${language}&voice=${encodeURIComponent(voiceId)}`
   }
 
+  async function generateAudioForTargets(
+    targets: Array<{ section: TestSection; language: AudioLanguage }>,
+    key: string,
+  ) {
+    if (!packageVersionId || !voiceId || targets.length === 0) return
+    const total = targets.reduce((sum, target) => sum + (itemsBySection[target.section.id]?.length ?? 0) + 1, 0)
+    let done = 0
+    setGeneratingKey(key)
+    setGenerationProgress({ done, total })
+    setError(null)
+    setMessage(null)
+    try {
+      for (const target of targets) {
+        const sectionItems = itemsBySection[target.section.id] ?? []
+        await generateNarration({
+          packageVersionId,
+          target: 'section_intro',
+          testSectionId: target.section.id,
+          language: target.language,
+          voiceId,
+        })
+        done += 1
+        setGenerationProgress({ done, total })
+
+        for (const item of sectionItems) {
+          await generateNarration({
+            packageVersionId,
+            target: 'test_item',
+            testItemId: item.id,
+            language: target.language,
+            voiceId,
+          })
+          done += 1
+          setGenerationProgress({ done, total })
+        }
+      }
+      await loadAudioSummary()
+      setMessage(
+        `Generated ${done} audio prompt${done === 1 ? '' : 's'} for ${targets.length} session${targets.length === 1 ? '' : 's'}. Review and approve generated audio before starting the test.`,
+      )
+    } catch (cause) {
+      const detail = cause instanceof Error ? cause.message : String(cause)
+      setError(
+        `Generate audio failed. ${detail} If this package version is published or your role cannot generate paid audio, open Admin Audio Prep with an admin account.`,
+      )
+    } finally {
+      setGeneratingKey(null)
+      setGenerationProgress(null)
+    }
+  }
+
+  function pendingGenerationTargets() {
+    return targetPreview
+      .map((item) => {
+        const language = languageBySection[item.section.id] ?? defaultLanguageForSection(item.section)
+        return { section: item.section, language }
+      })
+      .filter((target) => !audioSummaryBySection[target.section.id]?.[target.language]?.ready)
+  }
+
   async function prepareAndStart() {
     if (!assignmentId || targetPreview.length === 0 || !voiceId) return
     setBusy(true)
@@ -280,6 +344,9 @@ export function TeacherTestSetupPage() {
     navigate(`/teacher/test-runs/${startedRunIds[0]}?assignmentId=${assignmentId}`)
   }
 
+  const pendingTargets = pendingGenerationTargets()
+  const isGeneratingSelected = generatingKey === 'selected'
+
   return (
     <>
       <PageHeader
@@ -300,8 +367,8 @@ export function TeacherTestSetupPage() {
           <div className="test-setup-side">
             <div className="test-setup-stats">
               <div><Layers3 className="h-4 w-4 text-indigo-500" /><span>Sessions</span><strong>{targetPreview.length || preview.length}</strong></div>
-              <div><ListChecks className="h-4 w-4 text-emerald-500" /><span>Items</span><strong>{totalItemCount || packageItemCount}</strong></div>
-              <div><Gauge className="h-4 w-4 text-amber-500" /><span>Mode</span><strong>{runMode}</strong></div>
+              <div><ListChecks className="h-4 w-4 text-green-500" /><span>Items</span><strong>{totalItemCount || packageItemCount}</strong></div>
+              <div><Gauge className="h-4 w-4 text-yellow-500" /><span>Mode</span><strong>{runMode}</strong></div>
             </div>
 
             <div className="test-run-mode-picker">
@@ -323,7 +390,7 @@ export function TeacherTestSetupPage() {
             <label className="field">
               Audio voice/model
               <input value={voiceId} onChange={(event) => setVoiceId(event.target.value)} />
-              {suggestedVoiceIds.length > 0 ? <span className="meta text-slate-600 dark:text-slate-300">Available: {suggestedVoiceIds.slice(0, 2).join(', ')}</span> : null}
+              {suggestedVoiceIds.length > 0 ? <span className="meta">Available: {suggestedVoiceIds.slice(0, 2).join(', ')}</span> : null}
             </label>
           </div>
 
@@ -333,7 +400,25 @@ export function TeacherTestSetupPage() {
                 <h3>Session & audio review</h3>
                 <p>Each selected session can use VI or EN before the run starts.</p>
               </div>
-              <span>{totalItemCount || packageItemCount} questions</span>
+              <div className="test-audio-review-actions">
+                <span>{totalItemCount || packageItemCount} questions</span>
+                <button
+                  type="button"
+                  className="ghost"
+                  disabled={busy || generatingKey !== null || pendingTargets.length === 0}
+                  onClick={() => void generateAudioForTargets(pendingTargets, 'selected')}
+                  title="Generate intro + item audio for selected sessions that are not ready for the selected model. Generated audio still needs review/approval."
+                >
+                  {isGeneratingSelected ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                  {isGeneratingSelected && generationProgress
+                    ? `Generating ${generationProgress.done}/${generationProgress.total}…`
+                    : `Generate selected audio (${pendingTargets.length})`}
+                </button>
+              </div>
             </div>
             {sections.length === 0 ? (
               <EmptyState icon={ClipboardCheck} title="No Session is available" description="The assigned published Package Version has no sessions." />
@@ -359,6 +444,8 @@ export function TeacherTestSetupPage() {
                       const currentSummary = summary?.[language]
                       const ready = currentSummary?.ready ?? false
                       const needsAudioPrep = !ready
+                      const rowGenerateKey = `${section.id}:${language}`
+                      const isGeneratingRow = generatingKey === rowGenerateKey
                       return (
                         <tr key={section.id} className={selected ? 'is-selected' : ''}>
                           <td>
@@ -399,11 +486,29 @@ export function TeacherTestSetupPage() {
                           </td>
                           <td>
                             {ready ? (
-                              <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Ready</span>
+                              <span className="inline-flex items-center gap-1 text-xs font-bold text-green-700"><CheckCircle2 className="h-3.5 w-3.5" />Ready</span>
                             ) : needsAudioPrep ? (
-                              <Link className="btn ghost" to={audioPrepHref(section, language)}>
-                                <Sparkles className="h-4 w-4" /> Audio Prep
-                              </Link>
+                              <div className="test-audio-row-actions">
+                                <button
+                                  type="button"
+                                  className="ghost"
+                                  disabled={busy || generatingKey !== null}
+                                  onClick={() => void generateAudioForTargets([{ section, language }], rowGenerateKey)}
+                                  title="Generate intro + item audio for this session/language/model. Generated audio still needs review/approval."
+                                >
+                                  {isGeneratingRow ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Sparkles className="h-4 w-4" />
+                                  )}
+                                  {isGeneratingRow && generationProgress
+                                    ? `${generationProgress.done}/${generationProgress.total}`
+                                    : 'Generate'}
+                                </button>
+                                <Link className="btn ghost" to={audioPrepHref(section, language)}>
+                                  Audio Prep
+                                </Link>
+                              </div>
                             ) : null}
                           </td>
                         </tr>

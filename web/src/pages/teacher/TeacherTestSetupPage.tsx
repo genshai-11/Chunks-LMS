@@ -339,6 +339,10 @@ export function TeacherTestSetupPage() {
         setError(run.error)
         return
       }
+      if (run.data.status === 'in_progress') {
+        startedRunIds.push(run.data.runId)
+        continue
+      }
       if (!run.data.canStart) {
         setBusy(false)
         setMessage(

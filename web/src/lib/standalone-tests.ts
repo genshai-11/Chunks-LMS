@@ -139,6 +139,7 @@ export const prepareStandaloneRun = (
 ) =>
   rpc<{
     runId: string
+    status?: 'draft' | 'ready' | 'in_progress'
     canStart: boolean
     readinessToken: string
     approvedItemAudioCount: number

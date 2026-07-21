@@ -23,6 +23,7 @@ declare
   v_item_count int;
   v_audio_count int;
   v_hash text;
+  v_run_status text;
 begin
   if p_language not in ('vi','en') then
     raise exception 'Language is required and must be vi or en';
@@ -91,13 +92,30 @@ begin
     'hex'
   );
 
-  select id into v_run
+  select id,status into v_run,v_run_status
   from public.standalone_test_runs
   where assignment_id=a.id
     and test_section_id=s.id
-    and status in ('draft','ready')
-  order by created_at desc
+    and status in ('draft','ready','in_progress')
+  order by case status when 'in_progress' then 0 when 'ready' then 1 else 2 end, created_at desc
   limit 1;
+
+  if v_run_status='in_progress' then
+    return jsonb_build_object(
+      'runId',v_run,
+      'status','in_progress',
+      'canStart',true,
+      'readinessToken',coalesce((select readiness_hash from public.standalone_test_runs where id=v_run),''),
+      'introApproved',true,
+      'itemCount',v_item_count,
+      'approvedItemAudioCount',v_audio_count,
+      'sessionNumber',s.section_order,
+      'targetCvrOhm',m.target_cvr_ohm,
+      'cciName',m.cci_category_label,
+      'cciValue',m.cci_value,
+      'itemCpd',m.target_cvr_ohm*m.cci_value
+    );
+  end if;
 
   if v_run is null then
     insert into public.standalone_test_runs(
@@ -151,6 +169,7 @@ begin
 
   return jsonb_build_object(
     'runId',v_run,
+    'status',case when v_intro is not null and v_item_count=10 and v_audio_count=10 then 'ready' else 'draft' end,
     'canStart',v_intro is not null and v_item_count=10 and v_audio_count=10,
     'readinessToken',v_hash,
     'introApproved',v_intro is not null,

@@ -165,7 +165,7 @@ export function TeacherTestRunPage() {
     setRailWidth(readSavedRailWidth())
     setAutoPlayItems(readSavedBoolean(AUDIO_AUTOPLAY_ITEMS_KEY, false))
     setAutoPlaySessionIntro(readSavedBoolean(AUDIO_AUTOPLAY_INTRO_KEY, false))
-    setAudioRate(readSavedNumber(AUDIO_RATE_KEY, 1, 0.75, 1.5))
+    setAudioRate(readSavedNumber(AUDIO_RATE_KEY, 1, 0.75, 2))
     setAudioVolume(readSavedNumber(AUDIO_VOLUME_KEY, 0.85, 0, 1))
   }, [])
 
@@ -590,6 +590,11 @@ export function TeacherTestRunPage() {
           {mapOpen ? (
             <>
               <p className="observe-rail-name">{learnerName}</p>
+              <div className="observe-meta-row live-test-rail-meta">
+                <span className="observe-learner-rfc">RFC {summaryMetrics.rfc}%</span>
+                <span className="observe-learner-rfc">RAC {summaryMetrics.rac}%</span>
+                <span className="observe-learner-rfc">CPD {summaryMetrics.avgCpd || '—'}</span>
+              </div>
               <p className="observe-rail-n">{completedCount}/{items.length} scored</p>
             </>
           ) : null}
@@ -697,6 +702,8 @@ export function TeacherTestRunPage() {
                       <option value={1.15}>1.15×</option>
                       <option value={1.25}>1.25×</option>
                       <option value={1.5}>1.5×</option>
+                      <option value={1.75}>1.75×</option>
+                      <option value={2}>2×</option>
                     </select>
                   </label>
                   <label>
@@ -735,65 +742,26 @@ export function TeacherTestRunPage() {
         ) : null}
       </aside>
 
-      <main className="observe-stage observe-stage-tight">
+      <main className="observe-stage observe-stage-tight live-test-stage">
         {!isSummaryShown ? (
           <>
-            <div className="observe-stage-hero">
+            <div className="observe-stage-hero live-test-stage-hero">
               <div className="observe-phone-avatar"><UserAvatar name={learnerName} avatarUrl={learnerAvatarUrl} size="md" /></div>
-              <p className="observe-day-line">Session {currentSessionNumber} · Q{currentItemNumber}/{items.length} · {completedCount}/{items.length} finalized</p>
-              <h1 className="observe-learner observe-learner-solo flex items-center justify-center gap-2">
+              <p className="observe-day-line live-test-day-line">Session {currentSessionNumber} · Q{currentItemNumber}/{items.length} · {completedCount}/{items.length} finalized</p>
+              <h1 className="observe-learner observe-learner-solo live-test-learner-title">
                 <span>{learnerName}</span>
                 <button
                   type="button"
-                  className="text-xs bg-indigo-500/20 text-indigo-200 hover:bg-indigo-500/30 px-3 py-1 rounded-full font-mono font-bold flex items-center gap-1 transition"
+                  className="live-test-title-audio"
                   onClick={() => playCurrentItemAudio(true)}
                   title="Play current item audio"
+                  aria-label="Play current item audio"
                 >
-                  <Volume2 className="h-3.5 w-3.5" /> Audio
+                  <Volume2 className="h-3.5 w-3.5" />
                 </button>
               </h1>
 
-              <div className="observe-meta-row">
-                <span className="observe-learner-rfc">RFC {summaryMetrics.rfc}%</span>
-                <span className="observe-learner-rfc">RAC {summaryMetrics.rac}%</span>
-                <span className="observe-learner-rfc">CPD avg {summaryMetrics.avgCpd || '—'}</span>
-              </div>
-
-              {showKeys ? <p className="observe-depth-inline text-xs text-slate-400">Shortcuts: 0 Red · 1 Yellow · 2 Green · 3 Purple · H map · ? keys</p> : null}
-
-              <div className="live-test-focus-card">
-                <div className="flex items-center justify-between gap-3 text-xs text-indigo-200 font-mono">
-                  <span className="flex items-center gap-1 font-bold"><Volume2 className="h-4 w-4 text-indigo-400" /> {audioLabel} · {lang}</span>
-                  <button
-                    type="button"
-                    className="ghost text-[11px] text-indigo-200"
-                    onClick={() => (audioState === 'error' ? playCurrentItemAudio(true) : playCurrentItemAudio(true))}
-                  >
-                    {audioState === 'error' ? <RotateCcw className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
-                    {audioState === 'error' ? 'Retry' : 'Play'}
-                  </button>
-                </div>
-
-                <div className="mt-2 rounded-2xl border border-white/10 bg-slate-950/45 px-4 py-3">
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-indigo-200/80">Item text · Q{currentItemNumber}</p>
-                  <p className="mt-1 text-lg font-bold leading-snug text-white sm:text-xl">“{currentItem?.prompt_text ?? 'Select a question'}”</p>
-                </div>
-
-                <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-mono sm:grid-cols-6">
-                  <span className="rounded bg-indigo-900/60 px-2.5 py-1 text-indigo-100">CVR {currentItem?.cvr ?? '—'}</span>
-                  <span className="rounded bg-purple-900/60 px-2.5 py-1 text-purple-100">CCI {currentItem?.cci ?? '—'}</span>
-                  <span className="rounded bg-emerald-900/60 px-2.5 py-1 font-bold text-emerald-100">CPD {currentCpd ?? '—'}</span>
-                  <span className="rounded bg-slate-900/70 px-2.5 py-1 text-slate-200">Min {summaryMetrics.minCpd ?? '—'}</span>
-                  <span className="rounded bg-slate-900/70 px-2.5 py-1 text-slate-200">Max {summaryMetrics.maxCpd ?? '—'}</span>
-                  <span className="rounded bg-slate-900/70 px-2.5 py-1 text-slate-200">Avg {summaryMetrics.avgCpd || '—'}</span>
-                </div>
-
-                <div className="mt-3 flex items-center justify-between border-t border-indigo-900/40 pt-3 text-xs">
-                  <button type="button" className="ghost text-xs text-slate-300 hover:text-white flex items-center gap-1" disabled={selectedIndex === 0} onClick={() => setSelectedIndex((prev) => Math.max(0, prev - 1))}><ChevronLeft className="h-4 w-4" /> Prev Q</button>
-                  <span className="font-mono text-slate-400">Current result: {currentColor ?? 'not scored'}</span>
-                  <button type="button" className="ghost text-xs text-slate-300 hover:text-white flex items-center gap-1" disabled={selectedIndex === items.length - 1} onClick={() => setSelectedIndex((prev) => Math.min(items.length - 1, prev + 1))}>Next Q <ChevronRight className="h-4 w-4" /></button>
-                </div>
-              </div>
+              {showKeys ? <p className="observe-depth-inline live-test-shortcuts">Shortcuts: 0 Red · 1 Yellow · 2 Green · 3 Purple · H map · ? keys</p> : null}
             </div>
 
             {reaction ? (
@@ -815,6 +783,41 @@ export function TeacherTestRunPage() {
                 ))}
               </div>
               <div className="observe-dock-tools observe-split-tools"><span className="observe-dock-q">Q{currentItemNumber}/{items.length}</span></div>
+            </div>
+
+            <div className="live-test-focus-card">
+              <div className="live-test-focus-actions">
+                <button type="button" className="ghost" disabled={selectedIndex === 0} onClick={() => setSelectedIndex((prev) => Math.max(0, prev - 1))}>
+                  <ChevronLeft className="h-4 w-4" /> Prev
+                </button>
+                <button
+                  type="button"
+                  className="live-test-wave-play"
+                  onClick={() => (audioState === 'error' ? playCurrentItemAudio(true) : playCurrentItemAudio(true))}
+                  aria-label={audioState === 'error' ? 'Retry current item audio' : 'Play current item audio'}
+                >
+                  {audioState === 'error' ? <RotateCcw className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                  <span className="live-test-wave" aria-hidden><i /><i /><i /><i /></span>
+                  <span>{audioState === 'error' ? 'Retry' : 'Play'}</span>
+                </button>
+                <button type="button" className="ghost" disabled={selectedIndex === items.length - 1} onClick={() => setSelectedIndex((prev) => Math.min(items.length - 1, prev + 1))}>
+                  Next <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="live-test-prompt-box">
+                <p>Item text · Q{currentItemNumber}</p>
+                <strong>“{currentItem?.prompt_text ?? 'Select a question'}”</strong>
+              </div>
+
+              <div className="live-test-cpd-row">
+                <span>CVR {currentItem?.cvr ?? '—'}</span>
+                <span>CCI {currentItem?.cci ?? '—'}</span>
+                <span className="is-strong">CPD {currentCpd ?? '—'}</span>
+                <span>Min {summaryMetrics.minCpd ?? '—'}</span>
+                <span>Max {summaryMetrics.maxCpd ?? '—'}</span>
+                <span>Avg {summaryMetrics.avgCpd || '—'}</span>
+              </div>
             </div>
           </>
         ) : (

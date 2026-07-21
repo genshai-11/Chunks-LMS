@@ -4337,3 +4337,99 @@
     @apply inline-flex items-center gap-1;
   }
 }
+
+@layer components {
+  .live-test-session-heatmap {
+    @apply mt-2 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .live-test-session-heatmap::-webkit-scrollbar {
+    display: none;
+  }
+  .live-test-heat-session {
+    @apply rounded-2xl border border-white/5 bg-white/5 p-2 transition;
+  }
+  .live-test-heat-session.is-active {
+    @apply border-indigo-300/50 bg-indigo-500/15 ring-1 ring-indigo-300/20;
+  }
+  .live-test-heat-session-head {
+    @apply mb-1.5 flex items-center justify-between gap-2 text-[10px] text-slate-400;
+  }
+  .live-test-heat-session-head strong {
+    @apply text-white;
+  }
+  .live-test-heat-session-head span {
+    @apply font-mono font-bold text-amber-300;
+  }
+  .live-test-heat-session-grid {
+    @apply grid grid-cols-4 justify-items-center gap-1.5;
+  }
+  .observe-rail.is-mid .live-test-heat-session-grid {
+    @apply grid-cols-5;
+  }
+  .observe-rail.is-wide .live-test-heat-session-grid {
+    @apply grid-cols-6;
+  }
+  .observe-rail.is-compact .live-test-heat-session-grid {
+    @apply grid-cols-3 gap-1;
+  }
+  .live-test-audio-panel {
+    @apply mt-3 shrink-0 rounded-2xl border border-indigo-300/15 bg-slate-950/70 p-2.5 text-xs text-slate-200 shadow-inner;
+  }
+  .live-test-audio-head {
+    @apply mb-2 flex items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-wide text-indigo-200;
+  }
+  .live-test-audio-head span {
+    @apply flex items-center gap-1 font-bold;
+  }
+  .live-test-audio-head strong {
+    @apply text-[9px] text-slate-400;
+  }
+  .live-test-audio-el {
+    @apply h-8 w-full max-w-full accent-indigo-500;
+  }
+  .live-test-audio-label {
+    @apply my-1 truncate text-center font-mono text-[10px] text-slate-400;
+  }
+  .live-test-audio-actions {
+    @apply grid grid-cols-2 gap-1.5;
+  }
+  .live-test-audio-actions button {
+    @apply min-h-8 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-bold text-slate-100 shadow-none transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .live-test-audio-toggle {
+    @apply mt-2 flex items-center gap-2 text-[10px] font-semibold text-slate-300;
+  }
+  .live-test-audio-toggle input {
+    @apply h-3.5 w-3.5 accent-indigo-500;
+  }
+  .live-test-audio-grid {
+    @apply mt-2 grid grid-cols-2 gap-2 text-[10px] text-slate-400;
+  }
+  .live-test-audio-grid label {
+    @apply flex flex-col gap-1;
+  }
+  .live-test-audio-grid select,
+  .live-test-audio-grid input[type='range'] {
+    @apply min-h-8 rounded-lg border border-white/10 bg-slate-900 px-2 text-xs text-white;
+  }
+  .live-test-focus-card {
+    @apply mt-2 w-full max-w-xl rounded-2xl border border-indigo-300/20 bg-indigo-950/30 p-2.5 text-center shadow-lg sm:p-3;
+  }
+  .live-test-dock-compact {
+    @apply mt-2 max-w-full gap-2;
+  }
+  .live-test-dock-compact .observe-dock-colors {
+    @apply flex-row gap-2 rounded-[2rem] border-2 p-2;
+  }
+  .live-test-dock-compact .observe-dock-color {
+    @apply h-16 w-16 border-2 p-1.5 sm:h-20 sm:w-20;
+  }
+  .live-test-dock-compact .observe-dock-num {
+    @apply text-base sm:text-lg;
+  }
+  .live-test-dock-compact .observe-dock-label {
+    @apply text-[10px] sm:text-xs;
+  }
+}

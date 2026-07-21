@@ -19,6 +19,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   RotateCcw,
+  SlidersHorizontal,
   Sparkles,
   Volume2,
 } from 'lucide-react'
@@ -63,6 +64,10 @@ const RAIL_MIN = 168
 const RAIL_MAX = 460
 const RAIL_DEFAULT = 244
 const RAIL_COLLAPSED = 48
+const AUDIO_AUTOPLAY_ITEMS_KEY = 'chunks-lms:live-test-autoplay-items'
+const AUDIO_AUTOPLAY_INTRO_KEY = 'chunks-lms:live-test-autoplay-intro'
+const AUDIO_RATE_KEY = 'chunks-lms:live-test-audio-rate'
+const AUDIO_VOLUME_KEY = 'chunks-lms:live-test-audio-volume'
 
 function reactionFor(color: ResultColor): ReactionKind {
   if (color === 'purple') return 'celebrate'
@@ -99,6 +104,27 @@ function readSavedRailWidth(): number {
   return RAIL_DEFAULT
 }
 
+function readSavedBoolean(key: string, fallback: boolean): boolean {
+  try {
+    const saved = window.localStorage.getItem(key)
+    if (saved === 'true') return true
+    if (saved === 'false') return false
+  } catch {
+    /* ignore */
+  }
+  return fallback
+}
+
+function readSavedNumber(key: string, fallback: number, min: number, max: number): number {
+  try {
+    const saved = Number(window.localStorage.getItem(key))
+    if (Number.isFinite(saved)) return Math.min(max, Math.max(min, saved))
+  } catch {
+    /* ignore */
+  }
+  return fallback
+}
+
 export function TeacherTestRunPage() {
   const { runId } = useParams()
   const [searchParams] = useSearchParams()
@@ -110,10 +136,16 @@ export function TeacherTestRunPage() {
   const [allRuns, setAllRuns] = useState<StandaloneTestRunRow[]>([])
   const [items, setItems] = useState<TestItem[]>([])
   const [introVariantId, setIntroVariantId] = useState<string | null>(null)
+  const [sessionIntroVariantIds, setSessionIntroVariantIds] = useState<Record<number, string | null>>({})
   const [isSummaryShown, setIsSummaryShown] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [audioUrl, setAudioUrl] = useState('')
+  const [audioLabel, setAudioLabel] = useState('Current item')
   const [audioState, setAudioState] = useState<AudioState>('idle')
+  const [audioRate, setAudioRate] = useState(1)
+  const [audioVolume, setAudioVolume] = useState(0.85)
+  const [autoPlayItems, setAutoPlayItems] = useState(false)
+  const [autoPlaySessionIntro, setAutoPlaySessionIntro] = useState(false)
   const [reaction, setReaction] = useState<Reaction>(null)
   const [message, setMessage] = useState('')
   const [showHeader, setShowHeader] = useState(() =>
@@ -126,14 +158,52 @@ export function TeacherTestRunPage() {
   const [railWidth, setRailWidth] = useState(RAIL_DEFAULT)
   const [resizing, setResizing] = useState(false)
   const railWidthRef = useRef(railWidth)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const pendingAutoPlayRef = useRef(false)
 
   useEffect(() => {
     setRailWidth(readSavedRailWidth())
+    setAutoPlayItems(readSavedBoolean(AUDIO_AUTOPLAY_ITEMS_KEY, false))
+    setAutoPlaySessionIntro(readSavedBoolean(AUDIO_AUTOPLAY_INTRO_KEY, false))
+    setAudioRate(readSavedNumber(AUDIO_RATE_KEY, 1, 0.75, 1.5))
+    setAudioVolume(readSavedNumber(AUDIO_VOLUME_KEY, 0.85, 0, 1))
   }, [])
 
   useEffect(() => {
     railWidthRef.current = railWidth
   }, [railWidth])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(AUDIO_AUTOPLAY_ITEMS_KEY, String(autoPlayItems))
+    } catch {
+      /* ignore */
+    }
+  }, [autoPlayItems])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(AUDIO_AUTOPLAY_INTRO_KEY, String(autoPlaySessionIntro))
+    } catch {
+      /* ignore */
+    }
+  }, [autoPlaySessionIntro])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(AUDIO_RATE_KEY, String(audioRate))
+    } catch {
+      /* ignore */
+    }
+  }, [audioRate])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(AUDIO_VOLUME_KEY, String(audioVolume))
+    } catch {
+      /* ignore */
+    }
+  }, [audioVolume])
 
   const startRailResize = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -215,10 +285,16 @@ export function TeacherTestRunPage() {
     }
     setAllRuns(targetRuns)
 
-    const runtimeResult = await getStandaloneRunRuntime(currentRun.id)
-    if (runtimeResult.ok && runtimeResult.data.introNarrationVariantId) {
-      setIntroVariantId(runtimeResult.data.introNarrationVariantId)
-    }
+    const runtimeResults = await Promise.all(targetRuns.map((r) => getStandaloneRunRuntime(r.id)))
+    const nextIntroBySession: Record<number, string | null> = {}
+    runtimeResults.forEach((runtimeResult, index) => {
+      const sessionNumber = targetRuns[index]?.sessionNumber ?? index + 1
+      nextIntroBySession[sessionNumber] = runtimeResult.ok
+        ? runtimeResult.data.introNarrationVariantId
+        : null
+    })
+    setSessionIntroVariantIds(nextIntroBySession)
+    setIntroVariantId(nextIntroBySession[currentRun.sessionNumber] ?? null)
 
     const itemResults = await Promise.all(targetRuns.map((r) => listStandaloneRunItems(r.id)))
     let globalItemIndex = 1
@@ -258,23 +334,93 @@ export function TeacherTestRunPage() {
 
   const currentItem = useMemo(() => items[selectedIndex] ?? null, [items, selectedIndex])
   const completedCount = useMemo(() => items.filter(isItemFinalized).length, [items])
-  const currentVariantId = currentItem?.narration_variant_id ?? introVariantId ?? null
+  const currentSessionNumber = currentItem?.session_number || 1
+  const currentItemNumber = currentItem?.global_item_order ?? selectedIndex + 1
+  const currentItemVariantId = currentItem?.narration_variant_id ?? null
+  const currentSessionIntroVariantId = sessionIntroVariantIds[currentSessionNumber] ?? introVariantId ?? null
+  const isFirstItemInSession = useMemo(
+    () =>
+      currentItem
+        ? items.findIndex((item) => item.session_number === currentSessionNumber) === selectedIndex
+        : false,
+    [currentItem, currentSessionNumber, items, selectedIndex],
+  )
 
-  useEffect(() => {
-    if (!currentVariantId) return
+  const loadAudioVariant = useCallback(async (variantId: string, label: string, shouldPlay = false) => {
+    pendingAutoPlayRef.current = shouldPlay
     setAudioUrl('')
+    setAudioLabel(label)
     setAudioState('loading')
     setMessage('')
-    void getNarrationPlaybackUrl(currentVariantId)
-      .then((playback) => {
-        setAudioUrl(playback.signedUrl)
-        setAudioState('ready')
-      })
-      .catch((cause) => {
-        setAudioState('error')
-        setMessage(cause instanceof Error ? cause.message : 'Audio playback failed')
-      })
-  }, [currentVariantId])
+    try {
+      const playback = await getNarrationPlaybackUrl(variantId)
+      setAudioUrl(playback.signedUrl)
+      setAudioState('ready')
+    } catch (cause) {
+      pendingAutoPlayRef.current = false
+      setAudioState('error')
+      setMessage(cause instanceof Error ? cause.message : 'Audio playback failed')
+    }
+  }, [])
+
+  const playCurrentItemAudio = useCallback(
+    (shouldPlay = true) => {
+      if (!currentItemVariantId) return
+      void loadAudioVariant(currentItemVariantId, `Q${currentItemNumber} item`, shouldPlay)
+    },
+    [currentItemNumber, currentItemVariantId, loadAudioVariant],
+  )
+
+  const playCurrentSessionIntro = useCallback(
+    (shouldPlay = true) => {
+      if (!currentSessionIntroVariantId) return
+      void loadAudioVariant(currentSessionIntroVariantId, `Session ${currentSessionNumber} intro`, shouldPlay)
+    },
+    [currentSessionIntroVariantId, currentSessionNumber, loadAudioVariant],
+  )
+
+  useEffect(() => {
+    if (!currentItemVariantId) return
+    const deferForSessionIntro = autoPlaySessionIntro && Boolean(currentSessionIntroVariantId) && isFirstItemInSession
+    void loadAudioVariant(
+      currentItemVariantId,
+      `Q${currentItemNumber} item`,
+      autoPlayItems && !deferForSessionIntro,
+    )
+  }, [
+    autoPlayItems,
+    autoPlaySessionIntro,
+    currentItemNumber,
+    currentItemVariantId,
+    currentSessionIntroVariantId,
+    isFirstItemInSession,
+    loadAudioVariant,
+  ])
+
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    audio.volume = audioVolume
+    audio.playbackRate = audioRate
+  }, [audioRate, audioUrl, audioVolume])
+
+  useEffect(() => {
+    if (!audioUrl || !pendingAutoPlayRef.current) return
+    pendingAutoPlayRef.current = false
+    const audio = audioRef.current
+    if (!audio) return
+    audio.volume = audioVolume
+    audio.playbackRate = audioRate
+    void audio.play().catch(() => {
+      setAudioState('ready')
+      setMessage('Autoplay was blocked by the browser. Press Play once to enable audio in this run.')
+    })
+  }, [audioRate, audioUrl, audioVolume])
+
+  useEffect(() => {
+    if (!autoPlaySessionIntro || !currentSessionIntroVariantId || !isFirstItemInSession) return
+    playCurrentSessionIntro(true)
+  }, [autoPlaySessionIntro, currentSessionIntroVariantId, isFirstItemInSession, playCurrentSessionIntro])
 
   const handleRecord = useCallback(
     async (color: ResultColor) => {
@@ -382,8 +528,6 @@ export function TeacherTestRunPage() {
   const learnerAvatarUrl = learner?.avatarUrl ?? null
   const isAllFinalized = completedCount === items.length
   const totalSessions = allRuns.length || 1
-  const currentSessionNumber = currentItem?.session_number || 1
-  const currentItemNumber = currentItem?.global_item_order ?? selectedIndex + 1
   const currentColor = getItemColor(currentItem)
   const currentCpd = cpdValue(currentItem)
   const railSizeClass = !mapOpen
@@ -467,28 +611,106 @@ export function TeacherTestRunPage() {
                   ))}
                 </span>
               </div>
-              <div className="observe-heat-grid" aria-label="Package item heatmap">
-                {sessionsGrouped.flatMap(({ sessionNum, items: sessionItems }) =>
-                  sessionItems.map((item) => {
-                    const idx = items.findIndex((candidate) => candidate.id === item.id)
-                    const color = getItemColor(item)
-                    const statusClass = isItemFinalized(item) && color ? `is-${color}` : 'is-empty'
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        className={`observe-heat-dot-btn ${statusClass}${idx === selectedIndex ? ' is-current' : ''}`}
-                        title={`Session ${sessionNum} · Q${item.global_item_order}: ${item.prompt_text ?? ''}`}
-                        onClick={() => {
-                          setSelectedIndex(idx)
-                          setIsSummaryShown(false)
-                        }}
-                      >
-                        {item.global_item_order}
-                      </button>
-                    )
-                  }),
-                )}
+              <div className="live-test-session-heatmap" aria-label="Package item heatmap grouped by session">
+                {sessionsGrouped.map(({ sessionNum, items: sessionItems }) => {
+                  const sessionDone = sessionItems.filter(isItemFinalized).length
+                  const active = sessionNum === currentSessionNumber
+                  return (
+                    <section key={sessionNum} className={`live-test-heat-session${active ? ' is-active' : ''}`}>
+                      <div className="live-test-heat-session-head">
+                        <strong>Session {sessionNum}</strong>
+                        <span>{sessionDone}/{sessionItems.length}</span>
+                      </div>
+                      <div className="live-test-heat-session-grid">
+                        {sessionItems.map((item) => {
+                          const idx = items.findIndex((candidate) => candidate.id === item.id)
+                          const color = getItemColor(item)
+                          const statusClass = isItemFinalized(item) && color ? `is-${color}` : 'is-empty'
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              className={`observe-heat-dot-btn ${statusClass}${idx === selectedIndex ? ' is-current' : ''}`}
+                              title={`Session ${sessionNum} · Q${item.global_item_order}: ${item.prompt_text ?? ''}`}
+                              onClick={() => {
+                                setSelectedIndex(idx)
+                                setIsSummaryShown(false)
+                              }}
+                            >
+                              {item.global_item_order}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </section>
+                  )
+                })}
+              </div>
+
+              <div className="live-test-audio-panel" aria-label="Audio controls">
+                <div className="live-test-audio-head">
+                  <span><SlidersHorizontal className="h-3.5 w-3.5" /> Audio</span>
+                  <strong>{audioState}</strong>
+                </div>
+                <audio
+                  ref={audioRef}
+                  id="live-test-current-audio"
+                  key={audioUrl}
+                  controls
+                  src={audioUrl}
+                  onPlay={() => setAudioState('playing')}
+                  onEnded={() => setAudioState('played')}
+                  onError={() => setAudioState('error')}
+                  className="live-test-audio-el"
+                />
+                <p className="live-test-audio-label">{audioLabel}</p>
+                <div className="live-test-audio-actions">
+                  <button type="button" onClick={() => playCurrentSessionIntro(true)} disabled={!currentSessionIntroVariantId}>
+                    Session intro
+                  </button>
+                  <button type="button" onClick={() => playCurrentItemAudio(true)} disabled={!currentItemVariantId}>
+                    Current Q
+                  </button>
+                </div>
+                <label className="live-test-audio-toggle">
+                  <input
+                    type="checkbox"
+                    checked={autoPlayItems}
+                    onChange={(event) => setAutoPlayItems(event.target.checked)}
+                  />
+                  Auto-play next question
+                </label>
+                <label className="live-test-audio-toggle">
+                  <input
+                    type="checkbox"
+                    checked={autoPlaySessionIntro}
+                    onChange={(event) => setAutoPlaySessionIntro(event.target.checked)}
+                  />
+                  Auto-play session intro
+                </label>
+                <div className="live-test-audio-grid">
+                  <label>
+                    Speed
+                    <select value={audioRate} onChange={(event) => setAudioRate(Number(event.target.value))}>
+                      <option value={0.75}>0.75×</option>
+                      <option value={1}>1×</option>
+                      <option value={1.15}>1.15×</option>
+                      <option value={1.25}>1.25×</option>
+                      <option value={1.5}>1.5×</option>
+                    </select>
+                  </label>
+                  <label>
+                    Volume
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={audioVolume}
+                      onChange={(event) => setAudioVolume(Number(event.target.value))}
+                    />
+                  </label>
+                </div>
               </div>
             </div>
           </div>
@@ -524,10 +746,7 @@ export function TeacherTestRunPage() {
                 <button
                   type="button"
                   className="text-xs bg-indigo-500/20 text-indigo-200 hover:bg-indigo-500/30 px-3 py-1 rounded-full font-mono font-bold flex items-center gap-1 transition"
-                  onClick={() => {
-                    const audio = document.querySelector<HTMLAudioElement>('#live-test-current-audio')
-                    void audio?.play()
-                  }}
+                  onClick={() => playCurrentItemAudio(true)}
                   title="Play current item audio"
                 >
                   <Volume2 className="h-3.5 w-3.5" /> Audio
@@ -542,36 +761,18 @@ export function TeacherTestRunPage() {
 
               {showKeys ? <p className="observe-depth-inline text-xs text-slate-400">Shortcuts: 0 Red · 1 Yellow · 2 Green · 3 Purple · H map · ? keys</p> : null}
 
-              <div className="mt-2 w-full max-w-2xl rounded-3xl border border-indigo-300/20 bg-indigo-950/35 p-3 text-center shadow-lg sm:p-4">
+              <div className="live-test-focus-card">
                 <div className="flex items-center justify-between gap-3 text-xs text-indigo-200 font-mono">
-                  <span className="flex items-center gap-1 font-bold"><Volume2 className="h-4 w-4 text-indigo-400" /> Current item audio · {lang}</span>
-                  <span className="text-[10px] uppercase opacity-75">{audioState}</span>
-                </div>
-                {audioUrl ? (
-                  <audio id="live-test-current-audio" key={currentVariantId} controls src={audioUrl} onPlay={() => setAudioState('playing')} onEnded={() => setAudioState('played')} onError={() => setAudioState('error')} className="mx-auto my-2 h-8 w-full max-w-sm" />
-                ) : null}
-                {audioState === 'error' ? (
+                  <span className="flex items-center gap-1 font-bold"><Volume2 className="h-4 w-4 text-indigo-400" /> {audioLabel} · {lang}</span>
                   <button
                     type="button"
-                    className="ghost text-xs text-rose-300 mt-1"
-                    onClick={() => {
-                      if (!currentVariantId) return
-                      setAudioState('loading')
-                      setAudioUrl('')
-                      void getNarrationPlaybackUrl(currentVariantId)
-                        .then((playback) => {
-                          setAudioUrl(playback.signedUrl)
-                          setAudioState('ready')
-                        })
-                        .catch((cause) => {
-                          setAudioState('error')
-                          setMessage(cause instanceof Error ? cause.message : 'Playback failed')
-                        })
-                    }}
+                    className="ghost text-[11px] text-indigo-200"
+                    onClick={() => (audioState === 'error' ? playCurrentItemAudio(true) : playCurrentItemAudio(true))}
                   >
-                    <RotateCcw className="h-3.5 w-3.5" /> Retry audio
+                    {audioState === 'error' ? <RotateCcw className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+                    {audioState === 'error' ? 'Retry' : 'Play'}
                   </button>
-                ) : null}
+                </div>
 
                 <div className="mt-2 rounded-2xl border border-white/10 bg-slate-950/45 px-4 py-3">
                   <p className="text-[11px] uppercase tracking-[0.2em] text-indigo-200/80">Item text · Q{currentItemNumber}</p>
@@ -604,7 +805,7 @@ export function TeacherTestRunPage() {
               </div>
             ) : null}
 
-            <div className={`observe-dock observe-dock-lg${reaction ? ` is-glowing is-${reaction.color}` : ''}`}>
+            <div className={`observe-dock observe-dock-lg live-test-dock-compact${reaction ? ` is-glowing is-${reaction.color}` : ''}`}>
               <div className="observe-dock-colors" role="group" aria-label="Result color">
                 {COLORS.map((c) => (
                   <button key={c.key} type="button" className={`observe-dock-color is-${c.key}${currentColor === c.key ? ' is-selected' : ''}`} onClick={() => void handleRecord(c.key)} disabled={!currentItem} title={`${c.num} · ${c.label}`}>

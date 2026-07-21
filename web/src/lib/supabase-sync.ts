@@ -271,8 +271,6 @@ export async function ensureSupabaseStaffWorkspace(
     organizationId = insertedOrg.data.id as string
   }
 
-  // Database staff_roles authorize access. Keep compatibility memberships in sync
-  // for existing roster/domain reads without treating them as an auth grant.
   const membershipRows = identity.roles.map((role) => ({
     organization_id: organizationId!,
     user_id: userId!,
@@ -283,6 +281,16 @@ export async function ensureSupabaseStaffWorkspace(
       .from('organization_memberships')
       .upsert(membershipRows, { onConflict: 'organization_id,user_id,role' })
     if (membershipUpsert.error) return { ok: false, error: membershipUpsert.error.message }
+
+    const roleRows = identity.roles.map((role) => ({
+      user_id: userId!,
+      role,
+      active: true,
+    }))
+    const roleUpsert = await sb
+      .from('staff_roles')
+      .upsert(roleRows, { onConflict: 'user_id,role' })
+    if (roleUpsert.error) return { ok: false, error: roleUpsert.error.message }
   }
 
   return { ok: true, organizationId }

@@ -42,7 +42,7 @@ type Props = {
  * - copy / email scoped learner portal invite links
  */
 export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Props) {
-  const { roster, setRoster } = useAppState()
+  const { roster, setRoster, syncNow } = useAppState()
   const klass = roster.classes.find((c) => c.id === classId)
   const [existingId, setExistingId] = useState('')
   const [newName, setNewName] = useState('')
@@ -186,6 +186,7 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
                         const r = endEnrollment(roster, e.id)
                         if (!r.ok) return err(r.error)
                         setRoster(r.state)
+                        void syncNow({ roster: r.state })
                         ok(`${user?.displayName ?? 'Learner'} removed from class`)
                       }}
                     >
@@ -239,6 +240,7 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
                 })
                 if (!r.ok) return err(r.error)
                 setRoster(r.state)
+                void syncNow({ roster: r.state })
                 const invite = learnerInviteUrl(r.value.learner)
                 ok(
                   invite
@@ -326,6 +328,7 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
                 const learner = roster.users.find((u) => u.id === existingId)
                 const name = learner?.displayName ?? 'Learner'
                 setRoster(r.state)
+                void syncNow({ roster: r.state })
                 if (learnerInviteUrl(learner!)) {
                   ok(`${name} enrolled · invite ready`)
                 } else {

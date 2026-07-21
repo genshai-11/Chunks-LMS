@@ -60,6 +60,15 @@ function buildSession(
   }
 }
 
+const STAFF_LOGIN_ALIASES: Record<string, string> = {
+  admin: 'admin@example.com',
+}
+
+function normalizeStaffLoginIdentifier(raw: string): string {
+  const identifier = raw.trim().toLowerCase()
+  return STAFF_LOGIN_ALIASES[identifier] ?? identifier
+}
+
 async function loadStaffRolesByAuthUserId(authUserId: string | null): Promise<StaffRole[]> {
   const sb = getSupabase()
   if (!authUserId || !sb) return []
@@ -145,7 +154,7 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
       if (!sb) return { ok: false, error: 'Supabase Auth is not configured' }
       const redirectTo = typeof window !== 'undefined' ? window.location.origin : undefined
       const { error } = await sb.auth.signInWithOtp({
-        email: email.trim(),
+        email: normalizeStaffLoginIdentifier(email),
         options: redirectTo ? { emailRedirectTo: redirectTo } : undefined,
       })
       return error ? { ok: false, error: error.message } : { ok: true }
@@ -157,7 +166,7 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
     async (email, password) => {
       if (!sb) return { ok: false, error: 'Supabase Auth is not configured' }
       const { error } = await sb.auth.signInWithPassword({
-        email: email.trim(),
+        email: normalizeStaffLoginIdentifier(email),
         password,
       })
       return error ? { ok: false, error: error.message } : { ok: true }
@@ -169,7 +178,7 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
     async (email, password) => {
       if (!sb) return { ok: false, error: 'Supabase Auth is not configured' }
       const { data, error } = await sb.auth.signUp({
-        email: email.trim(),
+        email: normalizeStaffLoginIdentifier(email),
         password,
       })
       if (error) return { ok: false, error: error.message }

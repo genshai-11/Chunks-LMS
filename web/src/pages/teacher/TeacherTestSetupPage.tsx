@@ -50,27 +50,46 @@ export function TeacherTestSetupPage() {
     })
   }, [language, sectionId])
 
-  async function prepareAndStart() {
-    if (!assignmentId || !sectionId) return
+  async function prepareAndStart(fullPackage = true) {
+    if (!assignmentId || sections.length === 0) return
     setBusy(true)
     setError(null)
     setMessage(null)
-    const run = await prepareStandaloneRun(assignmentId, sectionId, language, voiceId)
-    if (!run.ok) {
-      setBusy(false)
-      return setError(run.error)
+
+    const targetSections = fullPackage ? sections : sections.filter((s) => s.id === sectionId)
+    const startedRunIds: string[] = []
+
+    for (const sec of targetSections) {
+      const run = await prepareStandaloneRun(assignmentId, sec.id, language, voiceId)
+      if (run.ok && run.data.canStart) {
+        const started = await startStandaloneRun(run.data.runId, run.data.readinessToken)
+        if (started.ok) {
+          startedRunIds.push(run.data.runId)
+        }
+      }
     }
-    if (!run.data.canStart) {
-      setBusy(false)
-      setMessage(
-        `Run is not ready: intro approval plus 10/10 current item audios are required. Current item count: ${run.data.approvedItemAudioCount}/10 for ${language.toUpperCase()} / ${voiceId}.`,
-      )
-      return
-    }
-    const started = await startStandaloneRun(run.data.runId, run.data.readinessToken)
+
     setBusy(false)
-    if (!started.ok) return setError(started.error)
-    navigate(`/teacher/test-runs/${run.data.runId}`)
+    if (startedRunIds.length === 0) {
+      // Fallback single run check
+      const singleRun = await prepareStandaloneRun(
+        assignmentId,
+        sectionId || sections[0]?.id,
+        language,
+        voiceId,
+      )
+      if (!singleRun.ok) return setError(singleRun.error)
+      if (!singleRun.data.canStart) {
+        return setMessage(
+          `Run requires approved narration. Current count: ${singleRun.data.approvedItemAudioCount}/10 for ${language.toUpperCase()} / ${voiceId}.`,
+        )
+      }
+      const started = await startStandaloneRun(singleRun.data.runId, singleRun.data.readinessToken)
+      if (!started.ok) return setError(started.error)
+      startedRunIds.push(singleRun.data.runId)
+    }
+
+    navigate(`/teacher/test-runs/${startedRunIds[0]}?assignmentId=${assignmentId}`)
   }
 
   return (
@@ -78,8 +97,8 @@ export function TeacherTestSetupPage() {
       <PageHeader
         icon={ClipboardPlus}
         kicker="Teacher · One-to-one Tests"
-        title="Prepare Test Run"
-        subtitle="Choose one Session and one approved language/voice bundle for this existing Learner assignment."
+        title="Prepare Full Package Test Run"
+        subtitle="Choose approved language/voice bundle to start the continuous Full Package Test Room."
       />
       <Flash message={message} error={error} />
       <Panel
@@ -90,7 +109,7 @@ export function TeacherTestSetupPage() {
       >
         <div className="form-grid">
           <label className="field">
-            Session
+            Session Focus
             <select value={sectionId} onChange={(event) => setSectionId(event.target.value)}>
               {sections.map((section) => (
                 <option key={section.id} value={section.id}>
@@ -123,8 +142,7 @@ export function TeacherTestSetupPage() {
         </div>
         <p className="banner-inline">
           <Volume2 className="h-4 w-4" />
-          Start requires one approved current intro plus ten approved current item audios for this
-          exact language and voice.
+          Start requires approved intro plus item audios for this exact language and voice.
         </p>
         {sections.length === 0 ? (
           <p className="banner-inline warning">
@@ -141,10 +159,17 @@ export function TeacherTestSetupPage() {
         <div className="btn-row">
           <button
             className="primary"
-            disabled={busy || !assignmentId || !sectionId || !voiceId}
-            onClick={() => void prepareAndStart()}
+            disabled={busy || !assignmentId || !voiceId}
+            onClick={() => void prepareAndStart(true)}
           >
-            {busy ? 'Checking 11/11 readiness…' : 'Check readiness & start'}
+            {busy ? 'Preparing Full Package…' : 'Start Full Package Run'}
+          </button>
+          <button
+            className="ghost"
+            disabled={busy || !assignmentId || !sectionId || !voiceId}
+            onClick={() => void prepareAndStart(false)}
+          >
+            Start Single Session Only
           </button>
           <button className="ghost" onClick={() => navigate('/teacher/tests')}>
             Cancel

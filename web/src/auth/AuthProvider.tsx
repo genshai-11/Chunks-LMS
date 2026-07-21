@@ -75,12 +75,12 @@ function StaffSignInForm() {
           <label className="flex flex-col gap-1.5 text-xs font-semibold text-slate-500">
             <span>Staff email</span>
             <input
-              type="email"
+              type="text"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="staff@example.com"
+              placeholder="staff@example.com or admin"
               required
-              autoComplete="email"
+              autoComplete="username"
               className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-700 shadow-3xs outline-none focus:border-red-500"
             />
           </label>
@@ -125,12 +125,12 @@ function StaffSignInForm() {
             <label className="flex flex-col gap-1.5 text-xs font-semibold text-slate-500">
               <span>Staff email</span>
               <input
-                type="email"
+                type="text"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="staff@example.com"
+                placeholder="staff@example.com or admin"
                 required
-                autoComplete="email"
+                autoComplete="username"
                 className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-700 shadow-3xs outline-none focus:border-red-500"
               />
             </label>

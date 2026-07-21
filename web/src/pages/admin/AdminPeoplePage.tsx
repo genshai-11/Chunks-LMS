@@ -14,13 +14,18 @@ import {
 } from 'lucide-react'
 import { Flash } from '../../components/Flash'
 import { readImageAsDataUrl } from '../../lib/readImageFile'
+import {
+  createTeacherAuthAccount,
+  deleteTeacherAuthAccount,
+  setTeacherAuthAccountStatus,
+  updateTeacherAuthAccount,
+} from '../../lib/staff-auth-admin'
 import { PageHeader } from '../../components/PageHeader'
 import { UserAvatar } from '../../components/UserAvatar'
 import { EmptyState, Panel } from '../../components/ui'
 import { useFlash } from '../../hooks/useFlash'
 import {
   addLearnerProfile,
-  addTeacherProfile,
   countDuplicateEmailGroups,
   deleteUserProfile,
   listActiveLearners,
@@ -35,11 +40,18 @@ import type { DomainUser } from '../../modules/roster/types'
 import { useAppState } from '../../state/useAppState'
 
 type Tab = 'teachers' | 'learners'
-type Draft = { displayName: string; email: string; avatarUrl?: string; allowMultiClass?: boolean }
+type Draft = {
+  displayName: string
+  email: string
+  password?: string
+  avatarUrl?: string
+  allowMultiClass?: boolean
+}
 
 const emptyDraft = (): Draft => ({
   displayName: '',
   email: '',
+  password: '',
   avatarUrl: '',
   allowMultiClass: false,
 })
@@ -67,7 +79,7 @@ function invitationMailto(user: DomainUser): string {
 }
 
 export function AdminPeoplePage() {
-  const { roster, setRoster, syncNow } = useAppState()
+  const { roster, setRoster, syncNow, reloadFromSupabase } = useAppState()
   const { message, error, ok, err } = useFlash()
   const [tab, setTab] = useState<Tab>('teachers')
   const [showAdd, setShowAdd] = useState(false)
@@ -87,15 +99,17 @@ export function AdminPeoplePage() {
 
   async function createAccount() {
     if (tab === 'teachers') {
-      const r = addTeacherProfile(roster, {
+      const password = draft.password ?? ''
+      if (password.length < 6) return err('Teacher password must be at least 6 characters')
+      const r = await createTeacherAuthAccount({
         displayName: draft.displayName,
-        email: draft.email || null,
+        email: draft.email,
+        password,
         avatarUrl: draft.avatarUrl || null,
       })
       if (!r.ok) return err(r.error)
-      setRoster(r.state)
-      await syncNow({ roster: r.state })
-      ok(`Teacher ${r.value.displayName} added`)
+      await reloadFromSupabase()
+      ok(`Teacher ${r.data.displayName} created with Supabase Auth login`)
     } else {
       const r = addLearnerProfile(roster, {
         displayName: draft.displayName,
@@ -113,6 +127,21 @@ export function AdminPeoplePage() {
   }
 
   async function saveEdit(id: string) {
+    const user = roster.users.find((u) => u.id === id)
+    if (user?.roles.includes('teacher')) {
+      const r = await updateTeacherAuthAccount({
+        userId: id,
+        displayName: editDraft.displayName,
+        email: editDraft.email,
+        avatarUrl: editDraft.avatarUrl || null,
+      })
+      if (!r.ok) return err(r.error)
+      await reloadFromSupabase()
+      setEditingId(null)
+      ok(`${r.data.displayName} updated`)
+      return
+    }
+
     const r = updateUserProfile(roster, id, {
       displayName: editDraft.displayName,
       email: editDraft.email || null,
@@ -207,7 +236,7 @@ export function AdminPeoplePage() {
           title={tab === 'teachers' ? 'New teacher' : 'New learner'}
           description={
             tab === 'teachers'
-              ? 'Email must match the Supabase staff account. Unique across all accounts.'
+              ? 'Creates a real Supabase Auth staff account plus database teacher role.'
               : 'Email is the portal invite identity. Unique across all accounts.'
           }
         >
@@ -237,6 +266,20 @@ export function AdminPeoplePage() {
                 placeholder={tab === 'learners' ? 'learner@school.edu' : 'teacher@school.edu'}
               />
             </label>
+            {tab === 'teachers' && (
+              <label>
+                Password
+                <input
+                  type="password"
+                  value={draft.password ?? ''}
+                  onChange={(e) => setDraft((d) => ({ ...d, password: e.target.value }))}
+                  required
+                  minLength={6}
+                  placeholder="Set teacher password"
+                  autoComplete="new-password"
+                />
+              </label>
+            )}
             {tab === 'learners' && (
               <label className="flex items-center gap-2 mt-2 select-none cursor-pointer">
                 <input
@@ -495,6 +538,18 @@ export function AdminPeoplePage() {
                             onClick={() => {
                               const next =
                                 (u.accountStatus ?? 'active') === 'active' ? 'inactive' : 'active'
+                              if (u.roles.includes('teacher')) {
+                                void (async () => {
+                                  const r = await setTeacherAuthAccountStatus({
+                                    userId: u.id,
+                                    accountStatus: next,
+                                  })
+                                  if (!r.ok) return err(r.error)
+                                  await reloadFromSupabase()
+                                  ok(`${u.displayName} → ${next}`)
+                                })()
+                                return
+                              }
                               const r = setAccountStatus(roster, u.id, next)
                               if (!r.ok) return err(r.error)
                               setRoster(r.state)
@@ -526,6 +581,15 @@ export function AdminPeoplePage() {
                             title="Delete"
                             onClick={() => {
                               if (!window.confirm(`Delete ${u.displayName}?`)) return
+                              if (u.roles.includes('teacher')) {
+                                void (async () => {
+                                  const r = await deleteTeacherAuthAccount(u.id)
+                                  if (!r.ok) return err(r.error)
+                                  await reloadFromSupabase()
+                                  ok(`${u.displayName} deleted`)
+                                })()
+                                return
+                              }
                               const r = deleteUserProfile(roster, u.id)
                               if (!r.ok) return err(r.error)
                               setRoster(r.state)

@@ -105,6 +105,26 @@ describe('Supabase staff session', () => {
     })
   })
 
+  it('maps the admin login alias to the seeded admin email before password sign-in', async () => {
+    const client = fakeClient({ user: null })
+    mocks.getSupabase.mockReturnValue(client)
+    render(
+      <SupabaseStaffSessionProvider>
+        <CaptureSession />
+      </SupabaseStaffSessionProvider>,
+    )
+    await waitFor(() => expect(latest?.ready).toBe(true))
+
+    await act(async () => {
+      await latest!.signInWithPassword('admin', 'admin123')
+    })
+
+    expect(client.auth.signInWithPassword).toHaveBeenCalledWith({
+      email: 'admin@example.com',
+      password: 'admin123',
+    })
+  })
+
   it('surfaces native password sign-in errors without granting access', async () => {
     mocks.getSupabase.mockReturnValue(
       fakeClient({ user: null, signInError: 'Invalid login credentials' }),

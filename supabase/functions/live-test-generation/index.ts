@@ -138,6 +138,17 @@ async function sha256Hex(input: string | Uint8Array): Promise<string> {
   ).join("");
 }
 
+async function requireStaff(userClient: SupabaseClientLike): Promise<string> {
+  const { data: actorId, error: actorError } = await userClient.rpc(
+    "current_staff_user_id",
+  );
+  if (actorError)
+    throw new Error(`Staff access failed: ${actorError.message}`);
+  if (!actorId)
+    throw new Error("Access Denied: Active staff account is required.");
+  return String(actorId);
+}
+
 async function requireAdmin(userClient: SupabaseClientLike): Promise<string> {
   const { data: isAdmin, error: adminError } = await userClient.rpc(
     "current_staff_is_admin",
@@ -148,17 +159,13 @@ async function requireAdmin(userClient: SupabaseClientLike): Promise<string> {
       "Access Denied: Only Admin staff can use live-test generation.",
     );
 
-  const { data: actorId, error: actorError } = await userClient.rpc(
-    "live_test_v2_current_user_id",
-  );
-  if (actorError)
-    throw new Error(`Actor resolution failed: ${actorError.message}`);
-  return String(actorId);
+  return await requireStaff(userClient);
 }
 
 async function loadPackageContext(
   admin: SupabaseClientLike,
   packageVersionId: string,
+  options: { requireDraft?: boolean } = { requireDraft: true },
 ) {
   const { data: version, error: versionError } = await admin
     .from("test_package_versions")
@@ -171,7 +178,7 @@ async function loadPackageContext(
     throw new Error(
       "Invalid packageVersionId: Package version does not exist.",
     );
-  if (version.status !== "draft")
+  if (options.requireDraft !== false && version.status !== "draft")
     throw new Error(
       "Conflict: Package version is not a draft and cannot be modified.",
     );
@@ -381,9 +388,13 @@ async function generateNarration(
     throw new Error("Invalid language: language must be vi or en.");
   if (!body.voiceId) throw new Error("Invalid voiceId: voiceId is required.");
 
+  // Narration generation only adds audio assets/variants. It does not mutate the
+  // immutable package content, so published Test packages can still receive missing
+  // VI/EN audio after publication.
   const { organizationId } = await loadPackageContext(
     admin,
     body.packageVersionId,
+    { requireDraft: false },
   );
   const text = await resolveNarrationText(admin, body);
   const sourceHash = `sha256:${await sha256Hex(`${text}:${body.language}:${body.voiceId}`)}`;
@@ -693,6 +704,18 @@ async function handleRequest(req: Request): Promise<Response> {
     });
   }
 
+  if (body.action === "generateNarration") {
+    const actorUserId = await requireStaff(userClient);
+    return jsonResponse(
+      await generateNarration(
+        body as GenerateNarrationBody,
+        actorUserId,
+        adminClient,
+        makeAdapter(),
+      ),
+    );
+  }
+
   const actorUserId = await requireAdmin(userClient);
 
   if (body.action === "listTtsModels") {
@@ -719,17 +742,6 @@ async function handleRequest(req: Request): Promise<Response> {
       ),
     );
   }
-  if (body.action === "generateNarration") {
-    return jsonResponse(
-      await generateNarration(
-        body as GenerateNarrationBody,
-        actorUserId,
-        adminClient,
-        adapter,
-      ),
-    );
-  }
-
   return jsonResponse({ error: "Unknown action" }, 400);
 }
 

@@ -4708,6 +4708,25 @@
     @apply border border-rose-200 bg-rose-50 px-2.5 py-1 text-rose-700 font-bold hover:border-rose-600 hover:bg-rose-600 hover:text-white transition-all shadow-3xs dark:border-rose-900/60 dark:bg-rose-950/60 dark:text-rose-200 dark:hover:bg-rose-600 dark:hover:text-white;
   }
 
+  .test-setup-page {
+    @apply text-slate-900;
+  }
+  .test-setup-page .panel {
+    @apply border-slate-200/80 bg-white;
+  }
+  .test-setup-page .panel-header {
+    @apply border-slate-100 bg-white;
+  }
+  .test-setup-page .panel-body-inner {
+    @apply bg-white px-4 pb-4 pt-3 text-slate-900;
+  }
+  .test-setup-page .panel-title {
+    @apply text-slate-900;
+  }
+  .test-setup-page .panel-desc {
+    @apply text-slate-500;
+  }
+
   .test-setup-shell {
     @apply grid gap-4 xl:grid-cols-[minmax(260px,340px)_minmax(0,1fr)];
   }

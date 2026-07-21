@@ -371,17 +371,17 @@ export async function listSectionNarrationReview(input: {
   sectionId: string
   itemIds: string[]
   language: 'vi' | 'en'
-  voiceId: string
+  voiceId?: string
 }): Promise<Result<NarrationReviewRecord[]>> {
   const sb = client()
   if (!sb) return { ok: false, error: 'Supabase is not configured' }
-  const { data, error } = await sb
+  let query = sb
     .from('narration_variants')
     .select('*')
     .eq('package_version_id', input.packageVersionId)
     .eq('language', input.language)
-    .eq('voice_id', input.voiceId)
-    .order('created_at', { ascending: false })
+  if (input.voiceId) query = query.eq('voice_id', input.voiceId)
+  const { data, error } = await query.order('created_at', { ascending: false })
   if (error) return { ok: false, error: error.message }
   const itemIds = new Set(input.itemIds)
   const variants = (data ?? [])

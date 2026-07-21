@@ -8,12 +8,34 @@ export type GenerationReceipt = {
   errorMessage?: string
 }
 
+async function readFunctionError(error: unknown, data: any): Promise<string | null> {
+  const dataMessage = data?.error?.message ?? data?.error?.code ?? data?.message
+  if (dataMessage) return String(dataMessage)
+
+  const context = (error as { context?: unknown })?.context
+  if (context && typeof Response !== 'undefined' && context instanceof Response) {
+    const response = context.clone()
+    const text = await response.text().catch(() => '')
+    if (!text) return null
+    try {
+      const parsed = JSON.parse(text) as { error?: { message?: string; code?: string } | string; message?: string }
+      if (typeof parsed.error === 'string') return parsed.error
+      return parsed.error?.message ?? parsed.error?.code ?? parsed.message ?? text
+    } catch {
+      return text
+    }
+  }
+  return null
+}
+
 async function invoke<T>(body: Record<string, unknown>): Promise<T> {
   const sb = getSupabase() as any
   if (!sb) throw new Error('Supabase is not configured')
   const { data, error } = await sb.functions.invoke('live-test-generation', { body })
-  const functionMessage = data?.error?.message ?? data?.error?.code
-  if (error) throw new Error(functionMessage ? `${error.message}: ${functionMessage}` : error.message)
+  if (error) {
+    const functionMessage = await readFunctionError(error, data)
+    throw new Error(functionMessage ? `${error.message}: ${functionMessage}` : error.message)
+  }
   if (data?.error) throw new Error(data.error.message ?? data.error.code ?? 'Generation failed')
   return data as T
 }

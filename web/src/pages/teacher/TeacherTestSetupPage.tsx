@@ -21,14 +21,11 @@ import {
   listSectionNarrationReview,
   listTestItems,
   listTestSections,
+  type NarrationReviewRecord,
 } from '../../lib/test-packages'
 import type { TestItem, TestSection } from '../../modules/catalog/test-package-catalog'
 import {
   audioReadiness,
-  audioTargetStatus,
-  narrationSourceHash,
-  resolveItemSpokenScript,
-  resolveNarrationRecord,
   type AudioLanguage,
   type AudioTargetStatus,
 } from '../../modules/catalog/spoken-scripts'
@@ -76,35 +73,47 @@ function intersectVoiceIds(groups: string[][]): string[] {
   return nonEmpty.reduce((acc, group) => acc.filter((id) => group.includes(id))).sort()
 }
 
+function targetKey(record: NarrationReviewRecord): string {
+  return record.variant.narrationTarget === 'section_intro'
+    ? `section:${record.variant.testSectionId}`
+    : `item:${record.variant.testItemId}`
+}
+
+function languageAudioTargetStatus(
+  records: NarrationReviewRecord[],
+  key: string,
+): AudioTargetStatus {
+  const candidates = records.filter((record) => targetKey(record) === key)
+  if (candidates.some((record) => record.variant.approvalStatus === 'approved' && record.variant.audioAssetId)) {
+    return 'approved'
+  }
+  if (candidates.some((record) => record.job?.status === 'failed')) return 'failed'
+  if (candidates.some((record) => record.variant.approvalStatus === 'generated' && record.variant.audioAssetId)) {
+    return 'generated'
+  }
+  if (candidates.some((record) => ['rejected', 'archived'].includes(record.variant.approvalStatus))) {
+    return 'rejected'
+  }
+  return 'missing'
+}
+
 async function sectionAudioStatuses(input: {
   packageVersionId: string
   section: TestSection
   items: TestItem[]
   language: AudioLanguage
-  voiceId: string
 }): Promise<AudioTargetStatus[]> {
   const review = await listSectionNarrationReview({
     packageVersionId: input.packageVersionId,
     sectionId: input.section.id,
     itemIds: input.items.map((item) => item.id),
     language: input.language,
-    voiceId: input.voiceId,
   })
   if (!review.ok) return Array(input.items.length + 1).fill('missing')
-  const introText = input.language === 'vi' ? input.section.introTextVi : input.section.introTextEn
-  const introHash = introText ? await narrationSourceHash(introText, input.language, input.voiceId) : undefined
-  const statuses: AudioTargetStatus[] = [
-    audioTargetStatus(resolveNarrationRecord(review.data, `section:${input.section.id}`, introHash), introHash),
+  return [
+    languageAudioTargetStatus(review.data, `section:${input.section.id}`),
+    ...input.items.map((item) => languageAudioTargetStatus(review.data, `item:${item.id}`)),
   ]
-  for (const item of input.items) {
-    const prompt = input.language === 'vi' ? item.promptVi : item.promptEn
-    const script = prompt
-      ? resolveItemSpokenScript({ itemOrder: item.itemOrder, prompt, language: input.language })
-      : ''
-    const hash = script ? await narrationSourceHash(script, input.language, input.voiceId) : undefined
-    statuses.push(audioTargetStatus(resolveNarrationRecord(review.data, `item:${item.id}`, hash), hash))
-  }
-  return statuses
 }
 
 export function TeacherTestSetupPage() {
@@ -129,14 +138,14 @@ export function TeacherTestSetupPage() {
 
   const loadAudioSummary = useCallback(
     async (nextPackageVersionId = packageVersionId, nextSections = sections) => {
-      if (!nextPackageVersionId || !voiceId || nextSections.length === 0) return
+      if (!nextPackageVersionId || nextSections.length === 0) return
       const summaries: Record<string, AudioStatusSummary> = {}
       await Promise.all(
         nextSections.map(async (section) => {
           const items = itemsBySection[section.id] ?? []
           const [viStatuses, enStatuses] = await Promise.all([
-            sectionAudioStatuses({ packageVersionId: nextPackageVersionId, section, items, language: 'vi', voiceId }),
-            sectionAudioStatuses({ packageVersionId: nextPackageVersionId, section, items, language: 'en', voiceId }),
+            sectionAudioStatuses({ packageVersionId: nextPackageVersionId, section, items, language: 'vi' }),
+            sectionAudioStatuses({ packageVersionId: nextPackageVersionId, section, items, language: 'en' }),
           ])
           summaries[section.id] = {
             vi: summarizeStatuses(viStatuses),
@@ -146,7 +155,7 @@ export function TeacherTestSetupPage() {
       )
       setAudioSummaryBySection(summaries)
     },
-    [itemsBySection, packageVersionId, sections, voiceId],
+    [itemsBySection, packageVersionId, sections],
   )
 
   useEffect(() => {
@@ -263,24 +272,30 @@ export function TeacherTestSetupPage() {
     try {
       for (const target of targets) {
         const sectionItems = itemsBySection[target.section.id] ?? []
-        await generateNarration({
+        const introReceipt = await generateNarration({
           packageVersionId,
           target: 'section_intro',
           testSectionId: target.section.id,
           language: target.language,
           voiceId,
         })
+        if (introReceipt.status === 'failed') {
+          throw new Error(introReceipt.errorMessage ?? `Generation failed for Session ${target.section.sectionOrder} intro`)
+        }
         done += 1
         setGenerationProgress({ done, total })
 
         for (const item of sectionItems) {
-          await generateNarration({
+          const itemReceipt = await generateNarration({
             packageVersionId,
             target: 'test_item',
             testItemId: item.id,
             language: target.language,
             voiceId,
           })
+          if (itemReceipt.status === 'failed') {
+            throw new Error(itemReceipt.errorMessage ?? `Generation failed for Session ${target.section.sectionOrder} Item ${item.itemOrder}`)
+          }
           done += 1
           setGenerationProgress({ done, total })
         }
@@ -292,7 +307,7 @@ export function TeacherTestSetupPage() {
     } catch (cause) {
       const detail = cause instanceof Error ? cause.message : String(cause)
       setError(
-        `Generate audio failed. ${detail} If this package version is published or your role cannot generate paid audio, open Admin Audio Prep with an admin account.`,
+        `Generate audio failed. ${detail} If this account cannot generate paid audio, sign in as active staff with generation access or open Admin Audio Prep.`,
       )
     } finally {
       setGeneratingKey(null)
@@ -327,7 +342,7 @@ export function TeacherTestSetupPage() {
       if (!run.data.canStart) {
         setBusy(false)
         setMessage(
-          `Session ${item.section.sectionOrder} is not ready for ${language.toUpperCase()} with model ${voiceId}. Start requires approved intro + approved item audio for this exact language/model. Approved item audio: ${run.data.approvedItemAudioCount}/${item.itemCount}. Open Audio Prep to generate/review/approve missing prompts.`,
+          `Session ${item.section.sectionOrder} is not ready for ${language.toUpperCase()}. Start requires approved intro + approved item audio for this language. Approved item audio: ${run.data.approvedItemAudioCount}/${item.itemCount}. Generate missing prompts, then review/approve audio before starting.`,
         )
         return
       }
@@ -348,7 +363,7 @@ export function TeacherTestSetupPage() {
   const isGeneratingSelected = generatingKey === 'selected'
 
   return (
-    <>
+    <div className="test-setup-page">
       <PageHeader
         icon={ClipboardPlus}
         kicker="Teacher · Tests 1-1"
@@ -388,7 +403,7 @@ export function TeacherTestSetupPage() {
               </select>
             </label>
             <label className="field">
-              Audio voice/model
+              Generate voice/model
               <input value={voiceId} onChange={(event) => setVoiceId(event.target.value)} />
               {suggestedVoiceIds.length > 0 ? <span className="meta">Available: {suggestedVoiceIds.slice(0, 2).join(', ')}</span> : null}
             </label>
@@ -407,7 +422,7 @@ export function TeacherTestSetupPage() {
                   className="ghost"
                   disabled={busy || generatingKey !== null || pendingTargets.length === 0}
                   onClick={() => void generateAudioForTargets(pendingTargets, 'selected')}
-                  title="Generate intro + item audio for selected sessions that are not ready for the selected model. Generated audio still needs review/approval."
+                  title="Generate intro + item audio for selected sessions that are not ready in the selected language. Generated audio still needs review/approval."
                 >
                   {isGeneratingSelected ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -473,13 +488,13 @@ export function TeacherTestSetupPage() {
                             </select>
                           </td>
                           <td>
-                            <span className={summary?.vi.ready ? 'badge success' : 'badge warning'} title="Approved for the selected model / expected prompts">
+                            <span className={summary?.vi.ready ? 'badge success' : 'badge warning'} title="Approved Vietnamese audio / expected prompts, across any model">
                               A {summary?.vi.approved ?? 0}/{summary?.vi.expected ?? itemCount + 1}
                             </span>
                             {summary?.vi.generated ? <span className="badge info ml-1">G {summary.vi.generated}</span> : null}
                           </td>
                           <td>
-                            <span className={summary?.en.ready ? 'badge success' : 'badge warning'} title="Approved for the selected model / expected prompts">
+                            <span className={summary?.en.ready ? 'badge success' : 'badge warning'} title="Approved English audio / expected prompts, across any model">
                               A {summary?.en.approved ?? 0}/{summary?.en.expected ?? itemCount + 1}
                             </span>
                             {summary?.en.generated ? <span className="badge info ml-1">G {summary.en.generated}</span> : null}
@@ -537,6 +552,6 @@ export function TeacherTestSetupPage() {
           <button className="ghost" onClick={() => navigate('/teacher/tests')}>Cancel</button>
         </div>
       </Panel>
-    </>
+    </div>
   )
 }

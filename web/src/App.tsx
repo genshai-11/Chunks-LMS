@@ -27,6 +27,7 @@ import { TeacherLearnerProfilePage } from './pages/teacher/TeacherLearnerProfile
 import { TeacherTestsPage } from './pages/teacher/TeacherTestsPage'
 import { TeacherTestSetupPage } from './pages/teacher/TeacherTestSetupPage'
 import { TeacherTestRunPage } from './pages/teacher/TeacherTestRunPage'
+import { TeacherTestAnalysisPage } from './pages/teacher/TeacherTestAnalysisPage'
 import { TeacherLearnerTestResultsPage } from './pages/teacher/TeacherLearnerTestResultsPage'
 import { LearnerLayout } from './pages/learner/LearnerLayout'
 import { LearnerOverviewPage } from './pages/learner/LearnerOverviewPage'
@@ -81,6 +82,7 @@ export default function App() {
                 <Route index element={<TeacherOverviewPage />} />
                 <Route path="classes" element={<TeacherClassesPage />} />
                 <Route path="tests" element={<TeacherTestsPage />} />
+                <Route path="tests/analysis/:assignmentId" element={<TeacherTestAnalysisPage />} />
                 <Route
                   path="tests/:assignmentId/sections/:sectionId/setup"
                   element={<TeacherTestSetupPage />}

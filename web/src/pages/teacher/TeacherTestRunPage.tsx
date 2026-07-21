@@ -27,6 +27,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { UserAvatar } from '../../components/UserAvatar'
 import { EmptyState, Panel } from '../../components/ui'
+import { PROBE_ACTIONS } from '../../modules/assessment/probe-actions'
 import { listActiveLearners } from '../../modules/roster/service'
 import { listTestSections } from '../../lib/test-packages'
 import {
@@ -38,6 +39,7 @@ import {
   listStandaloneRuns,
   prepareStandaloneRun,
   recordStandaloneResult,
+  resolveStandaloneProbe,
   startStandaloneRun,
   type StandaloneTestRunRow,
 } from '../../lib/standalone-tests'
@@ -75,8 +77,12 @@ function reactionFor(color: ResultColor): ReactionKind {
   return 'fight'
 }
 
+function getItemAttempt(item: TestItem | null | undefined) {
+  return item?.standalone_test_attempts?.[0] ?? null
+}
+
 function getItemSnapshot(item: TestItem | null | undefined) {
-  return item?.standalone_test_attempts?.[0]?.standalone_test_attempt_snapshots ?? null
+  return getItemAttempt(item)?.standalone_test_attempt_snapshots ?? null
 }
 
 function getItemColor(item: TestItem | null | undefined): ResultColor | null {
@@ -334,6 +340,10 @@ export function TeacherTestRunPage() {
 
   const currentItem = useMemo(() => items[selectedIndex] ?? null, [items, selectedIndex])
   const completedCount = useMemo(() => items.filter(isItemFinalized).length, [items])
+  const currentAttempt = getItemAttempt(currentItem)
+  const currentSnapshot = getItemSnapshot(currentItem)
+  const probeOpen = currentSnapshot?.status === 'probe_open' || currentSnapshot?.status === 'resolution_required'
+  const probeDepth = Number(currentSnapshot?.probe_count ?? currentSnapshot?.probeCount ?? 0)
   const currentSessionNumber = currentItem?.session_number || 1
   const currentItemNumber = currentItem?.global_item_order ?? selectedIndex + 1
   const currentItemVariantId = currentItem?.narration_variant_id ?? null
@@ -424,7 +434,7 @@ export function TeacherTestRunPage() {
 
   const handleRecord = useCallback(
     async (color: ResultColor) => {
-      if (!currentItem) return
+      if (!currentItem || probeOpen) return
       playReaction(color)
       const result = await recordStandaloneResult(currentItem.id, color)
       if (!result.ok) {
@@ -433,7 +443,26 @@ export function TeacherTestRunPage() {
       }
       await load()
     },
-    [currentItem, load, playReaction],
+    [currentItem, load, playReaction, probeOpen],
+  )
+
+  const handleProbe = useCallback(
+    async (outcome: 'fail' | 'continue' | 'done') => {
+      if (!currentAttempt?.id || !probeOpen) return
+      const result = await resolveStandaloneProbe(String(currentAttempt.id), outcome)
+      if (!result.ok) {
+        setMessage(result.error)
+        return
+      }
+      if (outcome === 'continue') {
+        setMessage(`Probe depth n=${result.data.probeCount}`)
+      } else {
+        playReaction(outcome === 'fail' ? 'yellow' : 'green')
+        setMessage('')
+      }
+      await load()
+    },
+    [currentAttempt?.id, load, playReaction, probeOpen],
   )
 
   useEffect(() => {
@@ -450,6 +479,23 @@ export function TeacherTestRunPage() {
         setShowKeys((v) => !v)
         return
       }
+      if (probeOpen) {
+        if (e.key.toLowerCase() === 'f') {
+          e.preventDefault()
+          void handleProbe('fail')
+          return
+        }
+        if (e.key.toLowerCase() === 'c' || e.key.toLowerCase() === 'p') {
+          e.preventDefault()
+          void handleProbe('continue')
+          return
+        }
+        if (e.key.toLowerCase() === 'd' || e.key === 'Enter') {
+          e.preventDefault()
+          void handleProbe('done')
+          return
+        }
+      }
       const found = COLORS.find((k) => k.num === e.key)
       if (found) {
         e.preventDefault()
@@ -458,11 +504,19 @@ export function TeacherTestRunPage() {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [currentItem, handleRecord])
+  }, [currentItem, handleProbe, handleRecord, probeOpen])
 
   async function completeAll() {
-    for (const r of allRuns) await completeStandaloneRun(r.id)
-    navigate('/teacher/tests')
+    const assignmentId = assignmentIdParam || runDetails?.assignmentId
+    for (const r of allRuns) {
+      const result = await completeStandaloneRun(r.id)
+      if (!result.ok) {
+        setMessage(result.error)
+        setIsSummaryShown(true)
+        return
+      }
+    }
+    navigate(assignmentId ? `/teacher/tests/analysis/${assignmentId}` : '/teacher/tests')
   }
 
   const sessionsGrouped = useMemo(() => {
@@ -567,6 +621,15 @@ export function TeacherTestRunPage() {
           </button>
           <button type="button" className={`observe-nav-btn observe-hide-phone${showKeys ? ' is-active' : ''}`} onClick={() => setShowKeys((v) => !v)} title="Keys (?)">
             <Keyboard aria-hidden strokeWidth={2.25} />
+          </button>
+          <button
+            type="button"
+            className="observe-nav-finish live-test-header-finish"
+            onClick={() => (isAllFinalized ? void completeAll() : setIsSummaryShown(true))}
+            title={isAllFinalized ? 'Finish Test / Complete Run' : 'Open summary before finishing'}
+          >
+            <CheckCircle2 aria-hidden strokeWidth={2.25} />
+            <span className="observe-nav-finish-label">Finish Test</span>
           </button>
         </div>
       </header>
@@ -774,14 +837,32 @@ export function TeacherTestRunPage() {
             ) : null}
 
             <div className={`observe-dock observe-dock-lg live-test-dock-compact${reaction ? ` is-glowing is-${reaction.color}` : ''}`}>
-              <div className="observe-dock-colors" role="group" aria-label="Result color">
-                {COLORS.map((c) => (
-                  <button key={c.key} type="button" className={`observe-dock-color is-${c.key}${currentColor === c.key ? ' is-selected' : ''}`} onClick={() => void handleRecord(c.key)} disabled={!currentItem} title={`${c.num} · ${c.label}`}>
-                    <span className="observe-dock-num">{c.num}</span>
-                    <span className="observe-dock-label">{c.label}</span>
-                  </button>
-                ))}
-              </div>
+              {probeOpen ? (
+                <div className="observe-dock-probe live-test-probe-dock" role="group" aria-label="Resolve probe">
+                  <p className="live-test-probe-depth">n=<strong>{probeDepth}</strong></p>
+                  {PROBE_ACTIONS.map((action) => (
+                    <button
+                      key={action.outcome}
+                      type="button"
+                      className={`observe-dock-probe-btn ${action.className}`}
+                      onClick={() => void handleProbe(action.outcome)}
+                      aria-label={`${action.label} probe`}
+                    >
+                      <span>{action.outcome === 'continue' ? 'Continue' : action.label}</span>
+                      <kbd>{action.outcome === 'continue' ? 'C' : action.shortcut}</kbd>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="observe-dock-colors" role="group" aria-label="Result color">
+                  {COLORS.map((c) => (
+                    <button key={c.key} type="button" className={`observe-dock-color is-${c.key}${currentColor === c.key ? ' is-selected' : ''}`} onClick={() => void handleRecord(c.key)} disabled={!currentItem} title={`${c.num} · ${c.label}`}>
+                      <span className="observe-dock-num">{c.num}</span>
+                      <span className="observe-dock-label">{c.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="observe-dock-tools observe-split-tools"><span className="observe-dock-q">Q{currentItemNumber}/{items.length}</span></div>
             </div>
 

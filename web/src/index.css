@@ -4635,3 +4635,143 @@
     }
   }
 }
+
+@layer components {
+  .live-test-header-finish {
+    @apply hidden sm:inline-flex;
+  }
+  .live-test-probe-dock {
+    @apply gap-2 rounded-[3rem] border-4 border-slate-700 bg-slate-950 p-3 text-slate-100;
+  }
+  .live-test-probe-depth {
+    @apply m-0 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-center font-mono text-xs font-bold text-amber-100;
+  }
+  .live-test-probe-depth strong {
+    @apply text-white;
+  }
+  .live-test-probe-dock .observe-dock-probe-btn {
+    width: clamp(4rem, 12dvh, 6.5rem) !important;
+    height: clamp(4rem, 12dvh, 6.5rem) !important;
+    @apply border-2 border-slate-600 bg-slate-900 text-slate-100;
+  }
+  .live-test-probe-dock .observe-dock-probe-btn span {
+    @apply text-slate-100;
+  }
+  .live-test-probe-dock .observe-dock-probe-btn.fail {
+    @apply border-rose-400/50 bg-rose-950/80 text-rose-100 hover:bg-rose-900;
+  }
+  .live-test-probe-dock .observe-dock-probe-btn.pass {
+    @apply border-amber-300/50 bg-amber-950/80 text-amber-100 hover:bg-amber-900;
+  }
+  .live-test-probe-dock .observe-dock-probe-btn.done {
+    @apply border-emerald-300/50 bg-emerald-950/80 text-emerald-100 hover:bg-emerald-900;
+  }
+
+  .standalone-analysis-grid {
+    @apply mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6;
+  }
+  .standalone-metric-card {
+    @apply rounded-2xl border border-slate-800 bg-slate-950 p-4 text-slate-100 shadow-sm;
+  }
+  .standalone-metric-card span {
+    @apply mt-2 block text-xs font-bold uppercase tracking-wide text-slate-400;
+  }
+  .standalone-metric-card strong {
+    @apply mt-1 block font-display text-2xl font-black text-white;
+  }
+  .standalone-chart-wrap {
+    @apply h-[min(56dvh,28rem)] min-h-[18rem] rounded-2xl border border-slate-800 bg-slate-950 p-3;
+  }
+  .standalone-chart-wrap.is-short {
+    @apply h-[min(44dvh,22rem)] min-h-[16rem];
+  }
+
+  .test-assignment-actions {
+    @apply flex flex-wrap items-center justify-end gap-2;
+  }
+  .ghost.danger {
+    @apply border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:bg-rose-500/20;
+  }
+
+  .test-setup-shell {
+    @apply grid gap-4 xl:grid-cols-[minmax(260px,340px)_minmax(0,1fr)];
+  }
+  .test-setup-side {
+    @apply min-w-0 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950;
+  }
+  .test-setup-stats {
+    @apply grid grid-cols-3 gap-2;
+  }
+  .test-setup-stats div {
+    @apply rounded-xl border border-slate-200 bg-white p-2 text-slate-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100;
+  }
+  .test-setup-stats span {
+    @apply mt-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400;
+  }
+  .test-setup-stats strong {
+    @apply block truncate font-display text-lg font-black text-slate-950 dark:text-white;
+  }
+  .test-run-mode-picker {
+    @apply grid gap-1 rounded-2xl border border-slate-200 bg-white p-1 dark:border-slate-800 dark:bg-slate-900;
+  }
+  .test-run-mode-picker button {
+    @apply min-h-9 rounded-xl border-0 bg-transparent px-3 py-2 text-left text-sm font-bold text-slate-700 shadow-none transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800;
+  }
+  .test-run-mode-picker button.is-active {
+    @apply bg-indigo-600 text-white hover:bg-indigo-600;
+  }
+  .test-setup-main {
+    @apply min-w-0 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950;
+  }
+  .test-audio-review-head {
+    @apply mb-3 flex flex-wrap items-center justify-between gap-2 text-slate-900 dark:text-slate-100;
+  }
+  .test-audio-review-head h3 {
+    @apply m-0 text-base font-black;
+  }
+  .test-audio-review-head p {
+    @apply m-0 text-xs text-slate-500 dark:text-slate-400;
+  }
+  .test-audio-review-head > span {
+    @apply rounded-full bg-slate-900 px-3 py-1 text-xs font-bold text-white dark:bg-white dark:text-slate-950;
+  }
+  .test-audio-review-table {
+    @apply max-h-[min(62dvh,34rem)] overflow-auto rounded-2xl border border-slate-200 dark:border-slate-800;
+  }
+  .test-audio-review-table table {
+    @apply min-w-[860px];
+  }
+  .test-audio-review-table th {
+    @apply sticky top-0 z-10 bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-200;
+  }
+  .test-audio-review-table td {
+    @apply align-middle text-slate-800 dark:text-slate-100;
+  }
+  .test-audio-review-table tr.is-selected td {
+    @apply bg-indigo-50 dark:bg-indigo-500/10;
+  }
+  .test-session-cell {
+    @apply flex min-h-0 flex-col items-start border-0 bg-transparent p-0 text-left shadow-none;
+  }
+  .test-session-cell strong {
+    @apply text-sm text-slate-950 dark:text-white;
+  }
+  .test-session-cell span {
+    @apply max-w-[22rem] truncate text-xs text-slate-500 dark:text-slate-400;
+  }
+  .badge.success {
+    @apply border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200;
+  }
+  .badge.warning {
+    @apply border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200;
+  }
+
+  @media (max-width: 1024px) {
+    .test-setup-shell {
+      @apply grid-cols-1;
+    }
+    .test-audio-review-table table {
+      @apply min-w-[760px];
+    }
+  }
+}

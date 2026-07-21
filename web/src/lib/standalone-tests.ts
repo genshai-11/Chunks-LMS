@@ -235,3 +235,51 @@ export async function listStandaloneRunItems(
   if (error) return { ok: false, error: error.message }
   return { ok: true, data: data ?? [] }
 }
+
+export async function deleteStandaloneAssignment(assignmentId: string): Promise<Result<true>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { error } = await sb.from('standalone_test_assignments').delete().eq('id', assignmentId)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: true }
+}
+
+export async function getStandaloneAssignmentAnalysis(assignmentId: string): Promise<
+  Result<{
+    assignment: StandaloneTestAssignmentRow | null
+    runs: StandaloneTestRunRow[]
+    items: Array<Record<string, unknown>>
+  }>
+> {
+  const assignments = await listStandaloneAssignments()
+  if (!assignments.ok) return assignments
+  const runs = await listStandaloneRuns(assignmentId)
+  if (!runs.ok) return runs
+  const itemResults = await Promise.all(runs.data.map((r) => listStandaloneRunItems(r.id)))
+  const items: Array<Record<string, unknown>> = []
+  for (let i = 0; i < runs.data.length; i += 1) {
+    const result = itemResults[i]
+    if (!result?.ok) return result ?? { ok: false, error: 'Could not load run items' }
+    for (const item of result.data) {
+      items.push({
+        ...item,
+        parent_run_id: runs.data[i]!.id,
+        session_number: runs.data[i]!.sessionNumber,
+        prompt_language: runs.data[i]!.promptLanguage,
+        voice_id: runs.data[i]!.voiceId,
+        target_cvr_ohm: runs.data[i]!.targetCvrOhm,
+        cci_name: runs.data[i]!.cciName,
+        cci_value: runs.data[i]!.cciValue,
+        item_cpd: runs.data[i]!.itemCpd,
+      })
+    }
+  }
+  return {
+    ok: true,
+    data: {
+      assignment: assignments.data.find((a) => a.id === assignmentId) ?? null,
+      runs: runs.data,
+      items,
+    },
+  }
+}

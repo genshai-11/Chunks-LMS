@@ -62,6 +62,7 @@ function buildSession(
 
 const STAFF_LOGIN_ALIASES: Record<string, string> = {
   admin: 'admin@example.com',
+  chunker: 'chunker@example.com',
 }
 
 function normalizeStaffLoginIdentifier(raw: string): string {

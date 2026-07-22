@@ -17,7 +17,6 @@ import { Flash } from '../../components/Flash'
 import { PageHeader } from '../../components/PageHeader'
 import { EmptyState, Panel } from '../../components/ui'
 import {
-  listApprovedSectionVoiceIds,
   listSectionNarrationReview,
   listTestItems,
   listTestSections,
@@ -40,8 +39,6 @@ type RunMode = 'single' | 'multi' | 'full'
 type SectionPreview = {
   section: TestSection
   itemCount: number
-  viVoiceIds: string[]
-  enVoiceIds: string[]
 }
 type AudioSummary = ReturnType<typeof audioReadiness> & {
   generated: number
@@ -65,12 +62,6 @@ function summarizeStatuses(statuses: AudioTargetStatus[]): AudioSummary {
     missing: statuses.filter((status) => status === 'missing').length,
     approvedModelSpecific: readiness.ready,
   }
-}
-
-function intersectVoiceIds(groups: string[][]): string[] {
-  const nonEmpty = groups.filter((group) => group.length > 0)
-  if (nonEmpty.length === 0) return []
-  return nonEmpty.reduce((acc, group) => acc.filter((id) => group.includes(id))).sort()
 }
 
 function targetKey(record: NarrationReviewRecord): string {
@@ -125,9 +116,17 @@ export function TeacherTestSetupPage() {
   const [sectionId, setSectionId] = useState(initialSectionId ?? '')
   const [selectedSectionIds, setSelectedSectionIds] = useState<Set<string>>(new Set())
   const [languageBySection, setLanguageBySection] = useState<Record<string, AudioLanguage>>({})
-  const [voiceId, setVoiceId] = useState('gemini/gemini-2.5-flash-preview-tts')
-  const [viVoiceIdsBySection, setViVoiceIdsBySection] = useState<Record<string, string[]>>({})
-  const [enVoiceIdsBySection, setEnVoiceIdsBySection] = useState<Record<string, string[]>>({})
+  const [voiceId] = useState('gemini/gemini-2.5-flash-preview-tts')
+  const [autoPlaySessionIntro, setAutoPlaySessionIntro] = useState(() =>
+    typeof window !== 'undefined'
+      ? window.localStorage.getItem('chunks-lms:live-test-autoplay-intro') === 'true'
+      : false,
+  )
+  const [autoPlayItems, setAutoPlayItems] = useState(() =>
+    typeof window !== 'undefined'
+      ? window.localStorage.getItem('chunks-lms:live-test-autoplay-items') === 'true'
+      : false,
+  )
   const [audioSummaryBySection, setAudioSummaryBySection] = useState<Record<string, AudioStatusSummary>>({})
   const [runMode, setRunMode] = useState<RunMode>('full')
   const [busy, setBusy] = useState(false)
@@ -191,20 +190,20 @@ export function TeacherTestSetupPage() {
   }, [assignmentId])
 
   useEffect(() => {
-    if (sections.length === 0) return
-    void (async () => {
-      const [viResults, enResults] = await Promise.all([
-        Promise.all(sections.map(async (section) => [section.id, await listApprovedSectionVoiceIds(section.id, 'vi')] as const)),
-        Promise.all(sections.map(async (section) => [section.id, await listApprovedSectionVoiceIds(section.id, 'en')] as const)),
-      ])
-      const viNext: Record<string, string[]> = {}
-      const enNext: Record<string, string[]> = {}
-      for (const [id, result] of viResults) if (result.ok) viNext[id] = result.data
-      for (const [id, result] of enResults) if (result.ok) enNext[id] = result.data
-      setViVoiceIdsBySection(viNext)
-      setEnVoiceIdsBySection(enNext)
-    })()
-  }, [sections])
+    try {
+      window.localStorage.setItem('chunks-lms:live-test-autoplay-intro', String(autoPlaySessionIntro))
+    } catch {
+      /* ignore */
+    }
+  }, [autoPlaySessionIntro])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('chunks-lms:live-test-autoplay-items', String(autoPlayItems))
+    } catch {
+      /* ignore */
+    }
+  }, [autoPlayItems])
 
   useEffect(() => {
     void loadAudioSummary()
@@ -215,10 +214,8 @@ export function TeacherTestSetupPage() {
       sections.map((section) => ({
         section,
         itemCount: itemsBySection[section.id]?.length ?? 0,
-        viVoiceIds: viVoiceIdsBySection[section.id] ?? [],
-        enVoiceIds: enVoiceIdsBySection[section.id] ?? [],
       })),
-    [enVoiceIdsBySection, itemsBySection, sections, viVoiceIdsBySection],
+    [itemsBySection, sections],
   )
 
   const targetPreview = useMemo(() => {
@@ -226,14 +223,6 @@ export function TeacherTestSetupPage() {
     if (runMode === 'single') return preview.filter((item) => item.section.id === sectionId)
     return preview.filter((item) => selectedSectionIds.has(item.section.id))
   }, [preview, runMode, sectionId, selectedSectionIds])
-
-  const suggestedVoiceIds = useMemo(() => {
-    const groups = targetPreview.map((item) => {
-      const language = languageBySection[item.section.id] ?? defaultLanguageForSection(item.section)
-      return language === 'vi' ? item.viVoiceIds : item.enVoiceIds
-    })
-    return intersectVoiceIds(groups)
-  }, [languageBySection, targetPreview])
 
   const totalItemCount = useMemo(
     () => targetPreview.reduce((sum, item) => sum + item.itemCount, 0),
@@ -382,6 +371,37 @@ export function TeacherTestSetupPage() {
         description="Choose Single Session or flexible Multi-Session groups such as Session 1–4 VI and Session 5–8 EN."
         collapsible={false}
       >
+        <div className="btn-row mt-4 test-setup-start-row">
+          <button className="primary" disabled={busy || !assignmentId || !voiceId || targetPreview.length === 0} onClick={() => void prepareAndStart()}>
+            <Play className="h-4 w-4" />
+            {busy ? 'Preparing…' : `Start Test · ${targetPreview.length} sessions · ${totalItemCount} items`}
+          </button>
+          <button className="ghost" onClick={() => navigate('/teacher/tests')}>Cancel</button>
+        </div>
+
+        <div className="test-setup-audio-card">
+          <div>
+            <strong>Audio behavior in test room</strong>
+            <span>Saved here and applied automatically when entering Live Test.</span>
+          </div>
+          <label>
+            <input
+              type="checkbox"
+              checked={autoPlaySessionIntro}
+              onChange={(event) => setAutoPlaySessionIntro(event.target.checked)}
+            />
+            Auto-play session intro
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={autoPlayItems}
+              onChange={(event) => setAutoPlayItems(event.target.checked)}
+            />
+            Auto-play question audio
+          </label>
+        </div>
+
         <div className="test-setup-shell">
           <div className="test-setup-side">
             <div className="test-setup-stats">
@@ -405,11 +425,6 @@ export function TeacherTestSetupPage() {
                   <option key={section.id} value={section.id}>Session {section.sectionOrder} · {section.title}</option>
                 ))}
               </select>
-            </label>
-            <label className="field">
-              Generate voice/model
-              <input value={voiceId} onChange={(event) => setVoiceId(event.target.value)} />
-              {suggestedVoiceIds.length > 0 ? <span className="meta">Available: {suggestedVoiceIds.slice(0, 2).join(', ')}</span> : null}
             </label>
           </div>
 
@@ -548,13 +563,6 @@ export function TeacherTestSetupPage() {
           <p className="banner-inline warning"><AlertTriangle className="h-4 w-4" />Select at least one session.</p>
         ) : null}
 
-        <div className="btn-row mt-4">
-          <button className="primary" disabled={busy || !assignmentId || !voiceId || targetPreview.length === 0} onClick={() => void prepareAndStart()}>
-            <Play className="h-4 w-4" />
-            {busy ? 'Preparing…' : `Start Test · ${targetPreview.length} sessions · ${totalItemCount} items`}
-          </button>
-          <button className="ghost" onClick={() => navigate('/teacher/tests')}>Cancel</button>
-        </div>
       </Panel>
     </div>
   )

@@ -230,11 +230,43 @@ export async function listStandaloneRunItems(
   if (!sb) return { ok: false, error: 'Supabase is not configured' }
   const { data, error } = await sb
     .from('standalone_test_run_items')
-    .select('*, standalone_test_attempts(*, standalone_test_attempt_snapshots(*))')
+    .select('*, test_items(prompt_vi, prompt_en), standalone_test_attempts(*, standalone_test_attempt_snapshots(*))')
     .eq('run_id', runId)
     .order('item_order')
   if (error) return { ok: false, error: error.message }
   return { ok: true, data: data ?? [] }
+}
+
+export async function findLatestApprovedNarrationVariant(input: {
+  target: 'section_intro' | 'test_item'
+  language: PromptLanguage
+  testSectionId?: string | null
+  testItemId?: string | null
+}): Promise<Result<{ id: string; audioAssetId: string } | null>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  let query = sb
+    .from('narration_variants')
+    .select('id, audio_asset_id')
+    .eq('narration_target', input.target)
+    .eq('language', input.language)
+    .eq('approval_status', 'approved')
+    .not('audio_asset_id', 'is', null)
+    .order('approved_at', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  if (input.target === 'section_intro') {
+    if (!input.testSectionId) return { ok: true, data: null }
+    query = query.eq('test_section_id', input.testSectionId)
+  } else {
+    if (!input.testItemId) return { ok: true, data: null }
+    query = query.eq('test_item_id', input.testItemId)
+  }
+
+  const { data, error } = await query.maybeSingle()
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: data ? { id: data.id, audioAssetId: data.audio_asset_id } : null }
 }
 
 export async function deleteStandaloneAssignment(assignmentId: string): Promise<Result<true>> {

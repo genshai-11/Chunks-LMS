@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Database, Gauge, ListChecks, Pencil, RefreshCw, Search, Volume2 } from 'lucide-react'
+import { Database, Gauge, ListChecks, Pencil, Plus, RefreshCw, Search, Trash2, Volume2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Flash } from '../../components/Flash'
 import { PageHeader } from '../../components/PageHeader'
@@ -14,6 +14,8 @@ import { useAppState } from '../../state/useAppState'
 import { listActiveLearners } from '../../modules/roster/service'
 import { getSupabase } from '../../lib/supabase'
 import {
+  createDraftTestItem,
+  deleteDraftTestItem,
   getSectionSnapshot,
   getTestPackagePublicationReadiness,
   listCciCategories,
@@ -51,6 +53,7 @@ type PackageScope = {
   version: TestPackageVersion
 }
 type ResourceTab = 'sessions' | 'items' | 'cci' | 'audio'
+type ResourceLanguage = AudioLanguage | 'all'
 
 export function AdminResourcesPage() {
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -64,16 +67,22 @@ export function AdminResourcesPage() {
   const [categories, setCategories] = useState<CciCategory[]>([])
   const [activeTab, setActiveTab] = useState<ResourceTab>('sessions')
   const [search, setSearch] = useState('')
+  const [sessionSearch, setSessionSearch] = useState('')
+  const [sessionAudioFilter, setSessionAudioFilter] = useState<'all' | 'ready' | 'missing'>('all')
   const [language, setLanguage] = useState<AudioLanguage>('vi')
+  const [resourceLanguage, setResourceLanguage] = useState<ResourceLanguage>('all')
   const [voiceId, setVoiceId] = useState('gemini/gemini-2.5-flash-preview-tts')
   const [publishVoiceVi, setPublishVoiceVi] = useState('gemini/gemini-2.5-flash-preview-tts')
   const [publishVoiceEn, setPublishVoiceEn] = useState('gemini/gemini-2.5-flash-preview-tts')
   const [publication, setPublication] = useState<TestPackagePublicationReadiness | null>(null)
   const [publishing, setPublishing] = useState(false)
-  const [audioStatuses, setAudioStatuses] = useState<AudioTargetStatus[]>(Array(11).fill('missing'))
-  const [expandedItemId, setExpandedItemId] = useState<string | null>(null)
+  const [audioStatuses, setAudioStatuses] = useState<AudioTargetStatus[]>([])
+  const [showItemDetails, setShowItemDetails] = useState(false)
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([])
+  const [showAddItem, setShowAddItem] = useState(false)
   const [promptDraft, setPromptDraft] = useState({ vi: '', en: '' })
+  const [newItemDraft, setNewItemDraft] = useState({ vi: '', en: '', tc: '', lc: '', tl: '' })
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -113,7 +122,8 @@ export function AdminResourcesPage() {
         if (!prepResult.ok) throw new Error(prepResult.error)
         
         if (!prepResult.data.canStart) {
-          throw new Error(`Session is not ready: requires approved intro + 10 approved item audios. Current approved: ${prepResult.data.approvedItemAudioCount}/10. Please generate and approve audio first.`)
+          const expectedItems = sectionItemCounts[secId] ?? 10
+          throw new Error(`Session is not ready: requires approved intro + ${expectedItems} approved item audios. Current approved: ${prepResult.data.approvedItemAudioCount}/${expectedItems}. Please generate and approve audio first.`)
         }
 
         // 3. Start run
@@ -140,7 +150,7 @@ export function AdminResourcesPage() {
   async function generateSessionAudio(secId: string) {
     if (!selectedScope) return
     setGeneratingSectionId(secId)
-    setGenProgress({ done: 0, total: 11 })
+    setGenProgress({ done: 0, total: (sectionItemCounts[secId] ?? 0) + 1 })
     setError(null)
     setMessage(null)
     try {
@@ -150,11 +160,10 @@ export function AdminResourcesPage() {
       const itemResult = await listTestItems(secId)
       if (!itemResult.ok) throw new Error(itemResult.error)
       const secItems = itemResult.data
-      if (secItems.length !== 10) {
-        throw new Error(`Session must have exactly 10 items. Found ${secItems.length}.`)
-      }
+      const totalAudioTargets = secItems.length + 1
 
       let done = 0
+      setGenProgress({ done, total: totalAudioTargets })
       await generateNarration({
         packageVersionId: selectedScope.version.id,
         target: 'section_intro',
@@ -163,7 +172,7 @@ export function AdminResourcesPage() {
         voiceId,
       })
       done += 1
-      setGenProgress({ done, total: 11 })
+      setGenProgress({ done, total: totalAudioTargets })
 
       for (const item of secItems) {
         await generateNarration({
@@ -174,10 +183,10 @@ export function AdminResourcesPage() {
           voiceId,
         })
         done += 1
-        setGenProgress({ done, total: 11 })
+        setGenProgress({ done, total: totalAudioTargets })
       }
 
-      setMessage(`Successfully generated 11 audio assets for Session ${section.sectionOrder} (${language.toUpperCase()})`)
+      setMessage(`Successfully generated ${totalAudioTargets} audio assets for Session ${section.sectionOrder} (${language.toUpperCase()})`)
       await loadPublicationReadiness()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Batch generation failed')
@@ -280,7 +289,7 @@ export function AdminResourcesPage() {
 
   useEffect(() => {
     if (!selectedSection || !selectedScope) {
-      setAudioStatuses(Array(11).fill('missing'))
+      setAudioStatuses(Array((items.length || 10) + 1).fill('missing'))
       return
     }
     void (async () => {
@@ -319,10 +328,12 @@ export function AdminResourcesPage() {
   }, [items, language, selectedScope, selectedSection, voiceId])
 
   const [sectionsReadiness, setSectionsReadiness] = useState<Record<string, { vi: number; en: number }>>({})
+  const [sectionItemCounts, setSectionItemCounts] = useState<Record<string, number>>({})
 
   useEffect(() => {
     if (!versionId) {
       setSectionsReadiness({})
+      setSectionItemCounts({})
       return
     }
     let active = true
@@ -352,8 +363,12 @@ export function AdminResourcesPage() {
       const variants = variantsRaw as Array<{ test_section_id: string | null; test_item_id: string | null; language: string }>
 
       const itemToSection = new Map<string, string>()
+      const itemCountMap: Record<string, number> = {}
       for (const item of allItems) {
-        if (item.section_id) itemToSection.set(item.id, item.section_id)
+        if (item.section_id) {
+          itemToSection.set(item.id, item.section_id)
+          itemCountMap[item.section_id] = (itemCountMap[item.section_id] ?? 0) + 1
+        }
       }
 
       const readinessMap: Record<string, { vi: number; en: number }> = {}
@@ -376,6 +391,7 @@ export function AdminResourcesPage() {
       
       if (active) {
         setSectionsReadiness(readinessMap)
+        setSectionItemCounts(itemCountMap)
       }
     })()
     return () => {
@@ -418,6 +434,29 @@ export function AdminResourcesPage() {
   }
 
   const readiness = audioReadiness(audioStatuses)
+  const totalItemCount = sections.reduce((sum, section) => sum + (sectionItemCounts[section.id] ?? 0), 0)
+  const selectedSectionItemCount = selectedSectionId ? (sectionItemCounts[selectedSectionId] ?? items.length) : 0
+  const selectedSectionAudioExpected = selectedSectionItemCount + 1
+  const filteredSections = useMemo(() => {
+    const needle = sessionSearch.trim().toLowerCase()
+    return sections.filter((section) => {
+      const snap = snapshots[section.id]
+      const category = snap ? categories.find((c) => c.id === snap.cciCategoryId) : null
+      const readinessForSection = sectionsReadiness[section.id] ?? { vi: 0, en: 0 }
+      const expectedAudioCount = (sectionItemCounts[section.id] ?? 10) + 1
+      const readyForFilter =
+        resourceLanguage === 'all'
+          ? readinessForSection.vi >= expectedAudioCount || readinessForSection.en >= expectedAudioCount
+          : readinessForSection[resourceLanguage] >= expectedAudioCount
+      if (sessionAudioFilter === 'ready' && !readyForFilter) return false
+      if (sessionAudioFilter === 'missing' && readyForFilter) return false
+      if (!needle) return true
+      return `${section.sectionOrder} ${section.title ?? ''} ${snap?.cciCategoryLabel ?? ''} ${category?.description ?? ''}`
+        .toLowerCase()
+        .includes(needle)
+    })
+  }, [categories, resourceLanguage, sectionItemCounts, sections, sectionsReadiness, sessionAudioFilter, sessionSearch, snapshots])
+
   const filteredItems = useMemo(() => {
     const needle = search.trim().toLowerCase()
     if (!needle) return items
@@ -427,6 +466,16 @@ export function AdminResourcesPage() {
         .includes(needle),
     )
   }, [items, search])
+
+  useEffect(() => {
+    setSelectedItemIds((current) => current.filter((id) => items.some((item) => item.id === id)))
+  }, [items])
+
+  useEffect(() => {
+    setSelectedItemIds([])
+    setShowAddItem(false)
+    setEditingItemId(null)
+  }, [selectedSectionId])
 
   async function savePrompt(item: TestItem) {
     if (!selectedScope) return
@@ -443,6 +492,38 @@ export function AdminResourcesPage() {
     setEditingItemId(null)
     setMessage(`Saved Item ${item.itemOrder}. Existing audio is now stale until regenerated.`)
     await loadItems()
+  }
+
+  async function addItemToSession() {
+    if (!selectedScope || !selectedSectionId) return
+    const result = await createDraftTestItem({
+      packageVersionId: selectedScope.version.id,
+      sectionId: selectedSectionId,
+      promptVi: newItemDraft.vi.trim() || null,
+      promptEn: newItemDraft.en.trim() || null,
+      tc: newItemDraft.tc ? Number(newItemDraft.tc) : null,
+      lc: newItemDraft.lc ? Number(newItemDraft.lc) : null,
+      tl: newItemDraft.tl ? Number(newItemDraft.tl) : null,
+    })
+    if (!result.ok) return setError(result.error)
+    setNewItemDraft({ vi: '', en: '', tc: '', lc: '', tl: '' })
+    setShowAddItem(false)
+    setMessage(`Added Item ${result.data.itemOrder}. Generate/approve audio before publishing or starting tests.`)
+    await loadItems()
+    await loadPublicationReadiness()
+  }
+
+  async function deleteSelectedItems() {
+    if (!selectedScope || selectedItemIds.length === 0) return
+    if (!window.confirm(`Delete ${selectedItemIds.length} item${selectedItemIds.length === 1 ? '' : 's'} from this draft session? Audio variants for deleted items will no longer be used.`)) return
+    for (const itemId of selectedItemIds) {
+      const result = await deleteDraftTestItem({ itemId, packageVersionId: selectedScope.version.id })
+      if (!result.ok) return setError(result.error)
+    }
+    setMessage(`Deleted ${selectedItemIds.length} item${selectedItemIds.length === 1 ? '' : 's'} from Session ${selectedSection?.sectionOrder ?? '—'}.`)
+    setSelectedItemIds([])
+    await loadItems()
+    await loadPublicationReadiness()
   }
 
   return (
@@ -493,9 +574,9 @@ export function AdminResourcesPage() {
                   {selectedScope?.version.status ?? '—'}
                 </span>
                 <strong>{sections.length} Sessions</strong>
-                <span>{sections.length * 10} items</span>
+                <span>{totalItemCount} items</span>
                 <span>
-                  Audio {readiness.approved}/{readiness.expected || 11}
+                  Audio {readiness.approved}/{readiness.expected || selectedSectionAudioExpected || 0}
                 </span>
               </div>
             </div>
@@ -564,23 +645,30 @@ export function AdminResourcesPage() {
               description="One row per test session; details no longer repeat package/version context."
               collapsible={false}
               actions={
-                <div className="btn-row">
+                <div className="resource-dynamic-filters">
+                  <label className="field-inline">
+                    <Search className="h-4 w-4" />
+                    <input
+                      value={sessionSearch}
+                      onChange={(event) => setSessionSearch(event.target.value)}
+                      placeholder="Filter sessions…"
+                    />
+                  </label>
                   <select
-                    value={language}
-                    onChange={(e) => setLanguage(e.target.value as AudioLanguage)}
+                    value={resourceLanguage}
+                    onChange={(e) => setResourceLanguage(e.target.value as ResourceLanguage)}
+                    title="Display/filter language"
                   >
+                    <option value="all">All languages</option>
                     <option value="vi">Vietnamese</option>
                     <option value="en">English</option>
                   </select>
-                  <label className="field-inline" title="Used only when generating new audio; the table badges count approved audio across any model.">
-                    Generate model:
-                    <input
-                      style={{ width: '12rem', padding: '0.25rem 0.5rem', fontSize: '0.875rem' }}
-                      value={voiceId}
-                      onChange={(e) => setVoiceId(e.target.value)}
-                    />
-                  </label>
-                  <span className="meta">Badges count approved audio across any model.</span>
+                  <select value={sessionAudioFilter} onChange={(e) => setSessionAudioFilter(e.target.value as 'all' | 'ready' | 'missing')}>
+                    <option value="all">All audio</option>
+                    <option value="ready">Ready for selected language</option>
+                    <option value="missing">Missing audio</option>
+                  </select>
+                  <span className="meta">Showing {filteredSections.length}/{sections.length}. Audio badges count approved audio across any model.</span>
                 </div>
               }
             >
@@ -616,9 +704,9 @@ export function AdminResourcesPage() {
                       <th>
                         <input
                           type="checkbox"
-                          checked={sections.length > 0 && selectedSessionIds.length === sections.length}
+                          checked={filteredSections.length > 0 && filteredSections.every((section) => selectedSessionIds.includes(section.id))}
                           onChange={(e) =>
-                            setSelectedSessionIds(e.target.checked ? sections.map((s) => s.id) : [])
+                            setSelectedSessionIds(e.target.checked ? filteredSections.map((s) => s.id) : [])
                           }
                         />
                       </th>
@@ -632,11 +720,13 @@ export function AdminResourcesPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {sections.map((section) => {
+                    {filteredSections.map((section) => {
                       const snap = snapshots[section.id]
                       const category = snap
                         ? categories.find((c) => c.id === snap.cciCategoryId)
                         : null
+                      const itemCount = sectionItemCounts[section.id] ?? 0
+                      const expectedAudioCount = itemCount + 1
                       return (
                         <tr
                           key={section.id}
@@ -674,23 +764,25 @@ export function AdminResourcesPage() {
                                 : '—'}
                             </strong>
                           </td>
-                          <td>10</td>
+                          <td>{itemCount}</td>
                           <td>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                              <span
-                                className={`badge ${sectionsReadiness[section.id]?.vi === 11 ? 'success' : 'experimental'}`}
-                                style={{ fontSize: '10px', padding: '0.125rem 0.375rem' }}
-                                title="Approved Vietnamese audio across any voice/model"
-                              >
-                                VI: {sectionsReadiness[section.id]?.vi ?? 0}/11
-                              </span>
-                              <span
-                                className={`badge ${sectionsReadiness[section.id]?.en === 11 ? 'success' : 'experimental'}`}
-                                style={{ fontSize: '10px', padding: '0.125rem 0.375rem' }}
-                                title="Approved English audio across any voice/model"
-                              >
-                                EN: {sectionsReadiness[section.id]?.en ?? 0}/11
-                              </span>
+                            <div className="resource-audio-badges">
+                              {resourceLanguage === 'all' || resourceLanguage === 'vi' ? (
+                                <span
+                                  className={`badge ${sectionsReadiness[section.id]?.vi === expectedAudioCount ? 'success' : 'experimental'}`}
+                                  title="Approved Vietnamese audio across any voice/model"
+                                >
+                                  VI: {sectionsReadiness[section.id]?.vi ?? 0}/{expectedAudioCount}
+                                </span>
+                              ) : null}
+                              {resourceLanguage === 'all' || resourceLanguage === 'en' ? (
+                                <span
+                                  className={`badge ${sectionsReadiness[section.id]?.en === expectedAudioCount ? 'success' : 'experimental'}`}
+                                  title="Approved English audio across any voice/model"
+                                >
+                                  EN: {sectionsReadiness[section.id]?.en ?? 0}/{expectedAudioCount}
+                                </span>
+                              ) : null}
                             </div>
                           </td>
                           <td>
@@ -734,7 +826,7 @@ export function AdminResourcesPage() {
               description="Primary sentence first; translation and CVR internals stay in row details."
               collapsible={false}
               actions={
-                <div className="btn-row">
+                <div className="resource-dynamic-filters">
                   <select
                     value={selectedSectionId}
                     onChange={(e) => setSelectedSectionId(e.target.value)}
@@ -746,15 +838,59 @@ export function AdminResourcesPage() {
                     ))}
                   </select>
                   <select
-                    value={language}
-                    onChange={(e) => setLanguage(e.target.value as AudioLanguage)}
+                    value={resourceLanguage}
+                    onChange={(e) => setResourceLanguage(e.target.value as ResourceLanguage)}
+                    title="Display language"
                   >
+                    <option value="all">All languages</option>
                     <option value="vi">Vietnamese</option>
                     <option value="en">English</option>
                   </select>
+                  <label className="resource-toggle-pill">
+                    <input
+                      type="checkbox"
+                      checked={showItemDetails}
+                      onChange={(event) => setShowItemDetails(event.target.checked)}
+                    />
+                    Show Translation & CVR details
+                  </label>
+                  {selectedScope?.version.status === 'draft' ? (
+                    <>
+                      <button className="ghost" onClick={() => setShowAddItem((value) => !value)}>
+                        <Plus className="h-4 w-4" /> Add item
+                      </button>
+                      <button className="ghost danger" disabled={selectedItemIds.length === 0} onClick={() => void deleteSelectedItems()}>
+                        <Trash2 className="h-4 w-4" /> Delete selected {selectedItemIds.length ? `(${selectedItemIds.length})` : ''}
+                      </button>
+                    </>
+                  ) : (
+                    <span className="meta">Published items are immutable.</span>
+                  )}
                 </div>
               }
             >
+              {showAddItem && selectedScope?.version.status === 'draft' ? (
+                <div className="resource-item-create-card">
+                  <label>
+                    VI prompt
+                    <textarea rows={2} value={newItemDraft.vi} onChange={(event) => setNewItemDraft((draft) => ({ ...draft, vi: event.target.value }))} />
+                  </label>
+                  <label>
+                    EN prompt
+                    <textarea rows={2} value={newItemDraft.en} onChange={(event) => setNewItemDraft((draft) => ({ ...draft, en: event.target.value }))} />
+                  </label>
+                  <div className="resource-item-cvr-grid">
+                    <label>TC<input value={newItemDraft.tc} onChange={(event) => setNewItemDraft((draft) => ({ ...draft, tc: event.target.value }))} /></label>
+                    <label>LC<input value={newItemDraft.lc} onChange={(event) => setNewItemDraft((draft) => ({ ...draft, lc: event.target.value }))} /></label>
+                    <label>TL<input value={newItemDraft.tl} onChange={(event) => setNewItemDraft((draft) => ({ ...draft, tl: event.target.value }))} /></label>
+                  </div>
+                  <div className="btn-row">
+                    <button className="primary" onClick={() => void addItemToSession()}>Add to session</button>
+                    <button className="ghost" onClick={() => setShowAddItem(false)}>Cancel</button>
+                  </div>
+                </div>
+              ) : null}
+
               <label className="field resource-search">
                 <Search className="h-4 w-4" />
                 <input
@@ -767,6 +903,15 @@ export function AdminResourcesPage() {
                 <table>
                   <thead>
                     <tr>
+                      <th>
+                        {selectedScope?.version.status === 'draft' ? (
+                          <input
+                            type="checkbox"
+                            checked={filteredItems.length > 0 && filteredItems.every((item) => selectedItemIds.includes(item.id))}
+                            onChange={(event) => setSelectedItemIds(event.target.checked ? filteredItems.map((item) => item.id) : [])}
+                          />
+                        ) : null}
+                      </th>
                       <th>#</th>
                       <th>Complete Sentence</th>
                       <th>CVR</th>
@@ -777,9 +922,25 @@ export function AdminResourcesPage() {
                   <tbody>
                     {filteredItems.map((item) => {
                       const editing = editingItemId === item.id
-                      const prompt = language === 'vi' ? item.promptVi : item.promptEn
+                      const prompt = resourceLanguage === 'en' ? item.promptEn : item.promptVi
+                      const translation = resourceLanguage === 'en' ? item.promptVi : item.promptEn
                       return (
-                        <tr key={item.id}>
+                        <tr key={item.id} className={selectedItemIds.includes(item.id) ? 'is-selected' : undefined}>
+                          <td>
+                            {selectedScope?.version.status === 'draft' ? (
+                              <input
+                                type="checkbox"
+                                checked={selectedItemIds.includes(item.id)}
+                                onChange={(event) =>
+                                  setSelectedItemIds((current) =>
+                                    event.target.checked
+                                      ? [...new Set([...current, item.id])]
+                                      : current.filter((id) => id !== item.id),
+                                  )
+                                }
+                              />
+                            ) : null}
+                          </td>
                           <td>
                             <strong>{item.itemOrder}</strong>
                           </td>
@@ -811,23 +972,23 @@ export function AdminResourcesPage() {
                               </div>
                             ) : (
                               <>
-                                <div>{prompt ?? '—'}</div>
-                                <button
-                                  className="link-button"
-                                  onClick={() =>
-                                    setExpandedItemId(expandedItemId === item.id ? null : item.id)
-                                  }
-                                >
-                                  {expandedItemId === item.id
-                                    ? 'Hide details'
-                                    : 'Translation & CVR details'}
-                                </button>
-                                {expandedItemId === item.id ? (
+                                {resourceLanguage === 'all' ? (
+                                  <div className="resource-bilingual-prompt">
+                                    <div><span>VI</span>{item.promptVi ?? '—'}</div>
+                                    <div><span>EN</span>{item.promptEn ?? '—'}</div>
+                                  </div>
+                                ) : (
+                                  <div>{prompt ?? '—'}</div>
+                                )}
+                                {showItemDetails ? (
                                   <div className="resource-row-details">
-                                    <div>{language === 'vi' ? item.promptEn : item.promptVi}</div>
+                                    {resourceLanguage !== 'all' ? <div>{translation ?? '—'}</div> : null}
                                     <span>
                                       TC {item.tc ?? '—'} · LC {item.lc ?? '—'} · TL{' '}
-                                      {item.tl ?? '—'}
+                                      {item.tl ?? '—'} · CVR {item.measuredCvr ?? '—'}
+                                    </span>
+                                    <span>
+                                      Terms: VI {item.termVi ?? '—'} · EN {item.termEn ?? '—'}
                                     </span>
                                   </div>
                                 ) : null}
@@ -921,12 +1082,12 @@ export function AdminResourcesPage() {
             <Panel
               icon={Volume2}
               title={`Session ${selectedSection?.sectionOrder ?? '—'} Audio`}
-              description="Prepare scripts before paid generation, then listen, approve, and reach 11/11."
+              description="Prepare scripts before paid generation, then listen, approve, and reach intro + all current items."
               collapsible={false}
             >
               <div className="audio-readiness-card">
                 <div>
-                  <strong>{readiness.approved}/11 approved</strong>
+                  <strong>{readiness.approved}/{selectedSectionAudioExpected || readiness.expected || 0} approved</strong>
                   <div className="meta">
                     {language.toUpperCase()} · {voiceId} · {readiness.stale} stale ·{' '}
                     {readiness.failed} failed

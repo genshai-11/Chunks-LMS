@@ -111,7 +111,11 @@ function mapSectionMeasurementSnapshot(row: any): SectionMeasurementSnapshot {
 export async function listTestPackages(): Promise<Result<TestPackage[]>> {
   const sb = client()
   if (!sb) return { ok: false, error: 'Supabase is not configured' }
-  const { data, error } = await sb.from('test_packages').select('*').order('title')
+  const { data, error } = await sb
+    .from('test_packages')
+    .select('*')
+    .is('archived_at', null)
+    .order('title')
   if (error) return { ok: false, error: error.message }
   return { ok: true, data: (data ?? []).map(mapTestPackage) }
 }
@@ -542,6 +546,46 @@ function slugify(value: string): string {
     .replace(/^-|-$/g, '')
 }
 
+export async function createDraftTestItem(input: {
+  packageVersionId: string
+  sectionId: string
+  promptVi: string | null
+  promptEn: string | null
+  tc: number | null
+  lc: number | null
+  tl: number | null
+}): Promise<Result<TestItem>> {
+  const draft = await assertDraftPackageVersion(input.packageVersionId)
+  if (!draft.ok) return draft
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { data: existing, error: orderError } = await sb
+    .from('test_items')
+    .select('item_order')
+    .eq('section_id', input.sectionId)
+    .order('item_order', { ascending: false })
+    .limit(1)
+  if (orderError) return { ok: false, error: orderError.message }
+  const nextOrder = (existing?.[0]?.item_order ?? 0) + 1
+  const { data, error } = await sb
+    .from('test_items')
+    .insert({
+      package_version_id: input.packageVersionId,
+      section_id: input.sectionId,
+      item_order: nextOrder,
+      prompt_vi: input.promptVi,
+      prompt_en: input.promptEn,
+      tc: input.tc,
+      lc: input.lc,
+      tl: input.tl,
+      source_metadata: { source: 'admin-resources-manual' },
+    })
+    .select()
+    .single()
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: mapTestItem(data) }
+}
+
 export async function updateDraftTestItem(input: {
   itemId: string
   packageVersionId: string
@@ -583,15 +627,6 @@ export async function deleteDraftTestItem(input: {
 }): Promise<Result<true>> {
   const draft = await assertDraftPackageVersion(input.packageVersionId)
   if (!draft.ok) return draft
-  const refs = await countItemExternalRefs(input.itemId)
-  if (!refs.ok) return refs
-  if (refs.data > 0) {
-    return {
-      ok: false,
-      error:
-        'This Test Item is linked to Session Questions. It cannot be deleted; create a new draft/version instead.',
-    }
-  }
   const sb = client()
   if (!sb) return { ok: false, error: 'Supabase is not configured' }
   const { error } = await sb

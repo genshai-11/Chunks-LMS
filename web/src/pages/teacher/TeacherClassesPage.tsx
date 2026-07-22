@@ -488,7 +488,7 @@ export function TeacherClassesPage() {
 
                   <button
                     type="button"
-                    className="btn ghost danger p-1.5"
+                    className="btn ghost danger flex justify-center gap-1.5 px-3 py-1.5 text-xs"
                     onClick={() => handleDeactivateLearner(learner.id, learner.name)}
                     title="Deactivate learner account completely (keeps historical analytics)"
                   >

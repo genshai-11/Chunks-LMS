@@ -23,6 +23,7 @@ export function TeacherTestsPage() {
   const [message, setMessage] = useState('')
   const [assignments, setAssignments] = useState<StandaloneTestAssignmentRow[]>([])
   const [busyAssignmentId, setBusyAssignmentId] = useState<string | null>(null)
+  const [selectedAssignmentIds, setSelectedAssignmentIds] = useState<Set<string>>(new Set())
 
   const loadAssignments = useCallback(async () => {
     const result = await listStandaloneAssignments()
@@ -51,6 +52,13 @@ export function TeacherTestsPage() {
   useEffect(() => {
     void loadAssignments()
   }, [loadAssignments])
+
+  useEffect(() => {
+    setSelectedAssignmentIds((current) => {
+      const validIds = new Set(assignments.map((assignment) => assignment.id))
+      return new Set(Array.from(current).filter((id) => validIds.has(id)))
+    })
+  }, [assignments])
 
   async function start() {
     if (!learnerId || !versionId) {
@@ -86,12 +94,59 @@ export function TeacherTestsPage() {
       setMessage(result.error)
       return
     }
+    setSelectedAssignmentIds((current) => {
+      const next = new Set(current)
+      next.delete(assignment.id)
+      return next
+    })
     setMessage('Deleted standalone test assignment.')
     await loadAssignments()
   }
 
+  function toggleAssignmentSelection(assignmentId: string) {
+    setSelectedAssignmentIds((current) => {
+      const next = new Set(current)
+      if (next.has(assignmentId)) next.delete(assignmentId)
+      else next.add(assignmentId)
+      return next
+    })
+  }
+
+  async function removeSelectedAssignments() {
+    const selectedAssignments = assignments.filter((assignment) => selectedAssignmentIds.has(assignment.id))
+    if (selectedAssignments.length === 0) return
+    if (
+      !window.confirm(
+        `Delete ${selectedAssignments.length} standalone test assignment${selectedAssignments.length === 1 ? '' : 's'}? This removes their runs, item attempts, events, and snapshots.`,
+      )
+    ) {
+      return
+    }
+    for (const assignment of selectedAssignments) {
+      setBusyAssignmentId(assignment.id)
+      const result = await deleteStandaloneAssignment(assignment.id)
+      if (!result.ok) {
+        setBusyAssignmentId(null)
+        setMessage(result.error)
+        return
+      }
+    }
+    setBusyAssignmentId(null)
+    setSelectedAssignmentIds(new Set())
+    setMessage(`Deleted ${selectedAssignments.length} standalone test assignment${selectedAssignments.length === 1 ? '' : 's'}.`)
+    await loadAssignments()
+  }
+
+  const selectedCount = selectedAssignmentIds.size
+  const allSelected = assignments.length > 0 && selectedCount === assignments.length
+  const statusBadgeClass = (status: string) => {
+    if (status === 'completed') return 'badge completed'
+    if (status === 'active') return 'badge success'
+    return 'badge info'
+  }
+
   return (
-    <>
+    <div className="tests-page">
       <PageHeader
         icon={ClipboardCheck}
         kicker="Teacher"
@@ -138,6 +193,25 @@ export function TeacherTestsPage() {
         icon={UserRound}
         title="Assignments"
         description="Delete old test trials or open dedicated standalone analysis."
+        actions={assignments.length > 0 ? (
+          <div className="test-assignment-bulk-actions">
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => setSelectedAssignmentIds(allSelected ? new Set() : new Set(assignments.map((assignment) => assignment.id)))}
+            >
+              {allSelected ? 'Clear' : 'Select all'}
+            </button>
+            <button
+              type="button"
+              className="ghost danger"
+              onClick={() => void removeSelectedAssignments()}
+              disabled={selectedCount === 0 || busyAssignmentId !== null}
+            >
+              <Trash2 className="h-4 w-4" /> Delete selected {selectedCount ? `(${selectedCount})` : ''}
+            </button>
+          </div>
+        ) : null}
         collapsible={false}
       >
         {assignments.length === 0 ? (
@@ -147,6 +221,14 @@ export function TeacherTestsPage() {
             <table>
               <thead>
                 <tr>
+                  <th className="w-10">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={() => setSelectedAssignmentIds(allSelected ? new Set() : new Set(assignments.map((assignment) => assignment.id)))}
+                      aria-label={allSelected ? 'Clear selected assignments' : 'Select all assignments'}
+                    />
+                  </th>
                   <th>Learner</th>
                   <th>Status</th>
                   <th>Assigned</th>
@@ -155,20 +237,28 @@ export function TeacherTestsPage() {
               </thead>
               <tbody>
                 {assignments.map((assignment) => (
-                  <tr key={assignment.id}>
+                  <tr key={assignment.id} className={selectedAssignmentIds.has(assignment.id) ? 'is-selected' : ''}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selectedAssignmentIds.has(assignment.id)}
+                        onChange={() => toggleAssignmentSelection(assignment.id)}
+                        aria-label={`Select assignment #${assignment.assignmentNumber}`}
+                      />
+                    </td>
                     <td>
                       <strong>
                         {learners.find((learner) => learner.id === assignment.learnerUserId)?.displayName ??
                           assignment.learnerUserId}
                       </strong>
-                      <div className="meta text-slate-600 dark:text-slate-300">
+                      <div className="test-assignment-meta">
                         Assignment #{assignment.assignmentNumber}
                       </div>
                     </td>
                     <td>
-                      <span className="badge">{assignment.status}</span>
+                      <span className={statusBadgeClass(assignment.status)}>{assignment.status}</span>
                     </td>
-                    <td className="text-slate-700 dark:text-slate-200">
+                    <td className="test-assignment-date">
                       {new Date(assignment.assignedAt).toLocaleDateString()}
                     </td>
                     <td>
@@ -198,6 +288,6 @@ export function TeacherTestsPage() {
           </div>
         )}
       </Panel>
-    </>
+    </div>
   )
 }

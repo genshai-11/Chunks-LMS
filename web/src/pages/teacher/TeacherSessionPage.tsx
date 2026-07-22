@@ -7,6 +7,7 @@ import {
   Play,
   Plus,
   Radio,
+  Trash2,
   Users,
 } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -37,7 +38,6 @@ import {
 import { subscribeToClassSnapshots } from '../../modules/realtime/snapshot-channel'
 import { closeOrphanOpenSessions } from '../../modules/scheduling/orphan-sessions'
 import { startLearningSession } from '../../modules/scheduling/session-lifecycle'
-import type { SessionKind } from '../../modules/scheduling/types'
 import {
   resolveSessionDayNumber,
   sessionDayBadge,
@@ -47,12 +47,6 @@ import {
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import { nextLearnerSessionNumber } from '../../modules/teacher/learner-insights'
 import { useAppState } from '../../state/useAppState'
-
-const SESSION_KINDS: { id: SessionKind; label: string; hint: string }[] = [
-  { id: 'regular', label: 'Regular day', hint: 'Normal teaching day' },
-  { id: 'pretest', label: 'Pretest', hint: 'Baseline RFC (start of program)' },
-  { id: 'posttest', label: 'Posttest', hint: 'Exit RFC (end of program)' },
-]
 
 export function TeacherSessionPage() {
   const {
@@ -65,6 +59,7 @@ export function TeacherSessionPage() {
     ledger,
     metricSettings,
     syncNow,
+    setActiveLearnerUserId,
   } = useAppState()
   const { message, error, ok, err } = useFlash()
   const { classRow, teacher } = useTeacherClassContext()
@@ -87,11 +82,12 @@ export function TeacherSessionPage() {
     if (openSession?.participantLearnerIds?.length) {
       return openSession.participantLearnerIds.filter((id) => activeLearnerIds.includes(id))
     }
-    return activeLearnerIds
+    return []
   }, [openSession, activeLearnerIds])
 
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+
   const [selectedIds, setSelectedIds] = useState<string[]>([])
-  const [sessionKind, setSessionKind] = useState<SessionKind>('regular')
 
   useEffect(() => {
     if (!classRow) return
@@ -201,7 +197,46 @@ export function TeacherSessionPage() {
   ])
 
   function toggleLearner(id: string) {
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+    setSelectedIds((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((x) => x !== id)
+      }
+      if (prev.length >= 2) {
+        return prev
+      }
+      return [...prev, id]
+    })
+  }
+
+  function deleteActiveSession() {
+    setShowCancelConfirm(true)
+  }
+
+  async function handleConfirmCancelActiveSession() {
+    if (!openSession) return
+    try {
+      const supabase = getSupabase()
+      if (supabase) {
+        const { error: dbErr } = await supabase
+          .from('learning_sessions')
+          .delete()
+          .eq('id', openSession.id)
+        if (dbErr) {
+          err(`Database error: ${dbErr.message}`)
+          return
+        }
+      }
+
+      const nextSessions = scheduling.learningSessions.filter((s) => s.id !== openSession.id)
+      const nextState = { ...scheduling, learningSessions: nextSessions }
+      setScheduling(nextState)
+      setCapture(null)
+      ok('Active session cancelled and deleted')
+    } catch (e: any) {
+      err(e.message || 'Failed to delete session')
+    } finally {
+      setShowCancelConfirm(false)
+    }
   }
 
   async function startLiveNow() {
@@ -219,16 +254,23 @@ export function TeacherSessionPage() {
     if (rosterForSession !== roster) setRoster(rosterForSession)
 
     const maxProbe = metricSettings.defaultMaxProbeCount
+    const nextNums = selectedIds.map((id) =>
+      nextLearnerSessionNumber({
+        ledger,
+        scheduling,
+        learnerUserId: id,
+        enrollments: roster.enrollments,
+        classId: classRow.id,
+      }),
+    )
+    const sessionNumber = nextNums.length > 0 ? Math.max(...nextNums) : undefined
+
     const r = startLearningSession(scheduling, {
       classId: classRow.id,
       maxProbeCount: maxProbe,
       ownerUserId: teacher.id,
-      sessionKind,
       participantLearnerIds: selectedIds,
-      sessionNumber:
-        selectedIds.length === 1
-          ? nextLearnerSessionNumber({ ledger, scheduling, learnerUserId: selectedIds[0]! })
-          : undefined,
+      sessionNumber,
     })
     if (!r.ok) return err(r.error)
     const sched = r.state
@@ -241,17 +283,16 @@ export function TeacherSessionPage() {
         maxProbeCount: maxProbe,
       }),
     )
+    if (selectedIds.length > 0) {
+      setActiveLearnerUserId(selectedIds[0]!)
+    }
     // Best-effort cloud push (full workspace + dedicated session upsert).
     // Observe works local-first even if this fails.
     const { ensureLearningSessionOnServer } = await import('../../lib/live-assessment')
     const ensured = await ensureLearningSessionOnServer(r.value)
     const pushed = await syncNow({ scheduling: sched, roster: rosterForSession })
     if (ensured.ok || pushed) {
-      ok(
-        `Live session started · ${selectedIds.length} learner(s)${
-          sessionKind !== 'regular' ? ` · ${sessionKind}` : ''
-        }`,
-      )
+      ok(`Live session started · ${selectedIds.length} learner(s)`)
     } else {
       ok(
         `Live session started offline · ${selectedIds.length} learner(s) — Observe works locally; Sync when ready`,
@@ -276,7 +317,7 @@ export function TeacherSessionPage() {
           icon={Radio}
           kicker="Teacher"
           title="Start session"
-          subtitle="Choose learners (1 or many), optional pretest/posttest for RFC baseline, then start Day N."
+          subtitle="Choose learners (1 or many), then start Day N."
         />
         <Flash message={message} error={error} />
 
@@ -305,26 +346,31 @@ export function TeacherSessionPage() {
             </div>
           }
         >
-          {activeLearnerIds.length === 0 ? (
+          {enrolledIds.length === 0 ? (
             <EmptyState
               icon={Users}
-              title="No learners yet"
-              description="Create learner profiles from Teacher → Learners first."
+              title="No learners seated"
+              description="Seat learners in this class under Teacher → Classes first."
               action={
-                <Link to="/teacher" className="btn ghost">
-                  Learners
+                <Link to="/teacher/classes" className="btn ghost">
+                  Manage Roster
                 </Link>
               }
             />
           ) : (
             <ul className="person-list">
-              {activeLearnerIds.map((id) => {
+              {enrolledIds.map((id) => {
                 const user = roster.users.find((u) => u.id === id)
                 const checked = selectedIds.includes(id)
                 return (
                   <li key={id}>
                     <label className="person-row-check">
-                      <input type="checkbox" checked={checked} onChange={() => toggleLearner(id)} />
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={!checked && selectedIds.length >= 2}
+                        onChange={() => toggleLearner(id)}
+                      />
                       <UserAvatar
                         name={user?.displayName ?? id}
                         avatarUrl={user?.avatarUrl}
@@ -333,10 +379,7 @@ export function TeacherSessionPage() {
                       <span>
                         <strong>{user?.displayName ?? id}</strong>
                         <span className="meta" style={{ display: 'block', margin: 0 }}>
-                          {user?.email ?? 'No email'} ·{' '}
-                          {enrolledIds.includes(id)
-                            ? 'Class assigned'
-                            : 'Will assign class on start'}
+                          {user?.email ?? 'No email'}
                         </span>
                       </span>
                     </label>
@@ -345,27 +388,6 @@ export function TeacherSessionPage() {
               })}
             </ul>
           )}
-        </Panel>
-
-        <Panel
-          icon={Layers}
-          title="Session label"
-          description="Pretest / posttest mark baseline windows for RFC change over time."
-        >
-          <div className="btn-row" role="group" aria-label="Session kind">
-            {SESSION_KINDS.map((k) => (
-              <button
-                key={k.id}
-                type="button"
-                className={sessionKind === k.id ? 'primary' : 'ghost'}
-                onClick={() => setSessionKind(k.id)}
-                title={k.hint}
-              >
-                {k.label}
-              </button>
-            ))}
-          </div>
-          <p className="meta mt-2">{SESSION_KINDS.find((k) => k.id === sessionKind)?.hint}</p>
         </Panel>
 
         <EmptyState
@@ -433,11 +455,19 @@ export function TeacherSessionPage() {
             : ''
         } · ${learnerCount} learner(s)`}
         actions={
-          <div className="page-actions">
+          <div className="page-actions flex items-center gap-2">
             <Link to={observeTo} className="btn primary">
               <Eye className="h-4 w-4" aria-hidden />
               <span>{finalizedCount > 0 ? `Open ${dayBadge}` : `Observe ${dayBadge}`}</span>
             </Link>
+            <button
+              type="button"
+              className="btn ghost text-red-400 hover:text-red-300 hover:bg-red-500/10 px-3 py-1.5 rounded flex items-center gap-1.5"
+              onClick={deleteActiveSession}
+            >
+              <Trash2 className="h-4 w-4" aria-hidden />
+              <span>Cancel Session</span>
+            </button>
           </div>
         }
       />
@@ -529,11 +559,19 @@ export function TeacherSessionPage() {
               full-screen. Use learner-first mode to walk each learner’s questions in turn.
             </p>
           </div>
-          <div className="btn-row">
+          <div className="btn-row flex items-center gap-2">
             <Link to={observeTo} className="btn primary observe-entry-cta">
               <Eye className="h-4 w-4" aria-hidden />
               <span>{finalizedCount > 0 ? `Open ${dayBadge}` : `Enter ${dayBadge}`}</span>
             </Link>
+            <button
+              type="button"
+              className="btn ghost text-red-400 hover:text-red-300 hover:bg-red-500/10 px-3 py-1.5 rounded flex items-center gap-1.5"
+              onClick={deleteActiveSession}
+            >
+              <Trash2 className="h-4 w-4" aria-hidden />
+              <span>Cancel Session</span>
+            </button>
             <button
               type="button"
               className="ghost"
@@ -612,6 +650,35 @@ export function TeacherSessionPage() {
           </div>
         )}
       </Panel>
+
+      {/* Custom Cancel Active Session Modal */}
+      {showCancelConfirm && (
+        <div className="observe-modal-container">
+          <div className="observe-modal-backdrop" onClick={() => setShowCancelConfirm(false)} />
+          <div className="observe-modal-card text-left max-w-md p-6 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl relative z-50">
+            <h3 className="text-lg font-bold text-white mb-2">Cancel Active Session?</h3>
+            <p className="text-sm text-slate-300 mb-6">
+              Are you sure you want to cancel and delete this active session? All progress captured in this session will be permanently lost.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                className="btn secondary px-4 py-2 text-xs font-semibold rounded-lg"
+                onClick={() => setShowCancelConfirm(false)}
+              >
+                Keep Session
+              </button>
+              <button
+                type="button"
+                className="btn primary bg-red-600 hover:bg-red-500 text-white px-4 py-2 text-xs font-semibold rounded-lg shadow-lg hover:shadow-red-500/20"
+                onClick={() => void handleConfirmCancelActiveSession()}
+              >
+                Cancel Session
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

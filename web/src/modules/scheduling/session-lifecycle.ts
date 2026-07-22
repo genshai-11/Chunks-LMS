@@ -303,6 +303,10 @@ export function startLearningSession(
     ownerUserId?: string | null
     lockTtlMs?: number
     sessionKind?: import('./types').SessionKind
+    sessionFormat?: import('./types').SessionFormat
+    promptLanguage?: import('./types').PromptLanguage | null
+    liveTestResourceId?: string | null
+    liveTestBlockId?: string | null
     /** Explicit display ordinal for learner-first single sessions. Defaults to next class day. */
     sessionNumber?: number | null
     /** Subset of class learners for this capture; null = all enrolled at start */
@@ -358,6 +362,10 @@ export function startLearningSession(
       ? new Date(new Date(at).getTime() + ttl).toISOString()
       : null,
     sessionKind: input.sessionKind ?? 'regular',
+    sessionFormat: input.sessionFormat ?? 'lesson',
+    promptLanguage: input.sessionFormat === 'test' ? (input.promptLanguage ?? 'vi') : null,
+    liveTestResourceId: input.sessionFormat === 'test' ? (input.liveTestResourceId ?? null) : null,
+    liveTestBlockId: input.sessionFormat === 'test' ? (input.liveTestBlockId ?? null) : null,
     participantLearnerIds: participants,
   }
 

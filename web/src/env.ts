@@ -1,17 +1,9 @@
 import { z } from 'zod'
-import { parseEmailList } from './auth/staff-roles'
 
 const envSchema = z.object({
-  VITE_CLERK_PUBLISHABLE_KEY: z.string().optional().default(''),
   VITE_SUPABASE_URL: z.string().url().optional().or(z.literal('')).default(''),
   VITE_SUPABASE_ANON_KEY: z.string().optional().default(''),
   VITE_AUTH_BYPASS: z.string().optional().default('false'),
-  /** Enable only after Clerk is registered under Supabase Third-Party Auth. */
-  VITE_SUPABASE_CLERK_AUTH: z.string().optional().default('false'),
-  /** Comma-separated admin emails (Clerk primary email). Empty = bootstrap any signed-in staff. */
-  VITE_STAFF_ADMIN_EMAILS: z.string().optional().default(''),
-  /** Comma-separated teacher emails. Empty = bootstrap any signed-in staff. */
-  VITE_STAFF_TEACHER_EMAILS: z.string().optional().default(''),
   MODE: z.string().optional(),
   DEV: z.boolean().optional(),
   PROD: z.boolean().optional(),
@@ -24,29 +16,21 @@ function truthy(raw: string | undefined): boolean {
 }
 
 export type AppEnv = {
-  clerkPublishableKey: string
   supabaseUrl: string
   supabaseAnonKey: string
   /** Local/CI only — grants Admin+Teacher without sign-in. Never true in production. */
   authBypass: boolean
-  supabaseClerkAuth: boolean
-  staffAdminEmails: string[]
-  staffTeacherEmails: string[]
-  /** Clerk + Supabase both configured */
+  /** Supabase URL + anon/publishable key are configured. */
   isConfigured: boolean
-  /** App can boot (Clerk key or auth bypass) */
+  /** App can boot with native Supabase Auth or local/CI auth bypass. */
   canBoot: boolean
 }
 
 function readEnv(): AppEnv {
   const parsed = envSchema.safeParse({
-    VITE_CLERK_PUBLISHABLE_KEY: import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
     VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
     VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
     VITE_AUTH_BYPASS: import.meta.env.VITE_AUTH_BYPASS,
-    VITE_SUPABASE_CLERK_AUTH: import.meta.env.VITE_SUPABASE_CLERK_AUTH,
-    VITE_STAFF_ADMIN_EMAILS: import.meta.env.VITE_STAFF_ADMIN_EMAILS,
-    VITE_STAFF_TEACHER_EMAILS: import.meta.env.VITE_STAFF_TEACHER_EMAILS,
     MODE: import.meta.env.MODE,
     DEV: import.meta.env.DEV,
     PROD: import.meta.env.PROD,
@@ -59,23 +43,17 @@ function readEnv(): AppEnv {
   const data = parsed.success
     ? parsed.data
     : {
-        VITE_CLERK_PUBLISHABLE_KEY: '',
         VITE_SUPABASE_URL: '',
         VITE_SUPABASE_ANON_KEY: '',
         VITE_AUTH_BYPASS: 'false',
-        VITE_SUPABASE_CLERK_AUTH: 'false',
-        VITE_STAFF_ADMIN_EMAILS: '',
-        VITE_STAFF_TEACHER_EMAILS: '',
       }
 
-  const clerkPublishableKey = (data.VITE_CLERK_PUBLISHABLE_KEY ?? '').trim()
   const supabaseUrl = data.VITE_SUPABASE_URL
   const supabaseAnonKey = data.VITE_SUPABASE_ANON_KEY
 
   /**
    * Vite sets PROD=true for every `vite build` (local preview, Vercel Preview, and
    * Production). Only block staff auth bypass on real Vercel Production deploys.
-   * Local + Vercel Preview may use VITE_AUTH_BYPASS for demos without Clerk.
    */
   const vercelEnv = String(import.meta.env.VITE_VERCEL_ENV ?? '').trim()
   const isVercelProduction = vercelEnv === 'production'
@@ -83,19 +61,17 @@ function readEnv(): AppEnv {
   const authBypass = authBypassRequested && !isVercelProduction
 
   if (authBypassRequested && isVercelProduction) {
-    console.warn('VITE_AUTH_BYPASS is ignored on Vercel Production — set VITE_CLERK_PUBLISHABLE_KEY')
+    console.warn('VITE_AUTH_BYPASS is ignored on Vercel Production — use native Supabase Auth')
   }
 
+  const isConfigured = Boolean(supabaseUrl && supabaseAnonKey)
+
   return {
-    clerkPublishableKey,
     supabaseUrl,
     supabaseAnonKey,
     authBypass,
-    supabaseClerkAuth: truthy(data.VITE_SUPABASE_CLERK_AUTH),
-    staffAdminEmails: parseEmailList(data.VITE_STAFF_ADMIN_EMAILS),
-    staffTeacherEmails: parseEmailList(data.VITE_STAFF_TEACHER_EMAILS),
-    isConfigured: Boolean(clerkPublishableKey && supabaseUrl && supabaseAnonKey),
-    canBoot: Boolean(clerkPublishableKey) || authBypass,
+    isConfigured,
+    canBoot: isConfigured || authBypass,
   }
 }
 

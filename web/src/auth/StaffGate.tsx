@@ -1,11 +1,11 @@
-import { SignInButton } from '@clerk/react'
 import { Lock, LogIn, ShieldAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { env } from '../env'
 import { PageHeader } from '../components/PageHeader'
 import type { StaffRole } from './staff-roles'
+import { StaffSignInForm } from './AuthProvider'
 import { useStaffSession } from './useStaffSession'
+import { Panel } from '../components/ui'
 
 type Props = {
   /** Required staff role for this workspace */
@@ -34,28 +34,44 @@ export function StaffGate({ role, children }: Props) {
           icon={Lock}
           kicker="Staff only"
           title={role === 'admin' ? 'Admin sign-in required' : 'Teacher sign-in required'}
-          subtitle="Use your Clerk staff account. Learners open a shared portal link instead."
+          subtitle="Use your Supabase Auth staff account. Learners open a signed learner access link instead."
         />
-        <div className="panel" style={{ maxWidth: 420, margin: '0 auto' }}>
-          {env.clerkPublishableKey ? (
-            <SignInButton mode="modal">
-              <button type="button" className="primary" style={{ width: '100%' }}>
-                <LogIn className="h-4 w-4" aria-hidden />
-                <span>Sign in with Clerk</span>
-              </button>
-            </SignInButton>
-          ) : (
-            <p className="meta">
-              Clerk is not configured. Set <code>VITE_CLERK_PUBLISHABLE_KEY</code> or enable{' '}
-              <code>VITE_AUTH_BYPASS=true</code> for local demos.
-            </p>
-          )}
-          <p className="meta" style={{ marginTop: 12 }}>
-            Student?{' '}
-            <Link to="/access" className="underline">
-              Open learner portal
-            </Link>
-          </p>
+        <div style={{ maxWidth: 460, margin: '0 auto', width: '100%' }}>
+          <Panel
+            icon={Lock}
+            title={role === 'admin' ? 'Admin Sign In' : 'Teacher Sign In'}
+            description="Sign in with email/password, create an account, or use a magic link."
+            collapsible={false}
+          >
+            {session.authEnabled ? (
+              <>
+                <StaffSignInForm />
+                <p
+                  className="meta"
+                  style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                >
+                  <LogIn className="h-4 w-4" aria-hidden /> Enter the magic link sent by Supabase
+                  Auth.
+                </p>
+              </>
+            ) : (
+              <p className="meta">
+                Supabase Auth is not configured. Set <code>VITE_SUPABASE_URL</code> and{' '}
+                <code>VITE_SUPABASE_ANON_KEY</code>, or enable <code>VITE_AUTH_BYPASS=true</code>{' '}
+                for local demos.
+              </p>
+            )}
+            <div
+              style={{ marginTop: '1.25rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}
+            >
+              <p className="meta">
+                Student?{' '}
+                <Link to="/access" className="underline">
+                  Open learner portal
+                </Link>
+              </p>
+            </div>
+          </Panel>
         </div>
       </div>
     )
@@ -70,8 +86,8 @@ export function StaffGate({ role, children }: Props) {
           title="This workspace is not assigned to you"
           subtitle={
             session.email
-              ? `Signed in as ${session.email}. Ask an admin to grant the ${role} role (Clerk metadata or staff email allowlist).`
-              : `Your account has no ${role} role.`
+              ? `Signed in as ${session.email}. Ask an admin to grant an active ${role} role in staff_roles.`
+              : `Your account has no active ${role} role.`
           }
         />
         <div className="panel" style={{ maxWidth: 480, margin: '0 auto' }}>
@@ -79,21 +95,12 @@ export function StaffGate({ role, children }: Props) {
             Your staff roles: {session.staffRoles.length ? session.staffRoles.join(', ') : 'none'}
           </p>
           <p className="meta" style={{ marginTop: 8 }}>
-            Grant access by either:
+            Staff authorization is database-owned in <code>staff_roles</code>; user-editable Auth
+            metadata and email allowlists are not used for authorization.
           </p>
-          <ul className="meta" style={{ marginTop: 6, paddingLeft: 18 }}>
-            <li>
-              Add your Clerk primary email to <code>VITE_STAFF_ADMIN_EMAILS</code> /{' '}
-              <code>VITE_STAFF_TEACHER_EMAILS</code> (Vercel env) and redeploy
-            </li>
-            <li>
-              Or set Clerk user public metadata:{' '}
-              <code>{`{ "chunksRole": "admin" }`}</code> (or <code>"teacher"</code> /{' '}
-              <code>"staff"</code>)
-            </li>
-          </ul>
           <p className="meta" style={{ marginTop: 8 }}>
-            Learners do not use Clerk — open the invite link at <code>/access?email=…</code>.
+            Learners do not use Supabase Auth accounts — open the signed invite link at{' '}
+            <code>/access?token=…</code>.
           </p>
           <div className="btn-row" style={{ marginTop: 12 }}>
             {session.canAccess('admin') ? (

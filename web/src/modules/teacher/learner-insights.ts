@@ -1,6 +1,7 @@
 import type { ResultRecord } from '../reporting/progress'
 import { COLOR_SCORE, type ResultColor } from '../result-lifecycle/types'
 import type { LearningSession, SchedulingState } from '../scheduling/types'
+import { effectiveResults } from '../ops/effective-results'
 
 export type LearnerSessionSummary = {
   learningSessionId: string
@@ -25,7 +26,8 @@ export function summarizeLearnerSessions(input: {
   learnerUserId: string
   classId?: string
 }): LearnerSessionSummary[] {
-  const learnerRecords = input.ledger.filter(
+  const effective = effectiveResults(input.ledger)
+  const learnerRecords = effective.filter(
     (record) => record.learnerUserId === input.learnerUserId,
   )
   const sessionIdsWithFinalizedObservations = new Set(
@@ -76,15 +78,68 @@ export function nextLearnerSessionNumber(input: {
   ledger: ResultRecord[]
   scheduling: SchedulingState
   learnerUserId: string
+  classId?: string
+  enrollments?: { classId: string; learnerUserId: string; status: string }[]
 }): number {
   const ids = new Set<string>()
-  for (const record of input.ledger) {
-    if (record.learnerUserId === input.learnerUserId) ids.add(record.learningSessionId)
+  const effective = effectiveResults(input.ledger)
+
+  for (const record of effective) {
+    if (record.learnerUserId === input.learnerUserId) {
+      ids.add(record.learningSessionId)
+    }
   }
+
   for (const session of input.scheduling.learningSessions) {
-    if (session.status !== 'open') continue
-    if (session.participantLearnerIds?.includes(input.learnerUserId)) ids.add(session.id)
+    if (session.status !== 'open' && session.status !== 'completed') continue
+    if (input.classId && session.classId !== input.classId) continue
+
+    if (session.participantLearnerIds?.includes(input.learnerUserId)) {
+      ids.add(session.id)
+    } else if (!session.participantLearnerIds || session.participantLearnerIds.length === 0) {
+      const hasResults = effective.some(
+        (r) => r.learningSessionId === session.id && r.learnerUserId === input.learnerUserId
+      )
+      if (hasResults) {
+        ids.add(session.id)
+      }
+    }
   }
+
+  return ids.size + 1
+}
+
+export function learnerCurrentSessionNumber(input: {
+  ledger: ResultRecord[]
+  scheduling: SchedulingState
+  learnerUserId: string
+  classId?: string
+}): number {
+  const ids = new Set<string>()
+  const effective = effectiveResults(input.ledger)
+
+  for (const record of effective) {
+    if (record.learnerUserId === input.learnerUserId) {
+      ids.add(record.learningSessionId)
+    }
+  }
+
+  for (const session of input.scheduling.learningSessions) {
+    if (session.status !== 'completed') continue
+    if (input.classId && session.classId !== input.classId) continue
+
+    if (session.participantLearnerIds?.includes(input.learnerUserId)) {
+      ids.add(session.id)
+    } else if (!session.participantLearnerIds || session.participantLearnerIds.length === 0) {
+      const hasResults = effective.some(
+        (r) => r.learningSessionId === session.id && r.learnerUserId === input.learnerUserId
+      )
+      if (hasResults) {
+        ids.add(session.id)
+      }
+    }
+  }
+
   return ids.size + 1
 }
 

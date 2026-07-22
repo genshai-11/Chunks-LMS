@@ -1,11 +1,18 @@
-import { useAuth, useUser } from '@clerk/react'
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { env } from '../env'
-import { getSupabase, setSupabaseAccessToken, setSupabaseAccessTokenProvider } from '../lib/supabase'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react'
+import type { User } from '@supabase/supabase-js'
+import { getSupabase } from '../lib/supabase'
 import {
   canAccessStaffRole,
-  resolveStaffRoles,
-  rolesFromMetadata,
+  normalizeStaffRole,
+  resolveActiveStaffRoles,
   type StaffRole,
 } from './staff-roles'
 
@@ -13,18 +20,39 @@ export type StaffSession = {
   ready: boolean
   signedIn: boolean
   authBypass: boolean
-  clerkEnabled: boolean
+  authEnabled: boolean
   userId: string | null
   email: string | null
   displayName: string | null
   staffRoles: StaffRole[]
   canAccess: (role: StaffRole) => boolean
   isStaff: boolean
+  signInWithEmail: (email: string) => Promise<{ ok: true } | { ok: false; error: string }>
+  signInWithPassword: (
+    email: string,
+    password: string,
+  ) => Promise<{ ok: true } | { ok: false; error: string }>
+  signUpWithPassword: (
+    email: string,
+    password: string,
+  ) => Promise<{ ok: true; message: string } | { ok: false; error: string }>
+  signOut: () => Promise<void>
 }
 
 const StaffSessionContext = createContext<StaffSession | null>(null)
 
-function buildSession(partial: Omit<StaffSession, 'canAccess' | 'isStaff'>): StaffSession {
+function buildSession(
+  partial: Omit<
+    StaffSession,
+    | 'canAccess'
+    | 'isStaff'
+    | 'signInWithEmail'
+    | 'signInWithPassword'
+    | 'signUpWithPassword'
+    | 'signOut'
+  > &
+    Pick<StaffSession, 'signInWithEmail' | 'signInWithPassword' | 'signUpWithPassword' | 'signOut'>,
+): StaffSession {
   return {
     ...partial,
     canAccess: (role) => canAccessStaffRole(partial.staffRoles, role),
@@ -32,158 +60,216 @@ function buildSession(partial: Omit<StaffSession, 'canAccess' | 'isStaff'>): Sta
   }
 }
 
-function normalizeDbRole(role: unknown): StaffRole | null {
-  return role === 'admin' || role === 'teacher' ? role : null
+const STAFF_LOGIN_ALIASES: Record<string, string> = {
+  admin: 'admin@example.com',
+  chunker: 'chunker@example.com',
 }
 
-async function loadStaffRolesByEmail(email: string | null): Promise<StaffRole[]> {
-  const normalized = email?.trim().toLowerCase()
+function normalizeStaffLoginIdentifier(raw: string): string {
+  const identifier = raw.trim().toLowerCase()
+  return STAFF_LOGIN_ALIASES[identifier] ?? identifier
+}
+
+async function loadStaffRolesByAuthUserId(authUserId: string | null): Promise<StaffRole[]> {
   const sb = getSupabase()
-  if (!normalized || !sb) return []
+  if (!authUserId || !sb) return []
 
-  const users = await sb.from('users').select('id,email').ilike('email', normalized)
-  const userRows = (users.data ?? []) as unknown as Array<{ id: string; email: string | null }>
-  if (users.error || userRows.length === 0) return []
-  const userIds = userRows
-    .filter((user) => String(user.email ?? '').toLowerCase() === normalized)
-    .map((user) => user.id)
-  if (userIds.length === 0) return []
+  const userResult = await sb
+    .from('users')
+    .select('id,account_status')
+    .eq('auth_user_id', authUserId)
+    .maybeSingle()
 
-  const memberships = await sb
-    .from('organization_memberships')
-    .select('role')
-    .in('user_id', userIds)
-  const membershipRows = (memberships.data ?? []) as unknown as Array<{ role: unknown }>
-  if (memberships.error || membershipRows.length === 0) return []
+  const userRow = userResult.data as { id: string; account_status?: string | null } | null
+  if (userResult.error || !userRow || userRow.account_status === 'inactive') return []
 
-  return Array.from(
-    new Set(membershipRows.map((row) => normalizeDbRole(row.role)).filter(Boolean) as StaffRole[]),
-  )
+  const rolesResult = await sb
+    .from('staff_roles')
+    .select('role,active')
+    .eq('user_id', userRow.id)
+    .eq('active', true)
+
+  const roleRows = (rolesResult.data ?? []) as Array<{ role: unknown; active: unknown }>
+  const grants = roleRows
+    .map((row) => ({ role: normalizeStaffRole(row.role), active: Boolean(row.active) }))
+    .filter((grant): grant is { role: StaffRole; active: boolean } => Boolean(grant.role))
+
+  if (rolesResult.error) return []
+  return resolveActiveStaffRoles(grants)
 }
+
+const noopSignIn: StaffSession['signInWithEmail'] = async () => ({
+  ok: false,
+  error: 'Supabase Auth is not configured',
+})
+const noopSignInPassword: StaffSession['signInWithPassword'] = async () => ({
+  ok: false,
+  error: 'Supabase Auth is not configured',
+})
+const noopSignUpPassword: StaffSession['signUpWithPassword'] = async () => ({
+  ok: false,
+  error: 'Supabase Auth is not configured',
+})
+const noopSignOut: StaffSession['signOut'] = async () => {}
 
 const BYPASS_SESSION = buildSession({
   ready: true,
   signedIn: true,
   authBypass: true,
-  clerkEnabled: false,
+  authEnabled: false,
   userId: 'bypass-staff',
   email: null,
   displayName: 'Local staff',
   staffRoles: ['admin', 'teacher'],
+  signInWithEmail: noopSignIn,
+  signInWithPassword: noopSignInPassword,
+  signUpWithPassword: noopSignUpPassword,
+  signOut: noopSignOut,
 })
 
-/** Local/CI: no Clerk required. */
+/** Local/CI: no hosted Supabase Auth required. */
 export function BypassStaffSessionProvider({ children }: { children: ReactNode }) {
   return (
     <StaffSessionContext.Provider value={BYPASS_SESSION}>{children}</StaffSessionContext.Provider>
   )
 }
 
-/** Production path: Clerk session → staff roles (metadata / allowlist / bootstrap). */
-export function ClerkStaffSessionProvider({ children }: { children: ReactNode }) {
-  const { isLoaded, isSignedIn, userId, getToken } = useAuth()
-  const { user, isLoaded: userLoaded } = useUser()
-  const [dbRoles, setDbRoles] = useState<StaffRole[]>([])
-  const [dbRoleEmail, setDbRoleEmail] = useState<string | null>(null)
-  const [dbRolesLoading, setDbRolesLoading] = useState(false)
+function displayNameFor(user: User | null): string | null {
+  if (!user) return null
+  const meta = user.user_metadata as Record<string, unknown> | null
+  const fullName = typeof meta?.full_name === 'string' ? meta.full_name : null
+  const name = typeof meta?.name === 'string' ? meta.name : null
+  return fullName ?? name ?? user.email ?? user.id
+}
+
+/** Production path: native Supabase Auth session → database-owned staff_roles. */
+export function SupabaseStaffSessionProvider({ children }: { children: ReactNode }) {
+  const sb = getSupabase()
+  const [ready, setReady] = useState(false)
+  const [user, setUser] = useState<User | null>(null)
+  const [staffRoles, setStaffRoles] = useState<StaffRole[]>([])
+  const [rolesLoading, setRolesLoading] = useState(false)
+
+  const signInWithEmail = useCallback<StaffSession['signInWithEmail']>(
+    async (email) => {
+      if (!sb) return { ok: false, error: 'Supabase Auth is not configured' }
+      const redirectTo = typeof window !== 'undefined' ? window.location.origin : undefined
+      const { error } = await sb.auth.signInWithOtp({
+        email: normalizeStaffLoginIdentifier(email),
+        options: redirectTo ? { emailRedirectTo: redirectTo } : undefined,
+      })
+      return error ? { ok: false, error: error.message } : { ok: true }
+    },
+    [sb],
+  )
+
+  const signInWithPassword = useCallback<StaffSession['signInWithPassword']>(
+    async (email, password) => {
+      if (!sb) return { ok: false, error: 'Supabase Auth is not configured' }
+      const { error } = await sb.auth.signInWithPassword({
+        email: normalizeStaffLoginIdentifier(email),
+        password,
+      })
+      return error ? { ok: false, error: error.message } : { ok: true }
+    },
+    [sb],
+  )
+
+  const signUpWithPassword = useCallback<StaffSession['signUpWithPassword']>(
+    async (email, password) => {
+      if (!sb) return { ok: false, error: 'Supabase Auth is not configured' }
+      const { data, error } = await sb.auth.signUp({
+        email: normalizeStaffLoginIdentifier(email),
+        password,
+      })
+      if (error) return { ok: false, error: error.message }
+      if (data.session) {
+        return { ok: true, message: 'Account created and signed in successfully!' }
+      } else {
+        return { ok: true, message: 'Account created! Please check your email to confirm signup.' }
+      }
+    },
+    [sb],
+  )
+
+  const signOut = useCallback(async () => {
+    if (sb) await sb.auth.signOut()
+  }, [sb])
 
   useEffect(() => {
-    if (!isLoaded) return
-    if (!isSignedIn) {
-      setSupabaseAccessTokenProvider(null)
-      void setSupabaseAccessToken(null)
+    if (!sb) {
+      setReady(true)
       return
     }
-    const provider = async () => getToken()
-    setSupabaseAccessTokenProvider(provider)
-    void provider().then((token) => setSupabaseAccessToken(token))
-    return () => setSupabaseAccessTokenProvider(null)
-  }, [isLoaded, isSignedIn, getToken])
-
-  useEffect(() => {
-    const email = user?.primaryEmailAddress?.emailAddress ?? null
-    const metadataRoles = rolesFromMetadata(
-      user?.publicMetadata as Record<string, unknown> | undefined,
-    )
-    const configuredRoles = resolveStaffRoles(
-      {
-        userId: isSignedIn ? (userId ?? null) : null,
-        email,
-        metadataRoles,
-      },
-      {
-        authBypass: false,
-        adminEmails: env.staffAdminEmails,
-        teacherEmails: env.staffTeacherEmails,
-      },
-    )
-
-    if (!isLoaded || !userLoaded || !isSignedIn || !email || configuredRoles.length > 0) {
-      setDbRoles([])
-      setDbRoleEmail(null)
-      setDbRolesLoading(false)
-      return
-    }
-
     let cancelled = false
-    setDbRolesLoading(true)
-    setDbRoleEmail(email)
-    void loadStaffRolesByEmail(email)
+    void sb.auth.getUser().then(({ data }) => {
+      if (!cancelled) {
+        const nextUser = data.user ?? null
+        setRolesLoading(Boolean(nextUser))
+        setUser(nextUser)
+        setReady(true)
+      }
+    })
+    const { data } = sb.auth.onAuthStateChange((_event, session) => {
+      const nextUser = session?.user ?? null
+      setRolesLoading(Boolean(nextUser))
+      setUser(nextUser)
+      setReady(true)
+    })
+    return () => {
+      cancelled = true
+      data.subscription.unsubscribe()
+    }
+  }, [sb])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!user) {
+      setStaffRoles([])
+      setRolesLoading(false)
+      return
+    }
+    setRolesLoading(true)
+    void loadStaffRolesByAuthUserId(user.id)
       .then((roles) => {
-        if (!cancelled) setDbRoles(roles)
+        if (!cancelled) setStaffRoles(roles)
       })
       .finally(() => {
-        if (!cancelled) setDbRolesLoading(false)
+        if (!cancelled) setRolesLoading(false)
       })
     return () => {
       cancelled = true
     }
-  }, [isLoaded, isSignedIn, userId, user, userLoaded])
+  }, [user])
 
-  const value = useMemo(() => {
-    if (env.authBypass) {
-      return buildSession({
-        ready: true,
-        signedIn: true,
-        authBypass: true,
-        clerkEnabled: true,
-        userId: userId ?? 'bypass-staff',
-        email: user?.primaryEmailAddress?.emailAddress ?? null,
-        displayName: user?.fullName ?? 'Local staff',
-        staffRoles: ['admin', 'teacher'],
-      })
-    }
-
-    const ready = isLoaded && userLoaded
-    const email = user?.primaryEmailAddress?.emailAddress ?? null
-    const metadataRoles = rolesFromMetadata(
-      user?.publicMetadata as Record<string, unknown> | undefined,
-    )
-    const configuredRoles = resolveStaffRoles(
-      {
-        userId: isSignedIn ? (userId ?? null) : null,
-        email,
-        metadataRoles,
-      },
-      {
+  const value = useMemo(
+    () =>
+      buildSession({
+        ready: ready && !rolesLoading,
+        signedIn: Boolean(user),
         authBypass: false,
-        adminEmails: env.staffAdminEmails,
-        teacherEmails: env.staffTeacherEmails,
-      },
-    )
-    const staffRoles = configuredRoles.length > 0 ? configuredRoles : dbRoleEmail === email ? dbRoles : []
-
-    return buildSession({
-      ready: ready && !dbRolesLoading,
-      signedIn: Boolean(isSignedIn),
-      authBypass: false,
-      clerkEnabled: true,
-      userId: isSignedIn ? (userId ?? null) : null,
-      email,
-      displayName: user?.fullName ?? user?.username ?? email,
+        authEnabled: Boolean(sb),
+        userId: user?.id ?? null,
+        email: user?.email ?? null,
+        displayName: displayNameFor(user),
+        staffRoles,
+        signInWithEmail,
+        signInWithPassword,
+        signUpWithPassword,
+        signOut,
+      }),
+    [
+      ready,
+      rolesLoading,
+      user,
+      sb,
       staffRoles,
-    })
-  }, [dbRoleEmail, dbRoles, dbRolesLoading, isLoaded, isSignedIn, userId, user, userLoaded])
+      signInWithEmail,
+      signInWithPassword,
+      signUpWithPassword,
+      signOut,
+    ],
+  )
 
   return <StaffSessionContext.Provider value={value}>{children}</StaffSessionContext.Provider>
 }

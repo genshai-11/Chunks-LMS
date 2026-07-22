@@ -41,7 +41,6 @@ Typical URL: `https://chunks-lms.vercel.app` (see [vercel-deploy.md](./vercel-de
 
 | Secret | Used by | Notes |
 |--------|---------|--------|
-| `VITE_CLERK_PUBLISHABLE_KEY` | CD build | Clerk publishable key; leave empty only if using auth bypass |
 | `VITE_SUPABASE_URL` | CD build | e.g. `https://<ref>.supabase.co` |
 | `VITE_SUPABASE_ANON_KEY` | CD build | Anon/public key (client-safe) |
 | `VERCEL_TOKEN` | CD deploy | Vercel token; **if missing, deploy is skipped** (job still green) |
@@ -54,8 +53,6 @@ Optional:
 
 | Secret | Purpose |
 |--------|---------|
-| `CLERK_SECRET_KEY` | Server / webhooks (not in Vite client) |
-| `CLERK_WEBHOOK_SECRET` | Webhook verification |
 | `SUPABASE_ACCESS_TOKEN` | CLI in CI (typegen, etc.) |
 | `SUPABASE_DB_PASSWORD` | Hosted DB promote |
 
@@ -75,7 +72,7 @@ CI does **not** load `CONTEXT.md`, but unit tests enforce domain rules described
 - Only finalized results feed metrics  
 - Course auto-schedule / session numbering (buổi) in scheduling modules  
 
-Build uses `VITE_AUTH_BYPASS=true` so CI can build without real Clerk keys.
+Build may use `VITE_AUTH_BYPASS=true` so CI can run without a hosted Auth session.
 
 ## Supabase and deploys
 
@@ -105,20 +102,20 @@ Promote steps (authoring):
 4. Hosted: `supabase link` + `supabase db push`.  
 5. **Never** drop assessment event history without an ADR.
 
-## Clerk + Supabase (production auth)
+## Native Supabase Auth
 
-1. Enable Clerk third-party auth in Supabase (not JWT template only).  
-2. Wire Clerk app to the Supabase project.  
-3. Client passes Clerk session JWT to Supabase.  
-4. Tighten RLS; remove foundation demo “allow all” policies before real multi-tenant production.
+1. Configure email signup/confirmation and exact Preview/Production redirects in Supabase Auth.  
+2. The browser client persists and refreshes the native session.  
+3. RLS evaluates `auth.uid()` through the linked domain User and active `staff_roles`.  
+4. External OAuth providers are deferred and require a separate reviewed change.
 
-See `docs/adr/0002-clerk-with-supabase-third-party-auth.md`.
+See `docs/adr/0007-native-supabase-auth-for-staff.md` and `docs/ops/supabase-auth.md`.
 
 ## Local developer flow
 
 ```bash
 # App
-cd web && cp .env.example .env   # fill VITE_SUPABASE_* (+ Clerk if needed)
+cd web && cp .env.example .env   # fill VITE_SUPABASE_*
 npm install
 npm run dev
 
@@ -139,8 +136,8 @@ npm run ci   # from repo root
 ## Deploy checklist
 
 - [ ] Vercel project linked; root directory `web/`  
-- [ ] GitHub secrets: Vercel + `VITE_SUPABASE_*` (+ Clerk as needed)  
+- [ ] GitHub secrets: Vercel + `VITE_SUPABASE_*`  
 - [ ] Same `VITE_*` on Vercel env for Production  
 - [ ] Supabase project exists; migrations pushed manually  
 - [ ] After push to `master`, Actions → CD production is green  
-- [ ] Clerk configured when leaving auth bypass  
+- [ ] Supabase Auth email/redirect settings validated; database staff roles granted  

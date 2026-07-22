@@ -9,7 +9,7 @@ import {
   type SnapshotSummary,
 } from '../modules/reporting/reconciliation'
 import { getSupabase } from './supabase'
-import { loadLiveLedger } from './live-assessment'
+import { loadLiveLedger, selectInBatches } from './live-assessment'
 import type { ResultRecord } from '../modules/reporting/progress'
 import { effectiveResults } from '../modules/ops/effective-results'
 
@@ -70,12 +70,14 @@ export async function runCloudReconciliation(
       }
     }
 
-    const sessionsRes = await sb
-      .from('learning_sessions')
-      .select('id')
-      .in('class_id', classIds)
-    if (sessionsRes.error) return { ok: false, error: sessionsRes.error.message }
-    const sessionIds = (sessionsRes.data ?? []).map((s: { id: string }) => s.id)
+    const sessionsRes = await selectInBatches<{ id: string }>(sb, {
+      table: 'learning_sessions',
+      select: 'id',
+      column: 'class_id',
+      values: classIds,
+    })
+    if (!sessionsRes.ok) return sessionsRes
+    const sessionIds = sessionsRes.data.map((s) => s.id)
     if (sessionIds.length === 0) {
       return {
         ok: true,
@@ -89,12 +91,14 @@ export async function runCloudReconciliation(
       }
     }
 
-    const attemptsRes = await sb
-      .from('assessment_attempts')
-      .select('id')
-      .in('learning_session_id', sessionIds)
-    if (attemptsRes.error) return { ok: false, error: attemptsRes.error.message }
-    const attemptIds = (attemptsRes.data ?? []).map((a: { id: string }) => a.id)
+    const attemptsRes = await selectInBatches<{ id: string }>(sb, {
+      table: 'assessment_attempts',
+      select: 'id',
+      column: 'learning_session_id',
+      values: sessionIds,
+    })
+    if (!attemptsRes.ok) return attemptsRes
+    const attemptIds = attemptsRes.data.map((a) => a.id)
     if (attemptIds.length === 0) {
       return {
         ok: true,
@@ -108,25 +112,38 @@ export async function runCloudReconciliation(
       }
     }
 
-    const eventsRes = await sb
-      .from('assessment_events')
-      .select('attempt_id, event_type, payload, created_at')
-      .in('attempt_id', attemptIds)
-      .order('created_at', { ascending: true })
-    if (eventsRes.error) return { ok: false, error: eventsRes.error.message }
+    const eventsRes = await selectInBatches<{
+      attempt_id: string
+      event_type: string
+      payload: unknown
+      created_at: string
+    }>(sb, {
+      table: 'assessment_events',
+      select: 'attempt_id, event_type, payload, created_at',
+      column: 'attempt_id',
+      values: attemptIds,
+      apply: (query) => query.order('created_at', { ascending: true }),
+    })
+    if (!eventsRes.ok) return eventsRes
 
-    const snapsRes = await sb
-      .from('assessment_attempt_snapshots')
-      .select('attempt_id, status, effective_color')
-      .in('attempt_id', attemptIds)
-    if (snapsRes.error) return { ok: false, error: snapsRes.error.message }
+    const snapsRes = await selectInBatches<{
+      attempt_id: string
+      status: string
+      effective_color: string | null
+    }>(sb, {
+      table: 'assessment_attempt_snapshots',
+      select: 'attempt_id, status, effective_color',
+      column: 'attempt_id',
+      values: attemptIds,
+    })
+    if (!snapsRes.ok) return snapsRes
 
     const eventsByAttempt = new Map<string, { lastFinalColor: string | null; eventCount: number }>()
     for (const id of attemptIds) {
       eventsByAttempt.set(id, { lastFinalColor: null, eventCount: 0 })
     }
     let eventRowCount = 0
-    for (const e of eventsRes.data ?? []) {
+    for (const e of eventsRes.data) {
       eventRowCount += 1
       const id = e.attempt_id as string
       const cur = eventsByAttempt.get(id) ?? { lastFinalColor: null, eventCount: 0 }
@@ -145,13 +162,11 @@ export async function runCloudReconciliation(
       eventCount: v.eventCount,
     }))
 
-    const snapshots: SnapshotSummary[] = (snapsRes.data ?? []).map(
-      (s: { attempt_id: string; status: string; effective_color: string | null }) => ({
-        attemptId: s.attempt_id,
-        status: s.status,
-        effectiveColor: s.effective_color,
-      }),
-    )
+    const snapshots: SnapshotSummary[] = snapsRes.data.map((s) => ({
+      attemptId: s.attempt_id,
+      status: s.status,
+      effectiveColor: s.effective_color,
+    }))
 
     const divergences = findSnapshotDivergences(events, snapshots)
     return {

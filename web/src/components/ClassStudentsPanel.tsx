@@ -39,10 +39,10 @@ type Props = {
  * - list roster with avatars
  * - enroll existing directory learner
  * - quick-add new learner (profile + seat)
- * - copy / email portal invite links (share-link V1 — no Clerk for learners)
+ * - copy / email scoped learner portal invite links
  */
 export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Props) {
-  const { roster, setRoster } = useAppState()
+  const { roster, setRoster, syncNow } = useAppState()
   const klass = roster.classes.find((c) => c.id === classId)
   const [existingId, setExistingId] = useState('')
   const [newName, setNewName] = useState('')
@@ -178,12 +178,15 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
                       type="button"
                       className="ghost danger"
                       onClick={() => {
-                        if (!window.confirm(`Remove ${user?.displayName ?? 'learner'} from class?`)) {
+                        if (
+                          !window.confirm(`Remove ${user?.displayName ?? 'learner'} from class?`)
+                        ) {
                           return
                         }
                         const r = endEnrollment(roster, e.id)
                         if (!r.ok) return err(r.error)
                         setRoster(r.state)
+                        void syncNow({ roster: r.state })
                         ok(`${user?.displayName ?? 'Learner'} removed from class`)
                       }}
                     >
@@ -237,6 +240,7 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
                 })
                 if (!r.ok) return err(r.error)
                 setRoster(r.state)
+                void syncNow({ roster: r.state })
                 const invite = learnerInviteUrl(r.value.learner)
                 ok(
                   invite
@@ -271,7 +275,11 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
                     />
                   </label>
                   {newAvatar ? (
-                    <button type="button" className="ghost danger" onClick={() => setNewAvatar(null)}>
+                    <button
+                      type="button"
+                      className="ghost danger"
+                      onClick={() => setNewAvatar(null)}
+                    >
                       <X className="h-3.5 w-3.5" aria-hidden />
                       <span>Remove</span>
                     </button>
@@ -301,7 +309,7 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
               </label>
               <p className="meta form-span-full">
                 After seating, use <strong>Copy</strong> or <strong>Email</strong> to send their
-                login link. Learners do not use Clerk.
+                scoped login link. Learners do not use staff Supabase Auth.
               </p>
               <button type="submit" className="primary" disabled={full}>
                 <UserPlus className="h-4 w-4" aria-hidden />
@@ -320,6 +328,7 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
                 const learner = roster.users.find((u) => u.id === existingId)
                 const name = learner?.displayName ?? 'Learner'
                 setRoster(r.state)
+                void syncNow({ roster: r.state })
                 if (learnerInviteUrl(learner!)) {
                   ok(`${name} enrolled · invite ready`)
                 } else {
@@ -337,9 +346,7 @@ export function ClassStudentsPanel({ classId, compact, onMessage, onError }: Pro
                   required
                 >
                   <option value="">
-                    {available.length === 0
-                      ? 'No other learners in directory'
-                      : 'Select learner…'}
+                    {available.length === 0 ? 'No other learners in directory' : 'Select learner…'}
                   </option>
                   {available.map((u) => (
                     <option key={u.id} value={u.id}>

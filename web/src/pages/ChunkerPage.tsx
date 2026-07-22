@@ -30,7 +30,7 @@ import {
   completeLearningSession,
   startLearningSession,
 } from '../modules/scheduling/session-lifecycle'
-import { formatPercent, learnerRfcStats, summarizeLearnerSessions } from '../modules/teacher/learner-insights'
+import { formatPercent, learnerRfcStats, nextLearnerSessionNumber, summarizeLearnerSessions } from '../modules/teacher/learner-insights'
 import { saveWorkspaceToSupabase } from '../lib/supabase-sync'
 import { useAppState } from '../state/useAppState'
 import type { ResultRecord } from '../modules/reporting/progress'
@@ -60,7 +60,6 @@ function MiniSessionChart({ rows }: { rows: ReturnType<typeof summarizeLearnerSe
     </div>
   )
 }
-
 export function ChunkerPage() {
   const {
     roster,
@@ -73,7 +72,9 @@ export function ChunkerPage() {
     backendStatus,
     backendError,
     setActiveClassId,
+    setActiveLearnerUserId,
   } = useAppState()
+
   const navigate = useNavigate()
   const { message, error, ok, err } = useFlash()
   const [selectedLearnerId, setSelectedLearnerId] = useState<string | null>(null)
@@ -192,10 +193,17 @@ export function ChunkerPage() {
       ownerUserId: teacher?.id ?? null,
       participantLearnerIds: [effectiveLearnerId],
       sessionKind: 'regular',
+      sessionNumber: nextLearnerSessionNumber({
+        ledger,
+        scheduling,
+        learnerUserId: effectiveLearnerId,
+        enrollments: roster.enrollments,
+      }),
     })
     if (!started.ok) return err(started.error)
     const saved = await persist(nextRoster, started.state)
     if (saved) {
+      setActiveLearnerUserId(effectiveLearnerId)
       if (andObserve) {
         setActiveClassId(selectedClass.id)
         navigate('/teacher/observe?from=chunker')
@@ -370,6 +378,7 @@ export function ChunkerPage() {
                         {session.status === 'open' ? (
                           <>
                             <button type="button" className="ghost" onClick={() => {
+                              setActiveLearnerUserId(effectiveLearnerId)
                               setActiveClassId(session.classId)
                               navigate('/teacher/observe?from=chunker')
                             }}>

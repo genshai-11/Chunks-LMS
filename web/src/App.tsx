@@ -14,7 +14,8 @@ import { AdminMetricsPage } from './pages/admin/AdminMetricsPage'
 import { AdminAnalysisPage } from './pages/admin/AdminAnalysisPage'
 import { AdminOpsPage } from './pages/admin/AdminOpsPage'
 import { AdminAuditPage } from './pages/admin/AdminAuditPage'
-import { AdminIntegrityPage } from './pages/admin/AdminIntegrityPage'
+import { AdminResourcesPage } from './pages/admin/AdminResourcesPage'
+import { AdminTestAudioPage } from './pages/admin/AdminTestAudioPage'
 import { TeacherLayout } from './pages/teacher/TeacherLayout'
 import { TeacherOverviewPage } from './pages/teacher/TeacherOverviewPage'
 import { TeacherSessionPage } from './pages/teacher/TeacherSessionPage'
@@ -23,6 +24,11 @@ import { TeacherAnalysisPage } from './pages/teacher/TeacherAnalysisPage'
 import { TeacherArchivePage } from './pages/teacher/TeacherArchivePage'
 import { TeacherClassesPage } from './pages/teacher/TeacherClassesPage'
 import { TeacherLearnerProfilePage } from './pages/teacher/TeacherLearnerProfilePage'
+import { TeacherTestsPage } from './pages/teacher/TeacherTestsPage'
+import { TeacherTestSetupPage } from './pages/teacher/TeacherTestSetupPage'
+import { TeacherTestRunPage } from './pages/teacher/TeacherTestRunPage'
+import { TeacherTestAnalysisPage } from './pages/teacher/TeacherTestAnalysisPage'
+import { TeacherLearnerTestResultsPage } from './pages/teacher/TeacherLearnerTestResultsPage'
 import { LearnerLayout } from './pages/learner/LearnerLayout'
 import { LearnerOverviewPage } from './pages/learner/LearnerOverviewPage'
 import { LearnerEnrollmentsPage } from './pages/learner/LearnerEnrollmentsPage'
@@ -53,19 +59,17 @@ export default function App() {
                 <Route path="ops" element={<AdminOpsPage />} />
                 <Route path="attendance" element={<Navigate to="/admin/ops" replace />} />
                 <Route path="audit" element={<AdminAuditPage />} />
-                <Route path="integrity" element={<AdminIntegrityPage />} />
                 <Route path="courses" element={<AdminCoursesPage />} />
                 <Route path="classes" element={<AdminClassesPage />} />
                 <Route path="people" element={<AdminPeoplePage />} />
                 <Route path="enrollments" element={<AdminEnrollmentsPage />} />
                 <Route path="analysis" element={<AdminAnalysisPage />} />
                 <Route path="metrics" element={<AdminMetricsPage />} />
+                <Route path="resources" element={<AdminResourcesPage />} />
+                <Route path="resources/audio" element={<AdminTestAudioPage />} />
               </Route>
 
-              <Route
-                path="/teacher/observe"
-                element={<TeacherObservePage />}
-              />
+              <Route path="/teacher/observe" element={<TeacherObservePage />} />
 
               <Route
                 path="/teacher"
@@ -77,6 +81,17 @@ export default function App() {
               >
                 <Route index element={<TeacherOverviewPage />} />
                 <Route path="classes" element={<TeacherClassesPage />} />
+                <Route path="tests" element={<TeacherTestsPage />} />
+                <Route path="tests/analysis/:assignmentId" element={<TeacherTestAnalysisPage />} />
+                <Route
+                  path="tests/:assignmentId/sections/:sectionId/setup"
+                  element={<TeacherTestSetupPage />}
+                />
+                <Route path="test-runs/:runId" element={<TeacherTestRunPage />} />
+                <Route
+                  path="learner/:learnerId/tests"
+                  element={<TeacherLearnerTestResultsPage />}
+                />
                 <Route path="learner/:learnerId" element={<TeacherLearnerProfilePage />} />
                 <Route path="session" element={<TeacherSessionPage />} />
                 <Route path="archive" element={<TeacherArchivePage />} />
@@ -84,7 +99,7 @@ export default function App() {
                 <Route path="progress" element={<Navigate to="/teacher/analysis" replace />} />
               </Route>
 
-              {/* Learner portal — share link only; no Clerk */}
+              {/* Learner portal — scoped share link, separate from staff Supabase Auth */}
               <Route path="/learner" element={<LearnerLayout />}>
                 <Route index element={<LearnerOverviewPage />} />
                 <Route path="enrollments" element={<LearnerEnrollmentsPage />} />

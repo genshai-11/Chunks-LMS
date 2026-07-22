@@ -1,6 +1,6 @@
 # Hosted end-to-end checklist
 
-Run against **production** (or production-like preview with real Clerk + Supabase).  
+Run against **production** (or production-like preview with native Supabase Auth).  
 Do **not** enable `VITE_AUTH_BYPASS` for this checklist.
 
 **Date:** _______________  
@@ -14,10 +14,10 @@ Do **not** enable `VITE_AUTH_BYPASS` for this checklist.
 | # | Check | Pass |
 |---|--------|------|
 | A1 | Home loads; no auth bypass badge | ☐ |
-| A2 | Staff sign-in (Clerk) works | ☐ |
+| A2 | Supabase staff signup/confirmation/sign-in and refresh persistence work | ☐ |
 | A3 | Unsigned user cannot open `/admin` or `/teacher` | ☐ |
 | A4 | Top bar shows only staff roles held + Portal | ☐ |
-| A5 | Learner path remains `/access` (no Clerk for learners) | ☐ |
+| A5 | Learner path remains scoped `/access` and separate from staff Auth | ☐ |
 
 ## B. Admin provisioning
 
@@ -49,7 +49,7 @@ Do **not** enable `VITE_AUTH_BYPASS` for this checklist.
 | D2 | Portal shows correct display name | ☐ |
 | D3 | Attendance reflects teacher marks | ☐ |
 | D4 | Analysis shows only that learner’s results | ☐ |
-| D5 | Cannot navigate to Admin/Teacher without staff Clerk | ☐ |
+| D5 | Cannot navigate to Admin/Teacher without a native session and active staff role | ☐ |
 
 ## E. Multi-user / integrity
 

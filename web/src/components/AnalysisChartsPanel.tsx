@@ -94,6 +94,26 @@ const LAYOUTS = [
   { id: 'single' as const, label: 'Single' },
 ]
 
+const RADIAN = Math.PI / 180
+const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5
+  const x = cx + radius * Math.cos(-midAngle * RADIAN)
+  const y = cy + radius * Math.sin(-midAngle * RADIAN)
+
+  return percent > 0.08 ? (
+    <text
+      x={x}
+      y={y}
+      fill="#000000"
+      textAnchor="middle"
+      dominantBaseline="central"
+      className="text-[10px] font-black"
+    >
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  ) : null
+}
+
 function toSessions(list: SessionOpt[], classId?: string) {
   return list.map((s) => ({
     id: s.id,
@@ -293,9 +313,8 @@ export function AnalysisChartsPanel({
               cx="50%"
               cy="50%"
               outerRadius={Math.min(100, height / 2 - 20)}
-              label={({ name, value, percent }) =>
-                `${name} ${value} (${((percent ?? 0) * 100).toFixed(0)}%)`
-              }
+              labelLine={false}
+              label={renderCustomizedLabel}
             >
               {colorMixPie.map((d) => (
                 <Cell key={d.name} fill={d.fill} />
@@ -470,9 +489,8 @@ export function AnalysisChartsPanel({
             cx="50%"
             cy="50%"
             outerRadius={Math.min(90, (height - 28) / 2 - 20)}
-            label={({ name, value, percent }) =>
-              `${name} ${value} (${((percent ?? 0) * 100).toFixed(0)}%)`
-            }
+            labelLine={false}
+            label={renderCustomizedLabel}
           >
             {colorMixPie.map((d) => (
               <Cell key={d.name} fill={d.fill} />
@@ -549,31 +567,28 @@ export function AnalysisChartsPanel({
 
       {!compact && points.length > 1 ? (
         <div className="analysis-charts-days">
-          <span className="analysis-filter-label">Days (empty = all)</span>
+          <span className="analysis-filter-label">Scope</span>
           <div className="analysis-chip-row">
+            <button
+              type="button"
+              className={`analysis-chip${selectedDays.length === 0 ? ' is-active' : ''}`}
+              onClick={() => setSelectedDays([])}
+            >
+              All Days
+            </button>
             {points.map((p) => {
-              const on =
-                selectedDays.length === 0 || selectedDays.includes(p.learningSessionId)
+              const on = selectedDays.includes(p.learningSessionId)
               return (
                 <button
                   key={p.learningSessionId}
                   type="button"
-                  className={`analysis-chip${on && selectedDays.length > 0 ? ' is-active' : ''}${selectedDays.length === 0 ? ' is-muted-on' : ''}`}
+                  className={`analysis-chip${on ? ' is-active' : ''}`}
                   onClick={() => toggleDay(p.learningSessionId)}
                 >
                   {sessionLabel(p.sessionNumber, p.startedAt, totalDays)}
                 </button>
               )
             })}
-            {selectedDays.length > 0 ? (
-              <button
-                type="button"
-                className="analysis-chip"
-                onClick={() => setSelectedDays([])}
-              >
-                Clear
-              </button>
-            ) : null}
           </div>
         </div>
       ) : null}

@@ -8,7 +8,7 @@ import { emptySchedulingState } from '../modules/scheduling/session-lifecycle'
 import type { SchedulingState } from '../modules/scheduling/types'
 import {
   deleteWorkspaceLearningDataFromSupabase,
-  ensureClerkWorkspace,
+  ensureSupabaseStaffWorkspace,
   isSupabaseConfigured,
   loadWorkspaceFromSupabase,
   normalizeIdsForDb,
@@ -41,9 +41,14 @@ function ledgerFromCapture(
   capture: CaptureSessionState,
   roster: RosterState,
   existing: ResultRecord[],
+  scheduling: SchedulingState,
 ): ResultRecord[] {
+  const session = scheduling.learningSessions.find((s) => s.id === capture.learningSessionId)
+  const classId = session?.classId
   const klass =
-    roster.classes.find((c) => c.teacherUserId === capture.teacherUserId) ?? roster.classes[0]
+    roster.classes.find((c) => c.id === classId) ??
+    roster.classes.find((c) => c.teacherUserId === capture.teacherUserId) ??
+    roster.classes[0]
   const course = roster.courses.find((c) => c.id === klass?.courseId) ?? roster.courses[0]
   if (!klass || !course) return existing
 
@@ -124,12 +129,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const staffSession = useStaffSession()
   const persistedRef = useRef(loadPersistedAppState())
   const [roster, setRoster] = useState<RosterState>(() =>
-    staffSession.clerkEnabled
+    staffSession.authEnabled
       ? createEmptyRoster()
       : ensureStableOrg(persistedRef.current?.roster ?? createEmptyRoster()),
   )
   const [scheduling, setScheduling] = useState<SchedulingState>(() =>
-    staffSession.clerkEnabled
+    staffSession.authEnabled
       ? emptySchedulingState()
       : (persistedRef.current?.scheduling ?? emptySchedulingState()),
   )
@@ -176,16 +181,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const liveRef = useRef({ roster, scheduling })
   liveRef.current = { roster, scheduling }
 
-  // Boot: staff (signed-in) cloud is authoritative for writes; signed-out learners
-  // still load a read-only snapshot so /access?email= works without Clerk.
+  // Boot: staff (signed-in) cloud is authoritative for writes. Learner access
+  // remains isolated through the existing scoped learner-link flow.
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       bootDone.current = false
-      if (staffSession.clerkEnabled && !staffSession.ready) return
+      if (staffSession.authEnabled && !staffSession.ready) return
 
       const staffAuthed =
-        staffSession.authBypass || (staffSession.clerkEnabled && staffSession.signedIn)
+        staffSession.authBypass || (staffSession.authEnabled && staffSession.signedIn)
       const canProvisionStaff =
         Boolean(staffSession.userId) &&
         (staffSession.authBypass || staffSession.staffRoles.length > 0)
@@ -193,7 +198,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       if (!isSupabaseConfigured()) {
         // Offline: restore local cache so learner invite still works on this browser.
         const cached = persistedRef.current
-        if (cached && staffSession.clerkEnabled && !staffAuthed) {
+        if (cached && staffSession.authEnabled && !staffAuthed) {
           skipNextSync.current = true
           setRoster(ensureStableOrg(cached.roster))
           setScheduling(cached.scheduling)
@@ -205,34 +210,27 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      // Signed-in Clerk user with no staff role: do not create a personal empty
-      // org or clobber roster — StaffGate will explain how to get access.
+      // Signed-in Supabase user with no database staff role must not create a
+      // workspace or clobber roster; StaffGate explains the missing grant.
       if (
-        staffSession.clerkEnabled &&
+        staffSession.authEnabled &&
         staffSession.signedIn &&
         !staffSession.authBypass &&
         staffSession.staffRoles.length === 0
       ) {
         setBackendStatus('offline')
-        setBackendError(
-          syncPhaseError(
-            'auth',
-            'Signed in but no staff role (Clerk metadata or VITE_STAFF_*_EMAILS allowlist)',
-          ),
-        )
+        setBackendError(syncPhaseError('auth', 'Signed in but no active database staff role'))
         bootDone.current = true
         return
       }
 
       let organizationId: string | undefined
       if (canProvisionStaff && staffSession.userId) {
-        const provisioned = await ensureClerkWorkspace({
-          clerkUserId: staffSession.userId,
+        const provisioned = await ensureSupabaseStaffWorkspace({
+          authUserId: staffSession.userId,
           email: staffSession.email,
           displayName: staffSession.displayName ?? staffSession.email ?? 'Chunks Staff',
-          roles: staffSession.staffRoles.length
-            ? staffSession.staffRoles
-            : ['admin', 'teacher'],
+          roles: staffSession.staffRoles.length ? staffSession.staffRoles : ['admin', 'teacher'],
         })
         if (!provisioned.ok) {
           setBackendStatus('error')
@@ -280,9 +278,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         if (source === 'cloud' || (source === 'empty' && wRemote === 0 && wLive === 0)) {
           setRoster(remote.roster)
           setScheduling(
-            wRemote > 0
-              ? mergeScheduling(live.scheduling, remote.scheduling)
-              : remote.scheduling,
+            wRemote > 0 ? mergeScheduling(live.scheduling, remote.scheduling) : remote.scheduling,
           )
           authoritativeRoster = remote.roster
         } else if (source === 'local') {
@@ -298,7 +294,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setRoster(remote.roster)
         setScheduling(mergeScheduling(live.scheduling, remote.scheduling))
       } else if (source === 'local') {
-        // One-time migration from this browser into the empty Clerk workspace.
+        // One-time migration from this browser into the empty Supabase Auth workspace.
         authoritativeRoster = live.roster
         setRoster(live.roster)
         setScheduling(live.scheduling)
@@ -350,7 +346,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       void saveOrgMetricSettings(orgId, metricSettings)
     }, 800)
     return () => clearTimeout(t)
-  }, [metricSettings, roster, staffSession.authBypass, staffSession.signedIn, staffSession.staffRoles.length])
+  }, [
+    metricSettings,
+    roster,
+    staffSession.authBypass,
+    staffSession.signedIn,
+    staffSession.staffRoles.length,
+  ])
 
   // Debounced Supabase save — staff only (learners must never write the workspace)
   useEffect(() => {
@@ -398,7 +400,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return () => {
       if (syncTimer.current) clearTimeout(syncTimer.current)
     }
-  }, [roster, scheduling, staffSession.authBypass, staffSession.signedIn, staffSession.staffRoles.length])
+  }, [
+    roster,
+    scheduling,
+    staffSession.authBypass,
+    staffSession.signedIn,
+    staffSession.staffRoles.length,
+  ])
 
   const resetAll = useCallback(() => {
     clearPersistedAppState()
@@ -452,7 +460,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     const staffUsers = stableRoster.users.filter((user) =>
       user.roles.some((role) => role === 'admin' || role === 'teacher'),
     )
-    setRoster({ ...createEmptyRoster(), organization: stableRoster.organization, users: staffUsers })
+    setRoster({
+      ...createEmptyRoster(),
+      organization: stableRoster.organization,
+      users: staffUsers,
+    })
     setScheduling(emptySchedulingState())
     setCapture(null)
     setLedger([])
@@ -465,7 +477,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, [roster, staffSession.authBypass, staffSession.signedIn, staffSession.staffRoles])
 
   const syncNow = useCallback(
-    async (override?: { roster?: RosterState; scheduling?: SchedulingState; pruneMissing?: boolean }) => {
+    async (override?: {
+      roster?: RosterState
+      scheduling?: SchedulingState
+      pruneMissing?: boolean
+    }) => {
       if (!isSupabaseConfigured()) {
         setBackendStatus('offline')
         return false
@@ -514,14 +530,20 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setBackendError(syncPhaseError('write', result.error))
       return false
     },
-    [roster, scheduling, staffSession.authBypass, staffSession.signedIn, staffSession.staffRoles.length],
+    [
+      roster,
+      scheduling,
+      staffSession.authBypass,
+      staffSession.signedIn,
+      staffSession.staffRoles.length,
+    ],
   )
 
   const reloadFromSupabase = useCallback(async () => {
     if (!isSupabaseConfigured() || !staffSession.userId) return
     setBackendStatus('syncing')
-    const provisioned = await ensureClerkWorkspace({
-      clerkUserId: staffSession.userId,
+    const provisioned = await ensureSupabaseStaffWorkspace({
+      authUserId: staffSession.userId,
       email: staffSession.email,
       displayName: staffSession.displayName ?? staffSession.email ?? 'Chunks Staff',
       roles: staffSession.staffRoles,
@@ -562,7 +584,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const appendFinalizedFromCapture = useCallback(
     (nextCapture: CaptureSessionState) => {
       setLedger((prev) => {
-        const next = ledgerFromCapture(nextCapture, roster, prev)
+        const next = ledgerFromCapture(nextCapture, roster, prev, scheduling)
         const events = auditFromNewResults(
           roster.organization.id,
           prev,
@@ -575,7 +597,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         return next
       })
     },
-    [roster],
+    [roster, scheduling],
   )
 
   const correctResult = useCallback(

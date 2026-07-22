@@ -1,10 +1,10 @@
 import {
   BookOpen,
   ChartColumn,
+  Database,
   Gauge,
   GraduationCap,
   LayoutDashboard,
-  ShieldCheck,
   Users,
 } from 'lucide-react'
 import { RoleWorkspace } from '../../components/RoleWorkspace'
@@ -16,8 +16,8 @@ const ITEMS = [
   { to: '/admin/courses', label: 'Courses', icon: BookOpen },
   { to: '/admin/classes', label: 'Classes', icon: GraduationCap },
   { to: '/admin/metrics', label: 'Metrics', icon: Gauge },
+  { to: '/admin/resources', label: 'Resources', icon: Database },
   { to: '/admin/analysis', label: 'Analysis', icon: ChartColumn },
-  { to: '/admin/integrity', label: 'Integrity', icon: ShieldCheck },
 ]
 
 export function AdminLayout() {

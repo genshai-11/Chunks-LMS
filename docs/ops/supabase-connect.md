@@ -20,7 +20,7 @@ Correct pattern (already in `web/src/lib/supabase.ts`):
 import { createClient } from '@supabase/supabase-js'
 // URL + anon from import.meta.env.VITE_*
 const supabase = createClient(env.supabaseUrl, env.supabaseAnonKey, {
-  accessToken: async () => /* Clerk JWT when signed in */ null,
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
 })
 ```
 
@@ -37,8 +37,7 @@ const supabase = createClient(env.supabaseUrl, env.supabaseAnonKey, {
 
 ```env
 VITE_SUPABASE_URL=https://ekubetkxfcuxlyahesrl.supabase.co
-VITE_SUPABASE_ANON_KEY=<Dashboard → Settings → API → anon public>
-VITE_CLERK_PUBLISHABLE_KEY=<Clerk pk_test_…>
+VITE_SUPABASE_ANON_KEY=<Dashboard → Settings → API → publishable/anon>
 # Local only — sync without signing in every time:
 # VITE_AUTH_BYPASS=true
 VITE_AUTH_BYPASS=false
@@ -88,10 +87,10 @@ Sign-in required when `VITE_AUTH_BYPASS=false`. Sign-out no longer wipes local c
 | Symptom | Fix |
 |---------|-----|
 | Badge “Local only” | Missing `VITE_SUPABASE_*` or restart dev server |
-| “Sign in to load…” | Clerk sign-in, or set `VITE_AUTH_BYPASS=true` locally |
+| “Sign in to load…” | Supabase email/password or magic-link sign-in; use bypass only locally |
 | Save errors / empty cloud | `supabase db push`; check RLS demo policies on foundation tables |
 | service_role in frontend | Remove it; use anon key only |
 
 ## 7. Vercel production
 
-Set the same `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` (+ Clerk) in Vercel env. **Never** set `VITE_AUTH_BYPASS=true` on production.
+Set the same `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` in Vercel env. **Never** set `VITE_AUTH_BYPASS=true` on production. Configure Auth redirects per [supabase-auth.md](./supabase-auth.md).

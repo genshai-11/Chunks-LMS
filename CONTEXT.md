@@ -9,8 +9,12 @@ The administrative scope that owns users, metric templates, and reports.
 _Avoid_: Tenant, school account
 
 **User**:
-A person authenticated to access an Organization (or a learner profile reached by invite link).
-_Avoid_: Account, profile
+A stable domain person. Staff may link to one native Supabase Auth identity through `auth_user_id`; a Learner may remain profile-only and use a scoped invite link.
+_Avoid_: Auth account, transient session
+
+**Staff Auth Identity**:
+A native Supabase `auth.users` account linked to one domain User. It authenticates but does not authorize; active database `staff_roles` grant Admin/Teacher access.
+_Avoid_: Clerk subject, metadata role, frontend allowlist
 
 **Account Status**:
 Active or inactive for a Teacher or Learner profile. Admin may deactivate without deleting history.
@@ -21,7 +25,7 @@ A User who owns classes/programs for their learners, starts sessions (selecting 
 _Avoid_: Instructor, assessor
 
 **Learner**:
-A User whose Focus and Awareness progress is observed across a Course (program label). Access via email invite, not Clerk in V1.
+A User whose Focus and Awareness progress is observed across a Course (program label). Access uses a scoped learner invite rather than staff Supabase Auth in V1.
 _Avoid_: Student, participant
 
 ## Learning structure
@@ -45,8 +49,28 @@ _Avoid_: Lesson, booking
 
 **Learning Session**:
 The actual teaching and assessment occurrence associated with a Class.
-May carry **session kind** (regular, pretest, posttest) for RFC baseline comparison, and an optional **participant learner list** (subset of the class for multi-select capture).
+May carry **session kind** (regular, pretest, posttest) for RFC baseline comparison, **session format** (lesson or test) for input behavior, an optional **prompt language** for live-test item display/audio, and an optional **participant learner list** (subset of the class for multi-select capture).
 _Avoid_: Round, room session
+
+**Test Resource**:
+A predefined live-test package containing ordered Test Blocks and Test Items, prompt text in Vietnamese/English, audio references, and CVR/CCI metadata.
+_Avoid_: Resource library, lesson content
+
+**Test Block**:
+One ordered 10-item block within a Test Resource, used as the input for one live-test Learning Session.
+_Avoid_: Learning Session, class session
+
+**Test Item**:
+One ordered bilingual complete-sentence prompt within a Test Section.
+_Avoid_: Session Question, sentence identity
+
+**Standalone Test Assignment**:
+One active Learner assigned directly to one published Test Package Version. It has no Class or Enrollment dependency.
+_Avoid_: Class test, hidden enrollment
+
+**Standalone Test Run**:
+One Learner's attempt at one Test Section with frozen CVR, CCI Name/Ampe, prompt language, voice, approved narration, ordered Test Items, and immutable result history. It is not a Learning Session.
+_Avoid_: Live Test Session, class session
 
 **Attendance**:
 A Learner’s participation status for a Learning Session.
@@ -104,6 +128,18 @@ _Avoid_: Failure score
 **RAC**:
 The share of finalized Assessment Attempts ending Green or Purple in a Report Window.
 _Avoid_: Success score
+
+**CVR**:
+Semantic Complexity Value Rating for a Test Item prompt, calculated from Estimated TC × LC × TL.
+_Avoid_: Generic difficulty, final result
+
+**CCI**:
+Named current/intensity measurement for a Test Section. The canonical workbook maps `CCI.Ampe (A)` to CCI value and retains CCI ID, Name, description, and category. Legacy `Unit (Ohm)` mappings are obsolete.
+_Avoid_: CVR, manually derived score
+
+**CPD**:
+Derived live-test demand value calculated as CVR × CCI and reproducible from stored source measurements.
+_Avoid_: Manually entered metric
 
 ---
 

@@ -91,3 +91,5 @@ data/
 /skills/
 .vercel
 .env*
+web/public/audio/intros/
+web/public/audio/sound-selection/

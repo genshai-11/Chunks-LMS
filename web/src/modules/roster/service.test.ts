@@ -330,6 +330,39 @@ describe('admin roster workflows', () => {
     ).toBe(1)
     expect(merged.state.classes.every((c) => c.teacherUserId !== cloneId)).toBe(true)
   })
+
+  it('prevents enrolling a learner in multiple classes unless allowMultiClass is enabled', () => {
+    let state = createSeedRoster()
+    const newClass = {
+      id: 'class-2',
+      courseId: state.courses[0]!.id,
+      name: 'Second Class',
+      capacity: 10,
+      teacherUserId: state.users.find((u) => u.roles.includes('teacher'))!.id,
+      status: 'active' as const,
+      startsOn: '2026-07-01',
+      endsOn: '2026-08-01',
+      schedule: null,
+    }
+    state = {
+      ...state,
+      classes: [...state.classes, newClass],
+    }
+
+    const learner = state.users.find((u) => u.roles.includes('learner'))!
+    const errRes = enrollLearner(state, 'class-2', learner.id)
+    expect(errRes.ok).toBe(false)
+    if (errRes.ok) return
+    expect(errRes.error).toContain('already enrolled in another active class')
+
+    const updateRes = updateUserProfile(state, learner.id, { allowMultiClass: true })
+    expect(updateRes.ok).toBe(true)
+    if (!updateRes.ok) return
+    state = updateRes.state
+
+    const okRes = enrollLearner(state, 'class-2', learner.id)
+    expect(okRes.ok).toBe(true)
+  })
 })
 
 function normalizeEmail(email: string | null | undefined): string | null {

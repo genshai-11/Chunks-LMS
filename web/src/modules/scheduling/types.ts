@@ -3,6 +3,10 @@ export type LearningSessionStatus = 'open' | 'completed'
 export type AttendanceStatus = 'present' | 'late' | 'absent' | 'excused'
 /** Baseline / exit labels for longitudinal RFC comparison */
 export type SessionKind = 'regular' | 'pretest' | 'posttest'
+/** Input behavior for a Learning Session. */
+export type SessionFormat = 'lesson' | 'test'
+/** Live-test prompt/audio language. */
+export type PromptLanguage = 'vi' | 'en'
 
 export type ScheduledSession = {
   id: string
@@ -42,6 +46,14 @@ export type LearningSession = {
    * Defaults to regular when missing (legacy snapshots).
    */
   sessionKind: SessionKind
+  /** Input behavior: current live lesson flow or resource-driven live-test. Legacy sessions default to lesson. */
+  sessionFormat?: SessionFormat
+  /** For test sessions, selects Vietnamese or English complete sentence prompt/audio. */
+  promptLanguage?: PromptLanguage | null
+  /** Selected live-test resource for test sessions. */
+  liveTestResourceId?: string | null
+  /** Selected 10-item live-test block for test sessions. */
+  liveTestBlockId?: string | null
   /**
    * Learners included in capture for this session (subset of class roster).
    * Null/empty means “all active enrollments at start” (legacy).

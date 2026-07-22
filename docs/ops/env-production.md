@@ -1,22 +1,21 @@
 # Production environment variables
 
-## Vercel (Production + Preview)
+## Vercel Preview and Production
 
 | Name | Example | Notes |
-|------|---------|--------|
-| `VITE_CLERK_PUBLISHABLE_KEY` | `pk_live_…` | Staff only |
-| `VITE_SUPABASE_URL` | `https://xxx.supabase.co` | |
-| `VITE_SUPABASE_ANON_KEY` | `eyJ…` | Public anon |
-| `VITE_AUTH_BYPASS` | *(unset or false)* | **Never true in production** |
-| `VITE_STAFF_ADMIN_EMAILS` | `you@school.edu` | Optional allowlist |
-| `VITE_STAFF_TEACHER_EMAILS` | `t1@school.edu,t2@…` | Optional allowlist |
+|---|---|---|
+| `VITE_SUPABASE_URL` | `https://xxx.supabase.co` | Hosted project URL |
+| `VITE_SUPABASE_ANON_KEY` | `sb_publishable_…` or legacy anon JWT | Public browser key only |
+| `VITE_AUTH_BYPASS` | unset / `false` | **Never true in production** |
+
+Clerk variables, Clerk JWT bridging, and `VITE_STAFF_*_EMAILS` are no longer used. Staff roles are active rows in `public.staff_roles`.
 
 ## GitHub Actions CD
 
-Same `VITE_*` as above, plus:
+Same `VITE_*` values as above, plus:
 
 | Name | Notes |
-|------|--------|
+|---|---|
 | `VERCEL_TOKEN` | Deploy token |
 | `VERCEL_ORG_ID` | From `vercel link` |
 | `VERCEL_PROJECT_ID` | From `vercel link` |
@@ -24,26 +23,17 @@ Same `VITE_*` as above, plus:
 ## Local production-like
 
 ```env
-VITE_CLERK_PUBLISHABLE_KEY=pk_test_…
-VITE_SUPABASE_URL=https://….supabase.co
-VITE_SUPABASE_ANON_KEY=eyJ…
+VITE_SUPABASE_URL=https://ekubetkxfcuxlyahesrl.supabase.co
+VITE_SUPABASE_ANON_KEY=<publishable/anon key>
 VITE_AUTH_BYPASS=false
-VITE_STAFF_ADMIN_EMAILS=you@example.com
-VITE_STAFF_TEACHER_EMAILS=you@example.com
 ```
 
-## Clerk metadata (alternative to email allowlists)
+## Supabase Auth configuration
 
-User public metadata:
+- Email signup/sign-in and magic links are native Supabase Auth operations.
+- Email confirmation follows hosted Auth settings.
+- External OAuth providers are intentionally deferred and are not shown in the application.
+- Configure exact local/Preview/Production redirects for magic links.
+- Authentication creates/links the domain User; authorization requires an active database `staff_roles` grant.
 
-```json
-{ "chunksRole": "admin" }
-```
-
-or
-
-```json
-{ "chunksRoles": ["admin", "teacher"] }
-```
-
-`staff` grants both admin and teacher surfaces.
+See [supabase-auth.md](./supabase-auth.md).

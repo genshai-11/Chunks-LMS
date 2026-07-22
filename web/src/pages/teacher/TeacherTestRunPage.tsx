@@ -133,6 +133,15 @@ function readSavedNumber(key: string, fallback: number, min: number, max: number
   return fallback
 }
 
+function readSavedVolume(): number {
+  const saved = readSavedNumber(AUDIO_VOLUME_KEY, 0.85, 0, 1)
+  return saved <= 0 ? 0.85 : saved
+}
+
+function audibleVolume(value: number): number {
+  return value <= 0 ? 0.85 : Math.min(1, Math.max(0.05, value))
+}
+
 export function TeacherTestRunPage() {
   const { runId } = useParams()
   const [searchParams] = useSearchParams()
@@ -176,7 +185,7 @@ export function TeacherTestRunPage() {
     setAutoPlayItems(readSavedBoolean(AUDIO_AUTOPLAY_ITEMS_KEY, false))
     setAutoPlaySessionIntro(readSavedBoolean(AUDIO_AUTOPLAY_INTRO_KEY, false))
     setAudioRate(readSavedNumber(AUDIO_RATE_KEY, 1, 0.75, 2))
-    setAudioVolume(readSavedNumber(AUDIO_VOLUME_KEY, 0.85, 0, 1))
+    setAudioVolume(readSavedVolume())
   }, [])
 
   useEffect(() => {
@@ -208,8 +217,13 @@ export function TeacherTestRunPage() {
   }, [audioRate])
 
   useEffect(() => {
+    const nextVolume = audibleVolume(audioVolume)
+    if (nextVolume !== audioVolume) {
+      setAudioVolume(nextVolume)
+      return
+    }
     try {
-      window.localStorage.setItem(AUDIO_VOLUME_KEY, String(audioVolume))
+      window.localStorage.setItem(AUDIO_VOLUME_KEY, String(nextVolume))
     } catch {
       /* ignore */
     }
@@ -496,7 +510,9 @@ export function TeacherTestRunPage() {
   useEffect(() => {
     const audio = audioRef.current
     if (!audio) return
-    audio.volume = audioVolume
+    const nextVolume = audibleVolume(audioVolume)
+    audio.muted = false
+    audio.volume = nextVolume
     audio.playbackRate = audioRate
   }, [audioRate, audioUrl, audioVolume])
 
@@ -505,7 +521,10 @@ export function TeacherTestRunPage() {
     pendingAutoPlayRef.current = false
     const audio = audioRef.current
     if (!audio) return
-    audio.volume = audioVolume
+    const nextVolume = audibleVolume(audioVolume)
+    if (nextVolume !== audioVolume) setAudioVolume(nextVolume)
+    audio.muted = false
+    audio.volume = nextVolume
     audio.playbackRate = audioRate
     void audio.play().catch(() => {
       setAudioState('ready')
@@ -905,14 +924,14 @@ export function TeacherTestRunPage() {
                     </select>
                   </label>
                   <label>
-                    Volume
+                    Volume <span>{Math.round(audioVolume * 100)}%</span>
                     <input
                       type="range"
-                      min="0"
+                      min="0.05"
                       max="1"
                       step="0.05"
                       value={audioVolume}
-                      onChange={(event) => setAudioVolume(Number(event.target.value))}
+                      onChange={(event) => setAudioVolume(audibleVolume(Number(event.target.value)))}
                     />
                   </label>
                 </div>

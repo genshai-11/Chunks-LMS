@@ -3,10 +3,7 @@ import { PageHeader } from '../../components/PageHeader'
 import { Flash } from '../../components/Flash'
 import { useFlash } from '../../hooks/useFlash'
 import type { MetricKey, MetricStatus } from '../../modules/metrics/calculate'
-import {
-  setDefaultMaxProbeCount,
-  updateMetricSetting,
-} from '../../modules/metrics/settings'
+import { updateMetricSetting } from '../../modules/metrics/settings'
 import { useAppState } from '../../state/useAppState'
 
 export function AdminMetricsPage() {
@@ -33,31 +30,14 @@ export function AdminMetricsPage() {
       <PageHeader
         icon={Gauge}
         title="Metrics"
-        subtitle="Enabled metrics feed Teacher/Learner charts (real ledger only). Labels & definitions are tooltips. Probe: n count / n depth max / n depth avg."
-        actions={
-          <label className="field field-inline" style={{ margin: 0 }}>
-            Probe ceiling
-            <input
-              type="number"
-              min={1}
-              max={10}
-              value={metricSettings.defaultMaxProbeCount}
-              onChange={(e) => {
-                const next = setDefaultMaxProbeCount(metricSettings, Number(e.target.value))
-                setMetricSettings(next)
-                ok(`Probe ceiling = ${next.defaultMaxProbeCount}`)
-              }}
-              title="Session maxProbeCount default — not the same as observed n depth max"
-            />
-          </label>
-        }
+        subtitle="Enabled metrics feed Teacher/Learner charts (real ledger only). Labels & definitions are tooltips. Probe n has no ceiling: n count / n depth max / n depth avg."
       />
       <Flash message={message} error={error} />
 
       <p className="meta" style={{ marginBottom: '0.75rem' }}>
         <strong>n count</strong> = Green (2) entries · <strong>n depth</strong> = probe depth per
-        question · <strong>n depth max/avg</strong> = peak/mean observed depth (not the ceiling
-        above). Sample size is never labeled “n”.
+        question · <strong>n depth max/avg</strong> = peak/mean observed depth. There is no n ceiling;
+        Fail/Done are teacher decisions. Sample size is never labeled “n”.
       </p>
 
       <div className="table-wrap">

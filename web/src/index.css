@@ -4730,6 +4730,96 @@
       @apply hidden;
     }
   }
+
+  @media (max-width: 639px) {
+    .observe-root:has(.live-test-stage) {
+      @apply overflow-hidden;
+    }
+    .observe-root:has(.live-test-stage) .observe-rail {
+      @apply order-2 w-full max-w-none shrink-0 border-r-0 border-t border-white/10 bg-slate-950/95;
+      height: min(42dvh, 21rem);
+      min-height: 9.5rem;
+      --observe-rail-w: 100vw !important;
+    }
+    .observe-root:has(.live-test-stage) .observe-rail.is-closed {
+      height: 3.25rem;
+      min-height: 3.25rem;
+    }
+    .observe-root:has(.live-test-stage) .observe-rail-person {
+      @apply hidden;
+    }
+    .observe-root:has(.live-test-stage) .observe-rail-map {
+      @apply px-2 py-2;
+    }
+    .observe-root:has(.live-test-stage) .observe-rail-footer,
+    .observe-root:has(.live-test-stage) .observe-rail-resize {
+      @apply hidden;
+    }
+    .observe-root:has(.live-test-stage) .observe-rail-peek {
+      @apply min-h-12 w-full rounded-none;
+    }
+    .observe-root:has(.live-test-stage) .live-test-stage {
+      @apply order-1 flex-1 overflow-y-auto px-2;
+      min-height: 0;
+      padding-bottom: 0.5rem;
+    }
+    .live-test-stage-hero {
+      max-width: 100%;
+      gap: 0.15rem;
+    }
+    .live-test-learner-title {
+      font-size: clamp(1rem, 7vw, 1.55rem) !important;
+    }
+    .live-test-focus-card {
+      width: min(100%, 24rem);
+      @apply rounded-xl px-2 py-2!;
+    }
+    .live-test-focus-actions {
+      @apply grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] gap-1.5;
+    }
+    .live-test-focus-actions .ghost {
+      @apply min-h-9 px-1 text-[0px];
+    }
+    .live-test-focus-actions .ghost svg {
+      @apply h-4 w-4;
+    }
+    .live-test-wave-play {
+      @apply min-h-9 w-full justify-center px-2 text-[11px];
+    }
+    .live-test-prompt-box {
+      @apply mt-1 rounded-xl px-2 py-1.5;
+    }
+    .live-test-prompt-box strong {
+      font-size: clamp(0.82rem, 3.8vw, 1rem) !important;
+    }
+    .live-test-dock-compact .observe-dock-colors {
+      @apply flex-row rounded-3xl border-2 p-1.5;
+      gap: clamp(0.35rem, 2vw, 0.55rem);
+    }
+    .live-test-dock-compact .observe-dock-color {
+      width: clamp(3.1rem, 17vw, 4rem) !important;
+      height: clamp(3.1rem, 17vw, 4rem) !important;
+    }
+    .live-test-dock-compact .observe-dock-num {
+      font-size: clamp(1rem, 5vw, 1.35rem) !important;
+    }
+    .live-test-audio-panel {
+      @apply mt-2 rounded-xl p-2!;
+    }
+    .live-test-audio-actions,
+    .live-test-audio-grid {
+      @apply grid-cols-1;
+    }
+    .live-test-audio-el {
+      @apply h-9;
+    }
+    .live-test-heat-session-grid {
+      @apply grid-cols-7 gap-1;
+    }
+    .live-test-heat-session-head {
+      @apply min-h-7;
+    }
+  }
 }
 
 @layer components {
@@ -5050,6 +5140,68 @@
   }
   .test-analysis-legend-row strong {
     @apply text-slate-950;
+  }
+
+  @media (max-width: 639px) {
+    .test-analysis-page {
+      @apply px-0;
+    }
+    .standalone-analysis-grid {
+      @apply grid-cols-2 gap-2;
+    }
+    .standalone-metric-card {
+      @apply rounded-xl p-3;
+    }
+    .standalone-metric-card span {
+      @apply mt-1 text-[10px];
+    }
+    .standalone-metric-card strong {
+      @apply text-xl;
+    }
+    .test-analysis-workbench {
+      @apply grid-cols-1 gap-3;
+    }
+    .test-analysis-filter-card {
+      @apply static rounded-xl p-2.5;
+    }
+    .test-analysis-filter-head {
+      @apply mb-2 pb-2;
+    }
+    .test-analysis-filter-section {
+      @apply mb-3;
+    }
+    .test-analysis-chip-grid {
+      @apply flex gap-1.5 overflow-x-auto pb-1;
+      scrollbar-width: none;
+    }
+    .test-analysis-chip-grid::-webkit-scrollbar {
+      display: none;
+    }
+    .test-analysis-chip {
+      @apply min-w-10 shrink-0 px-3;
+    }
+    .test-analysis-color-list {
+      @apply grid grid-cols-2 gap-1.5;
+    }
+    .test-analysis-chart-stack,
+    .test-analysis-chart-row {
+      @apply grid-cols-1 gap-3;
+    }
+    .test-analysis-panel .panel-body-inner {
+      @apply overflow-x-auto p-2;
+    }
+    .test-analysis-panel .standalone-chart-wrap {
+      @apply h-[18rem] min-h-[18rem] min-w-[36rem] rounded-xl p-2;
+    }
+    .test-analysis-chart-row .standalone-chart-wrap {
+      @apply h-[16rem] min-h-[16rem] min-w-[28rem];
+    }
+    .test-analysis-panel .panel-title {
+      @apply text-sm;
+    }
+    .test-analysis-panel .panel-desc {
+      @apply text-xs;
+    }
   }
 
   .test-setup-side {

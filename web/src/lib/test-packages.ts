@@ -34,7 +34,20 @@ function mapTestPackageVersion(row: any): TestPackageVersion {
     status: row.status,
     snapshotHash: row.snapshot_hash,
     publishedAt: row.published_at,
+    sourceMetadata: (row.source_metadata ?? {}) as Record<string, unknown>,
   }
+}
+
+export async function getTestPackageVersion(versionId: string): Promise<Result<TestPackageVersion | null>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { data, error } = await sb
+    .from('test_package_versions')
+    .select('*')
+    .eq('id', versionId)
+    .maybeSingle()
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: data ? mapTestPackageVersion(data) : null }
 }
 
 function mapTestSection(row: any): TestSection {
@@ -275,12 +288,14 @@ export async function createSnapshotOverride(input: {
   return { ok: true, data: mapSectionMeasurementSnapshot(data) }
 }
 
+export type NarrationTarget = 'package_start' | 'package_end' | 'section_intro' | 'test_item'
+
 export type NarrationVariant = {
   id: string
   packageVersionId: string
   testSectionId: string | null
   testItemId: string | null
-  narrationTarget: 'section_intro' | 'test_item'
+  narrationTarget: NarrationTarget
   language: 'vi' | 'en'
   voiceId: string
   voiceLabel: string | null
@@ -392,6 +407,8 @@ export async function listSectionNarrationReview(input: {
     .map(mapNarrationVariant)
     .filter(
       (variant: NarrationVariant) =>
+        variant.narrationTarget === 'package_start' ||
+        variant.narrationTarget === 'package_end' ||
         variant.testSectionId === input.sectionId ||
         (variant.testItemId !== null && itemIds.has(variant.testItemId)),
     )

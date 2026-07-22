@@ -19,6 +19,7 @@ const draftVersion: TestPackageVersion = {
   status: 'draft',
   snapshotHash: null,
   publishedAt: null,
+  sourceMetadata: {},
 }
 
 const publishedVersion: TestPackageVersion = {
@@ -28,6 +29,7 @@ const publishedVersion: TestPackageVersion = {
   status: 'published',
   snapshotHash: 'sha256:abc',
   publishedAt: '2026-07-19T03:00:00.000Z',
+  sourceMetadata: {},
 }
 
 const section: TestSection = {

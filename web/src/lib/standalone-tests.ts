@@ -182,6 +182,12 @@ export const completeStandaloneRun = (runId: string) =>
     { p_run_id: runId },
   )
 
+export const stopStandaloneRun = (runId: string) =>
+  rpc<{ runId: string; status: 'completed'; partial: boolean; finalizedItems: number; totalItems: number }>(
+    'stop_standalone_test_run',
+    { p_run_id: runId },
+  )
+
 export const getLearnerStandaloneResults = (learnerUserId: string) =>
   rpc<{
     learnerUserId: string

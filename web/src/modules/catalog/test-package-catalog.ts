@@ -18,6 +18,7 @@ export type TestPackageVersion = {
   status: TestPackageVersionStatus
   snapshotHash: string | null
   publishedAt: string | null
+  sourceMetadata: Record<string, unknown>
 }
 
 export type TestSection = {

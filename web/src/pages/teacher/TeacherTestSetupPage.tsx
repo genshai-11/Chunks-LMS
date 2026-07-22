@@ -17,6 +17,7 @@ import { Flash } from '../../components/Flash'
 import { PageHeader } from '../../components/PageHeader'
 import { EmptyState, Panel } from '../../components/ui'
 import {
+  getTestPackageVersion,
   listSectionNarrationReview,
   listTestItems,
   listTestSections,
@@ -50,7 +51,13 @@ type AudioStatusSummary = {
   en: AudioSummary
 }
 
-function defaultLanguageForSection(section: TestSection): AudioLanguage {
+function defaultLanguageForSection(
+  section: TestSection,
+  languagePolicy?: unknown,
+): AudioLanguage {
+  if (languagePolicy === 'alternating_vi_en') {
+    return section.sectionOrder % 2 === 1 ? 'vi' : 'en'
+  }
   return section.sectionOrder <= 4 ? 'vi' : 'en'
 }
 
@@ -111,6 +118,7 @@ export function TeacherTestSetupPage() {
   const { assignmentId, sectionId: initialSectionId } = useParams()
   const navigate = useNavigate()
   const [packageVersionId, setPackageVersionId] = useState('')
+  const [languagePolicy, setLanguagePolicy] = useState<unknown>(null)
   const [sections, setSections] = useState<TestSection[]>([])
   const [itemsBySection, setItemsBySection] = useState<Record<string, TestItem[]>>({})
   const [sectionId, setSectionId] = useState(initialSectionId ?? '')
@@ -165,6 +173,9 @@ export function TeacherTestSetupPage() {
       const assignment = assignments.data.find((candidate) => candidate.id === assignmentId)
       if (!assignment) return setError('Standalone assignment not found')
       setPackageVersionId(assignment.packageVersionId)
+      const versionResult = await getTestPackageVersion(assignment.packageVersionId)
+      const nextLanguagePolicy = versionResult.ok ? versionResult.data?.sourceMetadata?.languagePolicy : null
+      setLanguagePolicy(nextLanguagePolicy ?? null)
       const sectionResult = await listTestSections(assignment.packageVersionId)
       if (!sectionResult.ok) return setError(sectionResult.error)
       setSections(sectionResult.data)
@@ -175,7 +186,7 @@ export function TeacherTestSetupPage() {
       )
       setSelectedSectionIds(new Set(sectionResult.data.map((section) => section.id)))
       setLanguageBySection(
-        Object.fromEntries(sectionResult.data.map((section) => [section.id, defaultLanguageForSection(section)])),
+        Object.fromEntries(sectionResult.data.map((section) => [section.id, defaultLanguageForSection(section, nextLanguagePolicy)])),
       )
 
       const itemResults = await Promise.all(
@@ -307,7 +318,7 @@ export function TeacherTestSetupPage() {
   function pendingGenerationTargets() {
     return targetPreview
       .map((item) => {
-        const language = languageBySection[item.section.id] ?? defaultLanguageForSection(item.section)
+        const language = languageBySection[item.section.id] ?? defaultLanguageForSection(item.section, languagePolicy)
         return { section: item.section, language }
       })
       .filter((target) => !audioSummaryBySection[target.section.id]?.[target.language]?.ready)
@@ -321,7 +332,7 @@ export function TeacherTestSetupPage() {
 
     const startedRunIds: string[] = []
     for (const item of targetPreview) {
-      const language = languageBySection[item.section.id] ?? defaultLanguageForSection(item.section)
+      const language = languageBySection[item.section.id] ?? defaultLanguageForSection(item.section, languagePolicy)
       const run = await prepareStandaloneRun(assignmentId, item.section.id, language, voiceId)
       if (!run.ok) {
         setBusy(false)
@@ -473,7 +484,7 @@ export function TeacherTestSetupPage() {
                   <tbody>
                     {preview.map(({ section, itemCount }) => {
                       const selected = runMode === 'full' || (runMode === 'single' ? section.id === sectionId : selectedSectionIds.has(section.id))
-                      const language = languageBySection[section.id] ?? defaultLanguageForSection(section)
+                      const language = languageBySection[section.id] ?? defaultLanguageForSection(section, languagePolicy)
                       const summary = audioSummaryBySection[section.id]
                       const currentSummary = summary?.[language]
                       const ready = currentSummary?.ready ?? false

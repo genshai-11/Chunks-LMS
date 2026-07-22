@@ -11,8 +11,10 @@ import {
   BarChart3,
   Check,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   ClipboardCheck,
   GripVertical,
   Keyboard,
@@ -29,7 +31,7 @@ import { UserAvatar } from '../../components/UserAvatar'
 import { EmptyState, Panel } from '../../components/ui'
 import { PROBE_ACTIONS } from '../../modules/assessment/probe-actions'
 import { listActiveLearners } from '../../modules/roster/service'
-import { listTestSections } from '../../lib/test-packages'
+import { getTestPackageVersion, listTestSections } from '../../lib/test-packages'
 import {
   completeStandaloneRun,
   findLatestApprovedNarrationVariant,
@@ -42,6 +44,7 @@ import {
   recordStandaloneResult,
   resolveStandaloneProbe,
   startStandaloneRun,
+  stopStandaloneRun,
   type StandaloneTestRunRow,
 } from '../../lib/standalone-tests'
 import { getNarrationPlaybackUrl } from '../../modules/catalog/live-test-generation'
@@ -72,6 +75,7 @@ const AUDIO_AUTOPLAY_ITEMS_KEY = 'chunks-lms:live-test-autoplay-items'
 const AUDIO_AUTOPLAY_INTRO_KEY = 'chunks-lms:live-test-autoplay-intro'
 const AUDIO_RATE_KEY = 'chunks-lms:live-test-audio-rate'
 const AUDIO_VOLUME_KEY = 'chunks-lms:live-test-audio-volume'
+const AUDIO_PANEL_OPEN_KEY = 'chunks-lms:live-test-audio-panel-open'
 
 function reactionFor(color: ResultColor): ReactionKind {
   if (color === 'purple') return 'celebrate'
@@ -100,6 +104,24 @@ function cpdValue(item: TestItem | null | undefined): number | null {
   const raw = item.cpd ?? (item.cvr !== undefined && item.cci !== undefined ? Number(item.cvr) * Number(item.cci) : null)
   const n = Number(raw)
   return Number.isFinite(n) ? n : null
+}
+
+function resultColorScore(color: ResultColor | null): number | null {
+  if (!color) return null
+  if (color === 'red') return 0
+  if (color === 'yellow') return 1
+  if (color === 'green') return 2
+  return 3
+}
+
+function achievedCpdValue(item: TestItem | null | undefined): number | null {
+  if (!isItemFinalized(item)) return null
+  const baseCpd = cpdValue(item)
+  if (baseCpd == null) return null
+  const snapshot = getItemSnapshot(item)
+  const storedScore = Number(snapshot?.effective_score ?? snapshot?.effectiveScore)
+  const score = Number.isFinite(storedScore) ? storedScore : resultColorScore(getItemColor(item))
+  return score == null ? null : Math.round(baseCpd * score * 100) / 100
 }
 
 function metricNumber(value: unknown): number | null {
@@ -170,6 +192,15 @@ function audibleVolume(value: number): number {
   return value <= 0 ? 0.85 : Math.min(1, Math.max(0.05, value))
 }
 
+function languageForSectionOrder(
+  sectionOrder: number,
+  fallback: 'vi' | 'en',
+  languagePolicy?: unknown,
+): 'vi' | 'en' {
+  if (languagePolicy === 'alternating_vi_en') return sectionOrder % 2 === 1 ? 'vi' : 'en'
+  return fallback
+}
+
 export function TeacherTestRunPage() {
   const { runId } = useParams()
   const [searchParams] = useSearchParams()
@@ -191,6 +222,7 @@ export function TeacherTestRunPage() {
   const [audioVolume, setAudioVolume] = useState(0.85)
   const [autoPlayItems, setAutoPlayItems] = useState(false)
   const [autoPlaySessionIntro, setAutoPlaySessionIntro] = useState(false)
+  const [audioPanelOpen, setAudioPanelOpen] = useState(true)
   const [reaction, setReaction] = useState<Reaction>(null)
   const [message, setMessage] = useState('')
   const [showHeader, setShowHeader] = useState(false)
@@ -214,6 +246,7 @@ export function TeacherTestRunPage() {
     setAutoPlaySessionIntro(readSavedBoolean(AUDIO_AUTOPLAY_INTRO_KEY, false))
     setAudioRate(readSavedNumber(AUDIO_RATE_KEY, 1, 0.75, 2))
     setAudioVolume(readSavedVolume())
+    setAudioPanelOpen(readSavedBoolean(AUDIO_PANEL_OPEN_KEY, true))
   }, [])
 
   useEffect(() => {
@@ -235,6 +268,14 @@ export function TeacherTestRunPage() {
       /* ignore */
     }
   }, [autoPlaySessionIntro])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(AUDIO_PANEL_OPEN_KEY, String(audioPanelOpen))
+    } catch {
+      /* ignore */
+    }
+  }, [audioPanelOpen])
 
   useEffect(() => {
     try {
@@ -325,6 +366,8 @@ export function TeacherTestRunPage() {
         const assignment = assignmentRes.data.find((a) => a.id === assignmentId)
         if (assignment) {
           const sectionsRes = await listTestSections(assignment.packageVersionId)
+          const versionRes = await getTestPackageVersion(assignment.packageVersionId)
+          const languagePolicy = versionRes.ok ? versionRes.data?.sourceMetadata?.languagePolicy : null
           const existingRunsRes = await listStandaloneRuns(assignmentId)
           const existingRuns = existingRunsRes.ok ? existingRunsRes.data : []
           const existingSectionIds = new Set(existingRuns.map((r) => r.testSectionId))
@@ -334,7 +377,7 @@ export function TeacherTestRunPage() {
               const prep = await prepareStandaloneRun(
                 assignmentId,
                 sec.id,
-                currentRun.promptLanguage || 'vi',
+                languageForSectionOrder(sec.sectionOrder, currentRun.promptLanguage || 'vi', languagePolicy),
                 currentRun.voiceId || 'default',
               )
               if (prep.ok && prep.data.canStart) {
@@ -674,6 +717,25 @@ export function TeacherTestRunPage() {
     navigate(assignmentId ? `/teacher/tests/analysis/${assignmentId}` : '/teacher/tests')
   }
 
+  async function stopCurrentSessionAndOpenSummary() {
+    if (!runId) return
+    const assignmentId = assignmentIdParam || runDetails?.assignmentId
+    if (completedCount === 0) {
+      const proceed = window.confirm('No questions are finalized yet. Stop this session anyway and open analysis?')
+      if (!proceed) return
+    } else {
+      const proceed = window.confirm(`Stop this session now? Analysis will include ${completedCount}/${items.length} finalized questions.`)
+      if (!proceed) return
+    }
+    const result = await stopStandaloneRun(runId)
+    if (!result.ok) {
+      setMessage(result.error)
+      setIsSummaryShown(true)
+      return
+    }
+    navigate(assignmentId ? `/teacher/tests/analysis/${assignmentId}` : '/teacher/tests')
+  }
+
   const sessionsGrouped = useMemo(() => {
     const map = new Map<number, TestItem[]>()
     for (const item of items) {
@@ -692,7 +754,7 @@ export function TeacherTestRunPage() {
     const yellowCount = items.filter((i) => getItemColor(i) === 'yellow').length
     const greenCount = items.filter((i) => getItemColor(i) === 'green').length
     const purpleCount = items.filter((i) => getItemColor(i) === 'purple').length
-    const cpdValues = items.map(cpdValue).filter((v): v is number => v !== null)
+    const cpdValues = items.map(achievedCpdValue).filter((v): v is number => v !== null)
     const finalized = completedCount
     const rfc = finalized > 0 ? Math.round(((redCount + yellowCount) / finalized) * 100) : 0
     const rac = finalized > 0 ? Math.round(((greenCount + purpleCount) / finalized) * 100) : 0
@@ -712,7 +774,8 @@ export function TeacherTestRunPage() {
         return {
           itemOrder: item.global_item_order,
           label: `Q${item.global_item_order}`,
-          cpd: cpdValue(item) ?? 0,
+          cpd: achievedCpdValue(item) ?? 0,
+          baseCpd: cpdValue(item) ?? 0,
           cvr: item.cvr ?? 0,
           cci: item.cci ?? 0,
           colorKey: finalized ? colorKey : 'pending',
@@ -823,9 +886,9 @@ export function TeacherTestRunPage() {
             <>
               <p className="observe-rail-name">{learnerName}</p>
               <div className="observe-meta-row live-test-rail-meta">
-                <span className="observe-learner-rfc">RFC {summaryMetrics.rfc}%</span>
-                <span className="observe-learner-rfc">%c {summaryMetrics.rac}%</span>
-                <span className="observe-learner-rfc">CPD {formatVolt(summaryMetrics.avgCpd)}</span>
+                <span className="observe-learner-rfc is-rfc">RFC {summaryMetrics.rfc}%</span>
+                <span className="observe-learner-rfc is-percent-c">%c {summaryMetrics.rac}%</span>
+                <span className="observe-learner-rfc is-cpd">Max CPD {formatVolt(summaryMetrics.maxCpd)}</span>
               </div>
               <p className="observe-rail-n">{completedCount}/{items.length} scored</p>
             </>
@@ -897,72 +960,80 @@ export function TeacherTestRunPage() {
                 })}
               </div>
 
-              <div className="live-test-audio-panel" aria-label="Audio controls">
-                <div className="live-test-audio-head">
+              <div className={`live-test-audio-panel${audioPanelOpen ? ' is-open' : ' is-collapsed'}`} aria-label="Audio controls">
+                <button
+                  type="button"
+                  className="live-test-audio-head"
+                  onClick={() => setAudioPanelOpen((value) => !value)}
+                  aria-expanded={audioPanelOpen}
+                >
                   <span><SlidersHorizontal className="h-3.5 w-3.5" /> Audio</span>
                   <strong>{audioState}</strong>
-                </div>
-                <audio
-                  ref={audioRef}
-                  id="live-test-current-audio"
-                  key={audioUrl}
-                  controls
-                  src={audioUrl}
-                  onPlay={() => setAudioState('playing')}
-                  onEnded={handleAudioEnded}
-                  onError={() => setAudioState('error')}
-                  className="live-test-audio-el"
-                />
-                <p className="live-test-audio-label">{audioLabel}</p>
-                <div className="live-test-audio-actions">
-                  <button type="button" onClick={() => void playCurrentSessionIntro(true, true)} disabled={!canPlayCurrentSessionIntro}>
-                    Session intro → Q1
-                  </button>
-                  <button type="button" onClick={() => void playCurrentItemAudio(true)} disabled={!canPlayCurrentItemAudio}>
-                    Current Q
-                  </button>
-                </div>
-                <label className="live-test-audio-toggle">
-                  <input
-                    type="checkbox"
-                    checked={autoPlayItems}
-                    onChange={(event) => setAutoPlayItems(event.target.checked)}
-                  />
-                  Auto-play next question
-                </label>
-                <label className="live-test-audio-toggle">
-                  <input
-                    type="checkbox"
-                    checked={autoPlaySessionIntro}
-                    onChange={(event) => setAutoPlaySessionIntro(event.target.checked)}
-                  />
-                  Auto-play session intro
-                </label>
-                <div className="live-test-audio-grid">
-                  <label>
-                    Speed
-                    <select value={audioRate} onChange={(event) => setAudioRate(Number(event.target.value))}>
-                      <option value={0.75}>0.75×</option>
-                      <option value={1}>1×</option>
-                      <option value={1.15}>1.15×</option>
-                      <option value={1.25}>1.25×</option>
-                      <option value={1.5}>1.5×</option>
-                      <option value={1.75}>1.75×</option>
-                      <option value={2}>2×</option>
-                    </select>
-                  </label>
-                  <label>
-                    Volume <span>{Math.round(audioVolume * 100)}%</span>
-                    <input
-                      type="range"
-                      min="0.05"
-                      max="1"
-                      step="0.05"
-                      value={audioVolume}
-                      onChange={(event) => setAudioVolume(audibleVolume(Number(event.target.value)))}
+                  {audioPanelOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                </button>
+                <div className="live-test-audio-body" hidden={!audioPanelOpen}>
+                    <audio
+                      ref={audioRef}
+                      id="live-test-current-audio"
+                      key={audioUrl}
+                      controls
+                      src={audioUrl}
+                      onPlay={() => setAudioState('playing')}
+                      onEnded={handleAudioEnded}
+                      onError={() => setAudioState('error')}
+                      className="live-test-audio-el"
                     />
-                  </label>
-                </div>
+                    <p className="live-test-audio-label">{audioLabel}</p>
+                    <div className="live-test-audio-actions">
+                      <button type="button" onClick={() => void playCurrentSessionIntro(true, true)} disabled={!canPlayCurrentSessionIntro}>
+                        Session intro → Q1
+                      </button>
+                      <button type="button" onClick={() => void playCurrentItemAudio(true)} disabled={!canPlayCurrentItemAudio}>
+                        Current Q
+                      </button>
+                    </div>
+                    <label className="live-test-audio-toggle">
+                      <input
+                        type="checkbox"
+                        checked={autoPlayItems}
+                        onChange={(event) => setAutoPlayItems(event.target.checked)}
+                      />
+                      Auto-play next question
+                    </label>
+                    <label className="live-test-audio-toggle">
+                      <input
+                        type="checkbox"
+                        checked={autoPlaySessionIntro}
+                        onChange={(event) => setAutoPlaySessionIntro(event.target.checked)}
+                      />
+                      Auto-play session intro
+                    </label>
+                    <div className="live-test-audio-grid">
+                      <label>
+                        Speed
+                        <select value={audioRate} onChange={(event) => setAudioRate(Number(event.target.value))}>
+                          <option value={0.75}>0.75×</option>
+                          <option value={1}>1×</option>
+                          <option value={1.15}>1.15×</option>
+                          <option value={1.25}>1.25×</option>
+                          <option value={1.5}>1.5×</option>
+                          <option value={1.75}>1.75×</option>
+                          <option value={2}>2×</option>
+                        </select>
+                      </label>
+                      <label>
+                        Volume <span>{Math.round(audioVolume * 100)}%</span>
+                        <input
+                          type="range"
+                          min="0.05"
+                          max="1"
+                          step="0.05"
+                          value={audioVolume}
+                          onChange={(event) => setAudioVolume(audibleVolume(Number(event.target.value)))}
+                        />
+                      </label>
+                    </div>
+                  </div>
               </div>
             </div>
           </div>
@@ -1117,7 +1188,7 @@ export function TeacherTestRunPage() {
                       <Tooltip content={({ active, payload }) => {
                         if (!active || !payload?.length) return null
                         const d = payload[0].payload
-                        return <div className="p-3 rounded-lg bg-slate-900 text-white text-xs space-y-1 shadow-lg border border-slate-800"><div className="font-bold text-blue-400">{d.label}: {d.prompt}</div><div>CPD: <strong className="text-blue-300">{formatVolt(d.cpd)}</strong> (CVR <span className="text-rose-300">{formatOhm(d.cvr)}</span> × CCI <span className="text-emerald-300">{formatAmp(d.cci)}</span>)</div><div className="capitalize">Result: <strong>{d.colorKey}</strong></div></div>
+                        return <div className="p-3 rounded-lg bg-slate-900 text-white text-xs space-y-1 shadow-lg border border-slate-800"><div className="font-bold text-blue-400">{d.label}: {d.prompt}</div><div>Achieved CPD: <strong className="text-blue-300">{formatVolt(d.cpd)}</strong></div><div>Base: {formatVolt(d.baseCpd)} · CVR <span className="text-rose-300">{formatOhm(d.cvr)}</span> × CCI <span className="text-emerald-300">{formatAmp(d.cci)}</span></div><div className="capitalize">Result: <strong>{d.colorKey}</strong></div></div>
                       }} />
                       <Bar dataKey="cpd" radius={[4, 4, 0, 0]}>{chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.hex} />)}</Bar>
                     </BarChart>
@@ -1125,9 +1196,13 @@ export function TeacherTestRunPage() {
                 </div>
               </div>
 
-              <div className="flex gap-3 mt-6">
-                <button type="button" className="ghost flex-1 py-3" onClick={() => setIsSummaryShown(false)}>Quay lại chấm điểm</button>
-                {isAllFinalized ? <button type="button" className="primary flex-1 py-3" onClick={() => void completeAll()}><CheckCircle2 className="h-5 w-5" /> Hoàn thành Run & Kết thúc</button> : null}
+              <div className="flex flex-col gap-3 mt-6 sm:flex-row">
+                <button type="button" className="ghost flex-1 py-3" onClick={() => setIsSummaryShown(false)}>Back to scoring</button>
+                {isAllFinalized ? (
+                  <button type="button" className="primary flex-1 py-3" onClick={() => void completeAll()}><CheckCircle2 className="h-5 w-5" /> Finish Run & Open Analysis</button>
+                ) : (
+                  <button type="button" className="primary flex-1 py-3" onClick={() => void stopCurrentSessionAndOpenSummary()}><CheckCircle2 className="h-5 w-5" /> Stop session & Summary</button>
+                )}
               </div>
             </Panel>
           </div>

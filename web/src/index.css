@@ -4260,7 +4260,7 @@
   }
   .badge.metric-cpd,
   .metric-cpd-text {
-    @apply border-blue-100 bg-blue-50 text-blue-700;
+    @apply border-cyan-100 bg-cyan-50 text-cyan-700;
   }
 
   .compact-resource-table table {
@@ -4478,13 +4478,22 @@
     @apply mt-3 shrink-0 rounded-2xl border border-indigo-300/15 bg-slate-950/70 p-2.5 text-xs text-slate-200 shadow-inner;
   }
   .live-test-audio-head {
-    @apply mb-2 flex items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-wide text-indigo-200;
+    @apply mb-2 flex w-full items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/5 px-2 py-1.5 font-mono text-[10px] uppercase tracking-wide text-indigo-200 transition hover:bg-white/10;
   }
   .live-test-audio-head span {
     @apply flex items-center gap-1 font-bold;
   }
   .live-test-audio-head strong {
-    @apply text-[9px] text-slate-400;
+    @apply ml-auto rounded-full bg-slate-950/70 px-2 py-0.5 text-[9px] text-slate-300;
+  }
+  .live-test-audio-panel.is-collapsed {
+    @apply border-indigo-300/10 bg-slate-950/55;
+  }
+  .live-test-audio-panel.is-collapsed .live-test-audio-head {
+    @apply mb-0;
+  }
+  .live-test-audio-body[hidden] {
+    @apply hidden;
   }
   .live-test-audio-el {
     @apply h-8 w-full max-w-full accent-indigo-500;
@@ -4590,7 +4599,17 @@
     @apply mt-1 grid w-full grid-cols-3 gap-1 px-1;
   }
   .live-test-rail-meta .observe-learner-rfc {
-    @apply justify-center px-1 py-0.5 text-[9px];
+    @apply justify-center px-1.5 py-1 text-xs;
+    min-height: 1.5rem;
+  }
+  .live-test-rail-meta .observe-learner-rfc.is-rfc {
+    @apply border-amber-400/30 bg-amber-500/15 text-amber-200;
+  }
+  .live-test-rail-meta .observe-learner-rfc.is-percent-c {
+    @apply border-emerald-400/30 bg-emerald-500/15 text-emerald-200;
+  }
+  .live-test-rail-meta .observe-learner-rfc.is-cpd {
+    @apply border-cyan-400/30 bg-cyan-500/15 text-cyan-100;
   }
 
   /* Keep Live Test dock vertical and central; it scales by viewport height instead of forcing browser zoom-out. */
@@ -4674,7 +4693,7 @@
   }
   .live-test-cpd-row .metric-cpd,
   .live-test-cpd-row .is-strong {
-    @apply bg-blue-950/70 font-bold text-blue-100;
+    @apply bg-cyan-950/70 font-bold text-cyan-100;
   }
 
   .live-test-audio-el {
@@ -5076,7 +5095,7 @@
   }
   .standalone-metric-card.metric-cpd svg,
   .standalone-metric-card.metric-cpd strong {
-    @apply text-blue-600;
+    @apply text-cyan-600;
   }
   .standalone-chart-wrap {
     @apply border-slate-200 bg-white;
@@ -5402,8 +5421,9 @@
   .live-test-cpd-row span {
     @apply bg-slate-900/70 text-slate-200 ring-0;
   }
+  .live-test-cpd-row .metric-cpd,
   .live-test-cpd-row .is-strong {
-    @apply bg-emerald-900/70 text-emerald-100 ring-0;
+    @apply bg-cyan-950/70 text-cyan-100 ring-0;
   }
 
   .live-test-probe-dock {

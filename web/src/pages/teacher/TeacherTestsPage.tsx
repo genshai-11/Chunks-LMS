@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { BarChart3, ClipboardCheck, Play, Trash2, UserRound } from 'lucide-react'
+import { BarChart3, ClipboardCheck, ExternalLink, Play, RotateCcw, Trash2, UserRound } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { PageHeader } from '../../components/PageHeader'
 import { EmptyState, Panel } from '../../components/ui'
@@ -10,6 +10,7 @@ import {
   createStandaloneAssignment,
   deleteStandaloneAssignment,
   listStandaloneAssignments,
+  listStandaloneRuns,
   type StandaloneTestAssignmentRow,
 } from '../../lib/standalone-tests'
 
@@ -76,6 +77,32 @@ export function TeacherTestsPage() {
       return
     }
     navigate(`/teacher/tests/${assignment.data}/sections/${sections.data[0].id}/setup`)
+  }
+
+  async function openOrResumeAssignment(assignment: StandaloneTestAssignmentRow) {
+    setBusyAssignmentId(assignment.id)
+    setMessage('')
+    const runs = await listStandaloneRuns(assignment.id)
+    if (!runs.ok) {
+      setBusyAssignmentId(null)
+      setMessage(runs.error)
+      return
+    }
+    const resumable = runs.data.find((run) => ['in_progress', 'ready', 'draft'].includes(run.status))
+    const latestRun = [...runs.data].sort((a, b) => b.sessionNumber - a.sessionNumber || b.attemptNumber - a.attemptNumber)[0]
+    const targetRun = resumable ?? latestRun
+    if (targetRun) {
+      setBusyAssignmentId(null)
+      navigate(`/teacher/test-runs/${targetRun.id}?assignmentId=${assignment.id}`)
+      return
+    }
+    const sections = await listTestSections(assignment.packageVersionId)
+    setBusyAssignmentId(null)
+    if (!sections.ok || !sections.data[0]) {
+      setMessage(sections.ok ? 'Package has no sessions.' : sections.error)
+      return
+    }
+    navigate(`/teacher/tests/${assignment.id}/sections/${sections.data[0].id}/setup`)
   }
 
   async function removeAssignment(assignment: StandaloneTestAssignmentRow) {
@@ -263,6 +290,15 @@ export function TeacherTestsPage() {
                     </td>
                     <td>
                       <div className="test-assignment-actions">
+                        <button
+                          type="button"
+                          className="ghost"
+                          onClick={() => void openOrResumeAssignment(assignment)}
+                          disabled={busyAssignmentId === assignment.id}
+                          title="Open or resume the latest test session"
+                        >
+                          {assignment.status === 'completed' ? <ExternalLink className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />} Open
+                        </button>
                         <Link
                           className="btn ghost"
                           to={`/teacher/tests/analysis/${assignment.id}`}

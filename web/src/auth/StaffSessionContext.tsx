@@ -204,12 +204,16 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
     let cancelled = false
     void sb.auth.getUser().then(({ data }) => {
       if (!cancelled) {
-        setUser(data.user ?? null)
+        const nextUser = data.user ?? null
+        setRolesLoading(Boolean(nextUser))
+        setUser(nextUser)
         setReady(true)
       }
     })
     const { data } = sb.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
+      const nextUser = session?.user ?? null
+      setRolesLoading(Boolean(nextUser))
+      setUser(nextUser)
       setReady(true)
     })
     return () => {

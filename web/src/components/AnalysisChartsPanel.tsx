@@ -52,8 +52,8 @@ type Props = {
 }
 
 const METRIC_COLORS: Partial<Record<MetricKey, string>> = {
-  rfc: '#dc2626',
-  rac: '#059669',
+  rfc: '#d97706',
+  rac: '#16a34a',
   average_performance: '#4f46e5',
   purple_mastery_rate: '#7c3aed',
   clarification_rate: '#0891b2',
@@ -151,17 +151,22 @@ function colorByDay(
   })
 }
 
+function metricDisplayLabel(name: string): string {
+  return name === 'rac' || name.toUpperCase() === 'RAC' ? '%c' : name
+}
+
 function pctTooltip(value: number | string | undefined, name: string) {
-  if (value == null || value === '') return [String(value), name]
+  const label = metricDisplayLabel(name)
+  if (value == null || value === '') return [String(value), label]
   const n = typeof value === 'number' ? value : Number(value)
-  if (Number.isNaN(n)) return [String(value), name]
+  if (Number.isNaN(n)) return [String(value), label]
   if (name.toLowerCase().includes('avg') || name.toLowerCase().includes('score')) {
-    return [n.toFixed(2), name]
+    return [n.toFixed(2), label]
   }
   if (name.toLowerCase().includes('rfc') || name.toLowerCase().includes('rac') || name.includes('%')) {
-    return [`${n}%`, name]
+    return [`${n}%`, label]
   }
-  return [String(n), name]
+  return [String(n), label]
 }
 
 /**
@@ -190,7 +195,7 @@ export function AnalysisChartsPanel({
         : FALLBACK_METRICS
     return keys.map((key) => ({
       key,
-      label: metricSettings?.metrics.find((m) => m.key === key)?.label ?? key,
+      label: key === 'rac' ? '%c' : (metricSettings?.metrics.find((m) => m.key === key)?.label ?? key),
       color: METRIC_COLORS[key] ?? '#64748b',
     }))
   }, [metricSettings])
@@ -597,8 +602,8 @@ export function AnalysisChartsPanel({
         <div className="analysis-charts-grid">
           <article className="analysis-chart-card">
             <header className="analysis-chart-card-head">
-              <h3>RFC &amp; RAC by day</h3>
-              <span className="meta">Line · lower RFC better</span>
+              <h3>RFC &amp; %c by day</h3>
+              <span className="meta">Line · lower RFC and higher %c are better</span>
             </header>
             <div className="analysis-chart-body">{trendChart('line', 240)}</div>
           </article>

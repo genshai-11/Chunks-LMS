@@ -278,7 +278,7 @@ export function ProgressReportPanel({
                 <tr>
                   <th scope="col">Learner</th>
                   <th scope="col">Attempts</th>
-                  <th scope="col">RAC</th>
+                  <th scope="col">%c</th>
                   <th scope="col">RFC</th>
                 </tr>
               </thead>

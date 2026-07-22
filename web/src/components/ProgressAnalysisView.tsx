@@ -92,7 +92,7 @@ function pct(n: number, total: number): number {
   return total > 0 ? Math.round((n / total) * 100) : 0
 }
 
-/** RFC↑ = more struggle (worse). RAC↑ = more success (better). */
+/** RFC↑ = more struggle (worse). %c↑ = more success (better). */
 function trendTone(key: 'rfc' | 'rac', delta: number | null | undefined): 'up' | 'down' | 'flat' {
   if (delta == null || Math.abs(delta) < 0.05) return 'flat'
   if (key === 'rfc') return delta < 0 ? 'up' : 'down' // lower RFC is better
@@ -139,7 +139,7 @@ function pickMetric(
 
 /**
  * Teacher + learner Analysis dashboard.
- * Focus: RFC / RAC, color mix, per-day session trend — not the full metrics catalog.
+ * Focus: RFC / %c, color mix, per-day session trend — not the full metrics catalog.
  */
 export function ProgressAnalysisView({
   mode,
@@ -378,6 +378,7 @@ export function ProgressAnalysisView({
   }, [scopedLedger, orderedSessions, courseId, classId, focusLearnerId, dayMetricOptions, selectedLearnerIds])
 
   function metricLabel(key: MetricKey): string {
+    if (key === 'rac') return '%c'
     return metricSettings?.metrics.find((m) => m.key === key)?.label ?? key
   }
 
@@ -727,11 +728,11 @@ export function ProgressAnalysisView({
             </div>
             <div className={`stat-card analysis-kpi-rac${racTone === 'up' ? ' is-good' : racTone === 'down' ? ' is-warn' : ''}`}>
               <p className="stat-label flex items-center gap-1">
-                <span>Success (RAC)</span>
+                <span>Success (%c)</span>
                 <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
                   <Info className="h-3.5 w-3.5" />
                   <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
-                    <strong>Success (RAC)</strong> = (Green + Purple) ÷ sample. Higher RAC is better.
+                    <strong>Success (%c)</strong> = (Green + Purple) ÷ sample. Higher %c is better.
                   </span>
                 </span>
               </p>
@@ -978,7 +979,7 @@ export function ProgressAnalysisView({
       {tab === 'charts' && (
         <div className="analysis-tab-body">
           <p className="analysis-plain-hint">
-            Multi-chart board: line &amp; bar for RFC/RAC by day, stacked colors, pie mix.
+            Multi-chart board: line &amp; bar for RFC/%c by day, stacked colors, pie mix.
             Respects <strong>Who</strong> filter (class or one learner) above.
           </p>
           <AnalysisChartsPanel
@@ -1065,8 +1066,8 @@ export function ProgressAnalysisView({
                       </th>
                     ) : null}
                     {visibleDayColumns.includes('rac') ? (
-                      <th scope="col" title="RAC change vs previous day (percentage points)">
-                        Δ RAC
+                      <th scope="col" title="%c change vs previous day (percentage points)">
+                        Δ %c
                       </th>
                     ) : null}
                     <th scope="col" />
@@ -1169,7 +1170,7 @@ export function ProgressAnalysisView({
                   </th>
                   <th scope="col">RFC</th>
                   <th scope="col">Δ RFC</th>
-                  <th scope="col">RAC</th>
+                  <th scope="col">%c</th>
                   <th scope="col">Avg</th>
                   <th scope="col" />
                 </tr>

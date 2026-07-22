@@ -20,7 +20,7 @@ export type MetricSettingsState = {
 
 const LABELS: Record<MetricKey, string> = {
   rfc: 'RFC',
-  rac: 'RAC',
+  rac: '%c',
   average_performance: 'Average performance',
   purple_mastery_rate: 'Purple mastery',
   clarification_rate: 'Clarification rate',

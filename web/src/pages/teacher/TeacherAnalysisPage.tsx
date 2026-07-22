@@ -94,7 +94,7 @@ export function TeacherAnalysisPage() {
     <>
       <PageHeader
         title="Analysis"
-        subtitle={`${course.code} · ${classRow.name} · focus on RFC/RAC by day & learner`}
+        subtitle={`${course.code} · ${classRow.name} · focus on RFC/%c by day & learner`}
         actions={
           <Link to="/teacher/session" className="btn ghost">
             Session

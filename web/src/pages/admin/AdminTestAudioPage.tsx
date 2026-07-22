@@ -619,11 +619,11 @@ export function AdminTestAudioPage() {
           </label>
         </div>
         <div className="audio-prep-metrics">
-          <span className="badge">CVR {snapshot?.targetCvrOhm ?? '—'}</span>
-          <span className="badge">CCI {snapshot?.cciValue ?? '—'}</span>
+          <span className="badge metric-cvr">CVR {snapshot?.targetCvrOhm == null ? '—' : `${snapshot.targetCvrOhm} Ω`}</span>
+          <span className="badge metric-cci">CCI {snapshot?.cciValue == null ? '—' : `${snapshot.cciValue}A`}</span>
           <span className="badge">{snapshot?.cciCategoryLabel ?? 'CCI unmapped'}</span>
-          <span className="badge">
-            CPD {snapshot ? Math.round(snapshot.targetCvrOhm * snapshot.cciValue * 100) / 100 : '—'}
+          <span className="badge metric-cpd">
+            CPD {snapshot ? `${Math.round(snapshot.targetCvrOhm * snapshot.cciValue * 100) / 100}V` : '—'}
           </span>
           <span className={`badge ${readiness.ready ? 'success' : 'experimental'}`}>
             {readiness.approved}/11 approved

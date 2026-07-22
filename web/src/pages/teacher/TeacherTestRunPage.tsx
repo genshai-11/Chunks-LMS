@@ -102,6 +102,34 @@ function cpdValue(item: TestItem | null | undefined): number | null {
   return Number.isFinite(n) ? n : null
 }
 
+function metricNumber(value: unknown): number | null {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : null
+}
+
+function formatOhm(value: unknown): string {
+  const n = metricNumber(value)
+  return n == null ? '—' : `${n} Ω`
+}
+
+function formatAmp(value: unknown): string {
+  const n = metricNumber(value)
+  return n == null ? '—' : `${n}A`
+}
+
+function formatVolt(value: unknown): string {
+  const n = metricNumber(value)
+  return n == null ? '—' : `${Math.round(n * 100) / 100}V`
+}
+
+function formatVoltRange(min: unknown, max: unknown): string {
+  const a = metricNumber(min)
+  const b = metricNumber(max)
+  if (a == null && b == null) return '—'
+  if (a != null && b != null) return `${formatVolt(a)}–${formatVolt(b)}`
+  return formatVolt(a ?? b)
+}
+
 function readSavedRailWidth(): number {
   try {
     const n = Number(window.localStorage.getItem(RAIL_W_KEY))
@@ -796,8 +824,8 @@ export function TeacherTestRunPage() {
               <p className="observe-rail-name">{learnerName}</p>
               <div className="observe-meta-row live-test-rail-meta">
                 <span className="observe-learner-rfc">RFC {summaryMetrics.rfc}%</span>
-                <span className="observe-learner-rfc">RAC {summaryMetrics.rac}%</span>
-                <span className="observe-learner-rfc">CPD {summaryMetrics.avgCpd || '—'}</span>
+                <span className="observe-learner-rfc">%c {summaryMetrics.rac}%</span>
+                <span className="observe-learner-rfc">CPD {formatVolt(summaryMetrics.avgCpd)}</span>
               </div>
               <p className="observe-rail-n">{completedCount}/{items.length} scored</p>
             </>
@@ -810,7 +838,7 @@ export function TeacherTestRunPage() {
               <div className="observe-heat-summary">
                 <span className="observe-heat-metric">Items <strong>{items.length}</strong></span>
                 <span className="observe-heat-metric muted">Done <strong>{completedCount}</strong></span>
-                <span className="observe-heat-metric tabular">CPD <strong>{summaryMetrics.minCpd ?? '—'}–{summaryMetrics.maxCpd ?? '—'}</strong></span>
+                <span className="observe-heat-metric tabular">CPD <strong>{formatVoltRange(summaryMetrics.minCpd, summaryMetrics.maxCpd)}</strong></span>
                 <span className="observe-heat-counts" aria-label="Color counts">
                   {COLORS.map((c) => (
                     <span key={c.key} className={`observe-heat-count is-${c.key}`} title={c.label}>
@@ -1052,12 +1080,12 @@ export function TeacherTestRunPage() {
               </div>
 
               <div className="live-test-cpd-row">
-                <span>CVR {currentItem?.cvr ?? '—'}</span>
-                <span>CCI {currentItem?.cci ?? '—'}</span>
-                <span className="is-strong">CPD {currentCpd ?? '—'}</span>
-                <span>Min {summaryMetrics.minCpd ?? '—'}</span>
-                <span>Max {summaryMetrics.maxCpd ?? '—'}</span>
-                <span>Avg {summaryMetrics.avgCpd || '—'}</span>
+                <span className="metric-cvr">CVR {formatOhm(currentItem?.cvr)}</span>
+                <span className="metric-cci">CCI {formatAmp(currentItem?.cci)}</span>
+                <span className="is-strong metric-cpd">CPD {formatVolt(currentCpd)}</span>
+                <span className="metric-cpd">Min {formatVolt(summaryMetrics.minCpd)}</span>
+                <span className="metric-cpd">Max {formatVolt(summaryMetrics.maxCpd)}</span>
+                <span className="metric-cpd">Avg {formatVolt(summaryMetrics.avgCpd)}</span>
               </div>
             </div>
           </>
@@ -1065,18 +1093,18 @@ export function TeacherTestRunPage() {
           <div className="min-h-0 w-full max-w-4xl overflow-y-auto p-4">
             <Panel icon={BarChart3} title={`Màn hình Ghi nhận & Xem Kết quả · ${learnerName}`} description={`Tổng số câu trong Package: ${items.length} | Đã hoàn thành: ${summaryMetrics.finalized}/${items.length}`} collapsible={false}>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-3">
-                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-center"><div className="text-2xl font-bold text-red-500">{summaryMetrics.redCount}</div><div className="text-xs text-red-400 font-semibold">0 · Đỏ</div></div>
-                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-center"><div className="text-2xl font-bold text-amber-500">{summaryMetrics.yellowCount}</div><div className="text-xs text-amber-400 font-semibold">1 · Vàng</div></div>
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center"><div className="text-2xl font-bold text-emerald-500">{summaryMetrics.greenCount}</div><div className="text-xs text-emerald-400 font-semibold">2 · Xanh</div></div>
-                <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/30 text-center"><div className="text-2xl font-bold text-purple-500">{summaryMetrics.purpleCount}</div><div className="text-xs text-purple-400 font-semibold">3 · Tím</div></div>
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-center"><div className="text-2xl font-bold text-red-500">{summaryMetrics.redCount}</div><div className="text-xs text-red-400 font-semibold">0 · Red</div></div>
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-center"><div className="text-2xl font-bold text-amber-500">{summaryMetrics.yellowCount}</div><div className="text-xs text-amber-400 font-semibold">1 · Yellow</div></div>
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center"><div className="text-2xl font-bold text-emerald-500">{summaryMetrics.greenCount}</div><div className="text-xs text-emerald-400 font-semibold">2 · Green</div></div>
+                <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/30 text-center"><div className="text-2xl font-bold text-purple-500">{summaryMetrics.purpleCount}</div><div className="text-xs text-purple-400 font-semibold">3 · Purple</div></div>
               </div>
 
               <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-900 p-4 text-xs font-mono text-white shadow-inner sm:grid-cols-5">
                 <div><span className="text-slate-400">RFC </span><strong className="text-amber-400">{summaryMetrics.rfc}%</strong></div>
-                <div><span className="text-slate-400">RAC </span><strong className="text-emerald-400">{summaryMetrics.rac}%</strong></div>
-                <div><span className="text-slate-400">CPD min </span><strong className="text-indigo-300">{summaryMetrics.minCpd ?? '—'}</strong></div>
-                <div><span className="text-slate-400">CPD max </span><strong className="text-indigo-300">{summaryMetrics.maxCpd ?? '—'}</strong></div>
-                <div><span className="text-slate-400">CPD avg </span><strong className="text-indigo-300">{summaryMetrics.avgCpd || '—'}</strong></div>
+                <div><span className="text-slate-400">%c </span><strong className="text-emerald-400">{summaryMetrics.rac}%</strong></div>
+                <div><span className="text-slate-400">CPD min </span><strong className="text-blue-300">{formatVolt(summaryMetrics.minCpd)}</strong></div>
+                <div><span className="text-slate-400">CPD max </span><strong className="text-blue-300">{formatVolt(summaryMetrics.maxCpd)}</strong></div>
+                <div><span className="text-slate-400">CPD avg </span><strong className="text-blue-300">{formatVolt(summaryMetrics.avgCpd)}</strong></div>
               </div>
 
               <div className="space-y-2 pt-5">
@@ -1089,7 +1117,7 @@ export function TeacherTestRunPage() {
                       <Tooltip content={({ active, payload }) => {
                         if (!active || !payload?.length) return null
                         const d = payload[0].payload
-                        return <div className="p-3 rounded-lg bg-slate-900 text-white text-xs space-y-1 shadow-lg border border-slate-800"><div className="font-bold text-indigo-400">{d.label}: {d.prompt}</div><div>CPD: <strong>{d.cpd}</strong> (CVR {d.cvr} × CCI {d.cci})</div><div className="capitalize">Kết quả: <strong>{d.colorKey}</strong></div></div>
+                        return <div className="p-3 rounded-lg bg-slate-900 text-white text-xs space-y-1 shadow-lg border border-slate-800"><div className="font-bold text-blue-400">{d.label}: {d.prompt}</div><div>CPD: <strong className="text-blue-300">{formatVolt(d.cpd)}</strong> (CVR <span className="text-rose-300">{formatOhm(d.cvr)}</span> × CCI <span className="text-emerald-300">{formatAmp(d.cci)}</span>)</div><div className="capitalize">Result: <strong>{d.colorKey}</strong></div></div>
                       }} />
                       <Bar dataKey="cpd" radius={[4, 4, 0, 0]}>{chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.hex} />)}</Bar>
                     </BarChart>

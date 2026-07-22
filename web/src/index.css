@@ -4250,6 +4250,18 @@
   .resource-audio-badges .badge {
     @apply w-fit px-1.5 py-0.5 text-[10px];
   }
+  .badge.metric-cvr,
+  .metric-cvr-text {
+    @apply border-rose-100 bg-rose-50 text-rose-700;
+  }
+  .badge.metric-cci,
+  .metric-cci-text {
+    @apply border-emerald-100 bg-emerald-50 text-emerald-700;
+  }
+  .badge.metric-cpd,
+  .metric-cpd-text {
+    @apply border-blue-100 bg-blue-50 text-blue-700;
+  }
 
   .compact-resource-table table {
     @apply min-w-[46rem];
@@ -4654,8 +4666,15 @@
   .live-test-cpd-row span {
     @apply rounded-lg bg-slate-900/70 px-2 py-1 text-slate-200;
   }
+  .live-test-cpd-row .metric-cvr {
+    @apply bg-rose-950/70 font-bold text-rose-100;
+  }
+  .live-test-cpd-row .metric-cci {
+    @apply bg-emerald-950/70 font-bold text-emerald-100;
+  }
+  .live-test-cpd-row .metric-cpd,
   .live-test-cpd-row .is-strong {
-    @apply bg-emerald-900/70 font-bold text-emerald-100;
+    @apply bg-blue-950/70 font-bold text-blue-100;
   }
 
   .live-test-audio-el {
@@ -5040,6 +5059,24 @@
   }
   .standalone-metric-card strong {
     @apply text-slate-950;
+  }
+  .standalone-metric-card.metric-rfc svg,
+  .standalone-metric-card.metric-rfc strong {
+    @apply text-amber-600;
+  }
+  .standalone-metric-card.metric-percent-c svg,
+  .standalone-metric-card.metric-percent-c strong,
+  .standalone-metric-card.metric-cci svg,
+  .standalone-metric-card.metric-cci strong {
+    @apply text-emerald-600;
+  }
+  .standalone-metric-card.metric-cvr svg,
+  .standalone-metric-card.metric-cvr strong {
+    @apply text-rose-600;
+  }
+  .standalone-metric-card.metric-cpd svg,
+  .standalone-metric-card.metric-cpd strong {
+    @apply text-blue-600;
   }
   .standalone-chart-wrap {
     @apply border-slate-200 bg-white;

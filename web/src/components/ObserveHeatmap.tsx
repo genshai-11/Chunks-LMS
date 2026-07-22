@@ -12,7 +12,7 @@ type Props = {
 }
 
 /**
- * Compact Q map + RFC/RAC counts. Column mode for left rail.
+ * Compact Q map + RFC/%c counts. Column mode for left rail.
  */
 export function ObserveHeatmap({
   capture,
@@ -22,7 +22,7 @@ export function ObserveHeatmap({
   layout = 'column',
 }: Props) {
   const summary = sessionColorSummary(capture)
-  // Sample size for RFC/RAC — not probe "n" (probe depth uses probeCount elsewhere).
+  // Sample size for RFC/%c — not probe "n" (probe depth uses probeCount elsewhere).
   const finalized = summary.done
   const ry = summary.byColor.red + summary.byColor.yellow
   const gp = summary.byColor.green + summary.byColor.purple
@@ -46,7 +46,7 @@ export function ObserveHeatmap({
           RFC <strong>{finalized ? `${rfcPct}%` : '—'}</strong>
         </span>
         <span className="observe-heat-metric muted" title="(Green+Purple) / finalized questions">
-          RAC <strong>{finalized ? `${racPct}%` : '—'}</strong>
+          %c <strong>{finalized ? `${racPct}%` : '—'}</strong>
         </span>
         <span
           className="observe-heat-metric muted tabular"

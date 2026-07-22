@@ -33,10 +33,18 @@ const COLOR_HEX: Record<string, string> = {
 }
 
 const COLOR_LABELS: Record<ResultColor, string> = {
-  red: 'Đỏ',
-  yellow: 'Vàng',
-  green: 'Xanh',
-  purple: 'Tím',
+  red: 'Red',
+  yellow: 'Yellow',
+  green: 'Green',
+  purple: 'Purple',
+}
+
+const METRIC_HEX = {
+  rfc: '#d97706',
+  percentC: '#16a34a',
+  cvr: '#dc2626',
+  cci: '#16a34a',
+  cpd: '#2563eb',
 }
 
 const COLOR_SCORE: Record<ResultColor, number> = {
@@ -65,6 +73,18 @@ function num(value: unknown, fallback = 0): number {
 
 function pct(value: number): string {
   return `${Math.round(value)}%`
+}
+
+function ohm(value: number): string {
+  return `${value.toFixed(1)} Ω`
+}
+
+function amp(value: number): string {
+  return `${value.toFixed(1)}A`
+}
+
+function volt(value: number): string {
+  return `${value.toFixed(1)}V`
 }
 
 function resultScore(color: ResultColor | 'pending', snap: any): number {
@@ -138,7 +158,7 @@ export function TeacherTestAnalysisPage() {
         const finalCpd = Number((baseCpd * score).toFixed(2))
         return {
           index: index + 1,
-          label: `Câu ${index + 1}`,
+          label: `Question ${index + 1}`,
           shortLabel: `Q${index + 1}`,
           prompt: String(item.prompt_text ?? ''),
           session: num(item.session_number, run?.sessionNumber ?? 1),
@@ -181,7 +201,7 @@ export function TeacherTestAnalysisPage() {
       finalized: finalized.length,
       total: chartRows.length,
       rfc: finalized.length ? (redYellow / count) * 100 : 0,
-      rac: finalized.length ? (greenPurple / count) * 100 : 0,
+      percentC: finalized.length ? (greenPurple / count) * 100 : 0,
       avgCvr: finalized.reduce((sum, row) => sum + row.cvr, 0) / count,
       avgCci: finalized.reduce((sum, row) => sum + row.cci, 0) / count,
       avgCpd: finalized.reduce((sum, row) => sum + row.cpd, 0) / count,
@@ -189,7 +209,7 @@ export function TeacherTestAnalysisPage() {
     }
   }, [chartRows])
 
-  const rfcTimelineRows = useMemo(() => {
+  const percentCTimelineRows = useMemo(() => {
     const map = new Map<number, typeof chartRows>()
     for (const row of chartRows) {
       if (!map.has(row.session)) map.set(row.session, [])
@@ -208,7 +228,7 @@ export function TeacherTestAnalysisPage() {
           session,
           label: `Session ${session}`,
           shortLabel: `S${session}`,
-          rfc: finalized.length ? Math.round(((red + yellow) / denom) * 100) : 0,
+          percentC: finalized.length ? Math.round(((green + purple) / denom) * 100) : 0,
           finalized: finalized.length,
           red,
           yellow,
@@ -251,30 +271,30 @@ export function TeacherTestAnalysisPage() {
       />
 
       <div className="standalone-analysis-grid">
-        <div className="standalone-metric-card">
-          <Activity className="h-5 w-5 text-amber-300" />
+        <div className="standalone-metric-card metric-rfc">
+          <Activity className="h-5 w-5" />
           <span>RFC</span>
           <strong>{pct(metrics.rfc)}</strong>
         </div>
-        <div className="standalone-metric-card">
-          <Target className="h-5 w-5 text-emerald-300" />
-          <span>RAC</span>
-          <strong>{pct(metrics.rac)}</strong>
+        <div className="standalone-metric-card metric-percent-c">
+          <Target className="h-5 w-5" />
+          <span>%c</span>
+          <strong>{pct(metrics.percentC)}</strong>
         </div>
-        <div className="standalone-metric-card">
-          <Gauge className="h-5 w-5 text-indigo-300" />
+        <div className="standalone-metric-card metric-cvr">
+          <Gauge className="h-5 w-5" />
           <span>Avg CVR</span>
-          <strong>{metrics.avgCvr.toFixed(1)}</strong>
+          <strong>{ohm(metrics.avgCvr)}</strong>
         </div>
-        <div className="standalone-metric-card">
-          <Brain className="h-5 w-5 text-purple-300" />
+        <div className="standalone-metric-card metric-cci">
+          <Brain className="h-5 w-5" />
           <span>Avg CCI</span>
-          <strong>{metrics.avgCci.toFixed(1)}</strong>
+          <strong>{amp(metrics.avgCci)}</strong>
         </div>
-        <div className="standalone-metric-card">
-          <Zap className="h-5 w-5 text-cyan-300" />
+        <div className="standalone-metric-card metric-cpd">
+          <Zap className="h-5 w-5" />
           <span>Avg Final CPD</span>
-          <strong>{metrics.avgCpd.toFixed(1)}</strong>
+          <strong>{volt(metrics.avgCpd)}</strong>
         </div>
         <div className="standalone-metric-card">
           <LineChartIcon className="h-5 w-5 text-rose-300" />
@@ -289,7 +309,7 @@ export function TeacherTestAnalysisPage() {
             <Gauge className="h-4 w-4" />
             <div>
               <strong>Filters</strong>
-              <span>{chartRows.length}/{rows.length} câu</span>
+              <span>{chartRows.length}/{rows.length} questions</span>
             </div>
           </div>
 
@@ -366,8 +386,8 @@ export function TeacherTestAnalysisPage() {
           <Panel
             className="test-analysis-panel"
             icon={LineChartIcon}
-            title="CPD & Câu"
-              description={`${metrics.finalized}/${metrics.total} câu finalized · Final CPD = CVR × CCI × điểm màu.`}
+            title="CPD by Question"
+              description={`${metrics.finalized}/${metrics.total} finalized questions · Final CPD = CVR × CCI × color score.`}
               collapsible={false}
             >
               <div className="standalone-chart-wrap">
@@ -379,7 +399,8 @@ export function TeacherTestAnalysisPage() {
                       stroke="#334155"
                       fontSize={11}
                       tickLine={false}
-                      label={{ value: 'Final CPD', angle: -90, position: 'insideLeft', fill: '#334155' }}
+                      tickFormatter={(value) => `${value}V`}
+                      label={{ value: 'Final CPD (V)', angle: -90, position: 'insideLeft', fill: METRIC_HEX.cpd }}
                     />
                     <Tooltip
                       cursor={{ stroke: '#94a3b8', strokeDasharray: '3 3' }}
@@ -389,8 +410,9 @@ export function TeacherTestAnalysisPage() {
                         return (
                           <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
                             <div className="mb-1 font-black text-slate-950">{row.label}</div>
-                            <div>Final CPD: <strong style={{ color: row.colorHex }}>{row.cpd}</strong></div>
-                            <div>Formula: {row.baseCpd} × {row.resultScore}</div>
+                            <div>Final CPD: <strong style={{ color: METRIC_HEX.cpd }}>{volt(row.cpd)}</strong></div>
+                            <div>Formula: {volt(row.baseCpd)} × {row.resultScore}</div>
+                            <div>CVR: <strong style={{ color: METRIC_HEX.cvr }}>{ohm(row.cvr)}</strong> · CCI: <strong style={{ color: METRIC_HEX.cci }}>{amp(row.cci)}</strong></div>
                             <div>Result: <strong className="capitalize" style={{ color: row.colorHex }}>{row.color}</strong></div>
                             <div>Session: <strong>{row.session}</strong> · {row.language}</div>
                             {row.prompt ? <div className="mt-1 max-w-xs text-slate-600">“{row.prompt}”</div> : null}
@@ -402,7 +424,7 @@ export function TeacherTestAnalysisPage() {
                       type="monotone"
                       dataKey="cpd"
                       name="Final CPD"
-                      stroke="#4f46e5"
+                      stroke={METRIC_HEX.cpd}
                       strokeWidth={3}
                       dot={<ResultDot />}
                       activeDot={<ResultDot />}
@@ -410,7 +432,7 @@ export function TeacherTestAnalysisPage() {
                     >
                       {showChartLabels ? <LabelList dataKey="cpd" position="top" className="test-analysis-chart-label" /> : null}
                     </Line>
-                    <Brush dataKey="label" height={24} stroke="#4f46e5" travellerWidth={10} />
+                    <Brush dataKey="label" height={24} stroke={METRIC_HEX.cpd} travellerWidth={10} />
                   </RechartsLineChart>
                 </ResponsiveContainer>
               </div>
@@ -420,13 +442,13 @@ export function TeacherTestAnalysisPage() {
             <Panel
               className="test-analysis-panel"
               icon={LineChartIcon}
-              title="RFC theo session"
-              description="RFC% = tỷ lệ Đỏ + Vàng trên các câu finalized trong từng session."
+              title="%c by Session"
+              description="%c = Green + Purple results divided by finalized questions in each session."
               collapsible={false}
             >
               <div className="standalone-chart-wrap">
                 <ResponsiveContainer width="100%" height="100%">
-                  <RechartsLineChart data={rfcTimelineRows} margin={{ top: 20, right: 20, bottom: 8, left: -12 }}>
+                  <RechartsLineChart data={percentCTimelineRows} margin={{ top: 20, right: 20, bottom: 8, left: -12 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" />
                     <XAxis dataKey="shortLabel" stroke="#334155" fontSize={12} tickLine={false} />
                     <YAxis
@@ -435,23 +457,23 @@ export function TeacherTestAnalysisPage() {
                       stroke="#334155"
                       fontSize={11}
                       tickLine={false}
-                      label={{ value: 'RFC %', angle: -90, position: 'insideLeft', fill: '#334155' }}
+                      label={{ value: '%c', angle: -90, position: 'insideLeft', fill: METRIC_HEX.percentC }}
                     />
                     <Tooltip
-                      cursor={{ stroke: '#f59e0b', strokeDasharray: '3 3' }}
+                      cursor={{ stroke: METRIC_HEX.percentC, strokeDasharray: '3 3' }}
                       content={({ active, payload }) => {
                         if (!active || !payload?.length) return null
                         const row = payload[0]?.payload
                         return (
                           <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
                             <div className="mb-1 font-black text-slate-950">{row.label}</div>
-                            <div>RFC: <strong className="text-amber-700">{row.rfc}%</strong></div>
-                            <div>Finalized: <strong>{row.finalized}</strong> câu</div>
+                            <div>%c: <strong style={{ color: METRIC_HEX.percentC }}>{row.percentC}%</strong></div>
+                            <div>Finalized: <strong>{row.finalized}</strong> questions</div>
                             <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1">
-                              <span style={{ color: COLOR_HEX.red }}>Đỏ: {row.red}</span>
-                              <span style={{ color: COLOR_HEX.yellow }}>Vàng: {row.yellow}</span>
-                              <span style={{ color: COLOR_HEX.green }}>Xanh: {row.green}</span>
-                              <span style={{ color: COLOR_HEX.purple }}>Tím: {row.purple}</span>
+                              <span style={{ color: COLOR_HEX.red }}>Red: {row.red}</span>
+                              <span style={{ color: COLOR_HEX.yellow }}>Yellow: {row.yellow}</span>
+                              <span style={{ color: COLOR_HEX.green }}>Green: {row.green}</span>
+                              <span style={{ color: COLOR_HEX.purple }}>Purple: {row.purple}</span>
                             </div>
                           </div>
                         )
@@ -459,17 +481,17 @@ export function TeacherTestAnalysisPage() {
                     />
                     <Line
                       type="monotone"
-                      dataKey="rfc"
-                      name="RFC %"
-                      stroke="#d97706"
+                      dataKey="percentC"
+                      name="%c"
+                      stroke={METRIC_HEX.percentC}
                       strokeWidth={3}
-                      dot={{ r: 5, fill: '#d97706', stroke: '#ffffff', strokeWidth: 2 }}
-                      activeDot={{ r: 7, fill: '#d97706', stroke: '#0f172a', strokeWidth: 2 }}
+                      dot={{ r: 5, fill: METRIC_HEX.percentC, stroke: '#ffffff', strokeWidth: 2 }}
+                      activeDot={{ r: 7, fill: METRIC_HEX.percentC, stroke: '#0f172a', strokeWidth: 2 }}
                       isAnimationActive={false}
                     >
-                      {showChartLabels ? <LabelList dataKey="rfc" position="top" formatter={(value: unknown) => `${value}%`} className="test-analysis-chart-label" /> : null}
+                      {showChartLabels ? <LabelList dataKey="percentC" position="top" formatter={(value: unknown) => `${value}%`} className="test-analysis-chart-label" /> : null}
                     </Line>
-                    <Brush dataKey="shortLabel" height={24} stroke="#d97706" travellerWidth={10} />
+                    <Brush dataKey="shortLabel" height={24} stroke={METRIC_HEX.percentC} travellerWidth={10} />
                   </RechartsLineChart>
                 </ResponsiveContainer>
               </div>
@@ -478,8 +500,8 @@ export function TeacherTestAnalysisPage() {
             <Panel
               className="test-analysis-panel"
               icon={PieChartIcon}
-            title="Phân bổ % kết quả theo màu"
-            description="Tỷ lệ các kết quả đã finalized theo 4 màu: Đỏ, Vàng, Xanh, Tím."
+            title="Result Color Distribution"
+            description="Distribution of finalized results across Red, Yellow, Green, and Purple."
             collapsible={false}
           >
             <div className="standalone-chart-wrap">
@@ -492,8 +514,8 @@ export function TeacherTestAnalysisPage() {
                       return (
                         <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
                           <div className="font-black" style={{ color: row.fill }}>{row.name}</div>
-                          <div>Số câu: <strong>{row.count}</strong></div>
-                          <div>Tỷ lệ: <strong>{row.percent}%</strong></div>
+                          <div>Questions: <strong>{row.count}</strong></div>
+                          <div>Share: <strong>{row.percent}%</strong></div>
                         </div>
                       )
                     }}

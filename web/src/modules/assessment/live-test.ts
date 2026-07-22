@@ -95,9 +95,13 @@ export function introAudioAssetIdForLanguage(block: LiveTestBlock, language: Pro
   return language === 'en' ? block.introAudioEnAssetId : block.introAudioViAssetId
 }
 
+function unitRange(min: number | null | undefined, max: number | null | undefined, unit: string): string {
+  if (min == null && max == null) return '—'
+  if (min === max || max == null) return `${min}${unit}`
+  if (min == null) return `${max}${unit}`
+  return `${min}–${max}${unit}`
+}
+
 export function blockSummary(block: LiveTestBlock): string {
-  const cci = block.cciMin === block.cciMax ? block.cciMin : `${block.cciMin ?? '—'}–${block.cciMax ?? '—'}`
-  const cvr = block.cvrMin === block.cvrMax ? block.cvrMin : `${block.cvrMin ?? '—'}–${block.cvrMax ?? '—'}`
-  const cpd = block.cpdMin === block.cpdMax ? block.cpdMin : `${block.cpdMin ?? '—'}–${block.cpdMax ?? '—'}`
-  return `CCI ${cci} · CVR ${cvr} · CPD ${cpd}`
+  return `CCI ${unitRange(block.cciMin, block.cciMax, 'A')} · CVR ${unitRange(block.cvrMin, block.cvrMax, ' Ω')} · CPD ${unitRange(block.cpdMin, block.cpdMax, 'V')}`
 }

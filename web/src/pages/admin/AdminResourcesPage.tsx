@@ -53,6 +53,18 @@ type PackageScope = {
   version: TestPackageVersion
 }
 type ResourceTab = 'sessions' | 'items' | 'cci' | 'audio'
+
+function metricOhm(value: number | null | undefined): string {
+  return value == null ? '—' : `${value} Ω`
+}
+
+function metricAmp(value: number | null | undefined): string {
+  return value == null ? '—' : `${value}A`
+}
+
+function metricVolt(value: number | null | undefined): string {
+  return value == null ? '—' : `${Math.round(value * 100) / 100}V`
+}
 type ResourceLanguage = AudioLanguage | 'all'
 
 export function AdminResourcesPage() {
@@ -750,8 +762,8 @@ export function AdminResourcesPage() {
                             <div className="meta">{section.title}</div>
                           </td>
                           <td>
-                            <span className="badge">CVR {snap?.targetCvrOhm ?? '—'}</span>{' '}
-                            <span className="badge">CCI {snap?.cciValue ?? '—'}</span>
+                            <span className="badge metric-cvr">CVR {metricOhm(snap?.targetCvrOhm)}</span>{' '}
+                            <span className="badge metric-cci">CCI {metricAmp(snap?.cciValue)}</span>
                             <div className="meta">
                               {snap?.cciCategoryLabel ?? 'Unmapped'}
                               {category?.description ? ` · ${category.description}` : ''}
@@ -760,7 +772,7 @@ export function AdminResourcesPage() {
                           <td>
                             <strong>
                               {snap
-                                ? Math.round(snap.targetCvrOhm * snap.cciValue * 100) / 100
+                                ? metricVolt(snap.targetCvrOhm * snap.cciValue)
                                 : '—'}
                             </strong>
                           </td>
@@ -985,7 +997,7 @@ export function AdminResourcesPage() {
                                     {resourceLanguage !== 'all' ? <div>{translation ?? '—'}</div> : null}
                                     <span>
                                       TC {item.tc ?? '—'} · LC {item.lc ?? '—'} · TL{' '}
-                                      {item.tl ?? '—'} · CVR {item.measuredCvr ?? '—'}
+                                      {item.tl ?? '—'} · CVR {metricOhm(item.measuredCvr)}
                                     </span>
                                     <span>
                                       Terms: VI {item.termVi ?? '—'} · EN {item.termEn ?? '—'}
@@ -996,8 +1008,8 @@ export function AdminResourcesPage() {
                             )}
                           </td>
                           <td>
-                            <span className="badge">
-                              {item.measuredCvr ?? selectedSnapshot?.targetCvrOhm ?? '—'}
+                            <span className="badge metric-cvr">
+                              {metricOhm(item.measuredCvr ?? selectedSnapshot?.targetCvrOhm)}
                             </span>
                           </td>
                           <td>
@@ -1068,7 +1080,7 @@ export function AdminResourcesPage() {
                             </span>
                           </td>
                           <td>
-                            <strong>{category.value}</strong>
+                            <strong className="metric-cci-text">{metricAmp(category.value)}</strong>
                           </td>
                           <td>{category.description ?? '—'}</td>
                         </tr>

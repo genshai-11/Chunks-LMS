@@ -1512,7 +1512,7 @@ export function TeacherObservePage() {
                   </p>
                   {currentLiveTestItem ? (
                     <p className="mt-1 text-xs text-indigo-100/80">
-                      CCI {currentLiveTestItem.cciValue ?? '—'} · CVR {currentLiveTestItem.cvrValue ?? '—'} · CPD {currentLiveTestItem.cpdValue ?? '—'}
+                      CCI {currentLiveTestItem.cciValue == null ? '—' : `${currentLiveTestItem.cciValue}A`} · CVR {currentLiveTestItem.cvrValue == null ? '—' : `${currentLiveTestItem.cvrValue} Ω`} · CPD {currentLiveTestItem.cpdValue == null ? '—' : `${currentLiveTestItem.cpdValue}V`}
                     </p>
                   ) : null}
                 </div>

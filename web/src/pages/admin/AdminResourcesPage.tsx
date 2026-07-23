@@ -15,7 +15,10 @@ import { listActiveLearners } from '../../modules/roster/service'
 import { getSupabase } from '../../lib/supabase'
 import {
   createDraftTestItem,
+  createDraftTestPackage,
+  createDraftTestSection,
   deleteDraftTestItem,
+  deleteDraftTestSection,
   getSectionSnapshot,
   getTestPackagePublicationReadiness,
   listCciCategories,
@@ -27,6 +30,8 @@ import {
   listTestSections,
   publishTestPackageVersion,
   updateDraftTestItem,
+  updateDraftTestSection,
+  updateTestPackage,
   type TestPackagePublicationReadiness,
 } from '../../lib/test-packages'
 import {
@@ -90,6 +95,12 @@ export function AdminResourcesPage() {
   const [publishing, setPublishing] = useState(false)
   const [audioStatuses, setAudioStatuses] = useState<AudioTargetStatus[]>([])
   const [showItemDetails, setShowItemDetails] = useState(false)
+  const [showPackageBuilder, setShowPackageBuilder] = useState(false)
+  const [packageEditTitle, setPackageEditTitle] = useState('')
+  const [newPackageDraft, setNewPackageDraft] = useState({ title: '', version: 'v1', sessions: '8', items: '1' })
+  const [showAddSession, setShowAddSession] = useState(false)
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null)
+  const [sessionDraft, setSessionDraft] = useState({ title: '', targetCvr: '1' })
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([])
   const [showAddItem, setShowAddItem] = useState(false)
@@ -210,7 +221,12 @@ export function AdminResourcesPage() {
 
   const selectedScope = scopes.find((scope) => scope.version.id === versionId) ?? null
   const selectedSection = sections.find((section) => section.id === selectedSectionId) ?? null
+  const isDraftVersion = selectedScope?.version.status === 'draft'
   const selectedSnapshot = selectedSection ? (snapshots[selectedSection.id] ?? null) : null
+
+  useEffect(() => {
+    setPackageEditTitle(selectedScope?.packageTitle ?? '')
+  }, [selectedScope?.packageTitle])
   const selectedProfile = selectedSnapshot
     ? (profiles.find((profile) => profile.id === selectedSnapshot.cciProfileId) ?? null)
     : null
@@ -429,6 +445,108 @@ export function AdminResourcesPage() {
     void loadPublicationReadiness()
   }, [loadPublicationReadiness])
 
+  async function refreshSections(packageVersionId = versionId) {
+    if (!packageVersionId) return
+    const result = await listTestSections(packageVersionId)
+    if (!result.ok) return setError(result.error)
+    setSections(result.data)
+    setSelectedSectionId((current) =>
+      result.data.some((section) => section.id === current)
+        ? current
+        : (result.data[0]?.id ?? ''),
+    )
+  }
+
+  async function savePackageName() {
+    if (!selectedScope || !packageEditTitle.trim()) return
+    const result = await updateTestPackage({ packageId: selectedScope.packageId, title: packageEditTitle.trim() })
+    if (!result.ok) {
+      setError(result.error)
+      return
+    }
+    setMessage('Package name updated.')
+    await loadRoot()
+  }
+
+  async function createPackageDraft() {
+    const category = categories[0]
+    const profile = profiles.find((candidate) => candidate.id === category?.profileId) ?? profiles[0]
+    if (!category || !profile) {
+      setError('Create at least one CCI profile/category before building a package.')
+      return
+    }
+    const sessionCount = Math.max(1, Number(newPackageDraft.sessions) || 8)
+    const itemsPerSession = Math.max(1, Number(newPackageDraft.items) || 1)
+    const sessions = Array.from({ length: sessionCount }, (_, index) => ({
+      sectionOrder: index + 1,
+      title: `Session ${index + 1}`,
+      targetCvrOhm: 1,
+      cciProfileId: profile.id,
+      cciCategoryId: category.id,
+      cciCategoryLabel: category.label,
+      cciValue: category.value,
+    }))
+    const result = await createDraftTestPackage({
+      title: newPackageDraft.title,
+      versionLabel: newPackageDraft.version,
+      sessionCount,
+      itemsPerSession,
+      sessions,
+    })
+    if (!result.ok) {
+      setError(result.error)
+      return
+    }
+    setMessage('Draft package created.')
+    setShowPackageBuilder(false)
+    await loadRoot()
+    setVersionId(result.data.version.id)
+  }
+
+  async function addDraftSession() {
+    if (!selectedScope) return
+    const category = categories[0]
+    const profile = profiles.find((candidate) => candidate.id === category?.profileId) ?? profiles[0]
+    if (!category || !profile) return setError('Missing CCI profile/category for new session.')
+    const result = await createDraftTestSection({
+      packageVersionId: selectedScope.version.id,
+      title: sessionDraft.title.trim() || null,
+      targetCvrOhm: Number(sessionDraft.targetCvr) || 1,
+      cciProfileId: profile.id,
+      cciCategoryId: category.id,
+      cciCategoryLabel: category.label,
+      cciValue: category.value,
+    })
+    if (!result.ok) return setError(result.error)
+    setMessage('Session added.')
+    setShowAddSession(false)
+    setSessionDraft({ title: '', targetCvr: '1' })
+    await refreshSections(selectedScope.version.id)
+  }
+
+  async function saveDraftSession(section: TestSection) {
+    if (!selectedScope) return
+    const result = await updateDraftTestSection({
+      packageVersionId: selectedScope.version.id,
+      sectionId: section.id,
+      title: sessionDraft.title.trim() || null,
+      sectionOrder: section.sectionOrder,
+    })
+    if (!result.ok) return setError(result.error)
+    setMessage('Session updated.')
+    setEditingSessionId(null)
+    await refreshSections(selectedScope.version.id)
+  }
+
+  async function removeDraftSession(section: TestSection) {
+    if (!selectedScope) return
+    if (!window.confirm(`Delete Session ${section.sectionOrder} from this draft package?`)) return
+    const result = await deleteDraftTestSection({ sectionId: section.id, packageVersionId: selectedScope.version.id })
+    if (!result.ok) return setError(result.error)
+    setMessage('Session deleted.')
+    await refreshSections(selectedScope.version.id)
+  }
+
   async function publishPackage() {
     if (!selectedScope || !publication?.canPublish) return
     if (!window.confirm('Publish this Package Version? Scripts and audio become immutable.')) return
@@ -592,6 +710,43 @@ export function AdminResourcesPage() {
                 </span>
               </div>
             </div>
+            <div className="resource-item-create-card" style={{ marginTop: '0.75rem' }}>
+              <div className="resource-dynamic-filters">
+                <label className="field">
+                  Package name
+                  <input value={packageEditTitle} onChange={(event) => setPackageEditTitle(event.target.value)} />
+                </label>
+                <button className="ghost" disabled={!selectedScope || !packageEditTitle.trim()} onClick={() => void savePackageName()}>
+                  Save package name
+                </button>
+                <button className="ghost" onClick={() => setShowPackageBuilder((value) => !value)}>
+                  <Plus className="h-4 w-4" /> New draft package
+                </button>
+              </div>
+              {showPackageBuilder ? (
+                <div className="grid gap-3 sm:grid-cols-4">
+                  <label className="field">
+                    Title
+                    <input value={newPackageDraft.title} onChange={(event) => setNewPackageDraft((current) => ({ ...current, title: event.target.value }))} />
+                  </label>
+                  <label className="field">
+                    Version
+                    <input value={newPackageDraft.version} onChange={(event) => setNewPackageDraft((current) => ({ ...current, version: event.target.value }))} />
+                  </label>
+                  <label className="field">
+                    Sessions
+                    <input type="number" min="1" value={newPackageDraft.sessions} onChange={(event) => setNewPackageDraft((current) => ({ ...current, sessions: event.target.value }))} />
+                  </label>
+                  <label className="field">
+                    Placeholder items/session
+                    <input type="number" min="1" value={newPackageDraft.items} onChange={(event) => setNewPackageDraft((current) => ({ ...current, items: event.target.value }))} />
+                  </label>
+                  <button className="primary" disabled={!newPackageDraft.title.trim()} onClick={() => void createPackageDraft()}>
+                    Create draft package
+                  </button>
+                </div>
+              ) : null}
+            </div>
             <div className="resource-publication-gate">
               <div>
                 <strong>
@@ -680,6 +835,11 @@ export function AdminResourcesPage() {
                     <option value="ready">Ready for selected language</option>
                     <option value="missing">Missing audio</option>
                   </select>
+                  {isDraftVersion ? (
+                    <button className="ghost" onClick={() => setShowAddSession((value) => !value)}>
+                      <Plus className="h-4 w-4" /> Add session
+                    </button>
+                  ) : null}
                   <span className="meta">Showing {filteredSections.length}/{sections.length}. Audio badges count approved audio across any model.</span>
                 </div>
               }
@@ -707,6 +867,23 @@ export function AdminResourcesPage() {
                   <button className="ghost" onClick={() => setSelectedSessionIds([])}>
                     Cancel
                   </button>
+                </div>
+              ) : null}
+              {showAddSession && isDraftVersion ? (
+                <div className="resource-item-create-card" style={{ marginBottom: '1rem' }}>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <label className="field">
+                      Session title
+                      <input value={sessionDraft.title} onChange={(event) => setSessionDraft((current) => ({ ...current, title: event.target.value }))} placeholder="Session title" />
+                    </label>
+                    <label className="field">
+                      Target CVR (Ω)
+                      <input type="number" step="0.01" value={sessionDraft.targetCvr} onChange={(event) => setSessionDraft((current) => ({ ...current, targetCvr: event.target.value }))} />
+                    </label>
+                    <button className="primary" onClick={() => void addDraftSession()}>
+                      Add draft session
+                    </button>
+                  </div>
                 </div>
               ) : null}
               <div className="table-wrap compact-resource-table">
@@ -759,7 +936,15 @@ export function AdminResourcesPage() {
                           </td>
                           <td>
                             <strong>Session {section.sectionOrder}</strong>
-                            <div className="meta">{section.title}</div>
+                            {editingSessionId === section.id ? (
+                              <input
+                                value={sessionDraft.title}
+                                onChange={(event) => setSessionDraft((current) => ({ ...current, title: event.target.value }))}
+                                placeholder="Session title"
+                              />
+                            ) : (
+                              <div className="meta">{section.title}</div>
+                            )}
                           </td>
                           <td>
                             <span className="badge metric-cvr">CVR {metricOhm(snap?.targetCvrOhm)}</span>{' '}
@@ -813,15 +998,37 @@ export function AdminResourcesPage() {
                             )}
                           </td>
                           <td>
-                            <button
-                              className="ghost"
-                              onClick={() => {
-                                setSelectedSectionId(section.id)
-                                setActiveTab('items')
-                              }}
-                            >
-                              Open
-                            </button>
+                            <div className="resource-row-actions">
+                              <button
+                                className="ghost"
+                                onClick={() => {
+                                  setSelectedSectionId(section.id)
+                                  setActiveTab('items')
+                                }}
+                              >
+                                Open
+                              </button>
+                              {isDraftVersion ? (
+                                editingSessionId === section.id ? (
+                                  <button className="primary" onClick={() => void saveDraftSession(section)}>Save</button>
+                                ) : (
+                                  <button
+                                    className="ghost"
+                                    onClick={() => {
+                                      setEditingSessionId(section.id)
+                                      setSessionDraft({ title: section.title ?? '', targetCvr: String(snap?.targetCvrOhm ?? 1) })
+                                    }}
+                                  >
+                                    <Pencil className="h-4 w-4" /> Edit
+                                  </button>
+                                )
+                              ) : null}
+                              {isDraftVersion ? (
+                                <button className="ghost" onClick={() => void removeDraftSession(section)}>
+                                  <Trash2 className="h-4 w-4" /> Delete
+                                </button>
+                              ) : null}
+                            </div>
                           </td>
                         </tr>
                       )

@@ -58,6 +58,9 @@ function defaultLanguageForSection(
   if (languagePolicy === 'alternating_vi_en') {
     return section.sectionOrder % 2 === 1 ? 'vi' : 'en'
   }
+  if (languagePolicy === 'first4_en_last4_vi') {
+    return section.sectionOrder <= 4 ? 'en' : 'vi'
+  }
   return section.sectionOrder <= 4 ? 'vi' : 'en'
 }
 

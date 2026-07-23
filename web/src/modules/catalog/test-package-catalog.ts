@@ -8,6 +8,7 @@ export type TestPackage = {
   title: string
   slug: string
   createdByUserId: string | null
+  sourceMetadata: Record<string, unknown>
   archivedAt: string | null
 }
 

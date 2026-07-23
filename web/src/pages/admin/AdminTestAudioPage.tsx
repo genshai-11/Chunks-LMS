@@ -33,6 +33,7 @@ import {
   getLiveTestGenerationCapabilities,
   getNarrationPlaybackUrl,
   listTtsModels,
+  uploadNarrationAudio,
 } from '../../modules/catalog/live-test-generation'
 import {
   audioReadiness,
@@ -58,7 +59,7 @@ type PreparedRow = {
   key: string
   label: string
   spokenScript: string
-  target: 'section_intro' | 'test_item'
+  target: 'package_start' | 'package_end' | 'section_intro' | 'test_item'
   sectionId?: string
   item?: TestItem
   record?: NarrationReviewRecord
@@ -84,6 +85,8 @@ export function AdminTestAudioPage() {
   const [items, setItems] = useState<TestItem[]>([])
   const [snapshot, setSnapshot] = useState<SectionMeasurementSnapshot | null>(null)
   const [cciCategory, setCciCategory] = useState<CciCategory | null>(null)
+  const [packageStartDraft, setPackageStartDraft] = useState('')
+  const [packageEndDraft, setPackageEndDraft] = useState('')
   const [introDraft, setIntroDraft] = useState('')
   const [savedIntro, setSavedIntro] = useState('')
   const [scriptDrafts, setScriptDrafts] = useState<Record<string, string>>({})
@@ -148,7 +151,7 @@ export function AdminTestAudioPage() {
       for (const pkg of packages.data) {
         const versions = await listTestPackageVersions(pkg.id)
         if (!versions.ok) return setError(versions.error)
-        for (const version of versions.data.filter((candidate) => candidate.status === 'draft'))
+        for (const version of versions.data.filter((candidate) => candidate.status !== 'archived'))
           next.push({ packageTitle: pkg.title, version })
       }
       setScopes(next)
@@ -193,6 +196,13 @@ export function AdminTestAudioPage() {
           ) ?? null
     }
     setCciCategory(category)
+    const packageTitle = selectedScope?.packageTitle ?? 'Live Test'
+    setPackageStartDraft(language === 'vi'
+      ? `Bắt đầu bài kiểm tra ${packageTitle}. Hãy lắng nghe và trả lời từng câu.`
+      : `Start the ${packageTitle} test. Listen carefully and answer each item.`)
+    setPackageEndDraft(language === 'vi'
+      ? `Kết thúc bài kiểm tra ${packageTitle}. Cảm ơn em đã hoàn thành phần kiểm tra.`
+      : `End of the ${packageTitle} test. Thank you for completing the test.`)
     const persisted =
       (language === 'vi' ? selectedSection.introTextVi : selectedSection.introTextEn) ?? ''
     const suggested = snapshotResult.data
@@ -224,7 +234,7 @@ export function AdminTestAudioPage() {
     )
     setSavedScripts(nextScripts)
     setScriptDrafts(nextScripts)
-  }, [language, sectionId, selectedSection])
+  }, [language, sectionId, selectedScope?.packageTitle, selectedSection])
   useEffect(() => {
     void loadSection()
   }, [loadSection])
@@ -248,6 +258,8 @@ export function AdminTestAudioPage() {
   useEffect(() => {
     void (async () => {
       const next: Record<string, string> = {}
+      if (packageStartDraft) next['package:start'] = await narrationSourceHash(packageStartDraft, language, voiceId)
+      if (packageEndDraft) next['package:end'] = await narrationSourceHash(packageEndDraft, language, voiceId)
       if (selectedSection && introDraft)
         next[`section:${selectedSection.id}`] = await narrationSourceHash(
           introDraft,
@@ -260,7 +272,7 @@ export function AdminTestAudioPage() {
       }
       setHashes(next)
     })()
-  }, [introDraft, items, language, scriptDrafts, selectedSection, voiceId])
+  }, [introDraft, items, language, packageEndDraft, packageStartDraft, scriptDrafts, selectedSection, voiceId])
 
   useEffect(() => {
     setParams(
@@ -272,13 +284,37 @@ export function AdminTestAudioPage() {
   const rows = useMemo<PreparedRow[]>(() => {
     if (!selectedSection) return []
     const newest = latestNarrationByTarget(records)
+    const startKey = 'package:start'
+    const endKey = 'package:end'
+    const startRecord = newest.get(startKey)
+    const endRecord = newest.get(endKey)
+    const startBundleRecord = resolveNarrationRecord(records, startKey, hashes[startKey])
+    const endBundleRecord = resolveNarrationRecord(records, endKey, hashes[endKey])
     const introKey = `section:${selectedSection.id}`
     const introRecord = newest.get(introKey)
     const introBundleRecord = resolveNarrationRecord(records, introKey, hashes[introKey])
     const result: PreparedRow[] = [
       {
+        key: startKey,
+        label: 'Test Start',
+        spokenScript: packageStartDraft,
+        target: 'package_start',
+        record: startRecord,
+        status: audioTargetStatus(startRecord, hashes[startKey]),
+        bundleStatus: audioTargetStatus(startBundleRecord, hashes[startKey]),
+      },
+      {
+        key: endKey,
+        label: 'Test End',
+        spokenScript: packageEndDraft,
+        target: 'package_end',
+        record: endRecord,
+        status: audioTargetStatus(endRecord, hashes[endKey]),
+        bundleStatus: audioTargetStatus(endBundleRecord, hashes[endKey]),
+      },
+      {
         key: introKey,
-        label: 'Intro',
+        label: 'Session Intro',
         spokenScript: introDraft,
         target: 'section_intro',
         sectionId: selectedSection.id,
@@ -304,8 +340,9 @@ export function AdminTestAudioPage() {
       })
     }
     return result
-  }, [hashes, introDraft, items, scriptDrafts, records, selectedSection])
-  const readiness = audioReadiness(rows.map((row) => row.bundleStatus))
+  }, [hashes, introDraft, items, packageEndDraft, packageStartDraft, scriptDrafts, records, selectedSection])
+  const bundleRows = rows.filter((row) => row.target === 'section_intro' || row.target === 'test_item')
+  const readiness = audioReadiness(bundleRows.map((row) => row.bundleStatus))
   const generationTargets = rows.filter((row) =>
     ['missing', 'stale', 'failed', 'rejected'].includes(row.bundleStatus),
   )
@@ -313,8 +350,10 @@ export function AdminTestAudioPage() {
     introDraft !== savedIntro ||
     items.some((item) => (scriptDrafts[item.id] ?? '') !== (savedScripts[item.id] ?? ''))
   const invalid =
+    !packageStartDraft.trim() ||
+    !packageEndDraft.trim() ||
     !introDraft.trim() ||
-    items.length !== 10 ||
+    items.length === 0 ||
     items.some((item) => !(scriptDrafts[item.id] ?? '').trim())
 
   async function saveScripts() {
@@ -391,7 +430,7 @@ export function AdminTestAudioPage() {
         setBusyKey(row.key)
 
         // Auto-save if dirty
-        if (row.target === 'section_intro') {
+        if (row.target === 'section_intro' && selectedScope.version.status === 'draft') {
           if (introDraft !== savedIntro && selectedSection) {
             const sectionResult = await updateDraftTestSection({
               sectionId: selectedSection.id,
@@ -413,7 +452,7 @@ export function AdminTestAudioPage() {
               ),
             )
           }
-        } else if (row.target === 'test_item' && row.item) {
+        } else if (row.target === 'test_item' && row.item && selectedScope.version.status === 'draft') {
           const nextScript = scriptDrafts[row.item.id] ?? ''
           if (nextScript !== (savedScripts[row.item.id] ?? '')) {
             const result = await updateDraftTestItem({
@@ -451,6 +490,7 @@ export function AdminTestAudioPage() {
           target: row.target,
           testSectionId: row.target === 'section_intro' ? row.sectionId : undefined,
           testItemId: row.target === 'test_item' ? row.item?.id : undefined,
+          textOverride: row.target === 'package_start' || row.target === 'package_end' ? row.spokenScript : undefined,
           language,
           voiceId,
         })
@@ -499,6 +539,29 @@ export function AdminTestAudioPage() {
     }
   }
   const approveSelected = () => approveRows(rows.filter((row) => selectedKeys.includes(row.key) && row.record && row.status !== 'stale' && row.record.variant.approvalStatus !== 'approved'))
+
+  async function upload(row: PreparedRow, file: File | null | undefined) {
+    if (!file || !selectedScope) return
+    if (row.target !== 'package_start' && row.target !== 'package_end') return
+    setBusyKey(`upload:${row.key}`)
+    setError(null)
+    try {
+      await uploadNarrationAudio({
+        packageVersionId: selectedScope.version.id,
+        target: row.target,
+        language,
+        voiceId,
+        sourceTextHash: hashes[row.key] ?? await narrationSourceHash(row.spokenScript, language, voiceId),
+        file,
+      })
+      setMessage(`Uploaded and approved ${row.label} audio.`)
+      await loadReview()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Upload failed')
+    } finally {
+      setBusyKey(null)
+    }
+  }
 
   async function play(row: PreparedRow) {
     if (!row.record) return
@@ -647,7 +710,7 @@ export function AdminTestAudioPage() {
             </button>
             <button
               className="primary"
-              disabled={!dirty || invalid || busyKey === 'save'}
+              disabled={selectedScope?.version.status !== 'draft' || !dirty || invalid || busyKey === 'save'}
               onClick={() => void saveScripts()}
             >
               <Save className="h-4 w-4" />
@@ -779,7 +842,21 @@ export function AdminTestAudioPage() {
                     <strong>{row.label}</strong>
                   </td>
                   <td>
-                    {row.target === 'section_intro' ? (
+                    {row.target === 'package_start' ? (
+                      <textarea
+                        rows={2}
+                        aria-label="Exact spoken script Test Start"
+                        value={packageStartDraft}
+                        onChange={(event) => setPackageStartDraft(event.target.value)}
+                      />
+                    ) : row.target === 'package_end' ? (
+                      <textarea
+                        rows={2}
+                        aria-label="Exact spoken script Test End"
+                        value={packageEndDraft}
+                        onChange={(event) => setPackageEndDraft(event.target.value)}
+                      />
+                    ) : row.target === 'section_intro' ? (
                       <textarea
                         rows={3}
                         aria-label="Exact spoken script Intro"
@@ -830,6 +907,22 @@ export function AdminTestAudioPage() {
                       >
                         <WandSparkles className="h-3.5 w-3.5" />
                       </button>
+                      {(row.target === 'package_start' || row.target === 'package_end') ? (
+                        <label
+                          className="ghost compact-action-btn"
+                          style={{ padding: '0.25rem', height: '1.75rem', width: '1.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                          title="Upload audio file"
+                        >
+                          <Volume2 className="h-3.5 w-3.5" />
+                          <input
+                            hidden
+                            type="file"
+                            accept="audio/*"
+                            disabled={busyKey === `upload:${row.key}`}
+                            onChange={(event) => void upload(row, event.target.files?.[0])}
+                          />
+                        </label>
+                      ) : null}
                       <button
                         className="ghost compact-action-btn"
                         style={{ padding: '0.25rem', height: '1.75rem', width: '1.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
@@ -882,13 +975,13 @@ export function AdminTestAudioPage() {
       <Panel
         icon={CheckCircle2}
         title="3. Bundle gate"
-        description="The Teacher runner unlocks only when the current language/voice has one approved intro and ten approved current item assets."
+        description="The Teacher runner unlocks when the current language has one approved session intro and every current item asset. Test Start/End audio is optional and plays when available."
         collapsible={false}
       >
         <div className="audio-bundle-gate">
           <div>
             <strong>
-              {readiness.ready ? 'Ready for Test' : `${readiness.approved}/11 approved`}
+              {readiness.ready ? 'Ready for Test' : `${readiness.approved}/${bundleRows.length} approved`}
             </strong>
             <div className="meta">
               {language.toUpperCase()} · {voiceId} · {readiness.stale} stale · {readiness.failed}{' '}

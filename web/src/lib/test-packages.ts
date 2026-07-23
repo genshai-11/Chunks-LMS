@@ -22,6 +22,7 @@ function mapTestPackage(row: any): TestPackage {
     title: row.title,
     slug: row.slug,
     createdByUserId: row.created_by_user_id,
+    sourceMetadata: (row.source_metadata ?? {}) as Record<string, unknown>,
     archivedAt: row.archived_at,
   }
 }
@@ -130,7 +131,13 @@ export async function listTestPackages(): Promise<Result<TestPackage[]>> {
     .is('archived_at', null)
     .order('title')
   if (error) return { ok: false, error: error.message }
-  return { ok: true, data: (data ?? []).map(mapTestPackage) }
+  const packages = (data ?? []).map(mapTestPackage).sort((a: TestPackage, b: TestPackage) => {
+    const aDefault = a.sourceMetadata?.isDefaultLiveTestPackage === true
+    const bDefault = b.sourceMetadata?.isDefaultLiveTestPackage === true
+    if (aDefault !== bDefault) return aDefault ? -1 : 1
+    return a.title.localeCompare(b.title)
+  })
+  return { ok: true, data: packages }
 }
 
 export async function updateTestPackage(input: {

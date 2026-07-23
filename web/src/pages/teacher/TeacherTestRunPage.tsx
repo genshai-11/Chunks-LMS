@@ -227,6 +227,7 @@ export function TeacherTestRunPage() {
   const [packageEndVariantId, setPackageEndVariantId] = useState<string | null>(null)
   const [isSummaryShown, setIsSummaryShown] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [queuedAutoPlayItemId, setQueuedAutoPlayItemId] = useState<string | null>(null)
   const [audioUrl, setAudioUrl] = useState('')
   const [audioLabel, setAudioLabel] = useState('Current item')
   const [audioState, setAudioState] = useState<AudioState>('idle')
@@ -793,10 +794,19 @@ export function TeacherTestRunPage() {
   }, [autoPlayPartIntro, autoPlaySessionIntro, canPlayCurrentSessionIntro, currentSessionNumber, isFirstItemInSession, partIntroVariantIds, playCurrentSessionIntro])
 
   useEffect(() => {
+    if (!queuedAutoPlayItemId || String(currentItem?.id ?? '') !== queuedAutoPlayItemId) return
+    if (!canPlayCurrentItemAudio) return
+    pendingFirstItemAudioIndexRef.current = null
+    setQueuedAutoPlayItemId(null)
+    void playCurrentItemAudio(true)
+  }, [canPlayCurrentItemAudio, currentItem?.id, playCurrentItemAudio, queuedAutoPlayItemId])
+
+  useEffect(() => {
     const targetIndex = pendingFirstItemAudioIndexRef.current
     if (targetIndex == null || selectedIndex !== targetIndex) return
     if (!currentItem?.id || !canPlayCurrentItemAudio) return
     pendingFirstItemAudioIndexRef.current = null
+    setQueuedAutoPlayItemId(null)
     void playCurrentItemAudio(true)
   }, [canPlayCurrentItemAudio, currentItem?.id, playCurrentItemAudio, selectedIndex])
 
@@ -807,6 +817,7 @@ export function TeacherTestRunPage() {
     const nextItem = items[nextIndex]
     if (!nextItem || nextItem.session_number !== currentItem.session_number) return
     pendingFirstItemAudioIndexRef.current = nextIndex
+    setQueuedAutoPlayItemId(String(nextItem.id))
   }, [autoPlayItems, currentItem, items, selectedIndex])
 
   const handleAudioEnded = useCallback(() => {

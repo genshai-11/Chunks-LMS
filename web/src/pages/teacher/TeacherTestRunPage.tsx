@@ -800,6 +800,15 @@ export function TeacherTestRunPage() {
     void playCurrentItemAudio(true)
   }, [canPlayCurrentItemAudio, currentItem?.id, playCurrentItemAudio, selectedIndex])
 
+  const queueNextQuestionAudioAfterScore = useCallback(() => {
+    if (!autoPlayItems || !currentItem) return
+    const nextIndex = items.findIndex((item, index) => index > selectedIndex && !isItemFinalized(item))
+    if (nextIndex < 0) return
+    const nextItem = items[nextIndex]
+    if (!nextItem || nextItem.session_number !== currentItem.session_number) return
+    pendingFirstItemAudioIndexRef.current = nextIndex
+  }, [autoPlayItems, currentItem, items, selectedIndex])
+
   const handleAudioEnded = useCallback(() => {
     setAudioState('played')
     if (audioTargetRef.current === 'package_end' && pendingAfterEndNavigationRef.current) {
@@ -845,6 +854,7 @@ export function TeacherTestRunPage() {
       if (!currentItem || probeOpen) return
       const isFinalOutstandingItem = !isItemFinalized(currentItem) && items.filter((item) => !isItemFinalized(item)).length === 1
       playReaction(color)
+      queueNextQuestionAudioAfterScore()
       const result = await recordStandaloneResult(currentItem.id, color)
       if (!result.ok) {
         setMessage(result.error)
@@ -853,13 +863,14 @@ export function TeacherTestRunPage() {
       await load()
       if (isFinalOutstandingItem) await playEndAfterFinalScore()
     },
-    [currentItem, items, load, playEndAfterFinalScore, playReaction, probeOpen],
+    [currentItem, items, load, playEndAfterFinalScore, playReaction, probeOpen, queueNextQuestionAudioAfterScore],
   )
 
   const handleProbe = useCallback(
     async (outcome: 'fail' | 'continue' | 'done') => {
       if (!currentAttempt?.id || !probeOpen) return
       const isFinalOutstandingItem = outcome !== 'continue' && currentItem && !isItemFinalized(currentItem) && items.filter((item) => !isItemFinalized(item)).length === 1
+      if (outcome !== 'continue') queueNextQuestionAudioAfterScore()
       const result = await resolveStandaloneProbe(String(currentAttempt.id), outcome)
       if (!result.ok) {
         setMessage(result.error)
@@ -874,7 +885,7 @@ export function TeacherTestRunPage() {
       await load()
       if (isFinalOutstandingItem) await playEndAfterFinalScore()
     },
-    [currentAttempt?.id, currentItem, items, load, playEndAfterFinalScore, playReaction, probeOpen],
+    [currentAttempt?.id, currentItem, items, load, playEndAfterFinalScore, playReaction, probeOpen, queueNextQuestionAudioAfterScore],
   )
 
   useEffect(() => {

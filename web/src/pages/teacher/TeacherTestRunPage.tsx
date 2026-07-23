@@ -250,6 +250,7 @@ export function TeacherTestRunPage() {
   const [resizing, setResizing] = useState(false)
   const railWidthRef = useRef(railWidth)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const itemPlaybackCacheRef = useRef<Record<string, { variantId: string; signedUrl: string }>>({})
   const pendingAutoPlayRef = useRef(false)
   const audioTargetRef = useRef<AudioTarget>('item')
   const playFirstItemAfterIntroRef = useRef(false)
@@ -626,6 +627,31 @@ export function TeacherTestRunPage() {
     return currentItemVariantId
   }, [currentItem?.test_item_id, currentItemLanguage, currentItemVariantId])
 
+  const resolveItemAudioVariantId = useCallback(async (item: TestItem | null | undefined) => {
+    if (!item?.test_item_id) return item?.narration_variant_id ?? null
+    const language = (item.prompt_language ?? runDetails?.promptLanguage ?? 'vi') as 'vi' | 'en'
+    const latest = await findLatestApprovedNarrationVariant({
+      target: 'test_item',
+      language,
+      testItemId: String(item.test_item_id),
+    })
+    if (latest.ok && latest.data?.id) return latest.data.id
+    return item.narration_variant_id ?? null
+  }, [runDetails?.promptLanguage])
+
+  const primeItemPlaybackUrl = useCallback(async (item: TestItem | null | undefined) => {
+    if (!item?.id) return null
+    const cacheKey = String(item.id)
+    const cached = itemPlaybackCacheRef.current[cacheKey]
+    if (cached?.signedUrl) return cached
+    const variantId = await resolveItemAudioVariantId(item)
+    if (!variantId) return null
+    const playback = await getNarrationPlaybackUrl(variantId)
+    const next = { variantId, signedUrl: playback.signedUrl }
+    itemPlaybackCacheRef.current[cacheKey] = next
+    return next
+  }, [resolveItemAudioVariantId])
+
   const resolveCurrentSessionIntroVariantId = useCallback(async () => {
     if (!currentSessionRun?.testSectionId) return currentSessionIntroVariantId
     const latest = await findLatestApprovedNarrationVariant({
@@ -639,15 +665,37 @@ export function TeacherTestRunPage() {
 
   const playCurrentItemAudio = useCallback(
     async (shouldPlay = true) => {
-      const variantId = await resolveCurrentItemAudioVariantId()
+      const cached = await primeItemPlaybackUrl(currentItem)
+      const variantId = cached?.variantId ?? await resolveCurrentItemAudioVariantId()
       if (!variantId) {
         setMessage('No approved item audio is available for the current question/language.')
         return
       }
       playFirstItemAfterIntroRef.current = false
+      if (cached?.signedUrl) {
+        pendingAutoPlayRef.current = false
+        audioTargetRef.current = 'item'
+        setAudioLabel(`Q${currentItemNumber} item`)
+        setAudioUrl(cached.signedUrl)
+        setAudioState('ready')
+        if (shouldPlay) {
+          const audio = audioRef.current
+          if (audio) {
+            const nextVolume = audibleVolume(audioVolume)
+            audio.muted = false
+            audio.volume = nextVolume
+            audio.playbackRate = audioRate
+            audio.src = cached.signedUrl
+            void audio.play().catch(() => {
+              setMessage('Autoplay was blocked by the browser. Press Play once to enable audio in this run.')
+            })
+          }
+        }
+        return
+      }
       await loadAudioVariant(variantId, `Q${currentItemNumber} item`, shouldPlay, 'item')
     },
-    [currentItemNumber, loadAudioVariant, resolveCurrentItemAudioVariantId],
+    [audioRate, audioVolume, currentItem, currentItemNumber, loadAudioVariant, primeItemPlaybackUrl, resolveCurrentItemAudioVariantId],
   )
 
   const playPackageStartAudio = useCallback(
@@ -794,6 +842,15 @@ export function TeacherTestRunPage() {
   }, [autoPlayPartIntro, autoPlaySessionIntro, canPlayCurrentSessionIntro, currentSessionNumber, isFirstItemInSession, partIntroVariantIds, playCurrentSessionIntro])
 
   useEffect(() => {
+    const nextIndex = items.findIndex((item, index) => index > selectedIndex && !isItemFinalized(item))
+    const nextItem = nextIndex >= 0 ? items[nextIndex] : null
+    if (!nextItem || nextItem.session_number !== currentItem?.session_number) return
+    void primeItemPlaybackUrl(nextItem).catch(() => {
+      /* best-effort prefetch */
+    })
+  }, [currentItem?.id, currentItem?.session_number, items, primeItemPlaybackUrl, selectedIndex])
+
+  useEffect(() => {
     if (!queuedAutoPlayItemId || String(currentItem?.id ?? '') !== queuedAutoPlayItemId) return
     if (!canPlayCurrentItemAudio) return
     pendingFirstItemAudioIndexRef.current = null
@@ -810,15 +867,35 @@ export function TeacherTestRunPage() {
     void playCurrentItemAudio(true)
   }, [canPlayCurrentItemAudio, currentItem?.id, playCurrentItemAudio, selectedIndex])
 
-  const queueNextQuestionAudioAfterScore = useCallback(() => {
-    if (!autoPlayItems || !currentItem) return
+  const playNextQuestionAudioUnderGesture = useCallback(() => {
+    if (!autoPlayItems || !currentItem || isItemFinalized(currentItem)) return
     const nextIndex = items.findIndex((item, index) => index > selectedIndex && !isItemFinalized(item))
     if (nextIndex < 0) return
     const nextItem = items[nextIndex]
     if (!nextItem || nextItem.session_number !== currentItem.session_number) return
     pendingFirstItemAudioIndexRef.current = nextIndex
     setQueuedAutoPlayItemId(String(nextItem.id))
-  }, [autoPlayItems, currentItem, items, selectedIndex])
+    setSelectedIndex(nextIndex)
+
+    const cached = itemPlaybackCacheRef.current[String(nextItem.id)]
+    if (!cached?.signedUrl) return
+    pendingAutoPlayRef.current = false
+    audioTargetRef.current = 'item'
+    const nextNumber = nextItem.global_item_order ?? nextIndex + 1
+    setAudioLabel(`Q${nextNumber} item`)
+    setAudioUrl(cached.signedUrl)
+    setAudioState('ready')
+    const audio = audioRef.current
+    if (!audio) return
+    const nextVolume = audibleVolume(audioVolume)
+    audio.muted = false
+    audio.volume = nextVolume
+    audio.playbackRate = audioRate
+    audio.src = cached.signedUrl
+    void audio.play().catch(() => {
+      setMessage('Autoplay was blocked by the browser. Press Play once to enable audio in this run.')
+    })
+  }, [audioRate, audioVolume, autoPlayItems, currentItem, items, selectedIndex])
 
   const handleAudioEnded = useCallback(() => {
     setAudioState('played')
@@ -865,7 +942,7 @@ export function TeacherTestRunPage() {
       if (!currentItem || probeOpen) return
       const isFinalOutstandingItem = !isItemFinalized(currentItem) && items.filter((item) => !isItemFinalized(item)).length === 1
       playReaction(color)
-      queueNextQuestionAudioAfterScore()
+      playNextQuestionAudioUnderGesture()
       const result = await recordStandaloneResult(currentItem.id, color)
       if (!result.ok) {
         setMessage(result.error)
@@ -874,14 +951,14 @@ export function TeacherTestRunPage() {
       await load()
       if (isFinalOutstandingItem) await playEndAfterFinalScore()
     },
-    [currentItem, items, load, playEndAfterFinalScore, playReaction, probeOpen, queueNextQuestionAudioAfterScore],
+    [currentItem, items, load, playEndAfterFinalScore, playNextQuestionAudioUnderGesture, playReaction, probeOpen],
   )
 
   const handleProbe = useCallback(
     async (outcome: 'fail' | 'continue' | 'done') => {
       if (!currentAttempt?.id || !probeOpen) return
       const isFinalOutstandingItem = outcome !== 'continue' && currentItem && !isItemFinalized(currentItem) && items.filter((item) => !isItemFinalized(item)).length === 1
-      if (outcome !== 'continue') queueNextQuestionAudioAfterScore()
+      if (outcome !== 'continue') playNextQuestionAudioUnderGesture()
       const result = await resolveStandaloneProbe(String(currentAttempt.id), outcome)
       if (!result.ok) {
         setMessage(result.error)
@@ -896,7 +973,7 @@ export function TeacherTestRunPage() {
       await load()
       if (isFinalOutstandingItem) await playEndAfterFinalScore()
     },
-    [currentAttempt?.id, currentItem, items, load, playEndAfterFinalScore, playReaction, probeOpen, queueNextQuestionAudioAfterScore],
+    [currentAttempt?.id, currentItem, items, load, playEndAfterFinalScore, playNextQuestionAudioUnderGesture, playReaction, probeOpen],
   )
 
   useEffect(() => {

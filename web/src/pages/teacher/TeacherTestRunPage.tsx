@@ -52,7 +52,7 @@ import { triggerConfetti } from '../../lib/confetti'
 import { useAppState } from '../../state/useAppState'
 
 type AudioState = 'idle' | 'loading' | 'ready' | 'playing' | 'played' | 'error'
-type AudioTarget = 'item' | 'session_intro' | 'package_start' | 'part_intro_1' | 'part_intro_2' | 'package_end'
+type AudioTarget = 'item' | 'result_reaction' | 'session_intro' | 'package_start' | 'part_intro_1' | 'part_intro_2' | 'package_end'
 type ResultColor = 'red' | 'yellow' | 'green' | 'purple'
 type ReactionKind = 'celebrate' | 'happy' | 'fight'
 type Reaction = { kind: ReactionKind; color: ResultColor; id: number } | null
@@ -255,6 +255,7 @@ export function TeacherTestRunPage() {
   const firstItemAfterIntroIndexRef = useRef<number | null>(null)
   const pendingFirstItemAudioIndexRef = useRef<number | null>(null)
   const pendingAfterEndNavigationRef = useRef<string | null>(null)
+  const pendingAfterReactionRef = useRef<{ signedUrl: string; label: string } | null>(null)
   const suppressNextItemEffectForIdRef = useRef<string | null>(null)
   const partIntroPlayedRef = useRef<Record<1 | 2, boolean>>({ 1: false, 2: false })
   const packageEndPlayedRef = useRef(false)
@@ -389,24 +390,12 @@ export function TeacherTestRunPage() {
     [mapOpen],
   )
 
-  const playReaction = useCallback((color: ResultColor, options: { sound?: boolean } = {}) => {
+  const playReaction = useCallback((color: ResultColor) => {
     const id = Date.now()
     setReaction({ kind: reactionFor(color), color, id })
     if (color === 'purple') {
       triggerConfetti()
     }
-
-    if (options.sound !== false) {
-      try {
-        const audio = new Audio(`/audio/${color}.wav`)
-        void audio.play().catch((err) => {
-          console.warn('[live-test] reaction audio play failed:', err)
-        })
-      } catch (e) {
-        console.warn('[live-test] reaction audio init failed:', e)
-      }
-    }
-
     window.setTimeout(() => setReaction((current) => (current?.id === id ? null : current)), 1200)
   }, [])
 
@@ -859,33 +848,44 @@ export function TeacherTestRunPage() {
     void playCurrentItemAudio(true)
   }, [canPlayCurrentItemAudio, currentItem?.id, playCurrentItemAudio, selectedIndex])
 
-  const playNextQuestionAudioUnderGesture = useCallback((): boolean => {
-    if (!autoPlayItems || !currentItem || isItemFinalized(currentItem)) return false
+  const playScoreFeedbackThenNext = useCallback((color: ResultColor): boolean => {
+    if (!currentItem) return false
     const nextIndex = items.findIndex((item, index) => index > selectedIndex && !isItemFinalized(item))
-    if (nextIndex < 0) return false
-    const nextItem = items[nextIndex]
-    if (!nextItem || nextItem.session_number !== currentItem.session_number) return false
+    const nextItem = nextIndex >= 0 ? items[nextIndex] : null
+    const canAdvanceWithinSession = Boolean(
+      autoPlayItems &&
+      nextItem &&
+      nextItem.session_number === currentItem.session_number,
+    )
 
-    setSelectedIndex(nextIndex)
-    pendingFirstItemAudioIndexRef.current = null
-
-    const cached = itemPlaybackCacheRef.current[String(nextItem.id)]
-    if (!cached?.signedUrl) {
-      void primeItemPlaybackUrl(nextItem).catch(() => {
-        /* best-effort late prefetch */
-      })
-      setMessage('Next question audio is still preparing. Press Play if it does not start automatically.')
-      return false
+    pendingAfterReactionRef.current = null
+    if (canAdvanceWithinSession && nextItem) {
+      const cached = itemPlaybackCacheRef.current[String(nextItem.id)]
+      if (cached?.signedUrl) {
+        const nextNumber = nextItem.global_item_order ?? nextIndex + 1
+        pendingAfterReactionRef.current = { signedUrl: cached.signedUrl, label: `Q${nextNumber} item` }
+        suppressNextItemEffectForIdRef.current = String(nextItem.id)
+        pendingFirstItemAudioIndexRef.current = null
+        setSelectedIndex(nextIndex)
+      } else {
+        void primeItemPlaybackUrl(nextItem).catch(() => {
+          /* best-effort late prefetch */
+        })
+      }
     }
 
-    suppressNextItemEffectForIdRef.current = String(nextItem.id)
-    const nextNumber = nextItem.global_item_order ?? nextIndex + 1
-    activateAudioUrl(cached.signedUrl, `Q${nextNumber} item`, true, 'item')
-    return true
+    activateAudioUrl(`/audio/${color}.wav`, `${color} result`, true, 'result_reaction')
+    return Boolean(pendingAfterReactionRef.current)
   }, [activateAudioUrl, autoPlayItems, currentItem, items, primeItemPlaybackUrl, selectedIndex])
 
   const handleAudioEnded = useCallback(() => {
     setAudioState('played')
+    if (audioTargetRef.current === 'result_reaction') {
+      const next = pendingAfterReactionRef.current
+      pendingAfterReactionRef.current = null
+      if (next) activateAudioUrl(next.signedUrl, next.label, true, 'item')
+      return
+    }
     if (audioTargetRef.current === 'package_end' && pendingAfterEndNavigationRef.current) {
       const pendingPath = pendingAfterEndNavigationRef.current
       pendingAfterEndNavigationRef.current = null
@@ -922,14 +922,14 @@ export function TeacherTestRunPage() {
       return
     }
     void playCurrentItemAudio(true)
-  }, [autoPlayItems, autoPlayPartIntro, autoPlaySessionIntro, canPlayCurrentItemAudio, canPlayCurrentSessionIntro, navigate, partIntroVariantIds, playCurrentItemAudio, playCurrentSessionIntro, playPartIntroAudio, selectedIndex])
+  }, [activateAudioUrl, autoPlayItems, autoPlayPartIntro, autoPlaySessionIntro, canPlayCurrentItemAudio, canPlayCurrentSessionIntro, navigate, partIntroVariantIds, playCurrentItemAudio, playCurrentSessionIntro, playPartIntroAudio, selectedIndex])
 
   const handleRecord = useCallback(
     async (color: ResultColor) => {
       if (!currentItem || probeOpen) return
       const isFinalOutstandingItem = !isItemFinalized(currentItem) && items.filter((item) => !isItemFinalized(item)).length === 1
-      const nextAudioStarted = playNextQuestionAudioUnderGesture()
-      playReaction(color, { sound: !nextAudioStarted })
+      playReaction(color)
+      playScoreFeedbackThenNext(color)
       const result = await recordStandaloneResult(currentItem.id, color)
       if (!result.ok) {
         setMessage(result.error)
@@ -938,14 +938,14 @@ export function TeacherTestRunPage() {
       await load()
       if (isFinalOutstandingItem) await playEndAfterFinalScore()
     },
-    [currentItem, items, load, playEndAfterFinalScore, playNextQuestionAudioUnderGesture, playReaction, probeOpen],
+    [currentItem, items, load, playEndAfterFinalScore, playReaction, playScoreFeedbackThenNext, probeOpen],
   )
 
   const handleProbe = useCallback(
     async (outcome: 'fail' | 'continue' | 'done') => {
       if (!currentAttempt?.id || !probeOpen) return
       const isFinalOutstandingItem = outcome !== 'continue' && currentItem && !isItemFinalized(currentItem) && items.filter((item) => !isItemFinalized(item)).length === 1
-      const nextAudioStarted = outcome !== 'continue' ? playNextQuestionAudioUnderGesture() : false
+      if (outcome !== 'continue') playScoreFeedbackThenNext(outcome === 'fail' ? 'yellow' : 'green')
       const result = await resolveStandaloneProbe(String(currentAttempt.id), outcome)
       if (!result.ok) {
         setMessage(result.error)
@@ -954,13 +954,13 @@ export function TeacherTestRunPage() {
       if (outcome === 'continue') {
         setMessage(`Probe depth n=${result.data.probeCount}`)
       } else {
-        playReaction(outcome === 'fail' ? 'yellow' : 'green', { sound: !nextAudioStarted })
+        playReaction(outcome === 'fail' ? 'yellow' : 'green')
         setMessage('')
       }
       await load()
       if (isFinalOutstandingItem) await playEndAfterFinalScore()
     },
-    [currentAttempt?.id, currentItem, items, load, playEndAfterFinalScore, playNextQuestionAudioUnderGesture, playReaction, probeOpen],
+    [currentAttempt?.id, currentItem, items, load, playEndAfterFinalScore, playReaction, playScoreFeedbackThenNext, probeOpen],
   )
 
   useEffect(() => {

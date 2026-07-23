@@ -200,6 +200,7 @@ function languageForSectionOrder(
   languagePolicy?: unknown,
 ): 'vi' | 'en' {
   if (languagePolicy === 'alternating_vi_en') return sectionOrder % 2 === 1 ? 'vi' : 'en'
+  if (languagePolicy === 'first4_en_last4_vi') return sectionOrder <= 4 ? 'en' : 'vi'
   return fallback
 }
 

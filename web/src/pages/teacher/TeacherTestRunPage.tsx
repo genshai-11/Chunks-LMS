@@ -227,7 +227,6 @@ export function TeacherTestRunPage() {
   const [packageEndVariantId, setPackageEndVariantId] = useState<string | null>(null)
   const [isSummaryShown, setIsSummaryShown] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
-  const [audioUrl, setAudioUrl] = useState('')
   const [audioLabel, setAudioLabel] = useState('Current item')
   const [audioState, setAudioState] = useState<AudioState>('idle')
   const [audioRate, setAudioRate] = useState(1)
@@ -249,8 +248,8 @@ export function TeacherTestRunPage() {
   const [resizing, setResizing] = useState(false)
   const railWidthRef = useRef(railWidth)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const activeAudioUrlRef = useRef('')
   const itemPlaybackCacheRef = useRef<Record<string, { variantId: string; signedUrl: string }>>({})
-  const pendingAutoPlayRef = useRef(false)
   const audioTargetRef = useRef<AudioTarget>('item')
   const playFirstItemAfterIntroRef = useRef(false)
   const firstItemAfterIntroIndexRef = useRef<number | null>(null)
@@ -595,28 +594,64 @@ export function TeacherTestRunPage() {
     setShowHeader(false)
   }, [currentSessionNumber])
 
+  const activateAudioUrl = useCallback((
+    signedUrl: string,
+    label: string,
+    shouldPlay: boolean,
+    target: AudioTarget,
+  ) => {
+    audioTargetRef.current = target
+    setAudioLabel(label)
+    setAudioState('ready')
+    setMessage('')
+
+    const audio = audioRef.current
+    if (!audio) return
+    const sourceChanged = activeAudioUrlRef.current !== signedUrl
+    if (sourceChanged) {
+      audio.pause()
+      activeAudioUrlRef.current = signedUrl
+      audio.src = signedUrl
+      audio.load()
+    } else {
+      audio.pause()
+      audio.currentTime = 0
+    }
+    const nextVolume = audibleVolume(audioVolume)
+    audio.muted = false
+    audio.volume = nextVolume
+    audio.playbackRate = audioRate
+    if (!shouldPlay) return
+    void audio.play().catch(() => {
+      setAudioState('ready')
+      const pendingPath = pendingAfterEndNavigationRef.current
+      pendingAfterEndNavigationRef.current = null
+      if (target === 'package_end' && pendingPath) {
+        setMessage('End audio was blocked by the browser. Opening analysis now.')
+        navigate(pendingPath)
+        return
+      }
+      setMessage('Autoplay was blocked by the browser. Press Play once to enable audio in this run.')
+    })
+  }, [audioRate, audioVolume, navigate])
+
   const loadAudioVariant = useCallback(async (
     variantId: string,
     label: string,
     shouldPlay = false,
     target: AudioTarget = 'item',
   ) => {
-    pendingAutoPlayRef.current = shouldPlay
-    audioTargetRef.current = target
-    setAudioUrl('')
     setAudioLabel(label)
     setAudioState('loading')
     setMessage('')
     try {
       const playback = await getNarrationPlaybackUrl(variantId)
-      setAudioUrl(playback.signedUrl)
-      setAudioState('ready')
+      activateAudioUrl(playback.signedUrl, label, shouldPlay, target)
     } catch (cause) {
-      pendingAutoPlayRef.current = false
       setAudioState('error')
       setMessage(cause instanceof Error ? cause.message : 'Audio playback failed')
     }
-  }, [])
+  }, [activateAudioUrl])
 
   const resolveCurrentItemAudioVariantId = useCallback(async () => {
     if (!currentItem?.test_item_id) return currentItemVariantId
@@ -675,29 +710,12 @@ export function TeacherTestRunPage() {
       }
       playFirstItemAfterIntroRef.current = false
       if (cached?.signedUrl) {
-        pendingAutoPlayRef.current = false
-        audioTargetRef.current = 'item'
-        setAudioLabel(`Q${currentItemNumber} item`)
-        setAudioUrl(cached.signedUrl)
-        setAudioState('ready')
-        if (shouldPlay) {
-          const audio = audioRef.current
-          if (audio) {
-            const nextVolume = audibleVolume(audioVolume)
-            audio.muted = false
-            audio.volume = nextVolume
-            audio.playbackRate = audioRate
-            audio.src = cached.signedUrl
-            void audio.play().catch(() => {
-              setMessage('Autoplay was blocked by the browser. Press Play once to enable audio in this run.')
-            })
-          }
-        }
+        activateAudioUrl(cached.signedUrl, `Q${currentItemNumber} item`, shouldPlay, 'item')
         return
       }
       await loadAudioVariant(variantId, `Q${currentItemNumber} item`, shouldPlay, 'item')
     },
-    [audioRate, audioVolume, currentItem, currentItemNumber, loadAudioVariant, primeItemPlaybackUrl, resolveCurrentItemAudioVariantId],
+    [activateAudioUrl, currentItem, currentItemNumber, loadAudioVariant, primeItemPlaybackUrl, resolveCurrentItemAudioVariantId],
   )
 
   const playPackageStartAudio = useCallback(
@@ -804,30 +822,7 @@ export function TeacherTestRunPage() {
     audio.muted = false
     audio.volume = nextVolume
     audio.playbackRate = audioRate
-  }, [audioRate, audioUrl, audioVolume])
-
-  useEffect(() => {
-    if (!audioUrl || !pendingAutoPlayRef.current) return
-    pendingAutoPlayRef.current = false
-    const audio = audioRef.current
-    if (!audio) return
-    const nextVolume = audibleVolume(audioVolume)
-    if (nextVolume !== audioVolume) setAudioVolume(nextVolume)
-    audio.muted = false
-    audio.volume = nextVolume
-    audio.playbackRate = audioRate
-    void audio.play().catch(() => {
-      setAudioState('ready')
-      const pendingPath = pendingAfterEndNavigationRef.current
-      pendingAfterEndNavigationRef.current = null
-      if (audioTargetRef.current === 'package_end' && pendingPath) {
-        setMessage('End audio was blocked by the browser. Opening analysis now.')
-        navigate(pendingPath)
-        return
-      }
-      setMessage('Autoplay was blocked by the browser. Press Play once to enable audio in this run.')
-    })
-  }, [audioRate, audioUrl, audioVolume, navigate])
+  }, [audioRate, audioVolume])
 
   useEffect(() => {
     if (!autoPlayPartIntro || !isFirstItemInSession) return
@@ -883,28 +878,11 @@ export function TeacherTestRunPage() {
       return false
     }
 
-    pendingAutoPlayRef.current = false
-    audioTargetRef.current = 'item'
     suppressNextItemEffectForIdRef.current = String(nextItem.id)
     const nextNumber = nextItem.global_item_order ?? nextIndex + 1
-    setAudioLabel(`Q${nextNumber} item`)
-    setAudioUrl(cached.signedUrl)
-    setAudioState('ready')
-    setMessage('')
-    const audio = audioRef.current
-    if (!audio) return false
-    const nextVolume = audibleVolume(audioVolume)
-    audio.pause()
-    audio.muted = false
-    audio.volume = nextVolume
-    audio.playbackRate = audioRate
-    audio.src = cached.signedUrl
-    audio.load()
-    void audio.play().catch(() => {
-      setMessage('Autoplay was blocked by the browser. Press Play once to enable audio in this run.')
-    })
+    activateAudioUrl(cached.signedUrl, `Q${nextNumber} item`, true, 'item')
     return true
-  }, [audioRate, audioVolume, autoPlayItems, currentItem, items, primeItemPlaybackUrl, selectedIndex])
+  }, [activateAudioUrl, autoPlayItems, currentItem, items, primeItemPlaybackUrl, selectedIndex])
 
   const handleAudioEnded = useCallback(() => {
     setAudioState('played')
@@ -1303,9 +1281,7 @@ export function TeacherTestRunPage() {
                     <audio
                       ref={audioRef}
                       id="live-test-current-audio"
-                      key={audioUrl}
                       controls
-                      src={audioUrl}
                       onPlay={() => setAudioState('playing')}
                       onEnded={handleAudioEnded}
                       onError={() => setAudioState('error')}

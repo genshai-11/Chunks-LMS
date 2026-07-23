@@ -244,8 +244,9 @@ export async function listStandaloneRunItems(
 }
 
 export async function findLatestApprovedNarrationVariant(input: {
-  target: 'section_intro' | 'test_item'
+  target: 'package_start' | 'package_end' | 'section_intro' | 'test_item'
   language: PromptLanguage
+  packageVersionId?: string | null
   testSectionId?: string | null
   testItemId?: string | null
 }): Promise<Result<{ id: string; audioAssetId: string } | null>> {
@@ -262,7 +263,10 @@ export async function findLatestApprovedNarrationVariant(input: {
     .order('created_at', { ascending: false })
     .limit(1)
 
-  if (input.target === 'section_intro') {
+  if (input.target === 'package_start' || input.target === 'package_end') {
+    if (!input.packageVersionId) return { ok: true, data: null }
+    query = query.eq('package_version_id', input.packageVersionId)
+  } else if (input.target === 'section_intro') {
     if (!input.testSectionId) return { ok: true, data: null }
     query = query.eq('test_section_id', input.testSectionId)
   } else {

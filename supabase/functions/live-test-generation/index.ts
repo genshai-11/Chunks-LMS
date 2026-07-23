@@ -32,9 +32,10 @@ type GenerateTestItemBody = {
 type GenerateNarrationBody = {
   action: "generateNarration";
   packageVersionId: string;
-  target: "section_intro" | "test_item";
+  target: "package_start" | "package_end" | "section_intro" | "test_item";
   testSectionId?: string | null;
   testItemId?: string | null;
+  textOverride?: string | null;
   language: "vi" | "en";
   voiceId: string;
 };
@@ -327,6 +328,28 @@ async function resolveNarrationText(
   admin: SupabaseClientLike,
   body: GenerateNarrationBody,
 ): Promise<string> {
+  if (body.target === "package_start" || body.target === "package_end") {
+    if (body.testSectionId || body.testItemId)
+      throw new Error("Invalid parameters for package lifecycle narration target.");
+    const override = String(body.textOverride ?? "").trim().replace(/\s+/g, " ");
+    if (override) return override;
+    const { data: version, error: versionError } = await admin
+      .from("test_package_versions")
+      .select("version_label, test_packages(title)")
+      .eq("id", body.packageVersionId)
+      .maybeSingle();
+    if (versionError) throw new Error(`Package lookup failed: ${versionError.message}`);
+    const title = String((version?.test_packages as { title?: string } | null)?.title ?? "Live Test");
+    if (body.target === "package_start") {
+      return body.language === "vi"
+        ? `Bắt đầu bài kiểm tra ${title}. Hãy lắng nghe và trả lời từng câu.`
+        : `Start the ${title} test. Listen carefully and answer each item.`;
+    }
+    return body.language === "vi"
+      ? `Kết thúc bài kiểm tra ${title}. Cảm ơn em đã hoàn thành phần kiểm tra.`
+      : `End of the ${title} test. Thank you for completing the test.`;
+  }
+
   if (body.target === "section_intro") {
     if (!body.testSectionId || body.testItemId)
       throw new Error("Invalid parameters for section_intro narration target.");
@@ -407,9 +430,13 @@ async function generateNarration(
       body.target === "section_intro" ? body.testSectionId : null,
     test_item_id: body.target === "test_item" ? body.testItemId : null,
     job_type:
-      body.target === "section_intro"
-        ? "section_intro_narration"
-        : "item_narration",
+      body.target === "package_start"
+        ? "package_start_narration"
+        : body.target === "package_end"
+          ? "package_end_narration"
+          : body.target === "section_intro"
+            ? "section_intro_narration"
+            : "item_narration",
     status: "running",
     started_at: requestedAt,
     source_hash: sourceHash,

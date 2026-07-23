@@ -61,15 +61,19 @@ export async function narrationSourceHash(
 export type AudioTargetStatus =
   'missing' | 'generated' | 'approved' | 'stale' | 'failed' | 'rejected'
 
+function narrationTargetKey(record: NarrationReviewRecord): string {
+  if (record.variant.narrationTarget === 'package_start') return 'package:start'
+  if (record.variant.narrationTarget === 'package_end') return 'package:end'
+  if (record.variant.narrationTarget === 'section_intro') return `section:${record.variant.testSectionId}`
+  return `item:${record.variant.testItemId}`
+}
+
 export function latestNarrationByTarget(
   records: NarrationReviewRecord[],
 ): Map<string, NarrationReviewRecord> {
   const latest = new Map<string, NarrationReviewRecord>()
   for (const record of records) {
-    const key =
-      record.variant.narrationTarget === 'section_intro'
-        ? `section:${record.variant.testSectionId}`
-        : `item:${record.variant.testItemId}`
+    const key = narrationTargetKey(record)
     if (!latest.has(key)) latest.set(key, record)
   }
   return latest
@@ -80,13 +84,7 @@ export function resolveNarrationRecord(
   targetKey: string,
   currentHash: string | undefined,
 ): NarrationReviewRecord | undefined {
-  const candidates = records.filter((record) => {
-    const key =
-      record.variant.narrationTarget === 'section_intro'
-        ? `section:${record.variant.testSectionId}`
-        : `item:${record.variant.testItemId}`
-    return key === targetKey
-  })
+  const candidates = records.filter((record) => narrationTargetKey(record) === targetKey)
   if (!currentHash) return candidates[0]
   return (
     candidates.find(

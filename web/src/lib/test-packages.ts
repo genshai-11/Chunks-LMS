@@ -133,6 +133,25 @@ export async function listTestPackages(): Promise<Result<TestPackage[]>> {
   return { ok: true, data: (data ?? []).map(mapTestPackage) }
 }
 
+export async function updateTestPackage(input: {
+  packageId: string
+  title: string
+  slug?: string | null
+}): Promise<Result<TestPackage>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const values: Record<string, unknown> = { title: input.title.trim() }
+  if (input.slug !== undefined) values.slug = input.slug?.trim() || slugify(input.title)
+  const { data, error } = await sb
+    .from('test_packages')
+    .update(values)
+    .eq('id', input.packageId)
+    .select()
+    .single()
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: mapTestPackage(data) }
+}
+
 export async function listTestPackageVersions(
   packageId: string,
 ): Promise<Result<TestPackageVersion[]>> {
@@ -653,6 +672,62 @@ export async function deleteDraftTestItem(input: {
     .eq('package_version_id', input.packageVersionId)
   if (error) return { ok: false, error: error.message }
   return { ok: true, data: true }
+}
+
+export async function createDraftTestSection(input: {
+  packageVersionId: string
+  title: string | null
+  targetCvrOhm: number
+  cciProfileId: string
+  cciCategoryId: string
+  cciCategoryLabel: string
+  cciValue: number
+}): Promise<Result<TestSection>> {
+  const draft = await assertDraftPackageVersion(input.packageVersionId)
+  if (!draft.ok) return draft
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { data: existing, error: orderError } = await sb
+    .from('test_sections')
+    .select('section_order')
+    .eq('package_version_id', input.packageVersionId)
+    .order('section_order', { ascending: false })
+    .limit(1)
+  if (orderError) return { ok: false, error: orderError.message }
+  const nextOrder = (existing?.[0]?.section_order ?? 0) + 1
+  const { data, error } = await sb
+    .from('test_sections')
+    .insert({
+      package_version_id: input.packageVersionId,
+      section_order: nextOrder,
+      title: input.title,
+      target_cvr_ohm: input.targetCvrOhm,
+      cci_profile_id: input.cciProfileId,
+      cci_category_id: input.cciCategoryId,
+      cci_snapshot: {
+        label: input.cciCategoryLabel,
+        value: input.cciValue,
+        unit: 'Ampe',
+        targetCvrOhm: input.targetCvrOhm,
+        source: 'admin-resources-manual',
+      },
+      metadata: { source: 'admin-resources-manual' },
+    })
+    .select()
+    .single()
+  if (error) return { ok: false, error: error.message }
+  const { error: snapshotError } = await sb.from('section_measurement_snapshots').insert({
+    test_section_id: data.id,
+    package_version_id: input.packageVersionId,
+    target_cvr_ohm: input.targetCvrOhm,
+    cci_profile_id: input.cciProfileId,
+    cci_category_id: input.cciCategoryId,
+    cci_category_label: input.cciCategoryLabel,
+    cci_value: input.cciValue,
+    snapshot_metadata: { source: 'admin-resources-manual', unit: 'Ampe', sectionOrder: nextOrder },
+  })
+  if (snapshotError) return { ok: false, error: snapshotError.message }
+  return { ok: true, data: mapTestSection(data) }
 }
 
 export async function updateDraftTestSection(input: {

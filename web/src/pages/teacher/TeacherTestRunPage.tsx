@@ -227,7 +227,6 @@ export function TeacherTestRunPage() {
   const [packageEndVariantId, setPackageEndVariantId] = useState<string | null>(null)
   const [isSummaryShown, setIsSummaryShown] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
-  const [queuedAutoPlayItemId, setQueuedAutoPlayItemId] = useState<string | null>(null)
   const [audioUrl, setAudioUrl] = useState('')
   const [audioLabel, setAudioLabel] = useState('Current item')
   const [audioState, setAudioState] = useState<AudioState>('idle')
@@ -390,20 +389,22 @@ export function TeacherTestRunPage() {
     [mapOpen],
   )
 
-  const playReaction = useCallback((color: ResultColor) => {
+  const playReaction = useCallback((color: ResultColor, options: { sound?: boolean } = {}) => {
     const id = Date.now()
     setReaction({ kind: reactionFor(color), color, id })
     if (color === 'purple') {
       triggerConfetti()
     }
 
-    try {
-      const audio = new Audio(`/audio/${color}.wav`)
-      void audio.play().catch((err) => {
-        console.warn('[live-test] reaction audio play failed:', err)
-      })
-    } catch (e) {
-      console.warn('[live-test] reaction audio init failed:', e)
+    if (options.sound !== false) {
+      try {
+        const audio = new Audio(`/audio/${color}.wav`)
+        void audio.play().catch((err) => {
+          console.warn('[live-test] reaction audio play failed:', err)
+        })
+      } catch (e) {
+        console.warn('[live-test] reaction audio init failed:', e)
+      }
     }
 
     window.setTimeout(() => setReaction((current) => (current?.id === id ? null : current)), 1200)
@@ -851,51 +852,53 @@ export function TeacherTestRunPage() {
   }, [currentItem?.id, currentItem?.session_number, items, primeItemPlaybackUrl, selectedIndex])
 
   useEffect(() => {
-    if (!queuedAutoPlayItemId || String(currentItem?.id ?? '') !== queuedAutoPlayItemId) return
-    if (!canPlayCurrentItemAudio) return
-    pendingFirstItemAudioIndexRef.current = null
-    setQueuedAutoPlayItemId(null)
-    void playCurrentItemAudio(true)
-  }, [canPlayCurrentItemAudio, currentItem?.id, playCurrentItemAudio, queuedAutoPlayItemId])
-
-  useEffect(() => {
     const targetIndex = pendingFirstItemAudioIndexRef.current
     if (targetIndex == null || selectedIndex !== targetIndex) return
     if (!currentItem?.id || !canPlayCurrentItemAudio) return
     pendingFirstItemAudioIndexRef.current = null
-    setQueuedAutoPlayItemId(null)
     void playCurrentItemAudio(true)
   }, [canPlayCurrentItemAudio, currentItem?.id, playCurrentItemAudio, selectedIndex])
 
-  const playNextQuestionAudioUnderGesture = useCallback(() => {
-    if (!autoPlayItems || !currentItem || isItemFinalized(currentItem)) return
+  const playNextQuestionAudioUnderGesture = useCallback((): boolean => {
+    if (!autoPlayItems || !currentItem || isItemFinalized(currentItem)) return false
     const nextIndex = items.findIndex((item, index) => index > selectedIndex && !isItemFinalized(item))
-    if (nextIndex < 0) return
+    if (nextIndex < 0) return false
     const nextItem = items[nextIndex]
-    if (!nextItem || nextItem.session_number !== currentItem.session_number) return
-    pendingFirstItemAudioIndexRef.current = nextIndex
-    setQueuedAutoPlayItemId(String(nextItem.id))
+    if (!nextItem || nextItem.session_number !== currentItem.session_number) return false
+
     setSelectedIndex(nextIndex)
+    pendingFirstItemAudioIndexRef.current = null
 
     const cached = itemPlaybackCacheRef.current[String(nextItem.id)]
-    if (!cached?.signedUrl) return
+    if (!cached?.signedUrl) {
+      void primeItemPlaybackUrl(nextItem).catch(() => {
+        /* best-effort late prefetch */
+      })
+      setMessage('Next question audio is still preparing. Press Play if it does not start automatically.')
+      return false
+    }
+
     pendingAutoPlayRef.current = false
     audioTargetRef.current = 'item'
     const nextNumber = nextItem.global_item_order ?? nextIndex + 1
     setAudioLabel(`Q${nextNumber} item`)
     setAudioUrl(cached.signedUrl)
     setAudioState('ready')
+    setMessage('')
     const audio = audioRef.current
-    if (!audio) return
+    if (!audio) return false
     const nextVolume = audibleVolume(audioVolume)
+    audio.pause()
     audio.muted = false
     audio.volume = nextVolume
     audio.playbackRate = audioRate
     audio.src = cached.signedUrl
+    audio.load()
     void audio.play().catch(() => {
       setMessage('Autoplay was blocked by the browser. Press Play once to enable audio in this run.')
     })
-  }, [audioRate, audioVolume, autoPlayItems, currentItem, items, selectedIndex])
+    return true
+  }, [audioRate, audioVolume, autoPlayItems, currentItem, items, primeItemPlaybackUrl, selectedIndex])
 
   const handleAudioEnded = useCallback(() => {
     setAudioState('played')
@@ -941,8 +944,8 @@ export function TeacherTestRunPage() {
     async (color: ResultColor) => {
       if (!currentItem || probeOpen) return
       const isFinalOutstandingItem = !isItemFinalized(currentItem) && items.filter((item) => !isItemFinalized(item)).length === 1
-      playReaction(color)
-      playNextQuestionAudioUnderGesture()
+      const nextAudioStarted = playNextQuestionAudioUnderGesture()
+      playReaction(color, { sound: !nextAudioStarted })
       const result = await recordStandaloneResult(currentItem.id, color)
       if (!result.ok) {
         setMessage(result.error)
@@ -958,7 +961,7 @@ export function TeacherTestRunPage() {
     async (outcome: 'fail' | 'continue' | 'done') => {
       if (!currentAttempt?.id || !probeOpen) return
       const isFinalOutstandingItem = outcome !== 'continue' && currentItem && !isItemFinalized(currentItem) && items.filter((item) => !isItemFinalized(item)).length === 1
-      if (outcome !== 'continue') playNextQuestionAudioUnderGesture()
+      const nextAudioStarted = outcome !== 'continue' ? playNextQuestionAudioUnderGesture() : false
       const result = await resolveStandaloneProbe(String(currentAttempt.id), outcome)
       if (!result.ok) {
         setMessage(result.error)
@@ -967,7 +970,7 @@ export function TeacherTestRunPage() {
       if (outcome === 'continue') {
         setMessage(`Probe depth n=${result.data.probeCount}`)
       } else {
-        playReaction(outcome === 'fail' ? 'yellow' : 'green')
+        playReaction(outcome === 'fail' ? 'yellow' : 'green', { sound: !nextAudioStarted })
         setMessage('')
       }
       await load()

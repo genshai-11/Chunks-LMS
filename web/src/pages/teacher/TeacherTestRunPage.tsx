@@ -256,6 +256,7 @@ export function TeacherTestRunPage() {
   const firstItemAfterIntroIndexRef = useRef<number | null>(null)
   const pendingFirstItemAudioIndexRef = useRef<number | null>(null)
   const pendingAfterEndNavigationRef = useRef<string | null>(null)
+  const suppressNextItemEffectForIdRef = useRef<string | null>(null)
   const partIntroPlayedRef = useRef<Record<1 | 2, boolean>>({ 1: false, 2: false })
   const packageEndPlayedRef = useRef(false)
 
@@ -768,6 +769,10 @@ export function TeacherTestRunPage() {
 
   useEffect(() => {
     if (!currentItem?.id || !canPlayCurrentItemAudio) return
+    if (suppressNextItemEffectForIdRef.current === String(currentItem.id)) {
+      suppressNextItemEffectForIdRef.current = null
+      return
+    }
     if (pendingFirstItemAudioIndexRef.current === selectedIndex) return
     const deferForPackageStart = autoPlayPackageStart && currentSessionNumber === 1 && isFirstItemInSession && audioTargetRef.current !== 'package_start'
     const deferForPartIntro = autoPlayPartIntro && isFirstItemInSession && (
@@ -880,6 +885,7 @@ export function TeacherTestRunPage() {
 
     pendingAutoPlayRef.current = false
     audioTargetRef.current = 'item'
+    suppressNextItemEffectForIdRef.current = String(nextItem.id)
     const nextNumber = nextItem.global_item_order ?? nextIndex + 1
     setAudioLabel(`Q${nextNumber} item`)
     setAudioUrl(cached.signedUrl)

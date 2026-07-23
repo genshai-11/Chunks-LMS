@@ -600,8 +600,9 @@ export function TeacherTestRunPage() {
     if (sourceChanged) {
       audio.pause()
       activeAudioUrlRef.current = signedUrl
+      // Setting src already starts resource selection. Calling load() here immediately
+      // restarts that request and produced duplicate WAV fetches / audible stutter.
       audio.src = signedUrl
-      audio.load()
     } else {
       audio.pause()
       audio.currentTime = 0

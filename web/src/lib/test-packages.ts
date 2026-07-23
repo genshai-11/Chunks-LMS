@@ -307,7 +307,7 @@ export async function createSnapshotOverride(input: {
   return { ok: true, data: mapSectionMeasurementSnapshot(data) }
 }
 
-export type NarrationTarget = 'package_start' | 'package_end' | 'section_intro' | 'test_item'
+export type NarrationTarget = 'package_start' | 'part_intro' | 'package_end' | 'section_intro' | 'test_item'
 
 export type NarrationVariant = {
   id: string
@@ -319,6 +319,7 @@ export type NarrationVariant = {
   voiceId: string
   voiceLabel: string | null
   sourceTextHash: string
+  providerMetadata: Record<string, unknown>
   approvalStatus: 'draft' | 'generated' | 'approved' | 'rejected' | 'archived'
   audioAssetId: string | null
   generationJobId: string | null
@@ -362,6 +363,7 @@ function mapNarrationVariant(row: any): NarrationVariant {
     voiceId: row.voice_id,
     voiceLabel: row.voice_label,
     sourceTextHash: row.source_text_hash,
+    providerMetadata: row.provider_metadata ?? {},
     approvalStatus: row.approval_status,
     audioAssetId: row.audio_asset_id,
     generationJobId: row.generation_job_id,
@@ -427,6 +429,7 @@ export async function listSectionNarrationReview(input: {
     .filter(
       (variant: NarrationVariant) =>
         variant.narrationTarget === 'package_start' ||
+        variant.narrationTarget === 'part_intro' ||
         variant.narrationTarget === 'package_end' ||
         variant.testSectionId === input.sectionId ||
         (variant.testItemId !== null && itemIds.has(variant.testItemId)),

@@ -63,6 +63,7 @@ export type AudioTargetStatus =
 
 function narrationTargetKey(record: NarrationReviewRecord): string {
   if (record.variant.narrationTarget === 'package_start') return 'package:start'
+  if (record.variant.narrationTarget === 'part_intro') return `part:${record.variant.providerMetadata?.part ?? 'unknown'}`
   if (record.variant.narrationTarget === 'package_end') return 'package:end'
   if (record.variant.narrationTarget === 'section_intro') return `section:${record.variant.testSectionId}`
   return `item:${record.variant.testItemId}`

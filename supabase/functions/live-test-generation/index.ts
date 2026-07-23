@@ -32,7 +32,7 @@ type GenerateTestItemBody = {
 type GenerateNarrationBody = {
   action: "generateNarration";
   packageVersionId: string;
-  target: "package_start" | "package_end" | "section_intro" | "test_item";
+  target: "package_start" | "part_intro" | "package_end" | "section_intro" | "test_item";
   testSectionId?: string | null;
   testItemId?: string | null;
   textOverride?: string | null;
@@ -328,7 +328,7 @@ async function resolveNarrationText(
   admin: SupabaseClientLike,
   body: GenerateNarrationBody,
 ): Promise<string> {
-  if (body.target === "package_start" || body.target === "package_end") {
+  if (body.target === "package_start" || body.target === "part_intro" || body.target === "package_end") {
     if (body.testSectionId || body.testItemId)
       throw new Error("Invalid parameters for package lifecycle narration target.");
     const override = String(body.textOverride ?? "").trim().replace(/\s+/g, " ");
@@ -344,6 +344,11 @@ async function resolveNarrationText(
       return body.language === "vi"
         ? `Bắt đầu bài kiểm tra ${title}. Hãy lắng nghe và trả lời từng câu.`
         : `Start the ${title} test. Listen carefully and answer each item.`;
+    }
+    if (body.target === "part_intro") {
+      return body.language === "vi"
+        ? `Bắt đầu phần tiếp theo của bài kiểm tra ${title}.`
+        : `Start the next part of the ${title} test.`;
     }
     return body.language === "vi"
       ? `Kết thúc bài kiểm tra ${title}. Cảm ơn em đã hoàn thành phần kiểm tra.`
@@ -432,11 +437,13 @@ async function generateNarration(
     job_type:
       body.target === "package_start"
         ? "package_start_narration"
-        : body.target === "package_end"
-          ? "package_end_narration"
-          : body.target === "section_intro"
-            ? "section_intro_narration"
-            : "item_narration",
+        : body.target === "part_intro"
+          ? "part_intro_narration"
+          : body.target === "package_end"
+            ? "package_end_narration"
+            : body.target === "section_intro"
+              ? "section_intro_narration"
+              : "item_narration",
     status: "running",
     started_at: requestedAt,
     source_hash: sourceHash,

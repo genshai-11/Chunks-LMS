@@ -58,7 +58,7 @@ export function listTtsModels(language: 'vi' | 'en'): Promise<{
   return invoke({ action: 'listTtsModels', language })
 }
 
-export type NarrationGenerationTarget = 'package_start' | 'package_end' | 'section_intro' | 'test_item'
+export type NarrationGenerationTarget = 'package_start' | 'part_intro' | 'package_end' | 'section_intro' | 'test_item'
 
 export function generateNarration(input: {
   packageVersionId: string
@@ -86,7 +86,7 @@ async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
 
 export async function uploadNarrationAudio(input: {
   packageVersionId: string
-  target: Extract<NarrationGenerationTarget, 'package_start' | 'package_end'>
+  target: Extract<NarrationGenerationTarget, 'package_start' | 'part_intro' | 'package_end'>
   language: 'vi' | 'en'
   voiceId: string
   sourceTextHash: string

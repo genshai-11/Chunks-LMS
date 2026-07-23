@@ -52,7 +52,7 @@ import { triggerConfetti } from '../../lib/confetti'
 import { useAppState } from '../../state/useAppState'
 
 type AudioState = 'idle' | 'loading' | 'ready' | 'playing' | 'played' | 'error'
-type AudioTarget = 'item' | 'session_intro' | 'package_start' | 'package_end'
+type AudioTarget = 'item' | 'session_intro' | 'package_start' | 'part_intro_1' | 'part_intro_2' | 'package_end'
 type ResultColor = 'red' | 'yellow' | 'green' | 'purple'
 type ReactionKind = 'celebrate' | 'happy' | 'fight'
 type Reaction = { kind: ReactionKind; color: ResultColor; id: number } | null
@@ -74,6 +74,7 @@ const RAIL_COLLAPSED = 48
 const AUDIO_AUTOPLAY_ITEMS_KEY = 'chunks-lms:live-test-autoplay-items'
 const AUDIO_AUTOPLAY_INTRO_KEY = 'chunks-lms:live-test-autoplay-intro'
 const AUDIO_AUTOPLAY_PACKAGE_START_KEY = 'chunks-lms:live-test-autoplay-package-start'
+const AUDIO_AUTOPLAY_PART_INTRO_KEY = 'chunks-lms:live-test-autoplay-part-intro'
 const AUDIO_AUTOPLAY_PACKAGE_END_KEY = 'chunks-lms:live-test-autoplay-package-end'
 const AUDIO_RATE_KEY = 'chunks-lms:live-test-audio-rate'
 const AUDIO_VOLUME_KEY = 'chunks-lms:live-test-audio-volume'
@@ -217,6 +218,7 @@ export function TeacherTestRunPage() {
   const [introVariantId, setIntroVariantId] = useState<string | null>(null)
   const [sessionIntroVariantIds, setSessionIntroVariantIds] = useState<Record<number, string | null>>({})
   const [packageStartVariantId, setPackageStartVariantId] = useState<string | null>(null)
+  const [partIntroVariantIds, setPartIntroVariantIds] = useState<Record<1 | 2, string | null>>({ 1: null, 2: null })
   const [packageEndVariantId, setPackageEndVariantId] = useState<string | null>(null)
   const [isSummaryShown, setIsSummaryShown] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -228,6 +230,7 @@ export function TeacherTestRunPage() {
   const [autoPlayItems, setAutoPlayItems] = useState(false)
   const [autoPlaySessionIntro, setAutoPlaySessionIntro] = useState(false)
   const [autoPlayPackageStart, setAutoPlayPackageStart] = useState(false)
+  const [autoPlayPartIntro, setAutoPlayPartIntro] = useState(true)
   const [autoPlayPackageEnd, setAutoPlayPackageEnd] = useState(false)
   const [audioPanelOpen, setAudioPanelOpen] = useState(true)
   const [reaction, setReaction] = useState<Reaction>(null)
@@ -247,12 +250,14 @@ export function TeacherTestRunPage() {
   const firstItemAfterIntroIndexRef = useRef<number | null>(null)
   const pendingFirstItemAudioIndexRef = useRef<number | null>(null)
   const pendingAfterEndNavigationRef = useRef<string | null>(null)
+  const partIntroPlayedRef = useRef<Record<1 | 2, boolean>>({ 1: false, 2: false })
 
   useEffect(() => {
     setRailWidth(readSavedRailWidth())
     setAutoPlayItems(readSavedBoolean(AUDIO_AUTOPLAY_ITEMS_KEY, false))
     setAutoPlaySessionIntro(readSavedBoolean(AUDIO_AUTOPLAY_INTRO_KEY, false))
     setAutoPlayPackageStart(readSavedBoolean(AUDIO_AUTOPLAY_PACKAGE_START_KEY, false))
+    setAutoPlayPartIntro(readSavedBoolean(AUDIO_AUTOPLAY_PART_INTRO_KEY, true))
     setAutoPlayPackageEnd(readSavedBoolean(AUDIO_AUTOPLAY_PACKAGE_END_KEY, false))
     setAudioRate(readSavedNumber(AUDIO_RATE_KEY, 1, 0.75, 2))
     setAudioVolume(readSavedVolume())
@@ -286,6 +291,14 @@ export function TeacherTestRunPage() {
       /* ignore */
     }
   }, [autoPlayPackageStart])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(AUDIO_AUTOPLAY_PART_INTRO_KEY, String(autoPlayPartIntro))
+    } catch {
+      /* ignore */
+    }
+  }, [autoPlayPartIntro])
 
   useEffect(() => {
     try {
@@ -422,23 +435,41 @@ export function TeacherTestRunPage() {
     setAllRuns(targetRuns)
 
     if (packageVersionId) {
-      const lifecycleLanguage = targetRuns[0]?.promptLanguage ?? currentRun.promptLanguage ?? 'vi'
-      const [startAudio, endAudio] = await Promise.all([
+      const partOneLanguage = targetRuns.find((run) => run.sessionNumber === 1)?.promptLanguage ?? targetRuns[0]?.promptLanguage ?? currentRun.promptLanguage ?? 'vi'
+      const partTwoLanguage = targetRuns.find((run) => run.sessionNumber === 5)?.promptLanguage ?? targetRuns[4]?.promptLanguage ?? partOneLanguage
+      const [startAudio, partOneAudio, partTwoAudio, endAudio] = await Promise.all([
         findLatestApprovedNarrationVariant({
           target: 'package_start',
           packageVersionId,
-          language: lifecycleLanguage,
+          language: partOneLanguage,
+        }),
+        findLatestApprovedNarrationVariant({
+          target: 'part_intro',
+          packageVersionId,
+          part: 1,
+          language: partOneLanguage,
+        }),
+        findLatestApprovedNarrationVariant({
+          target: 'part_intro',
+          packageVersionId,
+          part: 2,
+          language: partTwoLanguage,
         }),
         findLatestApprovedNarrationVariant({
           target: 'package_end',
           packageVersionId,
-          language: lifecycleLanguage,
+          language: partTwoLanguage,
         }),
       ])
       setPackageStartVariantId(startAudio.ok && startAudio.data ? startAudio.data.id : null)
+      setPartIntroVariantIds({
+        1: partOneAudio.ok && partOneAudio.data ? partOneAudio.data.id : null,
+        2: partTwoAudio.ok && partTwoAudio.data ? partTwoAudio.data.id : null,
+      })
       setPackageEndVariantId(endAudio.ok && endAudio.data ? endAudio.data.id : null)
     } else {
       setPackageStartVariantId(null)
+      setPartIntroVariantIds({ 1: null, 2: null })
       setPackageEndVariantId(null)
     }
 
@@ -503,6 +534,7 @@ export function TeacherTestRunPage() {
   }, [runId, assignmentIdParam])
 
   useEffect(() => {
+    partIntroPlayedRef.current = { 1: false, 2: false }
     void load()
   }, [load])
 
@@ -619,6 +651,20 @@ export function TeacherTestRunPage() {
     [loadAudioVariant, packageEndVariantId],
   )
 
+  const playPartIntroAudio = useCallback(
+    async (part: 1 | 2, shouldPlay = true) => {
+      const variantId = partIntroVariantIds[part]
+      if (!variantId) {
+        setMessage(`No approved Part ${part === 1 ? 'I' : 'II'} intro audio is available for this package/language.`)
+        return
+      }
+      partIntroPlayedRef.current[part] = true
+      playFirstItemAfterIntroRef.current = false
+      await loadAudioVariant(variantId, part === 1 ? 'Part I intro' : 'Part II intro', shouldPlay, part === 1 ? 'part_intro_1' : 'part_intro_2')
+    },
+    [loadAudioVariant, partIntroVariantIds],
+  )
+
   const playCurrentSessionIntro = useCallback(
     async (shouldPlay = true, playFirstItemAfterIntro = true) => {
       const variantId = await resolveCurrentSessionIntroVariantId()
@@ -643,16 +689,25 @@ export function TeacherTestRunPage() {
   useEffect(() => {
     if (!currentItem?.id || !canPlayCurrentItemAudio) return
     if (pendingFirstItemAudioIndexRef.current === selectedIndex) return
+    const deferForPackageStart = autoPlayPackageStart && currentSessionNumber === 1 && isFirstItemInSession && audioTargetRef.current !== 'package_start'
+    const deferForPartIntro = autoPlayPartIntro && isFirstItemInSession && (
+      (currentSessionNumber === 1 && !partIntroPlayedRef.current[1] && Boolean(partIntroVariantIds[1])) ||
+      (currentSessionNumber === 5 && !partIntroPlayedRef.current[2] && Boolean(partIntroVariantIds[2]))
+    )
     const deferForSessionIntro = autoPlaySessionIntro && canPlayCurrentSessionIntro && isFirstItemInSession
-    if (deferForSessionIntro) return
+    if (deferForPackageStart || deferForPartIntro || deferForSessionIntro) return
     void playCurrentItemAudio(autoPlayItems)
   }, [
     autoPlayItems,
+    autoPlayPackageStart,
+    autoPlayPartIntro,
     autoPlaySessionIntro,
     canPlayCurrentItemAudio,
     canPlayCurrentSessionIntro,
     currentItem?.id,
+    currentSessionNumber,
     isFirstItemInSession,
+    partIntroVariantIds,
     playCurrentItemAudio,
     selectedIndex,
   ])
@@ -690,9 +745,22 @@ export function TeacherTestRunPage() {
   }, [audioRate, audioUrl, audioVolume, navigate])
 
   useEffect(() => {
+    if (!autoPlayPartIntro || !isFirstItemInSession) return
+    if (currentSessionNumber === 1 && !autoPlayPackageStart && !partIntroPlayedRef.current[1] && partIntroVariantIds[1]) {
+      void playPartIntroAudio(1, true)
+      return
+    }
+    if (currentSessionNumber === 5 && !partIntroPlayedRef.current[2] && partIntroVariantIds[2]) {
+      void playPartIntroAudio(2, true)
+    }
+  }, [autoPlayPackageStart, autoPlayPartIntro, currentSessionNumber, isFirstItemInSession, partIntroVariantIds, playPartIntroAudio])
+
+  useEffect(() => {
     if (!autoPlaySessionIntro || !canPlayCurrentSessionIntro || !isFirstItemInSession) return
+    if (autoPlayPartIntro && currentSessionNumber === 1 && !partIntroPlayedRef.current[1] && partIntroVariantIds[1]) return
+    if (autoPlayPartIntro && currentSessionNumber === 5 && !partIntroPlayedRef.current[2] && partIntroVariantIds[2]) return
     void playCurrentSessionIntro(true, true)
-  }, [autoPlaySessionIntro, canPlayCurrentSessionIntro, isFirstItemInSession, playCurrentSessionIntro])
+  }, [autoPlayPartIntro, autoPlaySessionIntro, canPlayCurrentSessionIntro, currentSessionNumber, isFirstItemInSession, partIntroVariantIds, playCurrentSessionIntro])
 
   useEffect(() => {
     const targetIndex = pendingFirstItemAudioIndexRef.current
@@ -710,6 +778,26 @@ export function TeacherTestRunPage() {
       navigate(pendingPath)
       return
     }
+    if (audioTargetRef.current === 'package_start') {
+      if (autoPlayPartIntro && partIntroVariantIds[1] && !partIntroPlayedRef.current[1]) {
+        void playPartIntroAudio(1, true)
+        return
+      }
+      if (autoPlaySessionIntro && canPlayCurrentSessionIntro) {
+        void playCurrentSessionIntro(true, true)
+        return
+      }
+    }
+    if (audioTargetRef.current === 'part_intro_1' || audioTargetRef.current === 'part_intro_2') {
+      if (autoPlaySessionIntro && canPlayCurrentSessionIntro) {
+        void playCurrentSessionIntro(true, true)
+        return
+      }
+      if (autoPlayItems && canPlayCurrentItemAudio) {
+        void playCurrentItemAudio(true)
+      }
+      return
+    }
     if (audioTargetRef.current !== 'session_intro' || !playFirstItemAfterIntroRef.current) return
     playFirstItemAfterIntroRef.current = false
     const firstItemIndex = firstItemAfterIntroIndexRef.current
@@ -720,7 +808,7 @@ export function TeacherTestRunPage() {
       return
     }
     void playCurrentItemAudio(true)
-  }, [navigate, playCurrentItemAudio, selectedIndex])
+  }, [autoPlayItems, autoPlayPartIntro, autoPlaySessionIntro, canPlayCurrentItemAudio, canPlayCurrentSessionIntro, navigate, partIntroVariantIds, playCurrentItemAudio, playCurrentSessionIntro, playPartIntroAudio, selectedIndex])
 
   const handleRecord = useCallback(
     async (color: ResultColor) => {
@@ -1086,6 +1174,12 @@ export function TeacherTestRunPage() {
                       <button type="button" onClick={() => void playPackageStartAudio(true)} disabled={!packageStartVariantId}>
                         Test Start
                       </button>
+                      <button type="button" onClick={() => void playPartIntroAudio(1, true)} disabled={!partIntroVariantIds[1]}>
+                        Part I
+                      </button>
+                      <button type="button" onClick={() => void playPartIntroAudio(2, true)} disabled={!partIntroVariantIds[2]}>
+                        Part II
+                      </button>
                       <button type="button" onClick={() => void playCurrentSessionIntro(true, true)} disabled={!canPlayCurrentSessionIntro}>
                         Session intro → Q1
                       </button>
@@ -1119,6 +1213,14 @@ export function TeacherTestRunPage() {
                         onChange={(event) => setAutoPlayPackageStart(event.target.checked)}
                       />
                       Auto-play Test Start
+                    </label>
+                    <label className="live-test-audio-toggle">
+                      <input
+                        type="checkbox"
+                        checked={autoPlayPartIntro}
+                        onChange={(event) => setAutoPlayPartIntro(event.target.checked)}
+                      />
+                      Auto-play Part I/II intro
                     </label>
                     <label className="live-test-audio-toggle">
                       <input

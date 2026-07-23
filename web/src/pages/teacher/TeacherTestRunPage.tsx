@@ -76,6 +76,7 @@ const AUDIO_AUTOPLAY_INTRO_KEY = 'chunks-lms:live-test-autoplay-intro'
 const AUDIO_AUTOPLAY_PACKAGE_START_KEY = 'chunks-lms:live-test-autoplay-package-start'
 const AUDIO_AUTOPLAY_PART_INTRO_KEY = 'chunks-lms:live-test-autoplay-part-intro'
 const AUDIO_AUTOPLAY_PACKAGE_END_KEY = 'chunks-lms:live-test-autoplay-package-end'
+const AUDIO_STANDARD_FLOW_KEY = 'chunks-lms:live-test-standard-audio-flow-v1'
 const AUDIO_RATE_KEY = 'chunks-lms:live-test-audio-rate'
 const AUDIO_VOLUME_KEY = 'chunks-lms:live-test-audio-volume'
 const AUDIO_PANEL_OPEN_KEY = 'chunks-lms:live-test-audio-panel-open'
@@ -176,6 +177,10 @@ function readSavedBoolean(key: string, fallback: boolean): boolean {
   return fallback
 }
 
+function clampAudioRate(value: number): number {
+  return Math.min(3, Math.max(0.5, Number.isFinite(value) ? value : 1))
+}
+
 function readSavedNumber(key: string, fallback: number, min: number, max: number): number {
   try {
     const saved = Number(window.localStorage.getItem(key))
@@ -227,11 +232,11 @@ export function TeacherTestRunPage() {
   const [audioState, setAudioState] = useState<AudioState>('idle')
   const [audioRate, setAudioRate] = useState(1)
   const [audioVolume, setAudioVolume] = useState(0.85)
-  const [autoPlayItems, setAutoPlayItems] = useState(false)
-  const [autoPlaySessionIntro, setAutoPlaySessionIntro] = useState(false)
-  const [autoPlayPackageStart, setAutoPlayPackageStart] = useState(false)
+  const [autoPlayItems, setAutoPlayItems] = useState(true)
+  const [autoPlaySessionIntro, setAutoPlaySessionIntro] = useState(true)
+  const [autoPlayPackageStart, setAutoPlayPackageStart] = useState(true)
   const [autoPlayPartIntro, setAutoPlayPartIntro] = useState(true)
-  const [autoPlayPackageEnd, setAutoPlayPackageEnd] = useState(false)
+  const [autoPlayPackageEnd, setAutoPlayPackageEnd] = useState(true)
   const [audioPanelOpen, setAudioPanelOpen] = useState(true)
   const [reaction, setReaction] = useState<Reaction>(null)
   const [message, setMessage] = useState('')
@@ -251,15 +256,31 @@ export function TeacherTestRunPage() {
   const pendingFirstItemAudioIndexRef = useRef<number | null>(null)
   const pendingAfterEndNavigationRef = useRef<string | null>(null)
   const partIntroPlayedRef = useRef<Record<1 | 2, boolean>>({ 1: false, 2: false })
+  const packageEndPlayedRef = useRef(false)
 
   useEffect(() => {
     setRailWidth(readSavedRailWidth())
-    setAutoPlayItems(readSavedBoolean(AUDIO_AUTOPLAY_ITEMS_KEY, false))
-    setAutoPlaySessionIntro(readSavedBoolean(AUDIO_AUTOPLAY_INTRO_KEY, false))
-    setAutoPlayPackageStart(readSavedBoolean(AUDIO_AUTOPLAY_PACKAGE_START_KEY, false))
-    setAutoPlayPartIntro(readSavedBoolean(AUDIO_AUTOPLAY_PART_INTRO_KEY, true))
-    setAutoPlayPackageEnd(readSavedBoolean(AUDIO_AUTOPLAY_PACKAGE_END_KEY, false))
-    setAudioRate(readSavedNumber(AUDIO_RATE_KEY, 1, 0.75, 2))
+    let forceStandardFlow = false
+    try {
+      forceStandardFlow = window.localStorage.getItem(AUDIO_STANDARD_FLOW_KEY) !== 'enabled'
+      if (forceStandardFlow) {
+        window.localStorage.setItem(AUDIO_STANDARD_FLOW_KEY, 'enabled')
+        window.localStorage.setItem(AUDIO_AUTOPLAY_ITEMS_KEY, 'true')
+        window.localStorage.setItem(AUDIO_AUTOPLAY_INTRO_KEY, 'true')
+        window.localStorage.setItem(AUDIO_AUTOPLAY_PACKAGE_START_KEY, 'true')
+        window.localStorage.setItem(AUDIO_AUTOPLAY_PART_INTRO_KEY, 'true')
+        window.localStorage.setItem(AUDIO_AUTOPLAY_PACKAGE_END_KEY, 'true')
+        window.localStorage.setItem(AUDIO_RATE_KEY, '1')
+      }
+    } catch {
+      forceStandardFlow = true
+    }
+    setAutoPlayItems(forceStandardFlow ? true : readSavedBoolean(AUDIO_AUTOPLAY_ITEMS_KEY, true))
+    setAutoPlaySessionIntro(forceStandardFlow ? true : readSavedBoolean(AUDIO_AUTOPLAY_INTRO_KEY, true))
+    setAutoPlayPackageStart(forceStandardFlow ? true : readSavedBoolean(AUDIO_AUTOPLAY_PACKAGE_START_KEY, true))
+    setAutoPlayPartIntro(forceStandardFlow ? true : readSavedBoolean(AUDIO_AUTOPLAY_PART_INTRO_KEY, true))
+    setAutoPlayPackageEnd(forceStandardFlow ? true : readSavedBoolean(AUDIO_AUTOPLAY_PACKAGE_END_KEY, true))
+    setAudioRate(clampAudioRate(forceStandardFlow ? 1 : readSavedNumber(AUDIO_RATE_KEY, 1, 0.5, 3)))
     setAudioVolume(readSavedVolume())
     setAudioPanelOpen(readSavedBoolean(AUDIO_PANEL_OPEN_KEY, true))
   }, [])
@@ -535,6 +556,7 @@ export function TeacherTestRunPage() {
 
   useEffect(() => {
     partIntroPlayedRef.current = { 1: false, 2: false }
+    packageEndPlayedRef.current = false
     void load()
   }, [load])
 
@@ -645,6 +667,7 @@ export function TeacherTestRunPage() {
         setMessage('No approved Test End audio is available for this package/language.')
         return
       }
+      packageEndPlayedRef.current = true
       playFirstItemAfterIntroRef.current = false
       await loadAudioVariant(packageEndVariantId, 'Test End', shouldPlay, 'package_end')
     },
@@ -665,6 +688,12 @@ export function TeacherTestRunPage() {
     [loadAudioVariant, partIntroVariantIds],
   )
 
+  const playEndAfterFinalScore = useCallback(async () => {
+    setIsSummaryShown(true)
+    if (!autoPlayPackageEnd || !packageEndVariantId || packageEndPlayedRef.current) return
+    await playPackageEndAudio(true)
+  }, [autoPlayPackageEnd, packageEndVariantId, playPackageEndAudio])
+
   const playCurrentSessionIntro = useCallback(
     async (shouldPlay = true, playFirstItemAfterIntro = true) => {
       const variantId = await resolveCurrentSessionIntroVariantId()
@@ -682,9 +711,10 @@ export function TeacherTestRunPage() {
 
   useEffect(() => {
     if (!packageStartVariantId || !autoPlayPackageStart) return
+    if (!currentItem?.id || completedCount > 0 || currentSessionNumber !== 1 || !isFirstItemInSession) return
     if (audioTargetRef.current === 'package_start') return
     void playPackageStartAudio(true)
-  }, [autoPlayPackageStart, packageStartVariantId, playPackageStartAudio])
+  }, [autoPlayPackageStart, completedCount, currentItem?.id, currentSessionNumber, isFirstItemInSession, packageStartVariantId, playPackageStartAudio])
 
   useEffect(() => {
     if (!currentItem?.id || !canPlayCurrentItemAudio) return
@@ -813,6 +843,7 @@ export function TeacherTestRunPage() {
   const handleRecord = useCallback(
     async (color: ResultColor) => {
       if (!currentItem || probeOpen) return
+      const isFinalOutstandingItem = !isItemFinalized(currentItem) && items.filter((item) => !isItemFinalized(item)).length === 1
       playReaction(color)
       const result = await recordStandaloneResult(currentItem.id, color)
       if (!result.ok) {
@@ -820,13 +851,15 @@ export function TeacherTestRunPage() {
         return
       }
       await load()
+      if (isFinalOutstandingItem) await playEndAfterFinalScore()
     },
-    [currentItem, load, playReaction, probeOpen],
+    [currentItem, items, load, playEndAfterFinalScore, playReaction, probeOpen],
   )
 
   const handleProbe = useCallback(
     async (outcome: 'fail' | 'continue' | 'done') => {
       if (!currentAttempt?.id || !probeOpen) return
+      const isFinalOutstandingItem = outcome !== 'continue' && currentItem && !isItemFinalized(currentItem) && items.filter((item) => !isItemFinalized(item)).length === 1
       const result = await resolveStandaloneProbe(String(currentAttempt.id), outcome)
       if (!result.ok) {
         setMessage(result.error)
@@ -839,8 +872,9 @@ export function TeacherTestRunPage() {
         setMessage('')
       }
       await load()
+      if (isFinalOutstandingItem) await playEndAfterFinalScore()
     },
-    [currentAttempt?.id, load, playReaction, probeOpen],
+    [currentAttempt?.id, currentItem, items, load, playEndAfterFinalScore, playReaction, probeOpen],
   )
 
   useEffect(() => {
@@ -895,7 +929,7 @@ export function TeacherTestRunPage() {
       }
     }
     const analysisPath = assignmentId ? `/teacher/tests/analysis/${assignmentId}` : '/teacher/tests'
-    if (autoPlayPackageEnd && packageEndVariantId) {
+    if (autoPlayPackageEnd && packageEndVariantId && !packageEndPlayedRef.current) {
       pendingAfterEndNavigationRef.current = analysisPath
       await playPackageEndAudio(true)
       return
@@ -1232,16 +1266,32 @@ export function TeacherTestRunPage() {
                     </label>
                     <div className="live-test-audio-grid">
                       <label>
-                        Speed
-                        <select value={audioRate} onChange={(event) => setAudioRate(Number(event.target.value))}>
+                        Speed <span>{audioRate.toFixed(2)}×</span>
+                        <select
+                          value={[0.75, 1, 1.15, 1.25, 1.5, 1.75, 2].includes(audioRate) ? audioRate : 'custom'}
+                          onChange={(event) => {
+                            if (event.target.value === 'custom') return
+                            setAudioRate(clampAudioRate(Number(event.target.value)))
+                          }}
+                        >
                           <option value={0.75}>0.75×</option>
-                          <option value={1}>1×</option>
+                          <option value={1}>1× default</option>
                           <option value={1.15}>1.15×</option>
                           <option value={1.25}>1.25×</option>
                           <option value={1.5}>1.5×</option>
                           <option value={1.75}>1.75×</option>
                           <option value={2}>2×</option>
+                          <option value="custom">Custom</option>
                         </select>
+                        <input
+                          type="number"
+                          min="0.5"
+                          max="3"
+                          step="0.05"
+                          value={audioRate}
+                          onChange={(event) => setAudioRate(clampAudioRate(Number(event.target.value)))}
+                          aria-label="Custom audio speed"
+                        />
                       </label>
                       <label>
                         Volume <span>{Math.round(audioVolume * 100)}%</span>

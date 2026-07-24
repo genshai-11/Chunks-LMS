@@ -85,9 +85,18 @@ export function buildManifest({ sheets, filename, sha256 }) {
 
   const packages = new Set(packageRows.map((row) => text(row.Package_id)).filter(Boolean))
   if (packages.size !== 1) issue(issues, 'error', 'PACKAGE_COUNT', `Expected one package id, found ${packages.size}`, 'Package-test')
-  if (packageRows.length !== 8) issue(issues, 'error', 'PACKAGE_SESSION_COUNT', `Expected 8 package sessions, found ${packageRows.length}`, 'Package-test')
-  if (cciRows.length !== 8) issue(issues, 'error', 'CCI_COUNT', `Expected 8 CCI definitions, found ${cciRows.length}`, 'CCI')
-  if (itemRows.length !== 80) issue(issues, 'error', 'ITEM_COUNT', `Expected 80 items, found ${itemRows.length}`, REQUIRED_SHEETS[0])
+  const sessionCount = packageRows.length
+  if (sessionCount !== 7 && sessionCount !== 8) {
+    issue(issues, 'error', 'PACKAGE_SESSION_COUNT', `Expected 7 or 8 package sessions, found ${sessionCount}`, 'Package-test')
+  }
+  if (cciRows.length !== sessionCount) {
+    issue(issues, 'error', 'CCI_COUNT', `Expected ${sessionCount} CCI definitions, found ${cciRows.length}`, 'CCI')
+  }
+  const expectedItemsPerSession = sessionCount === 7 ? 7 : 10
+  const expectedTotalItems = sessionCount * expectedItemsPerSession
+  if (itemRows.length !== expectedTotalItems) {
+    issue(issues, 'error', 'ITEM_COUNT', `Expected ${expectedTotalItems} items, found ${itemRows.length}`, REQUIRED_SHEETS[0])
+  }
 
   const cciBySession = new Map()
   const cciIds = new Set()
@@ -151,6 +160,9 @@ export function buildManifest({ sheets, filename, sha256 }) {
     for (const [field, value] of required) if (!text(value)) issue(issues, 'error', 'MISSING_VALUE', `${field} is required`, `${REQUIRED_SHEETS[0]}!${row.__row}`)
     const sourceCvrId = numeric(row['CVR-id'])
     if (sourceCvrId == null || sourceCvrId < 0) issue(issues, 'error', 'INVALID_CVR', `Invalid CVR-id ${text(row['CVR-id'])}`, `${REQUIRED_SHEETS[0]}!${row.__row}`)
+    const tcVal = numeric(row.TC)
+    const lcVal = numeric(row.LC)
+    const tlVal = numeric(row.TL)
     const item = {
       itemOrder,
       sourceItemId: text(row.Item_id),
@@ -161,19 +173,22 @@ export function buildManifest({ sheets, filename, sha256 }) {
       termEn: text(row['Term (Tiếng Anh)']),
       promptVi: text(row['Complete Sentence (Vie)']),
       promptEn: text(row['Complete Sentence (Eng)']),
+      ...(tcVal != null && { tc: tcVal }),
+      ...(lcVal != null && { lc: lcVal }),
+      ...(tlVal != null && { tl: tlVal }),
     }
     if (!groupedItems.has(sessionOrder)) groupedItems.set(sessionOrder, [])
     groupedItems.get(sessionOrder).push(item)
   }
 
   const sessions = []
-  for (let sessionOrder = 1; sessionOrder <= 8; sessionOrder += 1) {
+  for (let sessionOrder = 1; sessionOrder <= sessionCount; sessionOrder += 1) {
     const packageSession = packageBySession.get(sessionOrder)
     const cci = cciBySession.get(sessionOrder)
     const items = (groupedItems.get(sessionOrder) ?? []).sort((a, b) => a.itemOrder - b.itemOrder)
     if (!packageSession) issue(issues, 'error', 'MISSING_PACKAGE_SESSION', `Missing package session ${sessionOrder}`, 'Package-test')
     if (!cci) issue(issues, 'error', 'MISSING_CCI_SESSION', `Missing CCI session ${sessionOrder}`, 'CCI')
-    if (items.length !== 10) issue(issues, 'error', 'SESSION_ITEM_COUNT', `Session ${sessionOrder} expected 10 items, found ${items.length}`, REQUIRED_SHEETS[0])
+    if (items.length !== expectedItemsPerSession) issue(issues, 'error', 'SESSION_ITEM_COUNT', `Session ${sessionOrder} expected ${expectedItemsPerSession} items, found ${items.length}`, REQUIRED_SHEETS[0])
     const cvrs = [...new Set(items.map((item) => item.sourceCvrId).filter((value) => value != null))]
     if (cvrs.length !== 1) issue(issues, 'error', 'SESSION_CVR_COUNT', `Session ${sessionOrder} expected one CVR value, found ${cvrs.join(', ') || 'none'}`, REQUIRED_SHEETS[0])
     const targetCvrOhm = cvrs[0] ?? null

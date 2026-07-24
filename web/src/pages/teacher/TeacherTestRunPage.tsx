@@ -55,7 +55,7 @@ import { triggerConfetti } from '../../lib/confetti'
 import { useAppState } from '../../state/useAppState'
 
 type AudioState = 'idle' | 'loading' | 'ready' | 'playing' | 'played' | 'error'
-type AudioTarget = 'item' | 'result_reaction' | 'session_intro' | 'package_start' | 'part_intro_1' | 'part_intro_2' | 'part_intro_3' | 'package_end'
+type AudioTarget = 'item' | 'result_reaction' | 'session_intro' | 'package_start' | 'part_intro_1' | 'part_intro_2' | 'part_intro_3' | 'package_end' | 'item_prefix'
 type PartIntroNumber = 1 | 2 | 3
 type ResultColor = 'red' | 'yellow' | 'green' | 'purple'
 type ReactionKind = 'celebrate' | 'happy' | 'fight'
@@ -276,11 +276,12 @@ export function TeacherTestRunPage() {
   const firstItemAfterIntroIndexRef = useRef<number | null>(null)
   const pendingFirstItemAudioIndexRef = useRef<number | null>(null)
   const pendingAfterEndNavigationRef = useRef<string | null>(null)
-  const pendingAfterReactionRef = useRef<{ signedUrl: string; label: string } | null>(null)
+  const pendingAfterReactionRef = useRef<{ signedUrl: string; label: string; itemId?: string; variantId?: string } | null>(null)
   const suppressNextItemEffectForIdRef = useRef<string | null>(null)
   const partIntroPlayedRef = useRef<Record<PartIntroNumber, boolean>>({ 1: false, 2: false, 3: false })
   const packageEndPlayedRef = useRef(false)
   const enteringProbeRef = useRef(false)
+  const pendingItemAudioRef = useRef<{ signedUrl: string | null; variantId: string } | null>(null)
 
   useEffect(() => {
     liveAudioStartedRef.current = false
@@ -742,11 +743,24 @@ export function TeacherTestRunPage() {
         return
       }
       playFirstItemAfterIntroRef.current = false
-      if (cached?.signedUrl) {
-        activateAudioUrl(cached.signedUrl, `Q${currentItemNumber} item`, shouldPlay, 'item')
-        return
+
+      const questionNumber = currentItem?.item_order ?? 1
+      const prefixUrl = `/audio/number_${questionNumber}.wav`
+
+      if (shouldPlay) {
+        pendingItemAudioRef.current = {
+          signedUrl: cached?.signedUrl || null,
+          variantId
+        }
+        activateAudioUrl(prefixUrl, `Number ${questionNumber}`, true, 'item_prefix')
+      } else {
+        pendingItemAudioRef.current = null
+        if (cached?.signedUrl) {
+          activateAudioUrl(cached.signedUrl, `Q${currentItemNumber} item`, false, 'item')
+        } else {
+          await loadAudioVariant(variantId, `Q${currentItemNumber} item`, false, 'item')
+        }
       }
-      await loadAudioVariant(variantId, `Q${currentItemNumber} item`, shouldPlay, 'item')
     },
     [activateAudioUrl, currentItem, currentItemNumber, loadAudioVariant, primeItemPlaybackUrl, resolveCurrentItemAudioVariantId],
   )
@@ -1029,7 +1043,12 @@ export function TeacherTestRunPage() {
       const cached = itemPlaybackCacheRef.current[String(nextItem.id)]
       if (cached?.signedUrl) {
         const nextNumber = nextItem.global_item_order ?? nextIndex + 1
-        pendingAfterReactionRef.current = { signedUrl: cached.signedUrl, label: `Q${nextNumber} item` }
+        pendingAfterReactionRef.current = {
+          signedUrl: cached.signedUrl,
+          label: `Q${nextNumber} item`,
+          itemId: String(nextItem.id),
+          variantId: cached.variantId
+        }
         suppressNextItemEffectForIdRef.current = String(nextItem.id)
         pendingFirstItemAudioIndexRef.current = null
         setSelectedIndex(nextIndex)
@@ -1046,10 +1065,37 @@ export function TeacherTestRunPage() {
 
   const handleAudioEnded = useCallback(() => {
     setAudioState('played')
+    if (audioTargetRef.current === 'item_prefix') {
+      const pending = pendingItemAudioRef.current
+      pendingItemAudioRef.current = null
+      if (pending && liveAudioStartedRef.current && !probeOpen) {
+        if (pending.signedUrl) {
+          activateAudioUrl(pending.signedUrl, `Q${currentItemNumber} item`, true, 'item')
+        } else {
+          void loadAudioVariant(pending.variantId, `Q${currentItemNumber} item`, true, 'item')
+        }
+      }
+      return
+    }
     if (audioTargetRef.current === 'result_reaction') {
       const next = pendingAfterReactionRef.current
       pendingAfterReactionRef.current = null
-      if (next && liveAudioStartedRef.current && !probeOpen) activateAudioUrl(next.signedUrl, next.label, true, 'item')
+      if (next && liveAudioStartedRef.current && !probeOpen) {
+        if (next.itemId && next.variantId) {
+          const nextItem = items.find((item) => String(item.id) === next.itemId)
+          if (nextItem) {
+            const questionNumber = nextItem.item_order ?? 1
+            const prefixUrl = `/audio/number_${questionNumber}.wav`
+            pendingItemAudioRef.current = {
+              signedUrl: next.signedUrl,
+              variantId: next.variantId
+            }
+            activateAudioUrl(prefixUrl, `Number ${questionNumber}`, true, 'item_prefix')
+            return
+          }
+        }
+        activateAudioUrl(next.signedUrl, next.label, true, 'item')
+      }
       return
     }
     if (audioTargetRef.current === 'package_end' && pendingAfterEndNavigationRef.current) {
@@ -1089,7 +1135,7 @@ export function TeacherTestRunPage() {
       return
     }
     void playCurrentItemAudio(true)
-  }, [activateAudioUrl, autoPlayItems, autoPlayPartIntro, autoPlaySessionIntro, canPlayCurrentItemAudio, canPlayCurrentSessionIntro, navigate, partIntroVariantIds, playCurrentItemAudio, playCurrentSessionIntro, playPartIntroAudio, probeOpen, selectedIndex])
+  }, [activateAudioUrl, autoPlayItems, autoPlayPartIntro, autoPlaySessionIntro, canPlayCurrentItemAudio, canPlayCurrentSessionIntro, currentItemNumber, items, loadAudioVariant, navigate, partIntroVariantIds, playCurrentItemAudio, playCurrentSessionIntro, playPartIntroAudio, probeOpen, selectedIndex])
 
   const handleRecord = useCallback(
     async (color: ResultColor) => {

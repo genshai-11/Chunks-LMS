@@ -1,4 +1,5 @@
 import { cacheKey, cachedQuery, clearRequestCache } from './request-cache'
+export { clearRequestCache } from './request-cache'
 import { getSupabase } from './supabase'
 import type {
   PromptLanguage,

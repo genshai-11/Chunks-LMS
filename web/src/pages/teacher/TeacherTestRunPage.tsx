@@ -35,6 +35,7 @@ import { probeChunksNumber } from '../../modules/assessment/probe-metrics'
 import { listActiveLearners } from '../../modules/roster/service'
 import { getTestPackageVersion, listTestSections } from '../../lib/test-packages'
 import {
+  clearRequestCache,
   completeStandaloneRun,
   findLatestApprovedNarrationVariant,
   getStandaloneRun,
@@ -279,6 +280,7 @@ export function TeacherTestRunPage() {
   const suppressNextItemEffectForIdRef = useRef<string | null>(null)
   const partIntroPlayedRef = useRef<Record<PartIntroNumber, boolean>>({ 1: false, 2: false, 3: false })
   const packageEndPlayedRef = useRef(false)
+  const enteringProbeRef = useRef(false)
 
   useEffect(() => {
     liveAudioStartedRef.current = false
@@ -589,6 +591,7 @@ export function TeacherTestRunPage() {
       setIsSummaryShown(true)
       triggerConfetti()
     }
+    enteringProbeRef.current = false
   }, [runId, assignmentIdParam])
 
   useEffect(() => {
@@ -901,7 +904,7 @@ export function TeacherTestRunPage() {
   }, [autoPlayPackageStart, completedCount, currentItem?.id, currentSessionNumber, isFirstItemInSession, liveAudioStarted, packageStartVariantId, playPackageStartAudio, probeOpen])
 
   useEffect(() => {
-    if (!liveAudioStarted || probeOpen) return
+    if (!liveAudioStarted || probeOpen || enteringProbeRef.current) return
     if (!currentItem?.id || !canPlayCurrentItemAudio) return
     if (autoPlayedItemIdsRef.current.has(String(currentItem.id))) return
     if (suppressNextItemEffectForIdRef.current === String(currentItem.id)) {
@@ -1096,6 +1099,7 @@ export function TeacherTestRunPage() {
       if (color !== 'green') {
         playScoreFeedbackThenNext(color)
       } else {
+        enteringProbeRef.current = true
         activateAudioUrl('/audio/green.wav', 'green result', true, 'result_reaction')
       }
       const result = await recordStandaloneResult(currentItem.id, color)
@@ -1103,6 +1107,7 @@ export function TeacherTestRunPage() {
         setMessage(result.error)
         return
       }
+      clearRequestCache()
       await load()
       if (isFinalOutstandingItem) await playEndAfterFinalScore()
     },
@@ -1123,6 +1128,7 @@ export function TeacherTestRunPage() {
         setMessage(result.error)
         return
       }
+      clearRequestCache()
       if (outcome === 'continue') {
         setMessage(`Chunks Number=${probeChunksNumber({ enteredProbeFlow: true, probeCount: result.data.probeCount }) ?? 1}`)
       } else {

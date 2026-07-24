@@ -1,3 +1,4 @@
+import { cacheKey, cachedQuery } from '../../lib/request-cache'
 import { getSupabase } from '../../lib/supabase'
 
 export type GenerationReceipt = {
@@ -153,5 +154,10 @@ export function getNarrationPlaybackUrl(narrationVariantId: string): Promise<{
   mimeType: string
   durationMs: number | null
 }> {
-  return invoke({ action: 'getNarrationPlaybackUrl', narrationVariantId })
+  return cachedQuery(
+    cacheKey(['audio', 'signed-playback', narrationVariantId]),
+    () => invoke({ action: 'getNarrationPlaybackUrl', narrationVariantId }),
+    // Edge returns 10-minute signed URLs. Refresh before expiry but dedupe rapid duplicate lookups.
+    { ttlMs: 9 * 60_000, persist: true },
+  )
 }

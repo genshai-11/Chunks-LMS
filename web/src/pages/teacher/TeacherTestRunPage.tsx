@@ -20,6 +20,7 @@ import {
   Keyboard,
   PanelLeftClose,
   PanelLeftOpen,
+  PlayCircle,
   RotateCcw,
   SlidersHorizontal,
   Sparkles,
@@ -30,6 +31,7 @@ import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 
 import { UserAvatar } from '../../components/UserAvatar'
 import { EmptyState, Panel } from '../../components/ui'
 import { PROBE_ACTIONS } from '../../modules/assessment/probe-actions'
+import { probeChunksNumber } from '../../modules/assessment/probe-metrics'
 import { listActiveLearners } from '../../modules/roster/service'
 import { getTestPackageVersion, listTestSections } from '../../lib/test-packages'
 import {
@@ -52,7 +54,8 @@ import { triggerConfetti } from '../../lib/confetti'
 import { useAppState } from '../../state/useAppState'
 
 type AudioState = 'idle' | 'loading' | 'ready' | 'playing' | 'played' | 'error'
-type AudioTarget = 'item' | 'result_reaction' | 'session_intro' | 'package_start' | 'part_intro_1' | 'part_intro_2' | 'package_end'
+type AudioTarget = 'item' | 'result_reaction' | 'session_intro' | 'package_start' | 'part_intro_1' | 'part_intro_2' | 'part_intro_3' | 'package_end'
+type PartIntroNumber = 1 | 2 | 3
 type ResultColor = 'red' | 'yellow' | 'green' | 'purple'
 type ReactionKind = 'celebrate' | 'happy' | 'fight'
 type Reaction = { kind: ReactionKind; color: ResultColor; id: number } | null
@@ -61,7 +64,7 @@ type TestItem = Record<string, any>
 
 const COLORS: Array<{ key: ResultColor; label: string; num: string; hex: string }> = [
   { key: 'red', label: 'Red', num: '0', hex: '#ef4444' },
-  { key: 'yellow', label: 'Yellow', num: '1', hex: '#eab308' },
+  { key: 'yellow', label: 'Orange', num: '1', hex: '#f97316' },
   { key: 'green', label: 'Green', num: '2', hex: '#22c55e' },
   { key: 'purple', label: 'Purple', num: '3', hex: '#a855f7' },
 ]
@@ -207,7 +210,20 @@ function languageForSectionOrder(
 ): 'vi' | 'en' {
   if (languagePolicy === 'alternating_vi_en') return sectionOrder % 2 === 1 ? 'vi' : 'en'
   if (languagePolicy === 'first4_en_last4_vi') return sectionOrder <= 4 ? 'en' : 'vi'
+  if (languagePolicy === 'green_test_49q') return sectionOrder <= 3 || sectionOrder === 7 ? 'en' : 'vi'
   return fallback
+}
+
+function partIntroLabel(part: PartIntroNumber): string {
+  if (part === 1) return 'Part I'
+  if (part === 2) return 'Part II'
+  return 'Part III'
+}
+
+function partIntroTarget(part: PartIntroNumber): Extract<AudioTarget, 'part_intro_1' | 'part_intro_2' | 'part_intro_3'> {
+  if (part === 1) return 'part_intro_1'
+  if (part === 2) return 'part_intro_2'
+  return 'part_intro_3'
 }
 
 export function TeacherTestRunPage() {
@@ -223,7 +239,7 @@ export function TeacherTestRunPage() {
   const [introVariantId, setIntroVariantId] = useState<string | null>(null)
   const [sessionIntroVariantIds, setSessionIntroVariantIds] = useState<Record<number, string | null>>({})
   const [packageStartVariantId, setPackageStartVariantId] = useState<string | null>(null)
-  const [partIntroVariantIds, setPartIntroVariantIds] = useState<Record<1 | 2, string | null>>({ 1: null, 2: null })
+  const [partIntroVariantIds, setPartIntroVariantIds] = useState<Record<PartIntroNumber, string | null>>({ 1: null, 2: null, 3: null })
   const [packageEndVariantId, setPackageEndVariantId] = useState<string | null>(null)
   const [isSummaryShown, setIsSummaryShown] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -237,6 +253,7 @@ export function TeacherTestRunPage() {
   const [autoPlayPartIntro, setAutoPlayPartIntro] = useState(true)
   const [autoPlayPackageEnd, setAutoPlayPackageEnd] = useState(true)
   const [audioPanelOpen, setAudioPanelOpen] = useState(true)
+  const [liveAudioStarted, setLiveAudioStarted] = useState(false)
   const [reaction, setReaction] = useState<Reaction>(null)
   const [message, setMessage] = useState('')
   const [showHeader, setShowHeader] = useState(false)
@@ -251,14 +268,26 @@ export function TeacherTestRunPage() {
   const activeAudioUrlRef = useRef('')
   const itemPlaybackCacheRef = useRef<Record<string, { variantId: string; signedUrl: string }>>({})
   const audioTargetRef = useRef<AudioTarget>('item')
+  const liveAudioStartedRef = useRef(false)
+  const autoPlayedItemIdsRef = useRef<Set<string>>(new Set())
+  const sessionIntroPlayedRef = useRef<Record<number, boolean>>({})
   const playFirstItemAfterIntroRef = useRef(false)
   const firstItemAfterIntroIndexRef = useRef<number | null>(null)
   const pendingFirstItemAudioIndexRef = useRef<number | null>(null)
   const pendingAfterEndNavigationRef = useRef<string | null>(null)
   const pendingAfterReactionRef = useRef<{ signedUrl: string; label: string } | null>(null)
   const suppressNextItemEffectForIdRef = useRef<string | null>(null)
-  const partIntroPlayedRef = useRef<Record<1 | 2, boolean>>({ 1: false, 2: false })
+  const partIntroPlayedRef = useRef<Record<PartIntroNumber, boolean>>({ 1: false, 2: false, 3: false })
   const packageEndPlayedRef = useRef(false)
+
+  useEffect(() => {
+    liveAudioStartedRef.current = false
+    autoPlayedItemIdsRef.current = new Set()
+    sessionIntroPlayedRef.current = {}
+    partIntroPlayedRef.current = { 1: false, 2: false, 3: false }
+    packageEndPlayedRef.current = false
+    setLiveAudioStarted(false)
+  }, [runId])
 
   useEffect(() => {
     setRailWidth(readSavedRailWidth())
@@ -449,40 +478,50 @@ export function TeacherTestRunPage() {
 
     if (packageVersionId) {
       const partOneLanguage = targetRuns.find((run) => run.sessionNumber === 1)?.promptLanguage ?? targetRuns[0]?.promptLanguage ?? currentRun.promptLanguage ?? 'vi'
-      const partTwoLanguage = targetRuns.find((run) => run.sessionNumber === 5)?.promptLanguage ?? targetRuns[4]?.promptLanguage ?? partOneLanguage
-      const [startAudio, partOneAudio, partTwoAudio, endAudio] = await Promise.all([
+      const partTwoLanguage = targetRuns.find((run) => run.sessionNumber === 4)?.promptLanguage ?? targetRuns[3]?.promptLanguage ?? partOneLanguage
+      const partThreeLanguage = targetRuns.find((run) => run.sessionNumber === 7)?.promptLanguage ?? targetRuns[6]?.promptLanguage ?? partOneLanguage
+      const findPartIntroAudio = async (part: PartIntroNumber, preferredLanguage: 'vi' | 'en') => {
+        const preferred = await findLatestApprovedNarrationVariant({
+          target: 'part_intro',
+          packageVersionId,
+          part,
+          language: preferredLanguage,
+        })
+        // GREEN-TEST-49Q package-level intro scripts are authored/approved in English even
+        // when the next session's item language is Vietnamese. Fallback keeps Part II visible.
+        if ((preferred.ok && preferred.data) || preferredLanguage === 'en') return preferred
+        return findLatestApprovedNarrationVariant({
+          target: 'part_intro',
+          packageVersionId,
+          part,
+          language: 'en',
+        })
+      }
+      const [startAudio, partOneAudio, partTwoAudio, partThreeAudio, endAudio] = await Promise.all([
         findLatestApprovedNarrationVariant({
           target: 'package_start',
           packageVersionId,
           language: partOneLanguage,
         }),
-        findLatestApprovedNarrationVariant({
-          target: 'part_intro',
-          packageVersionId,
-          part: 1,
-          language: partOneLanguage,
-        }),
-        findLatestApprovedNarrationVariant({
-          target: 'part_intro',
-          packageVersionId,
-          part: 2,
-          language: partTwoLanguage,
-        }),
+        findPartIntroAudio(1, partOneLanguage),
+        findPartIntroAudio(2, partTwoLanguage),
+        findPartIntroAudio(3, partThreeLanguage),
         findLatestApprovedNarrationVariant({
           target: 'package_end',
           packageVersionId,
-          language: partTwoLanguage,
+          language: partThreeLanguage,
         }),
       ])
       setPackageStartVariantId(startAudio.ok && startAudio.data ? startAudio.data.id : null)
       setPartIntroVariantIds({
         1: partOneAudio.ok && partOneAudio.data ? partOneAudio.data.id : null,
         2: partTwoAudio.ok && partTwoAudio.data ? partTwoAudio.data.id : null,
+        3: partThreeAudio.ok && partThreeAudio.data ? partThreeAudio.data.id : null,
       })
       setPackageEndVariantId(endAudio.ok && endAudio.data ? endAudio.data.id : null)
     } else {
       setPackageStartVariantId(null)
-      setPartIntroVariantIds({ 1: null, 2: null })
+      setPartIntroVariantIds({ 1: null, 2: null, 3: null })
       setPackageEndVariantId(null)
     }
 
@@ -547,7 +586,7 @@ export function TeacherTestRunPage() {
   }, [runId, assignmentIdParam])
 
   useEffect(() => {
-    partIntroPlayedRef.current = { 1: false, 2: false }
+    partIntroPlayedRef.current = { 1: false, 2: false, 3: false }
     packageEndPlayedRef.current = false
     void load()
   }, [load])
@@ -557,7 +596,8 @@ export function TeacherTestRunPage() {
   const currentAttempt = getItemAttempt(currentItem)
   const currentSnapshot = getItemSnapshot(currentItem)
   const probeOpen = currentSnapshot?.status === 'probe_open' || currentSnapshot?.status === 'resolution_required'
-  const probeDepth = Number(currentSnapshot?.probe_count ?? currentSnapshot?.probeCount ?? 0)
+  const probeCount = Number(currentSnapshot?.probe_count ?? currentSnapshot?.probeCount ?? 0)
+  const chunksNumber = probeChunksNumber({ enteredProbeFlow: Boolean(currentSnapshot?.entered_probe_flow ?? currentSnapshot?.enteredProbeFlow ?? probeOpen), probeCount }) ?? 1
   const currentSessionNumber = currentItem?.session_number || 1
   const currentItemNumber = currentItem?.global_item_order ?? selectedIndex + 1
   const currentItemLanguage = (currentItem?.prompt_language ?? runDetails?.promptLanguage ?? 'vi') as 'vi' | 'en'
@@ -590,6 +630,9 @@ export function TeacherTestRunPage() {
     target: AudioTarget,
   ) => {
     audioTargetRef.current = target
+    if (target === 'item' && shouldPlay && currentItem?.id) {
+      autoPlayedItemIdsRef.current.add(String(currentItem.id))
+    }
     setAudioLabel(label)
     setAudioState('ready')
     setMessage('')
@@ -621,9 +664,11 @@ export function TeacherTestRunPage() {
         navigate(pendingPath)
         return
       }
-      setMessage('Autoplay was blocked by the browser. Press Play once to enable audio in this run.')
+      liveAudioStartedRef.current = false
+      setLiveAudioStarted(false)
+      setMessage('Audio was blocked by the browser. Press Start Live Test again, or press Play on the audio control once to unlock this run.')
     })
-  }, [audioRate, audioVolume, navigate])
+  }, [audioRate, audioVolume, currentItem?.id, navigate])
 
   const loadAudioVariant = useCallback(async (
     variantId: string,
@@ -679,17 +724,6 @@ export function TeacherTestRunPage() {
     return next
   }, [resolveItemAudioVariantId])
 
-  const resolveCurrentSessionIntroVariantId = useCallback(async () => {
-    if (!currentSessionRun?.testSectionId) return currentSessionIntroVariantId
-    const latest = await findLatestApprovedNarrationVariant({
-      target: 'section_intro',
-      language: currentSessionRun.promptLanguage,
-      testSectionId: currentSessionRun.testSectionId,
-    })
-    if (latest.ok && latest.data?.id) return latest.data.id
-    return currentSessionIntroVariantId
-  }, [currentSessionIntroVariantId, currentSessionRun?.promptLanguage, currentSessionRun?.testSectionId])
-
   const playCurrentItemAudio = useCallback(
     async (shouldPlay = true) => {
       const cached = await primeItemPlaybackUrl(currentItem)
@@ -734,15 +768,16 @@ export function TeacherTestRunPage() {
   )
 
   const playPartIntroAudio = useCallback(
-    async (part: 1 | 2, shouldPlay = true) => {
+    async (part: PartIntroNumber, shouldPlay = true) => {
       const variantId = partIntroVariantIds[part]
+      const label = partIntroLabel(part)
       if (!variantId) {
-        setMessage(`No approved Part ${part === 1 ? 'I' : 'II'} intro audio is available for this package/language.`)
+        setMessage(`No approved ${label} intro audio is available for this package/language.`)
         return
       }
       partIntroPlayedRef.current[part] = true
       playFirstItemAfterIntroRef.current = false
-      await loadAudioVariant(variantId, part === 1 ? 'Part I intro' : 'Part II intro', shouldPlay, part === 1 ? 'part_intro_1' : 'part_intro_2')
+      await loadAudioVariant(variantId, `${label} intro`, shouldPlay, partIntroTarget(part))
     },
     [loadAudioVariant, partIntroVariantIds],
   )
@@ -753,30 +788,116 @@ export function TeacherTestRunPage() {
     await playPackageEndAudio(true)
   }, [autoPlayPackageEnd, packageEndVariantId, playPackageEndAudio])
 
-  const playCurrentSessionIntro = useCallback(
-    async (shouldPlay = true, playFirstItemAfterIntro = true) => {
-      const variantId = await resolveCurrentSessionIntroVariantId()
+  const playSessionIntroAudio = useCallback(
+    async (sessionNumber: number, shouldPlay = true, playFirstItemAfterIntro = true) => {
+      const sessionRun = allRuns.find((run) => run.sessionNumber === sessionNumber) ?? null
+      let variantId = sessionIntroVariantIds[sessionNumber] ?? null
+      if (sessionRun?.testSectionId) {
+        const latest = await findLatestApprovedNarrationVariant({
+          target: 'section_intro',
+          language: sessionRun.promptLanguage,
+          testSectionId: sessionRun.testSectionId,
+        })
+        if (latest.ok && latest.data?.id) variantId = latest.data.id
+      }
       if (!variantId) {
-        setMessage('No approved session intro audio is available for the current session/language.')
+        setMessage(`No approved Session ${sessionNumber} intro audio is available.`)
         return
       }
-      const firstItemIndex = items.findIndex((item) => item.session_number === currentSessionNumber)
+      sessionIntroPlayedRef.current[sessionNumber] = true
+      const firstItemIndex = items.findIndex((item) => item.session_number === sessionNumber)
       playFirstItemAfterIntroRef.current = playFirstItemAfterIntro && firstItemIndex >= 0
       firstItemAfterIntroIndexRef.current = playFirstItemAfterIntro && firstItemIndex >= 0 ? firstItemIndex : null
-      await loadAudioVariant(variantId, `Session ${currentSessionNumber} intro`, shouldPlay, 'session_intro')
+      await loadAudioVariant(variantId, `Session ${sessionNumber} intro`, shouldPlay, 'session_intro')
     },
-    [currentSessionNumber, items, loadAudioVariant, resolveCurrentSessionIntroVariantId],
+    [allRuns, items, loadAudioVariant, sessionIntroVariantIds],
   )
 
+  const playCurrentSessionIntro = useCallback(
+    async (shouldPlay = true, playFirstItemAfterIntro = true) => {
+      await playSessionIntroAudio(currentSessionNumber, shouldPlay, playFirstItemAfterIntro)
+    },
+    [currentSessionNumber, playSessionIntroAudio],
+  )
+
+  const startLiveAudioFlow = useCallback(async () => {
+    liveAudioStartedRef.current = true
+    setLiveAudioStarted(true)
+    setMessage('')
+
+    if (probeOpen) {
+      setMessage('Live audio is ready. Resolve the probe first; probe screens do not auto-play question audio.')
+      return
+    }
+
+    if (autoPlayPackageStart && packageStartVariantId && completedCount === 0 && currentSessionNumber === 1 && isFirstItemInSession) {
+      await playPackageStartAudio(true)
+      return
+    }
+
+    if (autoPlayPartIntro && isFirstItemInSession) {
+      if (currentSessionNumber === 1 && partIntroVariantIds[1] && !partIntroPlayedRef.current[1]) {
+        await playPartIntroAudio(1, true)
+        return
+      }
+      if (currentSessionNumber === 4 && partIntroVariantIds[2] && !partIntroPlayedRef.current[2]) {
+        await playPartIntroAudio(2, true)
+        return
+      }
+      if (currentSessionNumber === 7 && partIntroVariantIds[3] && !partIntroPlayedRef.current[3]) {
+        await playPartIntroAudio(3, true)
+        return
+      }
+    }
+
+    if (autoPlaySessionIntro && canPlayCurrentSessionIntro && isFirstItemInSession && !sessionIntroPlayedRef.current[currentSessionNumber]) {
+      await playCurrentSessionIntro(true, true)
+      return
+    }
+
+    if (autoPlayItems && canPlayCurrentItemAudio) {
+      await playCurrentItemAudio(true)
+      return
+    }
+
+    if (canPlayCurrentItemAudio) {
+      await playCurrentItemAudio(false)
+      setMessage('Live test is ready. Auto-play is off; press Current Q when you want audio.')
+      return
+    }
+
+    setMessage('Live test is ready. No approved audio is available for the current question yet.')
+  }, [
+    autoPlayItems,
+    autoPlayPackageStart,
+    autoPlayPartIntro,
+    autoPlaySessionIntro,
+    canPlayCurrentItemAudio,
+    canPlayCurrentSessionIntro,
+    completedCount,
+    currentSessionNumber,
+    isFirstItemInSession,
+    packageStartVariantId,
+    partIntroVariantIds,
+    playCurrentItemAudio,
+    playCurrentSessionIntro,
+    playPackageStartAudio,
+    playPartIntroAudio,
+    probeOpen,
+  ])
+
   useEffect(() => {
+    if (!liveAudioStarted || probeOpen) return
     if (!packageStartVariantId || !autoPlayPackageStart) return
     if (!currentItem?.id || completedCount > 0 || currentSessionNumber !== 1 || !isFirstItemInSession) return
     if (audioTargetRef.current === 'package_start') return
     void playPackageStartAudio(true)
-  }, [autoPlayPackageStart, completedCount, currentItem?.id, currentSessionNumber, isFirstItemInSession, packageStartVariantId, playPackageStartAudio])
+  }, [autoPlayPackageStart, completedCount, currentItem?.id, currentSessionNumber, isFirstItemInSession, liveAudioStarted, packageStartVariantId, playPackageStartAudio, probeOpen])
 
   useEffect(() => {
+    if (!liveAudioStarted || probeOpen) return
     if (!currentItem?.id || !canPlayCurrentItemAudio) return
+    if (autoPlayedItemIdsRef.current.has(String(currentItem.id))) return
     if (suppressNextItemEffectForIdRef.current === String(currentItem.id)) {
       suppressNextItemEffectForIdRef.current = null
       return
@@ -785,7 +906,8 @@ export function TeacherTestRunPage() {
     const deferForPackageStart = autoPlayPackageStart && currentSessionNumber === 1 && isFirstItemInSession && audioTargetRef.current !== 'package_start'
     const deferForPartIntro = autoPlayPartIntro && isFirstItemInSession && (
       (currentSessionNumber === 1 && !partIntroPlayedRef.current[1] && Boolean(partIntroVariantIds[1])) ||
-      (currentSessionNumber === 5 && !partIntroPlayedRef.current[2] && Boolean(partIntroVariantIds[2]))
+      (currentSessionNumber === 4 && !partIntroPlayedRef.current[2] && Boolean(partIntroVariantIds[2])) ||
+      (currentSessionNumber === 7 && !partIntroPlayedRef.current[3] && Boolean(partIntroVariantIds[3]))
     )
     const deferForSessionIntro = autoPlaySessionIntro && canPlayCurrentSessionIntro && isFirstItemInSession
     if (deferForPackageStart || deferForPartIntro || deferForSessionIntro) return
@@ -800,8 +922,10 @@ export function TeacherTestRunPage() {
     currentItem?.id,
     currentSessionNumber,
     isFirstItemInSession,
+    liveAudioStarted,
     partIntroVariantIds,
     playCurrentItemAudio,
+    probeOpen,
     selectedIndex,
   ])
 
@@ -815,28 +939,38 @@ export function TeacherTestRunPage() {
   }, [audioRate, audioVolume])
 
   useEffect(() => {
+    if (!liveAudioStarted || probeOpen) return
     if (!autoPlayPartIntro || !isFirstItemInSession) return
     if (currentSessionNumber === 1 && !autoPlayPackageStart && !partIntroPlayedRef.current[1] && partIntroVariantIds[1]) {
       void playPartIntroAudio(1, true)
       return
     }
-    if (currentSessionNumber === 5 && !partIntroPlayedRef.current[2] && partIntroVariantIds[2]) {
+    if (currentSessionNumber === 4 && !partIntroPlayedRef.current[2] && partIntroVariantIds[2]) {
       void playPartIntroAudio(2, true)
+      return
     }
-  }, [autoPlayPackageStart, autoPlayPartIntro, currentSessionNumber, isFirstItemInSession, partIntroVariantIds, playPartIntroAudio])
+    if (currentSessionNumber === 7 && !partIntroPlayedRef.current[3] && partIntroVariantIds[3]) {
+      void playPartIntroAudio(3, true)
+    }
+  }, [autoPlayPackageStart, autoPlayPartIntro, currentSessionNumber, isFirstItemInSession, liveAudioStarted, partIntroVariantIds, playPartIntroAudio, probeOpen])
 
   useEffect(() => {
+    if (!liveAudioStarted || probeOpen) return
     if (!autoPlaySessionIntro || !canPlayCurrentSessionIntro || !isFirstItemInSession) return
+    if (sessionIntroPlayedRef.current[currentSessionNumber]) return
     if (autoPlayPartIntro && currentSessionNumber === 1 && !partIntroPlayedRef.current[1] && partIntroVariantIds[1]) return
-    if (autoPlayPartIntro && currentSessionNumber === 5 && !partIntroPlayedRef.current[2] && partIntroVariantIds[2]) return
+    if (autoPlayPartIntro && currentSessionNumber === 4 && !partIntroPlayedRef.current[2] && partIntroVariantIds[2]) return
+    if (autoPlayPartIntro && currentSessionNumber === 7 && !partIntroPlayedRef.current[3] && partIntroVariantIds[3]) return
     void playCurrentSessionIntro(true, true)
-  }, [autoPlayPartIntro, autoPlaySessionIntro, canPlayCurrentSessionIntro, currentSessionNumber, isFirstItemInSession, partIntroVariantIds, playCurrentSessionIntro])
+  }, [autoPlayPartIntro, autoPlaySessionIntro, canPlayCurrentSessionIntro, currentSessionNumber, isFirstItemInSession, liveAudioStarted, partIntroVariantIds, playCurrentSessionIntro, probeOpen])
 
   useEffect(() => {
-    const nextIndex = items.findIndex((item, index) => index > selectedIndex && !isItemFinalized(item))
-    const nextItem = nextIndex >= 0 ? items[nextIndex] : null
-    if (!nextItem || nextItem.session_number !== currentItem?.session_number) return
-    void primeItemPlaybackUrl(nextItem).catch(() => {
+    if (!items.length) return
+    const upcoming = items
+      .slice(selectedIndex, selectedIndex + 4)
+      .filter((item) => item?.id && item.session_number === currentItem?.session_number && !isItemFinalized(item))
+    if (upcoming.length === 0) return
+    void Promise.allSettled(upcoming.map((item) => primeItemPlaybackUrl(item))).catch(() => {
       /* best-effort prefetch */
     })
   }, [currentItem?.id, currentItem?.session_number, items, primeItemPlaybackUrl, selectedIndex])
@@ -844,16 +978,18 @@ export function TeacherTestRunPage() {
   useEffect(() => {
     const targetIndex = pendingFirstItemAudioIndexRef.current
     if (targetIndex == null || selectedIndex !== targetIndex) return
+    if (!liveAudioStarted || probeOpen) return
     if (!currentItem?.id || !canPlayCurrentItemAudio) return
     pendingFirstItemAudioIndexRef.current = null
     void playCurrentItemAudio(true)
-  }, [canPlayCurrentItemAudio, currentItem?.id, playCurrentItemAudio, selectedIndex])
+  }, [canPlayCurrentItemAudio, currentItem?.id, liveAudioStarted, playCurrentItemAudio, probeOpen, selectedIndex])
 
   const playScoreFeedbackThenNext = useCallback((color: ResultColor): boolean => {
     if (!currentItem) return false
     const nextIndex = items.findIndex((item, index) => index > selectedIndex && !isItemFinalized(item))
     const nextItem = nextIndex >= 0 ? items[nextIndex] : null
     const canAdvanceWithinSession = Boolean(
+      liveAudioStartedRef.current &&
       autoPlayItems &&
       nextItem &&
       nextItem.session_number === currentItem.session_number,
@@ -884,7 +1020,7 @@ export function TeacherTestRunPage() {
     if (audioTargetRef.current === 'result_reaction') {
       const next = pendingAfterReactionRef.current
       pendingAfterReactionRef.current = null
-      if (next) activateAudioUrl(next.signedUrl, next.label, true, 'item')
+      if (next && liveAudioStartedRef.current && !probeOpen) activateAudioUrl(next.signedUrl, next.label, true, 'item')
       return
     }
     if (audioTargetRef.current === 'package_end' && pendingAfterEndNavigationRef.current) {
@@ -893,6 +1029,7 @@ export function TeacherTestRunPage() {
       navigate(pendingPath)
       return
     }
+    if (!liveAudioStartedRef.current || probeOpen) return
     if (audioTargetRef.current === 'package_start') {
       if (autoPlayPartIntro && partIntroVariantIds[1] && !partIntroPlayedRef.current[1]) {
         void playPartIntroAudio(1, true)
@@ -903,7 +1040,7 @@ export function TeacherTestRunPage() {
         return
       }
     }
-    if (audioTargetRef.current === 'part_intro_1' || audioTargetRef.current === 'part_intro_2') {
+    if (audioTargetRef.current === 'part_intro_1' || audioTargetRef.current === 'part_intro_2' || audioTargetRef.current === 'part_intro_3') {
       if (autoPlaySessionIntro && canPlayCurrentSessionIntro) {
         void playCurrentSessionIntro(true, true)
         return
@@ -923,14 +1060,14 @@ export function TeacherTestRunPage() {
       return
     }
     void playCurrentItemAudio(true)
-  }, [activateAudioUrl, autoPlayItems, autoPlayPartIntro, autoPlaySessionIntro, canPlayCurrentItemAudio, canPlayCurrentSessionIntro, navigate, partIntroVariantIds, playCurrentItemAudio, playCurrentSessionIntro, playPartIntroAudio, selectedIndex])
+  }, [activateAudioUrl, autoPlayItems, autoPlayPartIntro, autoPlaySessionIntro, canPlayCurrentItemAudio, canPlayCurrentSessionIntro, navigate, partIntroVariantIds, playCurrentItemAudio, playCurrentSessionIntro, playPartIntroAudio, probeOpen, selectedIndex])
 
   const handleRecord = useCallback(
     async (color: ResultColor) => {
       if (!currentItem || probeOpen) return
       const isFinalOutstandingItem = !isItemFinalized(currentItem) && items.filter((item) => !isItemFinalized(item)).length === 1
       playReaction(color)
-      playScoreFeedbackThenNext(color)
+      if (color !== 'green') playScoreFeedbackThenNext(color)
       const result = await recordStandaloneResult(currentItem.id, color)
       if (!result.ok) {
         setMessage(result.error)
@@ -953,7 +1090,7 @@ export function TeacherTestRunPage() {
         return
       }
       if (outcome === 'continue') {
-        setMessage(`Probe depth n=${result.data.probeCount}`)
+        setMessage(`Chunks Number=${probeChunksNumber({ enteredProbeFlow: true, probeCount: result.data.probeCount }) ?? 1}`)
       } else {
         playReaction(outcome === 'fail' ? 'yellow' : 'green')
         setMessage('')
@@ -1218,6 +1355,23 @@ export function TeacherTestRunPage() {
                   ))}
                 </span>
               </div>
+              <div className="live-test-flow-audio-row" aria-label="Package flow audio shortcuts">
+                <button type="button" onClick={() => void playPackageStartAudio(true)} disabled={!packageStartVariantId} title="Play test start audio">
+                  <Volume2 className="h-3 w-3" aria-hidden /> Test
+                </button>
+                <button type="button" onClick={() => void playPartIntroAudio(1, true)} disabled={!partIntroVariantIds[1]} title="Play Part I intro">
+                  I
+                </button>
+                <button type="button" onClick={() => void playPartIntroAudio(2, true)} disabled={!partIntroVariantIds[2]} title="Play Part II intro">
+                  II
+                </button>
+                <button type="button" onClick={() => void playPartIntroAudio(3, true)} disabled={!partIntroVariantIds[3]} title="Play Part III intro">
+                  III
+                </button>
+                <button type="button" onClick={() => void playPackageEndAudio(true)} disabled={!packageEndVariantId} title="Play test end audio">
+                  End
+                </button>
+              </div>
               <div className="live-test-session-heatmap" aria-label="Package item heatmap grouped by session">
                 {sessionsGrouped.map(({ sessionNum, items: sessionItems }) => {
                   const sessionDone = sessionItems.filter(isItemFinalized).length
@@ -1225,20 +1379,34 @@ export function TeacherTestRunPage() {
                   const firstSessionIndex = items.findIndex((candidate) => candidate.session_number === sessionNum)
                   return (
                     <section key={sessionNum} className={`live-test-heat-session${active ? ' is-active' : ' is-collapsed'}`}>
-                      <button
-                        type="button"
-                        className="live-test-heat-session-head"
-                        onClick={() => {
-                          if (firstSessionIndex >= 0) {
-                            setSelectedIndex(firstSessionIndex)
-                            setIsSummaryShown(false)
-                          }
-                        }}
-                        aria-expanded={active}
-                      >
-                        <strong>Session {sessionNum}</strong>
-                        <span>{sessionDone}/{sessionItems.length}</span>
-                      </button>
+                      <div className="live-test-heat-session-head" aria-expanded={active}>
+                        <button
+                          type="button"
+                          className="live-test-heat-session-title"
+                          onClick={() => {
+                            if (firstSessionIndex >= 0) {
+                              setSelectedIndex(firstSessionIndex)
+                              setIsSummaryShown(false)
+                            }
+                          }}
+                        >
+                          <strong>Session {sessionNum}</strong>
+                          <span>{sessionDone}/{sessionItems.length}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="live-test-heat-session-audio"
+                          onClick={() => {
+                            if (firstSessionIndex >= 0) setSelectedIndex(firstSessionIndex)
+                            void playSessionIntroAudio(sessionNum, true, false)
+                          }}
+                          disabled={!sessionIntroVariantIds[sessionNum]}
+                          title={sessionIntroVariantIds[sessionNum] ? `Play Session ${sessionNum} intro` : `Session ${sessionNum} intro audio is missing`}
+                          aria-label={`Play Session ${sessionNum} intro`}
+                        >
+                          <Volume2 className="h-3 w-3" aria-hidden />
+                        </button>
+                      </div>
                       {active ? (
                         <div className="live-test-heat-session-grid">
                           {sessionItems.map((item) => {
@@ -1283,7 +1451,14 @@ export function TeacherTestRunPage() {
                       ref={audioRef}
                       id="live-test-current-audio"
                       controls
-                      onPlay={() => setAudioState('playing')}
+                      onPlay={() => {
+                        liveAudioStartedRef.current = true
+                        setLiveAudioStarted(true)
+                        if (audioTargetRef.current === 'item' && currentItem?.id) {
+                          autoPlayedItemIdsRef.current.add(String(currentItem.id))
+                        }
+                        setAudioState('playing')
+                      }}
                       onEnded={handleAudioEnded}
                       onError={() => setAudioState('error')}
                       className="live-test-audio-el"
@@ -1298,6 +1473,9 @@ export function TeacherTestRunPage() {
                       </button>
                       <button type="button" onClick={() => void playPartIntroAudio(2, true)} disabled={!partIntroVariantIds[2]}>
                         Part II
+                      </button>
+                      <button type="button" onClick={() => void playPartIntroAudio(3, true)} disabled={!partIntroVariantIds[3]}>
+                        Part III
                       </button>
                       <button type="button" onClick={() => void playCurrentSessionIntro(true, true)} disabled={!canPlayCurrentSessionIntro}>
                         Session intro → Q1
@@ -1339,7 +1517,7 @@ export function TeacherTestRunPage() {
                         checked={autoPlayPartIntro}
                         onChange={(event) => setAutoPlayPartIntro(event.target.checked)}
                       />
-                      Auto-play Part I/II intro
+                      Auto-play Part I/II/III intro
                     </label>
                     <label className="live-test-audio-toggle">
                       <input
@@ -1433,7 +1611,23 @@ export function TeacherTestRunPage() {
                 </button>
               </h1>
 
-              {showKeys ? <p className="observe-depth-inline live-test-shortcuts">Shortcuts: 0 Red · 1 Yellow · 2 Green · 3 Purple · H map · ? keys</p> : null}
+              {showKeys ? <p className="observe-depth-inline live-test-shortcuts">Shortcuts: 0 Red · 1 Orange · 2 Green · 3 Purple · H map · ? keys</p> : null}
+              {!liveAudioStarted ? (
+                <div className="live-test-start-card">
+                  <button
+                    type="button"
+                    className="btn primary flex items-center gap-2 rounded-full px-5 py-2 font-bold"
+                    onClick={() => void startLiveAudioFlow()}
+                    disabled={!currentItem}
+                  >
+                    <PlayCircle className="h-4 w-4" aria-hidden />
+                    Start Live Test
+                  </button>
+                  <p>
+                    Unlocks audio once, then standard flow runs: Test → Part → Session → Question. Manual audio buttons remain available in the map.
+                  </p>
+                </div>
+              ) : null}
             </div>
 
             {reaction ? (
@@ -1448,7 +1642,7 @@ export function TeacherTestRunPage() {
             <div className={`observe-dock observe-dock-lg live-test-dock-compact${reaction ? ` is-glowing is-${reaction.color}` : ''}`}>
               {probeOpen ? (
                 <div className="observe-dock-probe live-test-probe-dock" role="group" aria-label="Resolve probe">
-                  <p className="live-test-probe-depth">n=<strong>{probeDepth}</strong></p>
+                  <p className="live-test-probe-depth">CHUNKS NUMBER <strong>{chunksNumber}</strong></p>
                   {PROBE_ACTIONS.map((action) => (
                     <button
                       key={action.outcome}
@@ -1457,8 +1651,8 @@ export function TeacherTestRunPage() {
                       onClick={() => void handleProbe(action.outcome)}
                       aria-label={`${action.label} probe`}
                     >
-                      <span>{action.outcome === 'continue' ? 'Continue' : action.label}</span>
-                      <kbd>{action.outcome === 'continue' ? 'C' : action.shortcut}</kbd>
+                      <span>{action.label}</span>
+                      <kbd>{action.shortcut}</kbd>
                     </button>
                   ))}
                 </div>
@@ -1522,13 +1716,13 @@ export function TeacherTestRunPage() {
             <Panel icon={BarChart3} title={`Màn hình Ghi nhận & Xem Kết quả · ${learnerName}`} description={`Tổng số câu trong Package: ${items.length} | Đã hoàn thành: ${summaryMetrics.finalized}/${items.length}`} collapsible={false}>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-3">
                 <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-center"><div className="text-2xl font-bold text-red-500">{summaryMetrics.redCount}</div><div className="text-xs text-red-400 font-semibold">0 · Red</div></div>
-                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-center"><div className="text-2xl font-bold text-amber-500">{summaryMetrics.yellowCount}</div><div className="text-xs text-amber-400 font-semibold">1 · Yellow</div></div>
+                <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/30 text-center"><div className="text-2xl font-bold text-orange-500">{summaryMetrics.yellowCount}</div><div className="text-xs text-orange-400 font-semibold">1 · Orange</div></div>
                 <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center"><div className="text-2xl font-bold text-emerald-500">{summaryMetrics.greenCount}</div><div className="text-xs text-emerald-400 font-semibold">2 · Green</div></div>
                 <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/30 text-center"><div className="text-2xl font-bold text-purple-500">{summaryMetrics.purpleCount}</div><div className="text-xs text-purple-400 font-semibold">3 · Purple</div></div>
               </div>
 
               <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-900 p-4 text-xs font-mono text-white shadow-inner sm:grid-cols-5">
-                <div><span className="text-slate-400">RFC </span><strong className="text-amber-400">{summaryMetrics.rfc}%</strong></div>
+                <div><span className="text-slate-400">RFC </span><strong className="text-red-400">{summaryMetrics.rfc}%</strong></div>
                 <div><span className="text-slate-400">%c </span><strong className="text-emerald-400">{summaryMetrics.rac}%</strong></div>
                 <div><span className="text-slate-400">CPD min </span><strong className="text-blue-300">{formatVolt(summaryMetrics.minCpd)}</strong></div>
                 <div><span className="text-slate-400">CPD max </span><strong className="text-blue-300">{formatVolt(summaryMetrics.maxCpd)}</strong></div>
@@ -1565,7 +1759,6 @@ export function TeacherTestRunPage() {
           </div>
         )}
 
-        {message ? <p className="error-text text-sm p-2 text-center">{message}</p> : null}
       </main>
     </div>
   )

@@ -422,7 +422,7 @@
     @apply border-red-100 bg-red-50 text-red-700;
   }
   .color-yellow {
-    @apply border-yellow-100 bg-yellow-50 text-yellow-700;
+    @apply border-orange-100 bg-orange-50 text-orange-700;
   }
   .color-green {
     @apply border-green-100 bg-green-50 text-green-700;
@@ -1019,7 +1019,7 @@
     @apply bg-red-50 text-red-700;
   }
   .color-pill.is-yellow {
-    @apply bg-yellow-50 text-yellow-800;
+    @apply bg-orange-50 text-orange-800;
   }
   .color-pill.is-green {
     @apply bg-green-50 text-green-700;
@@ -1051,7 +1051,7 @@
     @apply border-l-4 border-l-red-500 border-slate-200/80 bg-red-50/20;
   }
   .archive-heat-cell.is-yellow {
-    @apply border-l-4 border-l-yellow-500 border-slate-200/80 bg-yellow-50/20;
+    @apply border-l-4 border-l-orange-500 border-slate-200/80 bg-orange-50/20;
   }
   .archive-heat-cell.is-green {
     @apply border-l-4 border-l-green-500 border-slate-200/80 bg-green-50/20;
@@ -1317,7 +1317,7 @@
     @apply border-red-100 bg-red-50 text-red-700;
   }
   .capture-dot.yellow {
-    @apply border-yellow-100 bg-yellow-50 text-yellow-700;
+    @apply border-orange-100 bg-orange-50 text-orange-700;
   }
   .capture-dot.green {
     @apply border-green-100 bg-green-50 text-green-700;
@@ -1727,7 +1727,7 @@
     @apply bg-red-500;
   }
   .observe-heat-count.is-yellow i {
-    @apply bg-yellow-400;
+    @apply bg-orange-500;
   }
   .observe-heat-count.is-green i {
     @apply bg-green-500;
@@ -1755,7 +1755,7 @@
     @apply bg-red-500 text-white;
   }
   .observe-heat-dot-btn.is-yellow {
-    @apply bg-yellow-400 text-yellow-950;
+    @apply bg-orange-500 text-white;
   }
   .observe-heat-dot-btn.is-green {
     @apply bg-green-500 text-white;
@@ -2329,11 +2329,11 @@
       0 0 18px rgb(239 68 68 / 0.45);
   }
   .observe-dock-color.is-yellow {
-    @apply border-slate-950 bg-gradient-to-b from-yellow-200 via-yellow-400 to-amber-600 text-yellow-950 hover:brightness-110;
+    @apply border-slate-950 bg-gradient-to-b from-orange-300 via-orange-500 to-orange-700 text-white hover:brightness-110;
     box-shadow:
-      inset 0 7px 10px rgb(255 255 255 / 0.48),
-      inset 0 -9px 12px rgb(120 53 15 / 0.3),
-      0 0 18px rgb(250 204 21 / 0.45);
+      inset 0 7px 10px rgb(255 255 255 / 0.36),
+      inset 0 -9px 12px rgb(124 45 18 / 0.42),
+      0 0 18px rgb(249 115 22 / 0.5);
   }
   .observe-dock-color.is-green {
     @apply border-slate-950 bg-gradient-to-b from-emerald-300 via-emerald-500 to-emerald-700 text-white hover:brightness-110;
@@ -2372,7 +2372,7 @@
     --dock-glow: 239 68 68;
   }
   .observe-dock.is-glowing.is-yellow .observe-dock-colors {
-    --dock-glow: 250 204 21;
+    --dock-glow: 249 115 22;
   }
   .observe-dock.is-glowing.is-green .observe-dock-colors {
     --dock-glow: 16 185 129;
@@ -2432,7 +2432,7 @@
     @apply bg-gradient-to-b from-[#ff3b30] to-[#e50914] text-white opacity-100 border-white/40 scale-105 shadow-[0_0_25px_8px_#ef4444,_inset_0_2px_6px_rgba(255,255,255,0.55)];
   }
   .observe-dock-color.is-yellow.is-selected {
-    @apply bg-gradient-to-b from-[#ffe600] to-[#f59e0b] text-yellow-950 opacity-100 border-white/40 scale-105 shadow-[0_0_25px_8px_#f59e0b,_inset_0_2px_6px_rgba(255,255,255,0.65)];
+    @apply bg-gradient-to-b from-[#fb923c] to-[#ea580c] text-white opacity-100 border-white/40 scale-105 shadow-[0_0_25px_8px_#f97316,_inset_0_2px_6px_rgba(255,255,255,0.55)];
   }
   .observe-dock-color.is-green.is-selected {
     @apply bg-gradient-to-b from-[#34c759] to-[#099268] text-white opacity-100 border-white/40 scale-105 shadow-[0_0_25px_8px_#10b981,_inset_0_2px_6px_rgba(255,255,255,0.55)];
@@ -2461,10 +2461,14 @@
       0 8px 18px rgb(0 0 0 / 0.32);
   }
 
-  .observe-dock-probe-btn.fail,
-  .observe-dock-probe-btn.pass,
+  .observe-dock-probe-btn.fail {
+    @apply border-yellow-300/60 bg-yellow-950/80 text-yellow-100 hover:bg-yellow-900;
+  }
+  .observe-dock-probe-btn.pass {
+    @apply border-blue-300/60 bg-blue-950/80 text-blue-100 hover:bg-blue-900;
+  }
   .observe-dock-probe-btn.done {
-    @apply border-slate-500 bg-slate-800 text-slate-100;
+    @apply border-indigo-300/60 bg-indigo-950/80 text-indigo-100 hover:bg-indigo-900;
   }
 
   .observe-dock-probe-btn kbd {
@@ -2900,7 +2904,7 @@
     @apply bg-red-500/20 text-red-200;
   }
   .color-tag-yellow {
-    @apply bg-yellow-500/20 text-yellow-200;
+    @apply bg-orange-500/20 text-orange-200;
   }
   .color-tag-green {
     @apply bg-green-500/20 text-green-200;
@@ -2921,7 +2925,7 @@
     @apply bg-red-600 text-white shadow-[0_0_0_1px_rgb(220_38_38)] hover:bg-red-500;
   }
   .observe-color-yellow {
-    @apply bg-yellow-500 text-yellow-950 shadow-[0_0_0_1px_rgb(234_179_8)] hover:bg-yellow-400;
+    @apply bg-orange-500 text-white shadow-[0_0_0_1px_rgb(249_115_22)] hover:bg-orange-400;
   }
   .observe-color-green {
     @apply bg-green-600 text-white shadow-[0_0_0_1px_rgb(22_163_74)] hover:bg-green-500;
@@ -3614,7 +3618,7 @@
   }
 
   .analysis-kpi-rfc.is-warn {
-    @apply border-amber-200 bg-gradient-to-b from-amber-50/80 to-white;
+    @apply border-red-200 bg-gradient-to-b from-red-50/80 to-white;
   }
 
   .analysis-kpi-rac.is-good {
@@ -3634,7 +3638,7 @@
   }
 
   .analysis-delta.is-down {
-    @apply text-amber-700;
+    @apply text-red-700;
   }
 
   .analysis-delta.is-flat {
@@ -3750,7 +3754,7 @@
     @apply bg-red-400;
   }
   .dist-yellow {
-    @apply bg-yellow-400;
+    @apply bg-orange-500;
   }
   .dist-green {
     @apply bg-green-400;
@@ -4434,7 +4438,7 @@
 
 @layer components {
   .live-test-session-heatmap {
-    @apply mt-2 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1;
+    @apply mt-2 flex min-h-16 flex-1 flex-col gap-2 overflow-y-auto pr-1;
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
@@ -4450,17 +4454,29 @@
   .live-test-heat-session.is-collapsed {
     @apply bg-black/10;
   }
+  .live-test-flow-audio-row {
+    @apply mb-2 grid grid-cols-5 gap-1 rounded-2xl border border-emerald-300/20 bg-emerald-950/25 p-1.5;
+  }
+  .live-test-flow-audio-row button {
+    @apply inline-flex min-h-8 items-center justify-center gap-1 rounded-xl border border-white/10 bg-white/5 px-1.5 py-1 text-[10px] font-black text-emerald-50 shadow-none transition hover:bg-white/10 disabled:opacity-35;
+  }
   .live-test-heat-session-head {
-    @apply flex min-h-8 w-full min-w-0 items-center justify-between gap-2 rounded-xl border-0 bg-transparent px-1.5 py-1 text-left text-[10px] text-slate-400 shadow-none transition hover:bg-white/10;
+    @apply mb-0 flex min-h-8 w-full min-w-0 items-center justify-between gap-1.5 rounded-xl px-1.5 py-1 text-left text-[10px] text-slate-400;
   }
   .live-test-heat-session.is-active .live-test-heat-session-head {
-    @apply mb-1.5 cursor-default hover:bg-transparent;
+    @apply mb-1.5;
   }
-  .live-test-heat-session-head strong {
+  .live-test-heat-session-title {
+    @apply flex min-h-7 min-w-0 flex-1 items-center justify-between gap-2 rounded-lg border-0 bg-transparent px-1 py-0 text-left text-[10px] text-slate-400 shadow-none hover:bg-white/10;
+  }
+  .live-test-heat-session-title strong {
     @apply truncate text-white;
   }
-  .live-test-heat-session-head span {
+  .live-test-heat-session-title span {
     @apply shrink-0 font-mono font-bold text-amber-300;
+  }
+  .live-test-heat-session-audio {
+    @apply grid h-7 min-h-7 w-7 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/5 p-0 text-emerald-200 shadow-none hover:bg-emerald-400/10 disabled:opacity-35;
   }
   .live-test-heat-session-grid {
     @apply grid grid-cols-4 justify-items-center gap-1.5;
@@ -4475,53 +4491,67 @@
     @apply grid-cols-3 gap-1;
   }
   .live-test-audio-panel {
-    @apply mt-3 shrink-0 rounded-2xl border border-indigo-300/15 bg-slate-950/70 p-2.5 text-xs text-slate-200 shadow-inner;
+    @apply sticky bottom-0 z-10 mt-2 flex min-h-0 shrink-0 flex-col rounded-2xl border border-indigo-300/20 bg-slate-950/90 p-2 text-xs text-slate-200 shadow-2xl shadow-slate-950/40 backdrop-blur;
+    max-height: clamp(14rem, 42dvh, 24rem);
   }
   .live-test-audio-head {
-    @apply mb-2 flex w-full items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/5 px-2 py-1.5 font-mono text-[10px] uppercase tracking-wide text-indigo-200 transition hover:bg-white/10;
+    @apply mb-2 flex min-h-10 w-full shrink-0 items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/7 px-3 py-2 font-mono text-[11px] uppercase tracking-wide text-indigo-100 transition hover:bg-white/10;
   }
   .live-test-audio-head span {
-    @apply flex items-center gap-1 font-bold;
+    @apply flex items-center gap-1.5 font-black;
   }
   .live-test-audio-head strong {
-    @apply ml-auto rounded-full bg-slate-950/70 px-2 py-0.5 text-[9px] text-slate-300;
+    @apply ml-auto rounded-full bg-slate-950/70 px-2.5 py-1 text-[10px] text-slate-200;
   }
   .live-test-audio-panel.is-collapsed {
-    @apply border-indigo-300/10 bg-slate-950/55;
+    @apply border-indigo-300/10 bg-slate-950/75 shadow-inner;
+    max-height: none;
   }
   .live-test-audio-panel.is-collapsed .live-test-audio-head {
     @apply mb-0;
+  }
+  .live-test-audio-body {
+    @apply min-h-0 overflow-y-auto pr-1;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
   }
   .live-test-audio-body[hidden] {
     @apply hidden;
   }
   .live-test-audio-el {
-    @apply h-8 w-full max-w-full accent-indigo-500;
+    @apply h-10 w-full max-w-full accent-indigo-500;
   }
   .live-test-audio-label {
-    @apply my-1 truncate text-center font-mono text-[10px] text-slate-400;
+    @apply my-1 truncate text-center font-mono text-[11px] text-slate-300;
   }
   .live-test-audio-actions {
-    @apply grid grid-cols-2 gap-1.5;
+    @apply grid grid-cols-2 gap-1.5 sm:grid-cols-3;
   }
   .live-test-audio-actions button {
-    @apply min-h-8 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-bold text-slate-100 shadow-none transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40;
+    @apply min-h-9 rounded-xl border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-black text-slate-100 shadow-none transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40;
   }
   .live-test-audio-toggle {
-    @apply mt-2 flex items-center gap-2 text-[10px] font-semibold text-slate-300;
+    @apply mt-2 flex items-center gap-2 rounded-lg bg-white/5 px-2 py-1.5 text-[11px] font-semibold text-slate-200;
   }
   .live-test-audio-toggle input {
-    @apply h-3.5 w-3.5 accent-indigo-500;
+    @apply h-4 w-4 shrink-0 accent-indigo-500;
   }
   .live-test-audio-grid {
-    @apply mt-2 grid grid-cols-2 gap-2 text-[10px] text-slate-400;
+    @apply mt-2 grid grid-cols-2 gap-2 text-[11px] text-slate-300;
   }
   .live-test-audio-grid label {
     @apply flex flex-col gap-1;
   }
   .live-test-audio-grid select,
+  .live-test-audio-grid input[type='number'],
   .live-test-audio-grid input[type='range'] {
-    @apply min-h-8 rounded-lg border border-white/10 bg-slate-900 px-2 text-xs text-white;
+    @apply min-h-9 rounded-xl border border-white/10 bg-slate-900 px-2 text-xs text-white;
+  }
+  .live-test-start-card {
+    @apply mt-2 flex flex-col items-center gap-1.5 rounded-xl border border-emerald-300/25 bg-emerald-950/30 px-3 py-2 text-center shadow-md shadow-emerald-950/20;
+  }
+  .live-test-start-card p {
+    @apply m-0 max-w-sm text-[10px] leading-snug text-emerald-50/75;
   }
   .live-test-focus-card {
     @apply mt-2 w-full max-w-xl rounded-2xl border border-indigo-300/20 bg-indigo-950/30 p-2.5 text-center shadow-lg sm:p-3;
@@ -4554,9 +4584,14 @@
       height: 100dvh;
       max-height: 100dvh;
     }
+    .observe-root:has(.live-test-stage) .observe-rail-map,
+    .observe-root:has(.live-test-stage) .observe-heat.layout-column {
+      min-height: 0;
+      overflow: hidden;
+    }
   }
   .live-test-stage {
-    @apply min-h-0 flex-col justify-start overflow-y-auto overflow-x-hidden;
+    @apply min-h-0 flex-col justify-center overflow-y-auto overflow-x-hidden;
     height: 100%;
     padding-block: clamp(0.35rem, 1.2dvh, 0.75rem);
     padding-bottom: max(clamp(0.75rem, 2dvh, 1.25rem), env(safe-area-inset-bottom));
@@ -4603,7 +4638,7 @@
     min-height: 1.5rem;
   }
   .live-test-rail-meta .observe-learner-rfc.is-rfc {
-    @apply border-amber-400/30 bg-amber-500/15 text-amber-200;
+    @apply border-red-400/30 bg-red-500/15 text-red-200;
   }
   .live-test-rail-meta .observe-learner-rfc.is-percent-c {
     @apply border-emerald-400/30 bg-emerald-500/15 text-emerald-200;
@@ -4697,21 +4732,18 @@
   }
 
   .live-test-audio-el {
-    @apply mt-1 h-8 w-full max-w-full opacity-100;
+    @apply mt-1 h-10 w-full max-w-full opacity-100;
     position: static !important;
     pointer-events: auto !important;
   }
   .live-test-audio-panel {
-    padding: clamp(0.45rem, 1dvh, 0.65rem) !important;
-  }
-  .live-test-audio-toggle {
-    @apply mt-1.5;
-  }
-  .live-test-audio-grid {
-    @apply mt-1.5;
+    padding: clamp(0.55rem, 1.1dvh, 0.8rem) !important;
   }
 
   @media (max-height: 760px) {
+    .live-test-audio-panel {
+      max-height: clamp(12.5rem, 38dvh, 19rem);
+    }
     .observe-bar,
     .observe-bar-slim {
       @apply py-1;
@@ -4743,6 +4775,17 @@
   }
 
   @media (max-height: 620px) {
+    .live-test-audio-panel {
+      max-height: clamp(11rem, 34dvh, 15rem);
+    }
+    .live-test-audio-head,
+    .live-test-audio-actions button {
+      @apply min-h-8 text-[10px];
+    }
+    .live-test-audio-toggle,
+    .live-test-audio-grid {
+      @apply text-[10px];
+    }
     .live-test-stage-hero {
       gap: 0;
     }
@@ -4842,14 +4885,15 @@
       font-size: clamp(1rem, 5vw, 1.35rem) !important;
     }
     .live-test-audio-panel {
-      @apply mt-2 rounded-xl p-2!;
+      @apply mt-2 rounded-2xl p-2!;
+      max-height: min(18rem, 34dvh);
     }
     .live-test-audio-actions,
     .live-test-audio-grid {
-      @apply grid-cols-1;
+      @apply grid-cols-2;
     }
     .live-test-audio-el {
-      @apply h-9;
+      @apply h-10;
     }
     .live-test-heat-session-grid {
       @apply grid-cols-7 gap-1;
@@ -4882,13 +4926,13 @@
     @apply text-slate-100;
   }
   .live-test-probe-dock .observe-dock-probe-btn.fail {
-    @apply border-rose-400/50 bg-rose-950/80 text-rose-100 hover:bg-rose-900;
+    @apply border-yellow-300/60 bg-yellow-950/80 text-yellow-100 hover:bg-yellow-900;
   }
   .live-test-probe-dock .observe-dock-probe-btn.pass {
-    @apply border-amber-300/50 bg-amber-950/80 text-amber-100 hover:bg-amber-900;
+    @apply border-blue-300/60 bg-blue-950/80 text-blue-100 hover:bg-blue-900;
   }
   .live-test-probe-dock .observe-dock-probe-btn.done {
-    @apply border-emerald-300/50 bg-emerald-950/80 text-emerald-100 hover:bg-emerald-900;
+    @apply border-indigo-300/60 bg-indigo-950/80 text-indigo-100 hover:bg-indigo-900;
   }
 
   .standalone-analysis-grid {
@@ -5081,7 +5125,7 @@
   }
   .standalone-metric-card.metric-rfc svg,
   .standalone-metric-card.metric-rfc strong {
-    @apply text-amber-600;
+    @apply text-red-600;
   }
   .standalone-metric-card.metric-percent-c svg,
   .standalone-metric-card.metric-percent-c strong,
@@ -5116,14 +5160,17 @@
   .test-analysis-page .panel-desc {
     @apply text-slate-600;
   }
+  .page:has(.test-analysis-page) {
+    @apply max-w-[110rem];
+  }
   .test-analysis-workbench {
-    @apply grid items-start gap-4 lg:grid-cols-[13rem_minmax(0,1fr)];
+    @apply grid items-start gap-4;
   }
   .test-analysis-filter-card {
-    @apply sticky top-20 rounded-2xl border border-slate-200 bg-white p-3 text-slate-800 shadow-sm;
+    @apply rounded-2xl border border-slate-200 bg-white p-2 text-slate-800 shadow-sm lg:grid lg:grid-cols-[minmax(10rem,0.8fr)_minmax(12rem,1fr)_minmax(18rem,1.4fr)_auto] lg:items-center lg:gap-3;
   }
   .test-analysis-filter-head {
-    @apply mb-3 flex items-center gap-2 border-b border-slate-100 pb-3 text-slate-700;
+    @apply mb-2 flex items-center gap-2 border-b border-slate-100 pb-2 text-slate-700 lg:mb-0 lg:border-b-0 lg:pb-0;
   }
   .test-analysis-filter-head strong {
     @apply block text-sm font-black text-slate-950;
@@ -5132,7 +5179,7 @@
     @apply block text-[11px] font-semibold text-slate-500;
   }
   .test-analysis-filter-section {
-    @apply mb-4 space-y-2;
+    @apply mb-2 space-y-1.5 lg:mb-0;
   }
   .test-analysis-filter-title {
     @apply flex items-center justify-between gap-2 text-[11px] font-black uppercase tracking-wide text-slate-600;
@@ -5141,7 +5188,7 @@
     @apply rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold normal-case tracking-normal text-slate-600 shadow-none transition hover:bg-slate-100;
   }
   .test-analysis-chip-grid {
-    @apply grid grid-cols-4 gap-1.5 lg:grid-cols-3;
+    @apply flex flex-wrap gap-1.5;
   }
   .test-analysis-chip {
     @apply min-h-8 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-black text-slate-500 shadow-none transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700;
@@ -5150,10 +5197,10 @@
     @apply border-indigo-300 bg-indigo-50 text-indigo-700;
   }
   .test-analysis-color-list {
-    @apply grid gap-1.5;
+    @apply flex flex-wrap gap-1.5;
   }
   .test-analysis-color-chip {
-    @apply flex min-h-8 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-500 shadow-none transition hover:bg-slate-100;
+    @apply flex min-h-8 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-500 shadow-none transition hover:bg-slate-100;
   }
   .test-analysis-color-chip.is-active {
     @apply text-slate-900;
@@ -5163,7 +5210,7 @@
     @apply inline-block h-2.5 w-2.5 shrink-0 rounded-full;
   }
   .test-analysis-label-toggle {
-    @apply mt-1 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-600 shadow-none transition hover:bg-slate-100;
+    @apply mt-1 flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-600 shadow-none transition hover:bg-slate-100 lg:mt-0 lg:w-auto lg:whitespace-nowrap;
   }
   .test-analysis-label-toggle.is-active {
     @apply border-indigo-200 bg-indigo-50 text-indigo-700;
@@ -5172,15 +5219,21 @@
     @apply grid min-w-0 gap-4;
   }
   .test-analysis-chart-row {
-    @apply grid min-w-0 gap-4 xl:grid-cols-2;
+    @apply grid min-w-0 gap-4 lg:grid-cols-2;
   }
   .test-analysis-panel .standalone-chart-wrap {
     @apply bg-white;
   }
+  .test-analysis-chart-row .standalone-chart-wrap {
+    @apply h-[min(50dvh,24rem)] min-h-[20rem];
+  }
   .test-analysis-chart-label {
-    fill: #334155;
     font-size: 11px;
     font-weight: 800;
+    paint-order: stroke;
+    stroke: #ffffff;
+    stroke-width: 3px;
+    stroke-linejoin: round;
   }
   .test-analysis-pie-layout {
     @apply grid gap-4 lg:grid-cols-[minmax(0,1fr)_16rem];
@@ -5442,12 +5495,12 @@
     @apply text-slate-100;
   }
   .live-test-probe-dock .observe-dock-probe-btn.fail {
-    @apply border-rose-400/50 bg-rose-950/80 text-rose-100 hover:bg-rose-900;
+    @apply border-yellow-300/60 bg-yellow-950/80 text-yellow-100 hover:bg-yellow-900;
   }
   .live-test-probe-dock .observe-dock-probe-btn.pass {
-    @apply border-amber-300/50 bg-amber-950/80 text-amber-100 hover:bg-amber-900;
+    @apply border-blue-300/60 bg-blue-950/80 text-blue-100 hover:bg-blue-900;
   }
   .live-test-probe-dock .observe-dock-probe-btn.done {
-    @apply border-emerald-300/50 bg-emerald-950/80 text-emerald-100 hover:bg-emerald-900;
+    @apply border-indigo-300/60 bg-indigo-950/80 text-indigo-100 hover:bg-indigo-900;
   }
 }

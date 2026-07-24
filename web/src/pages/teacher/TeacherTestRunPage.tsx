@@ -640,7 +640,7 @@ export function TeacherTestRunPage() {
     target: AudioTarget,
   ) => {
     audioTargetRef.current = target
-    if (target === 'item' && shouldPlay && currentItem?.id) {
+    if ((target === 'item' || target === 'item_prefix') && shouldPlay && currentItem?.id) {
       autoPlayedItemIdsRef.current.add(String(currentItem.id))
     }
     setAudioLabel(label)
@@ -751,6 +751,9 @@ export function TeacherTestRunPage() {
         pendingItemAudioRef.current = {
           signedUrl: cached?.signedUrl || null,
           variantId
+        }
+        if (currentItem?.id) {
+          autoPlayedItemIdsRef.current.add(String(currentItem.id))
         }
         activateAudioUrl(prefixUrl, `Number ${questionNumber}`, true, 'item_prefix')
       } else {
@@ -1543,7 +1546,7 @@ export function TeacherTestRunPage() {
                       onPlay={() => {
                         liveAudioStartedRef.current = true
                         setLiveAudioStarted(true)
-                        if (audioTargetRef.current === 'item' && currentItem?.id) {
+                        if ((audioTargetRef.current === 'item' || audioTargetRef.current === 'item_prefix') && currentItem?.id) {
                           autoPlayedItemIdsRef.current.add(String(currentItem.id))
                         }
                         setAudioState('playing')

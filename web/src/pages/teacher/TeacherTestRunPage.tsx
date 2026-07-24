@@ -574,6 +574,12 @@ export function TeacherTestRunPage() {
     }
     setItems(combinedItems)
 
+    const completed = combinedItems.filter(isItemFinalized).length
+    if (completed > 0) {
+      liveAudioStartedRef.current = true
+      setLiveAudioStarted(true)
+    }
+
     const firstUnfinalized = combinedItems.findIndex((item) => !isItemFinalized(item))
     if (firstUnfinalized !== -1) {
       setSelectedIndex(firstUnfinalized)
@@ -1487,46 +1493,48 @@ export function TeacherTestRunPage() {
                         Test End
                       </button>
                     </div>
-                    <label className="live-test-audio-toggle">
-                      <input
-                        type="checkbox"
-                        checked={autoPlayItems}
-                        onChange={(event) => setAutoPlayItems(event.target.checked)}
-                      />
-                      Auto-play next question
-                    </label>
-                    <label className="live-test-audio-toggle">
-                      <input
-                        type="checkbox"
-                        checked={autoPlaySessionIntro}
-                        onChange={(event) => setAutoPlaySessionIntro(event.target.checked)}
-                      />
-                      Auto-play session intro
-                    </label>
-                    <label className="live-test-audio-toggle">
-                      <input
-                        type="checkbox"
-                        checked={autoPlayPackageStart}
-                        onChange={(event) => setAutoPlayPackageStart(event.target.checked)}
-                      />
-                      Auto-play Test Start
-                    </label>
-                    <label className="live-test-audio-toggle">
-                      <input
-                        type="checkbox"
-                        checked={autoPlayPartIntro}
-                        onChange={(event) => setAutoPlayPartIntro(event.target.checked)}
-                      />
-                      Auto-play Part I/II/III intro
-                    </label>
-                    <label className="live-test-audio-toggle">
-                      <input
-                        type="checkbox"
-                        checked={autoPlayPackageEnd}
-                        onChange={(event) => setAutoPlayPackageEnd(event.target.checked)}
-                      />
-                      Play Test End before analysis
-                    </label>
+                    <div className="live-test-audio-toggles-grid">
+                      <label className="live-test-audio-toggle">
+                        <input
+                          type="checkbox"
+                          checked={autoPlayItems}
+                          onChange={(event) => setAutoPlayItems(event.target.checked)}
+                        />
+                        <span>Auto Q</span>
+                      </label>
+                      <label className="live-test-audio-toggle">
+                        <input
+                          type="checkbox"
+                          checked={autoPlaySessionIntro}
+                          onChange={(event) => setAutoPlaySessionIntro(event.target.checked)}
+                        />
+                        <span>Auto Session</span>
+                      </label>
+                      <label className="live-test-audio-toggle">
+                        <input
+                          type="checkbox"
+                          checked={autoPlayPackageStart}
+                          onChange={(event) => setAutoPlayPackageStart(event.target.checked)}
+                        />
+                        <span>Auto Start</span>
+                      </label>
+                      <label className="live-test-audio-toggle">
+                        <input
+                          type="checkbox"
+                          checked={autoPlayPartIntro}
+                          onChange={(event) => setAutoPlayPartIntro(event.target.checked)}
+                        />
+                        <span>Auto Part</span>
+                      </label>
+                      <label className="live-test-audio-toggle col-span-2">
+                        <input
+                          type="checkbox"
+                          checked={autoPlayPackageEnd}
+                          onChange={(event) => setAutoPlayPackageEnd(event.target.checked)}
+                        />
+                        <span>Auto End</span>
+                      </label>
+                    </div>
                     <div className="live-test-audio-grid">
                       <label>
                         Speed <span>{audioRate.toFixed(2)}×</span>
@@ -1612,22 +1620,6 @@ export function TeacherTestRunPage() {
               </h1>
 
               {showKeys ? <p className="observe-depth-inline live-test-shortcuts">Shortcuts: 0 Red · 1 Orange · 2 Green · 3 Purple · H map · ? keys</p> : null}
-              {!liveAudioStarted ? (
-                <div className="live-test-start-card">
-                  <button
-                    type="button"
-                    className="btn primary flex items-center gap-2 rounded-full px-5 py-2 font-bold"
-                    onClick={() => void startLiveAudioFlow()}
-                    disabled={!currentItem}
-                  >
-                    <PlayCircle className="h-4 w-4" aria-hidden />
-                    Start Live Test
-                  </button>
-                  <p>
-                    Unlocks audio once, then standard flow runs: Test → Part → Session → Question. Manual audio buttons remain available in the map.
-                  </p>
-                </div>
-              ) : null}
             </div>
 
             {reaction ? (
@@ -1640,7 +1632,22 @@ export function TeacherTestRunPage() {
             ) : null}
 
             <div className={`observe-dock observe-dock-lg live-test-dock-compact${reaction ? ` is-glowing is-${reaction.color}` : ''}`}>
-              {probeOpen ? (
+              {!liveAudioStarted ? (
+                <div className="live-test-start-card w-full max-w-md border-0 bg-transparent p-0 shadow-none">
+                  <button
+                    type="button"
+                    className="btn primary flex items-center gap-2 rounded-full px-6 py-3 font-bold text-sm mx-auto shadow-lg"
+                    onClick={() => void startLiveAudioFlow()}
+                    disabled={!currentItem}
+                  >
+                    <PlayCircle className="h-5 w-5" aria-hidden />
+                    Start Live Test
+                  </button>
+                  <p className="mt-2 text-[10px] leading-snug text-emerald-500 font-semibold text-center max-w-xs mx-auto">
+                    Unlocks audio once, then standard flow runs: Test → Part → Session → Question. Manual audio buttons remain available in the map.
+                  </p>
+                </div>
+              ) : probeOpen ? (
                 <div className="observe-dock-probe live-test-probe-dock" role="group" aria-label="Resolve probe">
                   <p className="live-test-probe-depth">CHUNKS NUMBER <strong>{chunksNumber}</strong></p>
                   {PROBE_ACTIONS.map((action) => (

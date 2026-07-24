@@ -5,7 +5,7 @@
   "expectedAudioFiles": 61,
   "foundAudioFiles": 61,
   "missingAudioFiles": 0,
-  "totalBytes": 18978096,
+  "totalBytes": 18467376,
   "finalSqlPath": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\GREEN-TEST-49Q.import.final.sql",
   "assets": [
     {
@@ -19,15 +19,15 @@
       "key": "audio_intro_part_I",
       "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/audio_intro_part_I.wav",
       "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\audio_intro_part_I.wav",
-      "bytes": 958124,
-      "sha256": "sha256:4efb2bed1df587961261a2aa2d0c126aad1298ebf692dc6408b720a3f0ed6ea3"
+      "bytes": 422444,
+      "sha256": "sha256:f956e53ab9ab36becf955774262ffe1537446aefb11f0accae778716ae129b9c"
     },
     {
       "key": "audio_intro_part_II",
       "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/audio_intro_part_II.wav",
       "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\audio_intro_part_II.wav",
-      "bytes": 472364,
-      "sha256": "sha256:5381dee5a6c60da501bfdfa0f08e51c1f6493a37dcfe04fd837581419e999ffe"
+      "bytes": 497324,
+      "sha256": "sha256:0b1c89a70d2209c16e69616c55804f7733a2338fb2521849eee1cbd5e600fa67"
     },
     {
       "key": "audio_intro_part_III",

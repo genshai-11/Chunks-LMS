@@ -2,10 +2,10 @@
  * Probe counters for teacher/analysis UI.
  *
  * Product language (not sample size):
- * - **n count** = times teacher chose Green (2) → entered probe flow
- * - **n depth** = probeCount on one attempt (Pass/Continue steps + final resolve)
- * - **n depth max** = max observed probeCount in the window
- * - **n depth avg** = mean probeCount over probed attempts
+ * - **chunks count** = times teacher chose Green (2) → entered probe flow
+ * - **chunks number** = displayed probe depth for one attempt; Green opens at 1
+ * - **max chunks number** = max displayed chunks number in the window
+ * - **avg chunks number** = mean displayed chunks number over probed attempts
  *
  * Do not call finalized sample size "n" — use sample / finalized.
  */
@@ -18,34 +18,39 @@ export type ProbeAttemptLike = {
 export type ProbeAggregates = {
   /** Times Green opened probe flow */
   nCount: number
-  /** Max observed probe depth (not session maxProbeCount ceiling) */
+  /** Max observed chunks number (not session maxProbeCount ceiling) */
   nDepthMax: number | null
-  /** Mean probe depth over probed attempts */
+  /** Mean chunks number over probed attempts */
   nDepthAvg: number | null
   /** Attempts that entered probe flow */
   probedCount: number
 }
 
 export const PROBE_METRIC_LABELS = {
-  nCount: 'n count',
-  nDepth: 'n depth',
-  nDepthMax: 'n depth max',
-  nDepthAvg: 'n depth avg',
+  nCount: 'chunks count',
+  nDepth: 'chunks number',
+  nDepthMax: 'max chunks number',
+  nDepthAvg: 'avg chunks number',
 } as const
 
 export const PROBE_METRIC_TOOLTIPS = {
   nCount:
     'Number of times the teacher selected Green (2) and entered the probe sub-screens.',
   nDepth:
-    'Probe depth for one question: each Pass (Continue) increments depth; Done/Fail also count when leaving the open probe. Example: Green once + Pass ×8 + Done → n depth = 9.',
-  nDepthMax: 'Highest n depth observed in this window (peak probe depth).',
-  nDepthAvg: 'Average n depth across questions that entered the probe flow.',
+    'Chunks Number for one question: Green opens at 1, and each Continue adds 1. Fail/Done resolve the current chunks number. Example: Green + Continue ×8 + Done → chunks number = 9.',
+  nDepthMax: 'Highest chunks number observed in this window.',
+  nDepthAvg: 'Average chunks number across questions that entered the probe flow.',
 } as const
 
-/** Per-attempt depth; null when never entered probe. */
-export function attemptNDepth(a: ProbeAttemptLike): number | null {
+/** Displayed chunks number; null when never entered probe. */
+export function probeChunksNumber(a: ProbeAttemptLike): number | null {
   if (!a.enteredProbeFlow && a.probeCount <= 0) return null
-  return a.probeCount
+  return Math.max(1, a.probeCount + 1)
+}
+
+/** Backwards-compatible helper name for callers that still use the old n-depth code name. */
+export function attemptNDepth(a: ProbeAttemptLike): number | null {
+  return probeChunksNumber(a)
 }
 
 export function aggregateProbeMetrics(attempts: ProbeAttemptLike[]): ProbeAggregates {
@@ -57,8 +62,9 @@ export function aggregateProbeMetrics(attempts: ProbeAttemptLike[]): ProbeAggreg
   let sum = 0
   let max = 0
   for (const a of probed) {
-    sum += a.probeCount
-    max = Math.max(max, a.probeCount)
+    const chunksNumber = probeChunksNumber(a) ?? 0
+    sum += chunksNumber
+    max = Math.max(max, chunksNumber)
   }
   return {
     nCount,

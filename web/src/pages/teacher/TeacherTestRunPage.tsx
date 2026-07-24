@@ -284,12 +284,10 @@ export function TeacherTestRunPage() {
   const pendingItemAudioRef = useRef<{ signedUrl: string | null; variantId: string } | null>(null)
 
   useEffect(() => {
-    liveAudioStartedRef.current = false
     autoPlayedItemIdsRef.current = new Set()
     sessionIntroPlayedRef.current = {}
     partIntroPlayedRef.current = { 1: false, 2: false, 3: false }
     packageEndPlayedRef.current = false
-    setLiveAudioStarted(false)
   }, [runId])
 
   useEffect(() => {

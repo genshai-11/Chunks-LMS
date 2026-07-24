@@ -280,7 +280,7 @@ export function TeacherTestRunPage() {
   const suppressNextItemEffectForIdRef = useRef<string | null>(null)
   const partIntroPlayedRef = useRef<Record<PartIntroNumber, boolean>>({ 1: false, 2: false, 3: false })
   const packageEndPlayedRef = useRef(false)
-  const enteringProbeRef = useRef(false)
+  const enteringProbeRef = useRef<string | null>(null)
   const pendingItemAudioRef = useRef<{ signedUrl: string | null; variantId: string } | null>(null)
 
   useEffect(() => {
@@ -592,7 +592,7 @@ export function TeacherTestRunPage() {
       setIsSummaryShown(true)
       triggerConfetti()
     }
-    enteringProbeRef.current = false
+    enteringProbeRef.current = null
   }, [runId, assignmentIdParam])
 
   useEffect(() => {
@@ -918,7 +918,10 @@ export function TeacherTestRunPage() {
   }, [autoPlayPackageStart, completedCount, currentItem?.id, currentSessionNumber, isFirstItemInSession, liveAudioStarted, packageStartVariantId, playPackageStartAudio, probeOpen])
 
   useEffect(() => {
-    if (!liveAudioStarted || probeOpen || enteringProbeRef.current) return
+    if (probeOpen && enteringProbeRef.current === String(currentItem?.id)) {
+      enteringProbeRef.current = null
+    }
+    if (!liveAudioStarted || probeOpen || enteringProbeRef.current === String(currentItem?.id)) return
     if (!currentItem?.id || !canPlayCurrentItemAudio) return
     if (autoPlayedItemIdsRef.current.has(String(currentItem.id))) return
     if (suppressNextItemEffectForIdRef.current === String(currentItem.id)) {
@@ -1145,7 +1148,7 @@ export function TeacherTestRunPage() {
       if (color !== 'green') {
         playScoreFeedbackThenNext(color)
       } else {
-        enteringProbeRef.current = true
+        enteringProbeRef.current = String(currentItem.id)
         activateAudioUrl('/audio/green.wav', 'green result', true, 'result_reaction')
       }
       const result = await recordStandaloneResult(currentItem.id, color)

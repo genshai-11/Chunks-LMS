@@ -52,7 +52,7 @@ type Props = {
 }
 
 const METRIC_COLORS: Partial<Record<MetricKey, string>> = {
-  rfc: '#d97706',
+  rfc: '#dc2626',
   rac: '#16a34a',
   average_performance: '#4f46e5',
   purple_mastery_rate: '#7c3aed',
@@ -76,7 +76,7 @@ const FALLBACK_METRICS: MetricKey[] = [
 
 const COLOR_HEX: Record<ResultColor, string> = {
   red: '#f87171',
-  yellow: '#facc15',
+  yellow: '#f97316',
   green: '#4ade80',
   purple: '#c084fc',
 }
@@ -470,7 +470,7 @@ export function AnalysisChartsPanel({
         <Tooltip />
         <Legend />
         <Bar dataKey="red" stackId="c" fill={COLOR_HEX.red} name="Red" radius={[0, 0, 0, 0]} />
-        <Bar dataKey="yellow" stackId="c" fill={COLOR_HEX.yellow} name="Yellow" />
+        <Bar dataKey="yellow" stackId="c" fill={COLOR_HEX.yellow} name="Orange" />
         <Bar dataKey="green" stackId="c" fill={COLOR_HEX.green} name="Green" />
         <Bar dataKey="purple" stackId="c" fill={COLOR_HEX.purple} name="Purple" radius={[4, 4, 0, 0]} />
       </BarChart>

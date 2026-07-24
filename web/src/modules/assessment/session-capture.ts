@@ -14,6 +14,7 @@ import {
   type CaptureMode,
   type CapturePosition,
 } from './capture-mode'
+import { probeChunksNumber } from './probe-metrics'
 
 export type SessionQuestion = {
   id: string
@@ -317,7 +318,7 @@ export function sessionColorSummary(state: CaptureSessionState): {
   let done = 0
   let maxProbeDepth = 0
   for (const a of state.attempts) {
-    maxProbeDepth = Math.max(maxProbeDepth, a.snapshot.probeCount)
+    maxProbeDepth = Math.max(maxProbeDepth, probeChunksNumber(a.snapshot) ?? 0)
     const s = a.snapshot.status
     if (s === 'finalized' || s === 'corrected') {
       done += 1

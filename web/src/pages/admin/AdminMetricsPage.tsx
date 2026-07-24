@@ -30,14 +30,14 @@ export function AdminMetricsPage() {
       <PageHeader
         icon={Gauge}
         title="Metrics"
-        subtitle="Enabled metrics feed Teacher/Learner charts (real ledger only). Labels & definitions are tooltips. Probe n has no ceiling: n count / n depth max / n depth avg."
+        subtitle="Enabled metrics feed Teacher/Learner charts (real ledger only). Labels & definitions are tooltips. Chunks Number has no ceiling: chunks count / max chunks number / avg chunks number."
       />
       <Flash message={message} error={error} />
 
       <p className="meta" style={{ marginBottom: '0.75rem' }}>
-        <strong>n count</strong> = Green (2) entries · <strong>n depth</strong> = probe depth per
-        question · <strong>n depth max/avg</strong> = peak/mean observed depth. There is no n ceiling;
-        Fail/Done are teacher decisions. Sample size is never labeled “n”.
+        <strong>chunks count</strong> = Green (2) entries · <strong>chunks number</strong> starts at 1
+        when Green opens probe and each Continue adds 1 · <strong>max/avg chunks number</strong> = peak/mean observed chunks number. There is no chunks number ceiling;
+        Fail/Done are teacher decisions. Sample size is never labeled chunks number.
       </p>
 
       <div className="table-wrap">

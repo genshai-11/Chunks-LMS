@@ -1,0 +1,440 @@
+{
+  "packageTitle": "GREEN-TEST-49Q",
+  "packageId": "d1cae67e-8b58-5b79-ab96-660a784553f1",
+  "packageVersionId": "e0e61415-f370-53ed-a4ab-c4e3c8f57763",
+  "expectedAudioFiles": 61,
+  "foundAudioFiles": 61,
+  "missingAudioFiles": 0,
+  "totalBytes": 18978096,
+  "finalSqlPath": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\GREEN-TEST-49Q.import.final.sql",
+  "assets": [
+    {
+      "key": "audio_intro_test",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/audio_intro_test.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\audio_intro_test.wav",
+      "bytes": 4366124,
+      "sha256": "sha256:f117491eae9550cc0f402e949724a4834f7cdb1891adc4e55b4292eda988beca"
+    },
+    {
+      "key": "audio_intro_part_I",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/audio_intro_part_I.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\audio_intro_part_I.wav",
+      "bytes": 958124,
+      "sha256": "sha256:4efb2bed1df587961261a2aa2d0c126aad1298ebf692dc6408b720a3f0ed6ea3"
+    },
+    {
+      "key": "audio_intro_part_II",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/audio_intro_part_II.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\audio_intro_part_II.wav",
+      "bytes": 472364,
+      "sha256": "sha256:5381dee5a6c60da501bfdfa0f08e51c1f6493a37dcfe04fd837581419e999ffe"
+    },
+    {
+      "key": "audio_intro_part_III",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/audio_intro_part_III.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\audio_intro_part_III.wav",
+      "bytes": 712364,
+      "sha256": "sha256:15cadb13102ebd61a891f71470a57892b18c6aa9a486704b1fe6bd2ee21e573d"
+    },
+    {
+      "key": "audio_end_test",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/audio_end_test.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\audio_end_test.wav",
+      "bytes": 961964,
+      "sha256": "sha256:dc1f5892f7ad2dc93708313a8bd3637fc8e87529c6603e8bbfea892f766233ac"
+    },
+    {
+      "key": "audio_intro_session1",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/audio_intro_session1.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\audio_intro_session1.wav",
+      "bytes": 328364,
+      "sha256": "sha256:55a8a6b1e8a2d9c044c77c3f5b71e8e9f8c04113e9f48ff1cd9fc6511179c253"
+    },
+    {
+      "key": "s1-q1-en",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s1-q1-en.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s1-q1-en.wav",
+      "bytes": 163770,
+      "sha256": "sha256:d1a5318c251aa8f33308b4287ff896923ad49e4530881731dd324538ce8a3eb3"
+    },
+    {
+      "key": "s1-q2-en",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s1-q2-en.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s1-q2-en.wav",
+      "bytes": 184890,
+      "sha256": "sha256:852163d287ebdb5301580bee697f9cacf376d96b4a42f88d46528d388679fb30"
+    },
+    {
+      "key": "s1-q3-en",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s1-q3-en.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s1-q3-en.wav",
+      "bytes": 200250,
+      "sha256": "sha256:f300905896c0c11eb29f61046ffe625afadb7c984c84314c69d48a1ae3f819fb"
+    },
+    {
+      "key": "s1-q4-en",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s1-q4-en.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s1-q4-en.wav",
+      "bytes": 152250,
+      "sha256": "sha256:4086e63a9b6698c11e654cd6b1ac289aee6f48bad160b9529c35144834f9ac20"
+    },
+    {
+      "key": "s1-q5-en",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s1-q5-en.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s1-q5-en.wav",
+      "bytes": 250170,
+      "sha256": "sha256:48c618484c576b9a8e08729d8641a3acd9a52c47c99ef0c8f093d6a7a5355bd1"
+    },
+    {
+      "key": "s1-q6-en",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s1-q6-en.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s1-q6-en.wav",
+      "bytes": 110010,
+      "sha256": "sha256:99afbde9974bd6fdd36ce922a346d214de377d68179039310dea63cf31e151e0"
+    },
+    {
+      "key": "s1-q7-en",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s1-q7-en.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s1-q7-en.wav",
+      "bytes": 165690,
+      "sha256": "sha256:aeb4eb60736e57715092196d826858ac56568fa931ffdc6983f8592bf1c5706d"
+    },
+    {
+      "key": "audio_intro_session2",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/audio_intro_session2.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\audio_intro_session2.wav",
+      "bytes": 322604,
+      "sha256": "sha256:15892e194918437da1df8178e2c3e0384a6a688ad53063844e57307891935858"
+    },
+    {
+      "key": "s2-q1-en",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s2-q1-en.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s2-q1-en.wav",
+      "bytes": 213690,
+      "sha256": "sha256:43066f01c4a437310e9f7db30d9c5639224be26886cd8df9495ea19c98b4cc53"
+    },
+    {
+      "key": "s2-q2-en",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s2-q2-en.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s2-q2-en.wav",
+      "bytes": 138810,
+      "sha256": "sha256:3643badf21646d99e2b4781b867b9f7a66c09f5659fe58ad6061169daa53ad9f"
+    },
+    {
+      "key": "s2-q3-en",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s2-q3-en.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s2-q3-en.wav",
+      "bytes": 129210,
+      "sha256": "sha256:86c8a2245d840d63ffd75d723e8c322df8475bb48785ccac5e09fdfff8d2d1a4"
+    },
+    {
+      "key": "s2-q4-en",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s2-q4-en.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s2-q4-en.wav",
+      "bytes": 177210,
+      "sha256": "sha256:8a75fbd88f7998af20cfdd20a0e7569b027eba94b1d3eead358aa534813582cd"
+    },
+    {
+      "key": "s2-q5-en",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s2-q5-en.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s2-q5-en.wav",
+      "bytes": 194490,
+      "sha256": "sha256:2867e61c2a9855531fe77dcc6d1d29f796a9e616baa7f1948a9065d0a44db6cb"
+    },
+    {
+      "key": "s2-q6-en",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s2-q6-en.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s2-q6-en.wav",
+      "bytes": 194490,
+      "sha256": "sha256:9707487315a6abacbecca151fbef13e02d45ade1620cc50f9a3bc04f7bd55918"
+    },
+    {
+      "key": "s2-q7-en",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s2-q7-en.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s2-q7-en.wav",
+      "bytes": 188730,
+      "sha256": "sha256:af926d7fecbfc18aeef506e1fb293b08e7246325f215772259f31a0f6ec6bb56"
+    },
+    {
+      "key": "audio_intro_session3",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/audio_intro_session3.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\audio_intro_session3.wav",
+      "bytes": 391724,
+      "sha256": "sha256:671e743fde5fc4759b42677910a1324155b7666d420d86da5a0bb4ef3ec83e84"
+    },
+    {
+      "key": "s3-q1-en",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s3-q1-en.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s3-q1-en.wav",
+      "bytes": 209850,
+      "sha256": "sha256:d9a50e63ea6760cba9503ce28fb59188faf2b392711952a1fda3175683f53b26"
+    },
+    {
+      "key": "s3-q2-en",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s3-q2-en.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s3-q2-en.wav",
+      "bytes": 169530,
+      "sha256": "sha256:e559f9b286a3b75fef3b52de78138b6e67eb7e7f84a263105952f9483f1f55d9"
+    },
+    {
+      "key": "s3-q3-en",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s3-q3-en.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s3-q3-en.wav",
+      "bytes": 194490,
+      "sha256": "sha256:52cd0b2cc2993afcd2f6be0ac2be7400a487f044771f86e4557066fd25c0ddb1"
+    },
+    {
+      "key": "s3-q4-en",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s3-q4-en.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s3-q4-en.wav",
+      "bytes": 200250,
+      "sha256": "sha256:7cfa0972df288a859c671d93849077417ec7b3c315b20ebcb7235b3c23c1a228"
+    },
+    {
+      "key": "s3-q5-en",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s3-q5-en.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s3-q5-en.wav",
+      "bytes": 161850,
+      "sha256": "sha256:80e7dace6af0219cbe15f12ab05ac011f1e1f3c2d254be735501753d7ae9794b"
+    },
+    {
+      "key": "s3-q6-en",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s3-q6-en.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s3-q6-en.wav",
+      "bytes": 173370,
+      "sha256": "sha256:e8383221121c651af2468d584ae3fbf7944e40e18910a9c5c24e70b9a077a4fa"
+    },
+    {
+      "key": "s3-q7-en",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s3-q7-en.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s3-q7-en.wav",
+      "bytes": 186810,
+      "sha256": "sha256:4d6e4db47c852083e0ea9562c4bceac5496fe7f7abdf928c8b6c957b09b1c67f"
+    },
+    {
+      "key": "audio_intro_session4",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/audio_intro_session4.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\audio_intro_session4.wav",
+      "bytes": 378284,
+      "sha256": "sha256:9f88e958a48ea5609622d870d57e55b34fdf83bb8378f9687cef03539cbc4cb0"
+    },
+    {
+      "key": "s4-q1-vi",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s4-q1-vi.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s4-q1-vi.wav",
+      "bytes": 179130,
+      "sha256": "sha256:054822507fb2ca3a8408d1ef1e43e9f9c654a459a0c7c1c7a564fe16d84d21c7"
+    },
+    {
+      "key": "s4-q2-vi",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s4-q2-vi.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s4-q2-vi.wav",
+      "bytes": 205484,
+      "sha256": "sha256:1f3d39528b7b65f7f7bd5d93f827955761d5882e423419dfdd87cc9fc8d2a7d8"
+    },
+    {
+      "key": "s4-q3-vi",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s4-q3-vi.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s4-q3-vi.wav",
+      "bytes": 184364,
+      "sha256": "sha256:e088c5468d0177c85caffb9088d467c0d8693539c9189c6f32d141c9a234fb08"
+    },
+    {
+      "key": "s4-q4-vi",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s4-q4-vi.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s4-q4-vi.wav",
+      "bytes": 195884,
+      "sha256": "sha256:ebff101346f183c16c9702bf823ff118e96ef81e66fe7288656204cc23c17578"
+    },
+    {
+      "key": "s4-q5-vi",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s4-q5-vi.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s4-q5-vi.wav",
+      "bytes": 203564,
+      "sha256": "sha256:e4baec0c052109e633aa1626063688a3e50c8ada68c2a2f0aebf67b7624c4366"
+    },
+    {
+      "key": "s4-q6-vi",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s4-q6-vi.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s4-q6-vi.wav",
+      "bytes": 182444,
+      "sha256": "sha256:be013ab4bc0ec52318c28fe7007750bf49fa450abe4a5f9dc145119a7ab9487e"
+    },
+    {
+      "key": "s4-q7-vi",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s4-q7-vi.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s4-q7-vi.wav",
+      "bytes": 184364,
+      "sha256": "sha256:f3df981f84b8e99f0d2a91054bc3fe4471792742439308447e1e0de377cb2592"
+    },
+    {
+      "key": "audio_intro_session5",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/audio_intro_session5.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\audio_intro_session5.wav",
+      "bytes": 353324,
+      "sha256": "sha256:ed76dc457745680bed6259ecbe1443f82bdc757490fcf99c00ed93572e83b469"
+    },
+    {
+      "key": "s5-q1-vi",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s5-q1-vi.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s5-q1-vi.wav",
+      "bytes": 236204,
+      "sha256": "sha256:0a774ee3cecd11df22a6feee8b2e85bba1c79abd545d5591967cebcd175299d6"
+    },
+    {
+      "key": "s5-q2-vi",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s5-q2-vi.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s5-q2-vi.wav",
+      "bytes": 205484,
+      "sha256": "sha256:7b3cf55a505c3801fca1ebd69fca1d070ea2615a818b5e907a5619e3e8a9febf"
+    },
+    {
+      "key": "s5-q3-vi",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s5-q3-vi.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s5-q3-vi.wav",
+      "bytes": 195884,
+      "sha256": "sha256:63b538ad9c8741d6a7f3d8e06fdca53ec01b3dcc1f02265911ad8b5672b2e383"
+    },
+    {
+      "key": "s5-q4-vi",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s5-q4-vi.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s5-q4-vi.wav",
+      "bytes": 213164,
+      "sha256": "sha256:498a480bfe5673d08da1f365198433508905803e1d5a1ca4e84e73b55e41008c"
+    },
+    {
+      "key": "s5-q5-vi",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s5-q5-vi.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s5-q5-vi.wav",
+      "bytes": 266924,
+      "sha256": "sha256:29717cf246b480ddb8fc78af11b8d7eaf5196588c85ee30596aa3d6baadb2a9f"
+    },
+    {
+      "key": "s5-q6-vi",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s5-q6-vi.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s5-q6-vi.wav",
+      "bytes": 218924,
+      "sha256": "sha256:bc21545bc82a42488e7615f7cafb57f6aface2ed95f175e57cdc7249d56cc578"
+    },
+    {
+      "key": "s5-q7-vi",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s5-q7-vi.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s5-q7-vi.wav",
+      "bytes": 226604,
+      "sha256": "sha256:4503b35572aff24dc86544b9b47bd49058561cec81b5059a7422d0f95fa6bbaf"
+    },
+    {
+      "key": "audio_intro_session6",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/audio_intro_session6.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\audio_intro_session6.wav",
+      "bytes": 320684,
+      "sha256": "sha256:55218a1c3846c1ec64317c6b3eb3155090f6452b90a195ebc622d67369246140"
+    },
+    {
+      "key": "s6-q1-vi",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s6-q1-vi.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s6-q1-vi.wav",
+      "bytes": 209324,
+      "sha256": "sha256:87c276a53b0f176f81c919b69bb512fea1b275c986c0979903a3c20bd4d03953"
+    },
+    {
+      "key": "s6-q2-vi",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s6-q2-vi.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s6-q2-vi.wav",
+      "bytes": 226604,
+      "sha256": "sha256:dce369f6b92463c5f72f5c4cd636adad4b027772ae09ed1c1bba1fb52d8e77d3"
+    },
+    {
+      "key": "s6-q3-vi",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s6-q3-vi.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s6-q3-vi.wav",
+      "bytes": 201644,
+      "sha256": "sha256:832d062c19ca8f35dedc4849a1b59eb2abd37b475bf22e89b81900b42c2113bc"
+    },
+    {
+      "key": "s6-q4-vi",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s6-q4-vi.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s6-q4-vi.wav",
+      "bytes": 209324,
+      "sha256": "sha256:c45d4f55239c69d38f0e5b665cf2cfb7e0ee6dc32856b84f6fd9cef5bc1050ee"
+    },
+    {
+      "key": "s6-q5-vi",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s6-q5-vi.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s6-q5-vi.wav",
+      "bytes": 222764,
+      "sha256": "sha256:2f31e689f44122713a6b0080798629abb6607e360f4c04ff585d16a7620167a5"
+    },
+    {
+      "key": "s6-q6-vi",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s6-q6-vi.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s6-q6-vi.wav",
+      "bytes": 217004,
+      "sha256": "sha256:86360d322d2512a6aaf643703e6baf35ff24f69d6a7ec0970ab8a0bfb42d70c5"
+    },
+    {
+      "key": "s6-q7-vi",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s6-q7-vi.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s6-q7-vi.wav",
+      "bytes": 218924,
+      "sha256": "sha256:3d759d1000ecfc090631e47bfda9b347b9bbe84048746e5c800ede3246cfd8f1"
+    },
+    {
+      "key": "audio_intro_session7",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/audio_intro_session7.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\audio_intro_session7.wav",
+      "bytes": 374444,
+      "sha256": "sha256:e914777f0eeb0139cd6c6ea147bb68e1d4e31e78cb84c97af6b69232b3ef23e6"
+    },
+    {
+      "key": "s7-q1-en",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s7-q1-en.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s7-q1-en.wav",
+      "bytes": 276524,
+      "sha256": "sha256:c68432b58cbb84069c8f0a232d60c3836726dd47a78f41ab67e1202124f43874"
+    },
+    {
+      "key": "s7-q2-en",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s7-q2-en.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s7-q2-en.wav",
+      "bytes": 240044,
+      "sha256": "sha256:afa953e865ce25018a35a28d8e155fa84778868a1c2132a8eb2658e96d74ef06"
+    },
+    {
+      "key": "s7-q3-en",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s7-q3-en.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s7-q3-en.wav",
+      "bytes": 289964,
+      "sha256": "sha256:73e4a8052215feb3a2e9e06eca5552d0abd0db520af3d08f34f8cce2524357bf"
+    },
+    {
+      "key": "s7-q4-manual-read",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s7-q4-manual-read.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s7-q4-manual-read.wav",
+      "bytes": 16844,
+      "sha256": "sha256:7905bd1b3be540429d632e2074385370ca89a35d497bd74e6a60ddc1409fa8e9"
+    },
+    {
+      "key": "s7-q5-manual-read",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s7-q5-manual-read.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s7-q5-manual-read.wav",
+      "bytes": 16844,
+      "sha256": "sha256:7905bd1b3be540429d632e2074385370ca89a35d497bd74e6a60ddc1409fa8e9"
+    },
+    {
+      "key": "s7-q6-manual-read",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s7-q6-manual-read.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s7-q6-manual-read.wav",
+      "bytes": 16844,
+      "sha256": "sha256:7905bd1b3be540429d632e2074385370ca89a35d497bd74e6a60ddc1409fa8e9"
+    },
+    {
+      "key": "s7-q7-manual-read",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/s7-q7-manual-read.wav",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\s7-q7-manual-read.wav",
+      "bytes": 16844,
+      "sha256": "sha256:7905bd1b3be540429d632e2074385370ca89a35d497bd74e6a60ddc1409fa8e9"
+    }
+  ],
+  "missing": []
+}

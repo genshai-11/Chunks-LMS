@@ -53,7 +53,7 @@ export function LearnerResultsPage() {
                       <td>
                         {a.snapshot.effectiveColor ? (
                           <span className={`capture-dot ${a.snapshot.effectiveColor}`}>
-                            {a.snapshot.effectiveColor}
+                            {a.snapshot.effectiveColor === 'yellow' ? 'orange' : a.snapshot.effectiveColor}
                           </span>
                         ) : (
                           '—'

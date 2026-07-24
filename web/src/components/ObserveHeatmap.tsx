@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { CaptureSessionState } from '../modules/assessment/session-capture'
 import { sessionColorSummary } from '../modules/assessment/session-capture'
+import { probeChunksNumber } from '../modules/assessment/probe-metrics'
 
 type Props = {
   capture: CaptureSessionState
@@ -22,7 +23,7 @@ export function ObserveHeatmap({
   layout = 'column',
 }: Props) {
   const summary = sessionColorSummary(capture)
-  // Sample size for RFC/%c — not probe "n" (probe depth uses probeCount elsewhere).
+  // Sample size for RFC/%c — not chunks number.
   const finalized = summary.done
   const ry = summary.byColor.red + summary.byColor.yellow
   const gp = summary.byColor.green + summary.byColor.purple
@@ -42,7 +43,7 @@ export function ObserveHeatmap({
   return (
     <div className={`observe-heat layout-${layout}`}>
       <div className="observe-heat-summary" aria-label="Session summary">
-        <span className="observe-heat-metric" title="(Red+Yellow) / finalized questions">
+        <span className="observe-heat-metric" title="(Red+Orange) / finalized questions">
           RFC <strong>{finalized ? `${rfcPct}%` : '—'}</strong>
         </span>
         <span className="observe-heat-metric muted" title="(Green+Purple) / finalized questions">
@@ -50,10 +51,10 @@ export function ObserveHeatmap({
         </span>
         <span
           className="observe-heat-metric muted tabular"
-          title={`Finalized questions · peak probe n=${summary.maxProbeDepth}`}
+          title={`Finalized questions · max chunks number=${summary.maxProbeDepth}`}
         >
           {summary.done}/{Math.max(summary.total, 1)}
-          {summary.maxProbeDepth > 0 ? ` · peak n=${summary.maxProbeDepth}` : ''}
+          {summary.maxProbeDepth > 0 ? ` · max chunks=${summary.maxProbeDepth}` : ''}
         </span>
       </div>
 
@@ -71,10 +72,9 @@ export function ObserveHeatmap({
           const draft = !snap || snap.status === 'draft'
           const active = i === currentQuestionIndex
           const cls = open ? 'is-open' : draft ? 'is-draft' : color ? `is-${color}` : 'is-empty'
-          const probeN =
-            snap && (snap.enteredProbeFlow || snap.probeCount > 0) ? snap.probeCount : null
+          const chunksNumber = snap ? probeChunksNumber(snap) : null
           const probeBit =
-            probeN != null ? ` · n depth=${probeN}` : open ? ' · probe open' : ''
+            chunksNumber != null ? ` · chunks number=${chunksNumber}` : open ? ' · probe open' : ''
           return (
             <button
               key={q.id}
@@ -87,7 +87,7 @@ export function ObserveHeatmap({
               aria-label={`Question ${q.sequenceNumber}, ${learnerName(
                 q.assignedLearnerUserId,
               )}, ${color ?? (open ? 'probe open' : 'not assessed')}${
-                probeN != null ? `, n=${probeN}` : ''
+                chunksNumber != null ? `, chunks number=${chunksNumber}` : ''
               }`}
               aria-current={active ? 'step' : undefined}
               onClick={() => onSelectQuestion(i)}

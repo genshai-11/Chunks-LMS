@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Activity, BarChart3, Brain, Eye, EyeOff, Gauge, LineChart as LineChartIcon, PieChart as PieChartIcon, Target, Zap } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import {
@@ -20,13 +20,14 @@ import { EmptyState, Panel } from '../../components/ui'
 import { listActiveLearners } from '../../modules/roster/service'
 import { getStandaloneAssignmentAnalysis, type StandaloneTestRunRow } from '../../lib/standalone-tests'
 import { useAppState } from '../../state/useAppState'
+import { probeChunksNumber } from '../../modules/assessment/probe-metrics'
 
 type ResultColor = 'red' | 'yellow' | 'green' | 'purple'
 type AnalysisItem = Record<string, any>
 
 const COLOR_HEX: Record<string, string> = {
   red: '#ef4444',
-  yellow: '#eab308',
+  yellow: '#f97316',
   green: '#22c55e',
   purple: '#a855f7',
   pending: '#64748b',
@@ -34,13 +35,13 @@ const COLOR_HEX: Record<string, string> = {
 
 const COLOR_LABELS: Record<ResultColor, string> = {
   red: 'Red',
-  yellow: 'Yellow',
+  yellow: 'Orange',
   green: 'Green',
   purple: 'Purple',
 }
 
 const METRIC_HEX = {
-  rfc: '#d97706',
+  rfc: '#dc2626',
   percentC: '#16a34a',
   cvr: '#dc2626',
   cci: '#16a34a',
@@ -122,6 +123,7 @@ export function TeacherTestAnalysisPage() {
   const [selectedSessions, setSelectedSessions] = useState<number[]>([])
   const [selectedColors, setSelectedColors] = useState<ResultColor[]>(['red', 'yellow', 'green', 'purple'])
   const [showChartLabels, setShowChartLabels] = useState(true)
+  const [sessionBrushRange, setSessionBrushRange] = useState<{ startIndex?: number; endIndex?: number }>({})
 
   useEffect(() => {
     if (!assignmentId) return
@@ -168,7 +170,10 @@ export function TeacherTestAnalysisPage() {
           baseCpd,
           resultScore: score,
           cpd: finalCpd,
-          probeDepth: num(snap?.probe_count ?? snap?.probeCount, 0),
+          probeDepth: probeChunksNumber({
+            enteredProbeFlow: Boolean(snap?.entered_probe_flow ?? snap?.enteredProbeFlow),
+            probeCount: num(snap?.probe_count ?? snap?.probeCount, 0),
+          }) ?? 0,
           color,
           colorHex: COLOR_HEX[color],
           finalized: isFinal(item),
@@ -224,11 +229,17 @@ export function TeacherTestAnalysisPage() {
         const yellow = finalized.filter((row) => row.color === 'yellow').length
         const green = finalized.filter((row) => row.color === 'green').length
         const purple = finalized.filter((row) => row.color === 'purple').length
+        const avgCpd = finalized.length
+          ? finalized.reduce((sum, row) => sum + row.cpd, 0) / denom
+          : 0
         return {
           session,
           label: `Session ${session}`,
           shortLabel: `S${session}`,
           percentC: finalized.length ? Math.round(((green + purple) / denom) * 100) : 0,
+          avgCpd: Number(avgCpd.toFixed(2)),
+          percentCLabel: finalized.length ? `${Math.round(((green + purple) / denom) * 100)}%` : '—',
+          avgCpdLabel: finalized.length ? `CPD ${avgCpd.toFixed(0)}V` : 'CPD —',
           finalized: finalized.length,
           red,
           yellow,
@@ -237,6 +248,72 @@ export function TeacherTestAnalysisPage() {
         }
       })
   }, [chartRows])
+
+  const maxSessionBrushIndex = Math.max(percentCTimelineRows.length - 1, 0)
+  const sessionBrushStart = Math.min(maxSessionBrushIndex, Math.max(0, sessionBrushRange.startIndex ?? 0))
+  const sessionBrushEnd = Math.max(
+    sessionBrushStart,
+    Math.min(maxSessionBrushIndex, sessionBrushRange.endIndex ?? maxSessionBrushIndex),
+  )
+
+  const brushedSessionRows = useMemo(
+    () => percentCTimelineRows.slice(sessionBrushStart, sessionBrushEnd + 1),
+    [percentCTimelineRows, sessionBrushEnd, sessionBrushStart],
+  )
+
+  const brushedSessionSet = useMemo(
+    () => new Set(brushedSessionRows.map((row) => row.session)),
+    [brushedSessionRows],
+  )
+
+  const cpdBrushIndexes = useMemo(() => {
+    const indexes = chartRows
+      .map((row, index) => (brushedSessionSet.size === 0 || brushedSessionSet.has(row.session) ? index : -1))
+      .filter((index) => index >= 0)
+    if (!indexes.length) return { startIndex: 0, endIndex: Math.max(chartRows.length - 1, 0) }
+    return { startIndex: Math.min(...indexes), endIndex: Math.max(...indexes) }
+  }, [brushedSessionSet, chartRows])
+
+  const handleSessionBrushChange = useCallback((range: { startIndex?: number; endIndex?: number } | null) => {
+    if (!range) return
+    setSessionBrushRange(range)
+  }, [])
+
+  const handleQuestionBrushChange = useCallback((range: { startIndex?: number; endIndex?: number } | null) => {
+    if (!range) return
+    const start = Math.max(0, range.startIndex ?? 0)
+    const end = Math.min(Math.max(chartRows.length - 1, 0), range.endIndex ?? Math.max(chartRows.length - 1, 0))
+    const visible = chartRows.slice(start, end + 1)
+    if (!visible.length) return
+    const visibleSessions = new Set(visible.map((row) => row.session))
+    const sessionIndexes = percentCTimelineRows
+      .map((row, index) => (visibleSessions.has(row.session) ? index : -1))
+      .filter((index) => index >= 0)
+    if (!sessionIndexes.length) return
+    setSessionBrushRange({ startIndex: Math.min(...sessionIndexes), endIndex: Math.max(...sessionIndexes) })
+  }, [chartRows, percentCTimelineRows])
+
+  const toggleSession = useCallback((session: number) => {
+    setSelectedSessions((current) => {
+      if (current.includes(session)) {
+        return current.filter((value) => value !== session)
+      }
+      return [...current, session].sort((a, b) => a - b)
+    })
+  }, [])
+
+  const toggleColor = useCallback((color: ResultColor) => {
+    setSelectedColors((current) => {
+      if (current.includes(color)) {
+        const next = current.filter((value) => value !== color)
+        if (next.length === 0) {
+          return ['red', 'yellow', 'green', 'purple']
+        }
+        return next
+      }
+      return [...current, color]
+    })
+  }, [])
 
   const colorDistribution = useMemo(() => {
     const finalized = chartRows.filter((row) => row.finalized && row.color !== 'pending')
@@ -298,8 +375,8 @@ export function TeacherTestAnalysisPage() {
         </div>
         <div className="standalone-metric-card">
           <LineChartIcon className="h-5 w-5 text-rose-300" />
-          <span>Peak Probe Depth</span>
-          <strong>n={metrics.peakProbeDepth}</strong>
+          <span>Max Chunks Number</span>
+          <strong>{metrics.peakProbeDepth}</strong>
         </div>
       </div>
 
@@ -316,23 +393,23 @@ export function TeacherTestAnalysisPage() {
           <div className="test-analysis-filter-section">
             <div className="test-analysis-filter-title">
               <span>Sessions</span>
-              <button type="button" onClick={() => setSelectedSessions([])}>All</button>
             </div>
             <div className="test-analysis-chip-grid">
+              <button
+                type="button"
+                className={`test-analysis-chip${selectedSessions.length === 0 ? ' is-active' : ''}`}
+                onClick={() => setSelectedSessions([])}
+              >
+                All
+              </button>
               {availableSessions.map((session) => {
-                const active = selectedSessions.length === 0 || selectedSessions.includes(session)
+                const active = selectedSessions.includes(session)
                 return (
                   <button
                     key={session}
                     type="button"
                     className={`test-analysis-chip${active ? ' is-active' : ''}`}
-                    onClick={() =>
-                      setSelectedSessions((current) =>
-                        current.includes(session)
-                          ? current.filter((value) => value !== session)
-                          : [...current, session].sort((a, b) => a - b),
-                      )
-                    }
+                    onClick={() => toggleSession(session)}
                   >
                     S{session}
                   </button>
@@ -344,24 +421,24 @@ export function TeacherTestAnalysisPage() {
           <div className="test-analysis-filter-section">
             <div className="test-analysis-filter-title">
               <span>Colors</span>
-              <button type="button" onClick={() => setSelectedColors(['red', 'yellow', 'green', 'purple'])}>All</button>
             </div>
             <div className="test-analysis-color-list">
+              <button
+                type="button"
+                className={`test-analysis-color-chip${selectedColors.length === 4 ? ' is-active' : ''}`}
+                onClick={() => setSelectedColors(['red', 'yellow', 'green', 'purple'])}
+              >
+                All
+              </button>
               {(['red', 'yellow', 'green', 'purple'] as ResultColor[]).map((color) => {
-                const active = selectedColors.includes(color)
+                const active = selectedColors.length < 4 && selectedColors.includes(color)
                 return (
                   <button
                     key={color}
                     type="button"
                     className={`test-analysis-color-chip${active ? ' is-active' : ''}`}
                     style={active ? { borderColor: COLOR_HEX[color], background: `${COLOR_HEX[color]}1f` } : undefined}
-                    onClick={() =>
-                      setSelectedColors((current) =>
-                        current.includes(color)
-                          ? current.filter((value) => value !== color)
-                          : [...current, color],
-                      )
-                    }
+                    onClick={() => toggleColor(color)}
                   >
                     <i style={{ background: COLOR_HEX[color] }} />
                     {COLOR_LABELS[color]}
@@ -383,6 +460,7 @@ export function TeacherTestAnalysisPage() {
         </aside>
 
         <div className="test-analysis-chart-stack">
+          <div className="test-analysis-chart-row">
           <Panel
             className="test-analysis-panel"
             icon={LineChartIcon}
@@ -392,7 +470,7 @@ export function TeacherTestAnalysisPage() {
             >
               <div className="standalone-chart-wrap">
                 <ResponsiveContainer width="100%" height="100%">
-                  <RechartsLineChart data={chartRows} margin={{ top: 20, right: 20, bottom: 8, left: -12 }}>
+                  <RechartsLineChart data={chartRows} syncId="standalone-analysis-brush" margin={{ top: 36, right: 20, bottom: 8, left: -12 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" />
                     <XAxis dataKey="label" stroke="#334155" fontSize={11} interval="preserveStartEnd" tickLine={false} />
                     <YAxis
@@ -413,7 +491,7 @@ export function TeacherTestAnalysisPage() {
                             <div>Final CPD: <strong style={{ color: METRIC_HEX.cpd }}>{volt(row.cpd)}</strong></div>
                             <div>Formula: {volt(row.baseCpd)} × {row.resultScore}</div>
                             <div>CVR: <strong style={{ color: METRIC_HEX.cvr }}>{ohm(row.cvr)}</strong> · CCI: <strong style={{ color: METRIC_HEX.cci }}>{amp(row.cci)}</strong></div>
-                            <div>Result: <strong className="capitalize" style={{ color: row.colorHex }}>{row.color}</strong></div>
+                            <div>Result: <strong className="capitalize" style={{ color: row.colorHex }}>{row.color === 'yellow' ? 'orange' : row.color}</strong></div>
                             <div>Session: <strong>{row.session}</strong> · {row.language}</div>
                             {row.prompt ? <div className="mt-1 max-w-xs text-slate-600">“{row.prompt}”</div> : null}
                           </div>
@@ -430,15 +508,22 @@ export function TeacherTestAnalysisPage() {
                       activeDot={<ResultDot />}
                       isAnimationActive={false}
                     >
-                      {showChartLabels ? <LabelList dataKey="cpd" position="top" className="test-analysis-chart-label" /> : null}
+                      {showChartLabels ? <LabelList dataKey="cpd" position="top" offset={10} formatter={(value: unknown) => `${Number(value).toFixed(0)}V`} className="test-analysis-chart-label" /> : null}
                     </Line>
-                    <Brush dataKey="label" height={24} stroke={METRIC_HEX.cpd} travellerWidth={10} />
+                    <Brush
+                      dataKey="label"
+                      height={24}
+                      stroke={METRIC_HEX.cpd}
+                      travellerWidth={10}
+                      startIndex={cpdBrushIndexes.startIndex}
+                      endIndex={cpdBrushIndexes.endIndex}
+                      onChange={handleQuestionBrushChange}
+                    />
                   </RechartsLineChart>
                 </ResponsiveContainer>
               </div>
           </Panel>
 
-          <div className="test-analysis-chart-row">
             <Panel
               className="test-analysis-panel"
               icon={LineChartIcon}
@@ -448,9 +533,9 @@ export function TeacherTestAnalysisPage() {
             >
               <div className="standalone-chart-wrap">
                 <ResponsiveContainer width="100%" height="100%">
-                  <RechartsLineChart data={percentCTimelineRows} margin={{ top: 20, right: 20, bottom: 8, left: -12 }}>
+                  <RechartsLineChart data={percentCTimelineRows} syncId="standalone-analysis-brush" margin={{ top: 42, right: 20, bottom: 8, left: -12 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" />
-                    <XAxis dataKey="shortLabel" stroke="#334155" fontSize={12} tickLine={false} />
+                    <XAxis dataKey="shortLabel" stroke="#334155" fontSize={12} tickLine={false} interval={0} />
                     <YAxis
                       domain={[0, 100]}
                       tickFormatter={(value) => `${value}%`}
@@ -471,7 +556,7 @@ export function TeacherTestAnalysisPage() {
                             <div>Finalized: <strong>{row.finalized}</strong> questions</div>
                             <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1">
                               <span style={{ color: COLOR_HEX.red }}>Red: {row.red}</span>
-                              <span style={{ color: COLOR_HEX.yellow }}>Yellow: {row.yellow}</span>
+                              <span style={{ color: COLOR_HEX.yellow }}>Orange: {row.yellow}</span>
                               <span style={{ color: COLOR_HEX.green }}>Green: {row.green}</span>
                               <span style={{ color: COLOR_HEX.purple }}>Purple: {row.purple}</span>
                             </div>
@@ -489,9 +574,108 @@ export function TeacherTestAnalysisPage() {
                       activeDot={{ r: 7, fill: METRIC_HEX.percentC, stroke: '#0f172a', strokeWidth: 2 }}
                       isAnimationActive={false}
                     >
-                      {showChartLabels ? <LabelList dataKey="percentC" position="top" formatter={(value: unknown) => `${value}%`} className="test-analysis-chart-label" /> : null}
+                      {showChartLabels ? (
+                        <LabelList dataKey="percentCLabel" position="top" offset={10} fill={METRIC_HEX.percentC} className="test-analysis-chart-label" />
+                      ) : null}
                     </Line>
-                    <Brush dataKey="shortLabel" height={24} stroke={METRIC_HEX.percentC} travellerWidth={10} />
+                    <Brush
+                      dataKey="shortLabel"
+                      height={24}
+                      stroke={METRIC_HEX.percentC}
+                      travellerWidth={10}
+                      startIndex={sessionBrushStart}
+                      endIndex={sessionBrushEnd}
+                      onChange={handleSessionBrushChange}
+                    />
+                  </RechartsLineChart>
+                </ResponsiveContainer>
+              </div>
+            </Panel>
+          </div>
+
+          <div className="test-analysis-chart-row">
+            <Panel
+              className="test-analysis-panel"
+              icon={LineChartIcon}
+              title="%c & Avg CPD by Session"
+              description="Dual-axis line chart: Session on X, %c as the green line, Avg CPD as the blue line. Brush stays synced with the session view."
+              collapsible={false}
+            >
+              <div className="standalone-chart-wrap">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RechartsLineChart data={percentCTimelineRows} syncId="standalone-analysis-brush" margin={{ top: 42, right: 18, bottom: 8, left: -12 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" />
+                    <XAxis dataKey="shortLabel" stroke="#334155" fontSize={12} tickLine={false} interval={0} />
+                    <YAxis
+                      yAxisId="percent"
+                      domain={[0, 100]}
+                      tickFormatter={(value) => `${value}%`}
+                      stroke={METRIC_HEX.percentC}
+                      fontSize={11}
+                      tickLine={false}
+                      label={{ value: '%c', angle: -90, position: 'insideLeft', fill: METRIC_HEX.percentC }}
+                    />
+                    <YAxis
+                      yAxisId="cpd"
+                      orientation="right"
+                      tickFormatter={(value) => `${Number(value).toFixed(0)}V`}
+                      stroke={METRIC_HEX.cpd}
+                      fontSize={11}
+                      tickLine={false}
+                      label={{ value: 'Avg CPD (V)', angle: 90, position: 'insideRight', fill: METRIC_HEX.cpd }}
+                    />
+                    <Tooltip
+                      cursor={{ stroke: '#94a3b8', strokeDasharray: '3 3' }}
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null
+                        const row = payload[0]?.payload
+                        return (
+                          <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
+                            <div className="mb-1 font-black text-slate-950">{row.label}</div>
+                            <div>%c: <strong style={{ color: METRIC_HEX.percentC }}>{row.percentC}%</strong></div>
+                            <div>Avg CPD: <strong style={{ color: METRIC_HEX.cpd }}>{volt(row.avgCpd)}</strong></div>
+                            <div>Finalized: <strong>{row.finalized}</strong> questions</div>
+                          </div>
+                        )
+                      }}
+                    />
+                    <Line
+                      yAxisId="percent"
+                      type="monotone"
+                      dataKey="percentC"
+                      name="%c"
+                      stroke={METRIC_HEX.percentC}
+                      strokeWidth={3}
+                      dot={{ r: 5, fill: METRIC_HEX.percentC, stroke: '#ffffff', strokeWidth: 2 }}
+                      activeDot={{ r: 7, fill: METRIC_HEX.percentC, stroke: '#0f172a', strokeWidth: 2 }}
+                      isAnimationActive={false}
+                    >
+                      {showChartLabels ? (
+                        <LabelList dataKey="percentCLabel" position="top" offset={10} fill={METRIC_HEX.percentC} className="test-analysis-chart-label" />
+                      ) : null}
+                    </Line>
+                    <Line
+                      yAxisId="cpd"
+                      type="monotone"
+                      dataKey="avgCpd"
+                      name="Avg CPD"
+                      stroke={METRIC_HEX.cpd}
+                      strokeWidth={3}
+                      dot={{ r: 5, fill: METRIC_HEX.cpd, stroke: '#ffffff', strokeWidth: 2 }}
+                      activeDot={{ r: 7, fill: METRIC_HEX.cpd, stroke: '#0f172a', strokeWidth: 2 }}
+                      isAnimationActive={false}
+                    >
+                      {showChartLabels ? <LabelList dataKey="avgCpd" position="bottom" offset={10} formatter={(value: unknown) => `${Number(value).toFixed(0)}V`} className="test-analysis-chart-label" /> : null}
+                    </Line>
+                    <Brush
+                      dataKey="shortLabel"
+                      height={24}
+                      stroke={METRIC_HEX.cpd}
+                      travellerWidth={10}
+                      startIndex={sessionBrushStart}
+                      endIndex={sessionBrushEnd}
+                      onChange={handleSessionBrushChange}
+                    />
                   </RechartsLineChart>
                 </ResponsiveContainer>
               </div>
@@ -501,7 +685,7 @@ export function TeacherTestAnalysisPage() {
               className="test-analysis-panel"
               icon={PieChartIcon}
             title="Result Color Distribution"
-            description="Distribution of finalized results across Red, Yellow, Green, and Purple."
+            description="Distribution of finalized results across Red, Orange, Green, and Purple."
             collapsible={false}
           >
             <div className="standalone-chart-wrap">

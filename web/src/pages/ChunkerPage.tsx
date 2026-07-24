@@ -426,7 +426,7 @@ export function ChunkerPage() {
                     <th>Session</th>
                     <th>Status</th>
                     <th>Red</th>
-                    <th>Yellow</th>
+                    <th>Orange</th>
                     <th>Green</th>
                     <th>Purple</th>
                     <th>RFC</th>

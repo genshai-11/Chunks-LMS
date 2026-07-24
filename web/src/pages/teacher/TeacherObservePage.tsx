@@ -39,6 +39,7 @@ import { ObserveHeatmap } from '../../components/ObserveHeatmap'
 import { UserAvatar } from '../../components/UserAvatar'
 import type { ResultColor } from '../../modules/result-lifecycle/types'
 import { PROBE_ACTIONS } from '../../modules/assessment/probe-actions'
+import { probeChunksNumber } from '../../modules/assessment/probe-metrics'
 import type { LiveTestItem } from '../../modules/assessment/live-test'
 import {
   audioAssetIdForLanguage,
@@ -70,7 +71,7 @@ import { triggerConfetti } from '../../lib/confetti'
 
 const COLORS: { key: ResultColor; label: string; shortcut: string }[] = [
   { key: 'red', label: 'Red', shortcut: '0' },
-  { key: 'yellow', label: 'Yellow', shortcut: '1' },
+  { key: 'yellow', label: 'Orange', shortcut: '1' },
   { key: 'green', label: 'Green', shortcut: '2' },
   { key: 'purple', label: 'Purple', shortcut: '3' },
 ]
@@ -115,10 +116,10 @@ function formatFinishSummary(
     `Questions: ${capture.questions.length}`,
     `Finalized: ${summary.done}/${summary.total}`,
     `0 Red: ${summary.byColor.red}`,
-    `1 Yellow: ${summary.byColor.yellow}`,
+    `1 Orange: ${summary.byColor.yellow}`,
     `2 Green: ${summary.byColor.green}`,
     `3 Purple: ${summary.byColor.purple}`,
-    `Max probe depth: ${summary.maxProbeDepth}`,
+    `Max chunks number: ${summary.maxProbeDepth}`,
     unresolved > 0
       ? `Left unfinalized when session closed: ${unresolved}`
       : 'All captured attempts finalized.',
@@ -494,7 +495,9 @@ export function TeacherObservePage() {
     }
   }, [currentLiveTestItem, liveTestLanguage])
 
-  const probeDepth = attempt?.snapshot.probeCount ?? 0
+  const chunksNumber = attempt?.snapshot
+    ? (probeChunksNumber(attempt.snapshot) ?? 1)
+    : 1
   const isFinalized =
     attempt?.snapshot.status === 'finalized' || attempt?.snapshot.status === 'corrected'
   const probeOpen =
@@ -634,14 +637,22 @@ export function TeacherObservePage() {
           result.data.snapshot.status === 'finalized' ||
           result.data.snapshot.status === 'corrected'
         ) {
-          const color: ResultColor = outcome === 'fail' ? 'yellow' : 'green'
+          const color: ResultColor = outcome === 'fail' ? 'red' : 'green'
           playReaction(color)
           next = await advanceAfterFinal(next)
           setCapture(next)
           appendFinalizedFromCapture(next)
           flash(color)
         } else if (outcome === 'continue') {
-          flash(`n=${result.data.snapshot.probeCount}`)
+          try {
+            const audio = new Audio('/audio/yellow.wav')
+            void audio.play().catch((err) => {
+              console.warn('[observe] audio play failed:', err)
+            })
+          } catch (e) {
+            console.warn('[observe] audio init failed:', e)
+          }
+          flash(`Chunks Number=${probeChunksNumber(result.data.snapshot) ?? 1}`)
         }
       } finally {
         setLiveSaving(false)
@@ -745,14 +756,22 @@ export function TeacherObservePage() {
           result.data.snapshot.status === 'finalized' ||
           result.data.snapshot.status === 'corrected'
         ) {
-          const color: ResultColor = outcome === 'fail' ? 'yellow' : 'green'
+          const color: ResultColor = outcome === 'fail' ? 'red' : 'green'
           playReaction(color)
           next = await advanceLearnerPane(next, learnerUserId)
           setCapture(next)
           appendFinalizedFromCapture(next)
           flash(color)
         } else if (outcome === 'continue') {
-          flash(`n=${result.data.snapshot.probeCount}`)
+          try {
+            const audio = new Audio('/audio/yellow.wav')
+            void audio.play().catch((err) => {
+              console.warn('[observe] audio play failed:', err)
+            })
+          } catch (e) {
+            console.warn('[observe] audio init failed:', e)
+          }
+          flash(`Chunks Number=${probeChunksNumber(result.data.snapshot) ?? 1}`)
         }
       } finally {
         setLiveSaving(false)
@@ -1082,7 +1101,9 @@ export function TeacherObservePage() {
       paneAttempt?.snapshot.status === 'resolution_required'
     const paneFinalized =
       paneAttempt?.snapshot.status === 'finalized' || paneAttempt?.snapshot.status === 'corrected'
-    const paneProbeDepth = paneAttempt?.snapshot.probeCount ?? 0
+    const paneChunksNumber = paneAttempt?.snapshot
+      ? (probeChunksNumber(paneAttempt.snapshot) ?? 1)
+      : 1
     const learnerQuestionIndex = paneAttempt
       ? Math.max(
           0,
@@ -1135,8 +1156,8 @@ export function TeacherObservePage() {
               </span>
             </div>
             {paneProbeOpen ? (
-              <p className="observe-depth-inline" title="n = how deep after Green (Continue).">
-                n=<strong>{paneProbeDepth}</strong>
+              <p className="observe-depth-inline" title="Chunks Number starts at 1 when Green opens probe; each Continue adds 1.">
+                CHUNKS NUMBER <strong>{paneChunksNumber}</strong>
               </p>
             ) : null}
           </div>
@@ -1338,8 +1359,8 @@ export function TeacherObservePage() {
               <>
                 <p className="observe-rail-name">{learner?.displayName ?? 'Learner'}</p>
                 {probeOpen ? (
-                  <p className="observe-rail-n" title="n = probe depth after Green">
-                    n={probeDepth}
+                  <p className="observe-rail-n" title="Chunks Number starts at 1 when Green opens probe">
+                    chunks={chunksNumber}
                   </p>
                 ) : null}
               </>
@@ -1467,7 +1488,7 @@ export function TeacherObservePage() {
                 {done > 0 ? (
                   <span
                     className="observe-learner-rfc"
-                    title={`Focus Coefficient: ${rfcPct}% Red/Yellow`}
+                    title={`Focus Coefficient: ${rfcPct}% Red/Orange`}
                   >
                     <Activity className="h-3.5 w-3.5" aria-hidden />
                     RFC {rfcPct}%
@@ -1495,8 +1516,8 @@ export function TeacherObservePage() {
                 </div>
               </div>
               {probeOpen ? (
-                <p className="observe-depth-inline" title="n = how deep after Green (Continue).">
-                  n=<strong>{probeDepth}</strong>
+                <p className="observe-depth-inline" title="Chunks Number starts at 1 when Green opens probe; each Continue adds 1.">
+                  CHUNKS NUMBER <strong>{chunksNumber}</strong>
                 </p>
               ) : null}
               {isLiveTest ? (
@@ -1660,7 +1681,7 @@ export function TeacherObservePage() {
               </div>
               <div className="observe-key-row">
                 <span>
-                  <kbd>F</kbd>/<kbd>P</kbd>/<kbd>D</kbd> Fail / Pass / Done
+                  <kbd>F</kbd>/<kbd>C</kbd>/<kbd>D</kbd> Fail / Continue / Done
                 </span>
               </div>
             </div>
@@ -1817,7 +1838,7 @@ export function TeacherObservePage() {
                   <p className="text-[10px] text-slate-400 uppercase font-medium mb-1.5">Color Distribution</p>
                   <div className="h-3 w-full rounded-full bg-slate-950 overflow-hidden flex">
                     {finishMetrics.red > 0 && <div className="h-full bg-red-500" style={{ width: `${(finishMetrics.red / Math.max(finishMetrics.done, 1)) * 100}%` }} />}
-                    {finishMetrics.yellow > 0 && <div className="h-full bg-yellow-400" style={{ width: `${(finishMetrics.yellow / Math.max(finishMetrics.done, 1)) * 100}%` }} />}
+                    {finishMetrics.yellow > 0 && <div className="h-full bg-orange-500" style={{ width: `${(finishMetrics.yellow / Math.max(finishMetrics.done, 1)) * 100}%` }} />}
                     {finishMetrics.green > 0 && <div className="h-full bg-emerald-500" style={{ width: `${(finishMetrics.green / Math.max(finishMetrics.done, 1)) * 100}%` }} />}
                     {finishMetrics.purple > 0 && <div className="h-full bg-fuchsia-500" style={{ width: `${(finishMetrics.purple / Math.max(finishMetrics.done, 1)) * 100}%` }} />}
                   </div>
@@ -1825,8 +1846,8 @@ export function TeacherObservePage() {
                     <div className="bg-red-500/10 text-red-400 border border-red-500/20 py-1 rounded font-bold">
                       Red: {finishMetrics.red}
                     </div>
-                    <div className="bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 py-1 rounded font-bold">
-                      Yellow: {finishMetrics.yellow}
+                    <div className="bg-orange-400/10 text-orange-400 border border-orange-400/20 py-1 rounded font-bold">
+                      Orange: {finishMetrics.yellow}
                     </div>
                     <div className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 py-1 rounded font-bold">
                       Green: {finishMetrics.green}
@@ -1839,8 +1860,8 @@ export function TeacherObservePage() {
 
                 {/* Additional metrics */}
                 <div className="flex justify-between items-center text-xs pt-1 border-t border-white/5">
-                  <span className="text-slate-400">Peak probe depth:</span>
-                  <span className="font-mono font-bold text-white">n={finishMetrics.maxProbeDepth}</span>
+                  <span className="text-slate-400">Max chunks number:</span>
+                  <span className="font-mono font-bold text-white">{finishMetrics.maxProbeDepth}</span>
                 </div>
 
                 {/* Unresolved / status info */}

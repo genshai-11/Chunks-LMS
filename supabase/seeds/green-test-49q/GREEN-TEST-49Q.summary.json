@@ -1,0 +1,21 @@
+{
+  "source": "chunks-resourcce/Package-Green-test.xlsx",
+  "sourceSha256": "b234a76d369c09452d7c4590bb98e65d748fb19a03b0d5c2438d669c53003d4c",
+  "packageId": "d1cae67e-8b58-5b79-ab96-660a784553f1",
+  "packageVersionId": "e0e61415-f370-53ed-a4ab-c4e3c8f57763",
+  "cciProfileId": "6f6031ab-5966-56c7-99c9-72ff6b8efe16",
+  "packageTitle": "GREEN-TEST-49Q",
+  "sessions": 7,
+  "items": 49,
+  "scriptsIntro": 12,
+  "audioAssets": 61,
+  "introAudioAssets": 12,
+  "packageLevelIntroAssets": 5,
+  "sessionIntroAssets": 7,
+  "ttsAudioTasks": 57,
+  "silentPlaceholderAssets": 4,
+  "itemAudioTasks": 45,
+  "teacherReadDirectItems": 4,
+  "outputDir": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q",
+  "runtimeNote": "All 12 intro scripts are English content with Kore. Session 4-6 section_intro rows use runtime language key vi so current readiness gates pass with Vietnamese item audio."
+}

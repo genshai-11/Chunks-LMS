@@ -1,0 +1,50 @@
+﻿Session,Item,CCI,CVR,CPD,TL,LC,Max words,Actual words vi,Length OK,Name Check,TC Vietnamese,TC English,Sentence vi,Sentence en
+1,1,2,1,2,1.0,1.0,10,9,OK,OK,,,Có hai con mèo đen đang ngủ trên ghế.,There are two black cats sleeping on the chair.
+1,2,2,1,2,1.0,1.0,10,10,OK,OK,,,"Buổi sáng, mẹ thường mua bánh mì ở đầu ngõ.","In the morning, Mom usually buys bread at the end of the lane."
+1,3,2,1,2,1.0,1.0,10,8,OK,OK,,,Tôi để chiếc ô màu xanh cạnh cửa.,I leave the blue umbrella beside the door.
+1,4,2,1,2,1.0,1.0,10,8,OK,OK,,,Em bé đang chơi với quả bóng đỏ.,The baby is playing with a red ball.
+1,5,2,1,2,1.0,1.0,10,8,OK,OK,,,Có một chậu hoa nhỏ trên ban công.,There is a small flowerpot on the balcony.
+1,6,2,1,2,1.0,1.0,10,8,OK,OK,,,Bố đọc báo trong lúc uống cà phê.,Dad reads the newspaper while drinking coffee.
+1,7,2,1,2,1.0,1.0,10,8,OK,OK,,,"Tối nay, cả nhà ăn cơm ở nhà.","Tonight, the whole family eats dinner at home."
+2,1,2,3,6,1.0,1.0,10,7,OK,OK,Duyệt,Approve / give me a go-ahead,Cô giáo duyệt bài vẽ trong lớp.,The teacher approves the drawing in class.
+2,2,2,3,6,1.0,1.0,10,8,OK,OK,"..., có thể nói vậy","..., so to speak","Căn phòng hơi nhỏ, có thể nói vậy.","The room is a bit small, so to speak."
+2,3,2,3,6,1.0,1.0,10,9,OK,OK,Cải thiện,Work on / improve,Tôi muốn cải thiện điểm toán trong tháng này.,I want to improve my math score this month.
+2,4,2,3,6,1.0,1.0,10,9,OK,OK,Quản trị,Management,Chị quản lý học quản trị quán cà phê.,The manager studies coffee shop management.
+2,5,2,3,6,1.0,1.0,10,9,OK,OK,Nguyên tắc,Philosophy / principle,Nguyên tắc ở nhà là ăn cơm đúng giờ.,The rule at home is to eat on time.
+2,6,2,3,6,1.0,1.0,10,9,OK,OK,Dài dòng,Lengthy / wordy,Tin nhắn dài dòng khiến tôi đọc rất lâu.,The wordy message takes me a long time to read.
+2,7,2,3,6,1.0,1.0,10,8,OK,OK,Dầu gió,Medicated oil,Bà xoa dầu gió khi bị nhức đầu.,Grandma rubs medicated oil on when she has a headache.
+3,1,4,5,20,1.3,1.3,15,11,OK,OK,Cái máy lạnh,AC / Air Conditioner,Cái máy lạnh trong phòng ngủ chạy êm hơn tối qua.,The air conditioner in the bedroom ran more quietly last night.
+3,2,4,5,20,1.3,1.3,15,11,OK,OK,Cứ thoải mái,Freely / feel free,Bạn cứ thoải mái ngồi đây chờ tôi lấy nước nhé.,Please feel free to sit here while I get some water.
+3,3,4,5,20,1.3,1.3,15,11,OK,OK,Kỹ sư trưởng,Chief engineer,Kỹ sư trưởng kiểm tra máy trước khi mọi người dùng.,The chief engineer checks the machine before everyone uses it.
+3,4,4,5,20,1.3,1.3,15,12,OK,OK,Kỹ năng và khả năng,Skill and ability,Kỹ năng và khả năng nói chuyện giúp tôi tự tin hơn.,Communication skills and ability help me feel more confident.
+3,5,4,5,20,1.3,1.3,15,11,OK,OK,Thực tập sinh,Intern / trainee / probationer / apprentice,Thực tập sinh mới hỏi đường đến phòng họp sáng nay.,The new intern asks the way to the meeting room this morning.
+3,6,4,5,20,1.3,1.3,15,11,OK,OK,Có lẽ,Perhaps / maybe / most likely,Có lẽ trời sắp mưa nên mẹ mang thêm áo khoác.,"Perhaps it is going to rain, so Mom brings an extra jacket."
+3,7,4,5,20,1.3,1.3,15,10,OK,OK,Duyệt,Approve / give me a go-ahead,Sếp duyệt hóa đơn rồi gửi lại cho kế toán.,The boss approves the invoice and sends it back to accounting.
+4,1,4,7,28,1.4,1.7,20,15,OK,OK,Dễ (kiếm tiền),Easy money,"Bán đồ cũ trên mạng nghe dễ kiếm tiền, nhưng cũng cần chụp ảnh đẹp.","Selling used things online sounds like easy money, but it still needs good photos."
+4,2,4,7,28,1.4,1.7,20,13,OK,OK,Hợp đồng,Contract,Tôi đọc kỹ hợp đồng thuê nhà trước khi chuyển vào phòng mới.,I read the rental contract carefully before moving into the new room.
+4,3,4,7,28,1.4,1.7,20,15,OK,OK,Ký một cái hợp đồng,Sign a contract,Bố muốn ký một cái hợp đồng sửa nhà sau khi thợ báo giá rõ.,Dad wants to sign a home repair contract after the worker gives a clear quote.
+4,4,4,7,28,1.4,1.7,20,13,OK,OK,Trước tiên,First / firstly / first off,"Trước tiên, mẹ rửa rau thật sạch rồi mới bắt đầu nấu canh.","First, Mom washes the vegetables carefully before she starts cooking soup."
+4,5,4,7,28,1.4,1.7,20,13,OK,OK,Thương lượng,Negotiate,Tôi thương lượng giá chiếc xe đạp vì bánh sau đã hơi cũ.,I negotiate the bicycle price because the back wheel is a bit old.
+4,6,4,7,28,1.4,1.7,20,12,OK,OK,Ồn ào / to mồm,Noisy / loud-mouthed,Cậu bé ồn ào trong rạp phim khiến mọi người khó chịu.,The noisy boy in the cinema makes everyone uncomfortable.
+4,7,4,7,28,1.4,1.7,20,13,OK,OK,Đồng nghiệp,Coworker / colleague / office buddy,Đồng nghiệp của tôi mang bánh đến văn phòng vào sáng thứ hai.,My coworker brings cakes to the office on Monday morning.
+5,1,6,9,54,1.6,2.1,25,16,OK,OK,Nhiều khi / có mấy lúc,Sometimes / once in a while / at times,"Nhiều khi tôi muốn ở nhà nấu cơm, nhưng bạn bè lại rủ đi ăn ngoài.","Sometimes I want to cook at home, but my friends invite me out to eat."
+5,2,6,9,54,1.6,2.1,25,16,OK,OK,Tôi e là không,I'm afraid not,"Tôi e là không thể đến đúng giờ, vì xe buýt hôm nay chạy khá chậm.",I’m afraid I cannot arrive on time because the bus is quite slow today.
+5,3,6,9,54,1.6,2.1,25,17,OK,OK,(Ý anh) là sao?,What'd you mean?,"Ý anh là sao khi nói bữa tối đơn giản, trong khi mẹ đã nấu cả chiều?",What do you mean by saying dinner is simple when Mom cooked all afternoon?
+5,4,6,9,54,1.6,2.1,25,18,OK,OK,Phức tạp,Complicated / complex / like a mess,"Chuyện chuyển nhà nghe khá phức tạp, vì vừa phải đóng gói vừa đổi địa chỉ nhận thư.",Moving house sounds quite complicated because we must pack and change the mailing address.
+5,5,6,9,54,1.6,2.1,25,16,OK,OK,Mỗi 5 năm,Every 5 years,"Mỗi 5 năm, gia đình tôi lại chụp ảnh chung để nhớ các mốc quan trọng.","Every five years, my family takes a group photo to remember important milestones."
+5,6,6,9,54,1.6,2.1,25,16,OK,OK,Thông thường,Usually / often / always,"Thông thường, mẹ đi chợ rất sớm, nhưng hôm nay trời mưa nên bà ở nhà.","Usually, Mom goes to the market early, but today it rains, so she stays home."
+5,7,6,9,54,1.6,2.1,25,17,OK,OK,Vấn đề thiếu hụt nhân lực,Staff shortage / headcount problem,Vấn đề thiếu hụt nhân lực khiến quán cà phê phải đóng cửa sớm cuối tuần này.,The staff shortage makes the coffee shop close early this weekend.
+6,1,6,11,66,1.8,2.6,25,16,OK,OK,Tốt hơn là cậu nên…,You'd better… / You should...,"Tốt hơn là cậu nên gọi cho mẹ trước, vì bà đang chờ tin từ sáng.",You’d better call Mom first because she has been waiting for news since morning.
+6,2,6,11,66,1.8,2.6,25,15,OK,OK,Chuỗi cung ứng,Supply chain,Chuỗi cung ứng bị trễ khiến cửa hàng gần nhà thiếu sữa trong hai ngày.,The delayed supply chain leaves the nearby store short of milk for two days.
+6,3,6,11,66,1.8,2.6,25,14,OK,OK,Thiếu hụt,Shortage / scarcity,Thiếu hụt giáo viên thay thế làm lớp học phải nghỉ thêm một ngày.,The shortage of substitute teachers makes the class take one more day off.
+6,4,6,11,66,1.8,2.6,25,16,OK,OK,Đại dịch,Pandemic / epidemic,Đại dịch khiến nhiều người quen làm việc từ xa và họp qua màn hình nhỏ.,The pandemic makes many people used to working remotely and meeting through small screens.
+6,5,6,11,66,1.8,2.6,25,17,OK,OK,Chính phủ Trung Quốc,Chinese government,"Chính phủ Trung Quốc thay đổi quy định, nên vài đơn hàng bị dời sang tuần sau.","The Chinese government changes the rules, so some orders are moved to next week."
+6,6,6,11,66,1.8,2.6,25,15,OK,OK,đóng cửa,Shut down,Cửa hàng đóng cửa sớm vì nhân viên bị ốm và trời mưa rất to.,The shop shuts down early because the staff are sick and it rains heavily.
+6,7,6,11,66,1.8,2.6,25,15,OK,OK,Nỗi đau thật sự,Real pain point,Nỗi đau thật sự của người bán là thấy quán nhỏ vắng khách nhiều tháng.,The seller’s real pain point is seeing the small shop empty for months.
+7,1,8,13,104,2.0,3.1,25,15,OK,OK,Trào ngược dạ dày,Acid reflux,Trào ngược dạ dày làm tôi khó ngủ sau những bữa tối nhiều dầu mỡ.,Acid reflux makes me sleep badly after oily dinners.
+7,2,8,13,104,2.0,3.1,25,14,OK,OK,Ợ nóng,Heartburn,Ợ nóng xuất hiện sau bữa tiệc khiến tôi chỉ muốn uống nước ấm.,"Heartburn appears after the party, making me only want warm water."
+7,3,8,13,104,2.0,3.1,25,14,OK,OK,Đường huyết,Blood sugar,Đường huyết của ông tăng cao sau Tết vì ăn quá nhiều bánh ngọt.,Grandpa’s blood sugar rises after Tet because he eats too many sweets.
+7,4,8,13,104,2.0,3.1,25,16,OK,OK,Ngộ độc thực phẩm,Food poisoning,Ngộ độc thực phẩm làm cả nhóm hủy chuyến đi biển và ở nhà nghỉ ngơi.,Food poisoning makes the whole group cancel the beach trip and rest at home.
+7,5,8,13,104,2.0,3.1,25,15,OK,OK,Ngấn mỡ bụng,Love handles,"Ngấn mỡ bụng khiến tôi ngại mặc áo ôm, dù cơ thể vẫn khỏe mạnh.","Love handles make me shy about wearing tight shirts, though my body is still healthy."
+7,6,8,13,104,2.0,3.1,25,16,OK,OK,"""Có tâm""",Dedicated,Cô y tá có tâm luôn hỏi bệnh nhân có đau không trước khi thay băng.,The dedicated nurse always asks if patients feel pain before changing bandages.
+7,7,8,13,104,2.0,3.1,25,14,OK,OK,Còn khuya mới...,Nowhere near... / far from...,Còn khuya mới xong bài nếu tôi cứ mở điện thoại xem tin nhắn.,I am nowhere near finishing if I keep checking messages on my phone.

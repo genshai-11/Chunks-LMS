@@ -1,0 +1,38 @@
+{
+  "generatedAt": "2026-07-24T13:26:16.375Z",
+  "summary": {
+    "total": 1,
+    "generated": 1,
+    "generatedSilentPlaceholders": 0,
+    "skippedExisting": 0,
+    "failed": 0,
+    "audioDir": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio",
+    "reportPath": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\GREEN-TEST-49Q.tts-report.json"
+  },
+  "results": [
+    {
+      "key": "audio_intro_test",
+      "type": "package_start",
+      "sessionOrder": null,
+      "itemOrder": null,
+      "language": "en",
+      "model": "gemini/gemini-3.1-flash-tts-preview/Kore",
+      "requiresTts": true,
+      "text": "CHUNKS Test No. 1 Welcome to CHUNKS Test No. 1, also known as the Green Test or Focus Test. This assessment is developed by CHUNKS based on CHUNKS Theory and will take place in the official Green Room. The session will be recorded for review and analysis. The test will be conducted fully in English, except for designated Vietnamese challenges. This test is designed for a registered native Vietnamese speaker, using Vietnamese as L1 and English as L2. It lasts approximately 45 minutes and includes 49 challenges across 7 progressive levels of CVR and CCI constraints. The average CPD value is set at 56 volts. The test has three parts: Part I: Listening, with 21 challenges; Part II: Speaking, with 21 challenges; and Part III: Chunker Challenge, a special section with 7 challenges that combine both listening and speaking. The goal is to measure your Focus level, represented as %c. During the test, you must stay calm and execute the exact physical requests from the CiC immediately after the bell. Unknown terms or forgotten vocabulary may be expressed in Vietnamese and will be corrected and sound-locked by the CiC. Corrected mistakes should not be repeated. Any repeated mistakes, delays, or rule breaks will increase your %RFC score and affect your final %c result. Your CPD chart will be evaluated through the official 7-color assessment system.",
+      "packageVersionId": "e0e61415-f370-53ed-a4ab-c4e3c8f57763",
+      "sectionId": null,
+      "itemId": null,
+      "part": null,
+      "audioAssetId": "32927517-e395-5adf-ac0e-27bd55ee9a14",
+      "narrationVariantId": "20072f29-c375-57c2-a47f-4e136d62fa8c",
+      "sourceTextHash": "sha256:0f97c04ec46e391b871d7aa3b35e07b522cb5603dc24684b9dbd482e1e66d697",
+      "storageBucket": "narration-audio",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/audio_intro_test.wav",
+      "status": "generated",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\audio_intro_test.wav",
+      "bytes": 4366124,
+      "sha256": "sha256:f117491eae9550cc0f402e949724a4834f7cdb1891adc4e55b4292eda988beca",
+      "responseFormat": "wav"
+    }
+  ]
+}

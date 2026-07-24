@@ -151,13 +151,13 @@ export function AdminAuditPage() {
                       {e.previousColor ? (
                         <span>
                           <span className={`color-pill is-${e.previousColor}`}>
-                            {e.previousColor}
+                            {e.previousColor === 'yellow' ? 'orange' : e.previousColor}
                           </span>
                           {' → '}
                         </span>
                       ) : null}
                       {e.color ? (
-                        <span className={`color-pill is-${e.color}`}>{e.color}</span>
+                        <span className={`color-pill is-${e.color}`}>{e.color === 'yellow' ? 'orange' : e.color}</span>
                       ) : (
                         '—'
                       )}

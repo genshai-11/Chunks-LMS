@@ -946,29 +946,49 @@ export function TeacherTestRunPage() {
 
   useEffect(() => {
     if (!liveAudioStarted || probeOpen) return
-    if (!autoPlayPartIntro || !isFirstItemInSession) return
-    if (currentSessionNumber === 1 && !autoPlayPackageStart && !partIntroPlayedRef.current[1] && partIntroVariantIds[1]) {
-      void playPartIntroAudio(1, true)
-      return
-    }
-    if (currentSessionNumber === 4 && !partIntroPlayedRef.current[2] && partIntroVariantIds[2]) {
-      void playPartIntroAudio(2, true)
-      return
-    }
-    if (currentSessionNumber === 7 && !partIntroPlayedRef.current[3] && partIntroVariantIds[3]) {
-      void playPartIntroAudio(3, true)
-    }
-  }, [autoPlayPackageStart, autoPlayPartIntro, currentSessionNumber, isFirstItemInSession, liveAudioStarted, partIntroVariantIds, playPartIntroAudio, probeOpen])
+    if (!isFirstItemInSession) return
 
-  useEffect(() => {
-    if (!liveAudioStarted || probeOpen) return
-    if (!autoPlaySessionIntro || !canPlayCurrentSessionIntro || !isFirstItemInSession) return
-    if (sessionIntroPlayedRef.current[currentSessionNumber]) return
-    if (autoPlayPartIntro && currentSessionNumber === 1 && !partIntroPlayedRef.current[1] && partIntroVariantIds[1]) return
-    if (autoPlayPartIntro && currentSessionNumber === 4 && !partIntroPlayedRef.current[2] && partIntroVariantIds[2]) return
-    if (autoPlayPartIntro && currentSessionNumber === 7 && !partIntroPlayedRef.current[3] && partIntroVariantIds[3]) return
-    void playCurrentSessionIntro(true, true)
-  }, [autoPlayPartIntro, autoPlaySessionIntro, canPlayCurrentSessionIntro, currentSessionNumber, isFirstItemInSession, liveAudioStarted, partIntroVariantIds, playCurrentSessionIntro, probeOpen])
+    // 1. Check if we should trigger a Part Intro first
+    if (autoPlayPartIntro) {
+      if (currentSessionNumber === 1 && !autoPlayPackageStart && !partIntroPlayedRef.current[1] && partIntroVariantIds[1]) {
+        void playPartIntroAudio(1, true)
+        return
+      }
+      if (currentSessionNumber === 4 && !partIntroPlayedRef.current[2] && partIntroVariantIds[2]) {
+        void playPartIntroAudio(2, true)
+        return
+      }
+      if (currentSessionNumber === 7 && !partIntroPlayedRef.current[3] && partIntroVariantIds[3]) {
+        void playPartIntroAudio(3, true)
+        return
+      }
+    }
+
+    // 2. If no Part Intro is to be played, check if we should trigger the Session Intro.
+    if (autoPlaySessionIntro && canPlayCurrentSessionIntro) {
+      if (!sessionIntroPlayedRef.current[currentSessionNumber]) {
+        // Guard: if autoPlayPartIntro is enabled and this session is a part boundary, and the corresponding part intro
+        // has NOT been played yet, do NOT play session intro now. It will be triggered by handleAudioEnded after part intro ends.
+        if (autoPlayPartIntro && currentSessionNumber === 1 && !partIntroPlayedRef.current[1] && partIntroVariantIds[1]) return
+        if (autoPlayPartIntro && currentSessionNumber === 4 && !partIntroPlayedRef.current[2] && partIntroVariantIds[2]) return
+        if (autoPlayPartIntro && currentSessionNumber === 7 && !partIntroPlayedRef.current[3] && partIntroVariantIds[3]) return
+
+        void playCurrentSessionIntro(true, true)
+      }
+    }
+  }, [
+    autoPlayPackageStart,
+    autoPlayPartIntro,
+    autoPlaySessionIntro,
+    canPlayCurrentSessionIntro,
+    currentSessionNumber,
+    isFirstItemInSession,
+    liveAudioStarted,
+    partIntroVariantIds,
+    playCurrentSessionIntro,
+    playPartIntroAudio,
+    probeOpen,
+  ])
 
   useEffect(() => {
     if (!items.length) return
@@ -1073,7 +1093,11 @@ export function TeacherTestRunPage() {
       if (!currentItem || probeOpen) return
       const isFinalOutstandingItem = !isItemFinalized(currentItem) && items.filter((item) => !isItemFinalized(item)).length === 1
       playReaction(color)
-      if (color !== 'green') playScoreFeedbackThenNext(color)
+      if (color !== 'green') {
+        playScoreFeedbackThenNext(color)
+      } else {
+        activateAudioUrl('/audio/green.wav', 'green result', true, 'result_reaction')
+      }
       const result = await recordStandaloneResult(currentItem.id, color)
       if (!result.ok) {
         setMessage(result.error)
@@ -1082,14 +1106,18 @@ export function TeacherTestRunPage() {
       await load()
       if (isFinalOutstandingItem) await playEndAfterFinalScore()
     },
-    [currentItem, items, load, playEndAfterFinalScore, playReaction, playScoreFeedbackThenNext, probeOpen],
+    [activateAudioUrl, currentItem, items, load, playEndAfterFinalScore, playReaction, playScoreFeedbackThenNext, probeOpen],
   )
 
   const handleProbe = useCallback(
     async (outcome: 'fail' | 'continue' | 'done') => {
       if (!currentAttempt?.id || !probeOpen) return
       const isFinalOutstandingItem = outcome !== 'continue' && currentItem && !isItemFinalized(currentItem) && items.filter((item) => !isItemFinalized(item)).length === 1
-      if (outcome !== 'continue') playScoreFeedbackThenNext(outcome === 'fail' ? 'yellow' : 'green')
+      if (outcome !== 'continue') {
+        playScoreFeedbackThenNext(outcome === 'fail' ? 'red' : 'green')
+      } else {
+        activateAudioUrl('/audio/yellow.wav', 'continue result', true, 'result_reaction')
+      }
       const result = await resolveStandaloneProbe(String(currentAttempt.id), outcome)
       if (!result.ok) {
         setMessage(result.error)
@@ -1098,13 +1126,13 @@ export function TeacherTestRunPage() {
       if (outcome === 'continue') {
         setMessage(`Chunks Number=${probeChunksNumber({ enteredProbeFlow: true, probeCount: result.data.probeCount }) ?? 1}`)
       } else {
-        playReaction(outcome === 'fail' ? 'yellow' : 'green')
+        playReaction(outcome === 'fail' ? 'red' : 'green')
         setMessage('')
       }
       await load()
       if (isFinalOutstandingItem) await playEndAfterFinalScore()
     },
-    [currentAttempt?.id, currentItem, items, load, playEndAfterFinalScore, playReaction, playScoreFeedbackThenNext, probeOpen],
+    [activateAudioUrl, currentAttempt?.id, currentItem, items, load, playEndAfterFinalScore, playReaction, playScoreFeedbackThenNext, probeOpen],
   )
 
   useEffect(() => {
@@ -1470,29 +1498,7 @@ export function TeacherTestRunPage() {
                       className="live-test-audio-el"
                     />
                     <p className="live-test-audio-label">{audioLabel}</p>
-                    <div className="live-test-audio-actions">
-                      <button type="button" onClick={() => void playPackageStartAudio(true)} disabled={!packageStartVariantId}>
-                        Test Start
-                      </button>
-                      <button type="button" onClick={() => void playPartIntroAudio(1, true)} disabled={!partIntroVariantIds[1]}>
-                        Part I
-                      </button>
-                      <button type="button" onClick={() => void playPartIntroAudio(2, true)} disabled={!partIntroVariantIds[2]}>
-                        Part II
-                      </button>
-                      <button type="button" onClick={() => void playPartIntroAudio(3, true)} disabled={!partIntroVariantIds[3]}>
-                        Part III
-                      </button>
-                      <button type="button" onClick={() => void playCurrentSessionIntro(true, true)} disabled={!canPlayCurrentSessionIntro}>
-                        Session intro → Q1
-                      </button>
-                      <button type="button" onClick={() => void playCurrentItemAudio(true)} disabled={!canPlayCurrentItemAudio}>
-                        Current Q
-                      </button>
-                      <button type="button" onClick={() => void playPackageEndAudio(true)} disabled={!packageEndVariantId}>
-                        Test End
-                      </button>
-                    </div>
+
                     <div className="live-test-audio-toggles-grid">
                       <label className="live-test-audio-toggle">
                         <input

@@ -92,7 +92,7 @@ export async function listStandaloneAssignments(
       if (error) return { ok: false, error: error.message }
       return { ok: true, data: (data ?? []).map(assignment) }
     },
-    { ttlMs: 8_000 },
+    { ttlMs: 30_000, persist: true }
   )
 }
 
@@ -113,7 +113,7 @@ export async function listStandaloneRuns(
       if (error) return { ok: false, error: error.message }
       return { ok: true, data: (data ?? []).map(run) }
     },
-    { ttlMs: 3_000 },
+    { ttlMs: 15_000, persist: true },
   )
 }
 
@@ -133,7 +133,7 @@ export async function getStandaloneRun(
       if (error) return { ok: false, error: error.message }
       return { ok: true, data: data ? run(data) : null }
     },
-    { ttlMs: 3_000 },
+    { ttlMs: 15_000, persist: true },
   )
 }
 
@@ -252,7 +252,7 @@ export async function getStandaloneRunRuntime(runId: string): Promise<
         },
       }
     },
-    { ttlMs: 3_000 },
+    { ttlMs: 15_000, persist: true },
   )
 }
 
@@ -272,7 +272,7 @@ export async function listStandaloneRunItems(
       if (error) return { ok: false, error: error.message }
       return { ok: true, data: data ?? [] }
     },
-    { ttlMs: 2_000 },
+    { ttlMs: 10_000, persist: true }
   )
 }
 
@@ -283,7 +283,7 @@ export async function findLatestApprovedNarrationVariant(input: {
   part?: number | null
   testSectionId?: string | null
   testItemId?: string | null
-}): Promise<Result<{ id: string; audioAssetId: string } | null>> {
+}): Promise<Result<{ id: string; audioAssetId: string; voiceId?: string } | null>> {
   return cachedQuery(
     cacheKey([
       'standalone',
@@ -300,7 +300,7 @@ export async function findLatestApprovedNarrationVariant(input: {
       if (!sb) return { ok: false, error: 'Supabase is not configured' }
       let query = sb
         .from('narration_variants')
-        .select('id, audio_asset_id')
+        .select('id, audio_asset_id, voice_id')
         .eq('narration_target', input.target)
         .eq('language', input.language)
         .eq('approval_status', 'approved')
@@ -323,7 +323,7 @@ export async function findLatestApprovedNarrationVariant(input: {
 
       const { data, error } = await query.maybeSingle()
       if (error) return { ok: false, error: error.message }
-      return { ok: true, data: data ? { id: data.id, audioAssetId: data.audio_asset_id } : null }
+      return { ok: true, data: data ? { id: data.id, audioAssetId: data.audio_asset_id, voiceId: data.voice_id } : null }
     },
     { ttlMs: 60_000, persist: true },
   )

@@ -11,8 +11,11 @@ export function HomePage() {
   const courseCode = roster.courses[0]?.code
   const people = roster.users.length
 
-  if (session.ready && session.signedIn && !session.authBypass) {
-    return <Navigate to={session.canAccess('admin') ? '/admin' : '/teacher'} replace />
+  if (session.ready && !session.authBypass) {
+    if (session.signedIn) {
+      return <Navigate to={session.canAccess('admin') ? '/admin' : '/teacher'} replace />
+    }
+    return <Navigate to="/admin" replace />
   }
 
   const chips: Array<{

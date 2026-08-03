@@ -503,7 +503,7 @@ export function TeacherSessionPage() {
       <Panel
         icon={Users}
         title="By learner (columns)"
-        description="Each question is assigned to one learner only. Tracking splits by learner — Q count and probe n stats are real capture data."
+        description="Each question is assigned to one learner only. Tracking splits by learner — Q count and chunks number stats are real capture data."
       >
         <div className="table-wrap">
           <table>
@@ -589,7 +589,7 @@ export function TeacherSessionPage() {
           <p className="meta">
             Mode {capture.position.mode.replace('_', '-')} · Q {capture.position.questionIndex + 1}/
             {Math.max(capture.questions.length, 1)} · {finalizedCount}/
-            {capture.attempts.length || '—'} finalized · Peak {PROBE_METRIC_LABELS.nDepth}=
+            {capture.attempts.length || '—'} finalized · {PROBE_METRIC_LABELS.nDepthMax}=
             {captureSummary?.maxProbeDepth ?? 0}
           </p>
         </div>
@@ -631,7 +631,7 @@ export function TeacherSessionPage() {
                       </td>
                       <td>
                         {color ? (
-                          <span className={`capture-dot ${color}`}>{color}</span>
+                          <span className={`capture-dot ${color}`}>{color === 'yellow' ? 'orange' : color}</span>
                         ) : (
                           <span className="capture-dot">·</span>
                         )}
@@ -645,7 +645,7 @@ export function TeacherSessionPage() {
             <p className="meta mt-2">
               <strong>{PROBE_METRIC_LABELS.nDepth}</strong> = {PROBE_METRIC_TOOLTIPS.nDepth}{' '}
               <strong>{PROBE_METRIC_LABELS.nCount}</strong> this session = {probeAgg?.nCount ?? 0}.
-              Sample/finalized counts are never labeled “n”.
+              Sample/finalized counts are never labeled chunks number.
             </p>
           </div>
         )}

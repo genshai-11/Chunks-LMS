@@ -33,13 +33,13 @@ type ColumnKey = keyof typeof DEFAULT_COLUMNS
 const COLUMN_LABELS: Record<ColumnKey, string> = {
   date: 'Date',
   red: 'Red',
-  yellow: 'Yellow',
+  yellow: 'Orange',
   green: 'Green',
   purple: 'Purple',
   total: 'Total',
   rfc: 'RFC',
   scoreAvg: 'Score avg',
-  probeTotal: 'Probe n',
+  probeTotal: 'Chunks Number',
 }
 
 export function TeacherLearnerProfilePage() {
@@ -317,7 +317,7 @@ export function TeacherLearnerProfilePage() {
         <Panel
           icon={BarChart3}
           title="RFC summary"
-          description="RFC = (Red + Yellow) / total finalized observations per session."
+          description="RFC = (Red + Orange) / total finalized observations per session."
         >
           <div className="stat-grid compact">
             <StatCard
@@ -345,7 +345,7 @@ export function TeacherLearnerProfilePage() {
       <Panel
         icon={BarChart3}
         title="Session detail table"
-        description="Show/hide the table and choose columns. Example: red: 1, yellow: 2, purple: 10, total session: 13."
+        description="Show/hide the table and choose columns. Example: red: 1, orange: 2, purple: 10, total session: 13."
         actions={
           <button type="button" className="ghost" onClick={() => setShowTable((value) => !value)}>
             {showTable ? (
@@ -386,17 +386,17 @@ export function TeacherLearnerProfilePage() {
                     <th scope="col">Session</th>
                     {columns.date ? <th scope="col">Date</th> : null}
                     {columns.red ? <th scope="col">Red</th> : null}
-                    {columns.yellow ? <th scope="col">Yellow</th> : null}
+                    {columns.yellow ? <th scope="col">Orange</th> : null}
                     {columns.green ? <th scope="col">Green</th> : null}
                     {columns.purple ? <th scope="col">Purple</th> : null}
                     {columns.total ? <th scope="col">Total session</th> : null}
                     {columns.rfc ? (
-                      <th scope="col" title="(Red + Yellow) / total">
+                      <th scope="col" title="(Red + Orange) / total">
                         RFC
                       </th>
                     ) : null}
                     {columns.scoreAvg ? <th scope="col">Score avg</th> : null}
-                    {columns.probeTotal ? <th scope="col">Probe n</th> : null}
+                    {columns.probeTotal ? <th scope="col">Chunks Number</th> : null}
                   </tr>
                 </thead>
                 <tbody>

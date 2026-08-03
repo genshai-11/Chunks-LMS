@@ -1,0 +1,69 @@
+{
+  "sourceWorkbook": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\chunks-resourcce\\Package-Green-test.xlsx",
+  "sheet": "Scripts Intro",
+  "count": 12,
+  "missing": [],
+  "extra": [],
+  "rows": [
+    {
+      "row": 2,
+      "key": "audio_intro_test",
+      "text": "CHUNKS Test No. 1\n\nWelcome to CHUNKS Test No. 1, also known as the Green Test or Focus Test. This assessment is developed by CHUNKS based on CHUNKS Theory and will take place in the official Green Room. The session will be recorded for review and analysis. The test will be conducted fully in English, except for designated Vietnamese challenges.\n\nThis test is designed for a registered native Vietnamese speaker, using Vietnamese as L1 and English as L2. It lasts approximately 45 minutes and includes 49 challenges across 7 progressive levels of CVR and CCI constraints. The average CPD value is set at 60 volts.\n\nThe test has three parts: Part I: Listening, with 21 challenges; Part II: Speaking, with 21 challenges; and Part III: Chunker Challenge, a special section with 7 challenges that combine both listening and speaking. The goal is to measure your Focus level, represented as %c.\n\nDuring the test, you must stay calm and execute the exact physical requests from the CiC immediately after the bell. Unknown terms or forgotten vocabulary may be expressed in Vietnamese and will be corrected and sound-locked by the CiC. Corrected mistakes should not be repeated. Any repeated mistakes, delays, or rule breaks will increase your %RFC score and affect your final %c result. Your CPD chart will be evaluated through the official 7-color assessment system."
+    },
+    {
+      "row": 3,
+      "key": "audio_intro_part_I",
+      "text": "Part I – LISTENING, you will listen to the idea in English 2 times, then execute your answer in English right after the bell"
+    },
+    {
+      "row": 4,
+      "key": "audio_intro_part_II",
+      "text": "Part II – SPEAKING, you will listen to the idea in Vietnamese 2 times, then execute your answer in English right after the bell"
+    },
+    {
+      "row": 5,
+      "key": "audio_intro_part_III",
+      "text": "Part III: CHUNKER CHALLENGE. You will listen to the idea in either English or Vietnamese twice, then execute your answer in English with the appropriate manner requested by the CiC, immediately after the bell."
+    },
+    {
+      "row": 6,
+      "key": "audio_end_test",
+      "text": "This is the end of CHUNKS Test No. 1. After the test, the test taker will receive the result verbally from the CiC. A digital copy of the official result, including the test taker’s ID picture, will be sent directly to the registered email address within 24 hours.\nThank you for completing the Green Test with us."
+    },
+    {
+      "row": 9,
+      "key": "audio_intro_session1",
+      "text": "Session 1 – Give it a shot – CVR 1 ohms CCI 2 Amps"
+    },
+    {
+      "row": 10,
+      "key": "audio_intro_session2",
+      "text": "Session 2 – Go with the flow – CVR 3 ohms CCI 2 Amps"
+    },
+    {
+      "row": 11,
+      "key": "audio_intro_session3",
+      "text": "Session 3 – Chunks on the go – CVR 5 ohms CCI 4 Amps"
+    },
+    {
+      "row": 12,
+      "key": "audio_intro_session4",
+      "text": "Session 4 – Robot – CVR 7 ohms CCI 4 Amps"
+    },
+    {
+      "row": 13,
+      "key": "audio_intro_session5",
+      "text": "Session 5 – Taichi – CVR 9 ohms CCI 4 Amps"
+    },
+    {
+      "row": 14,
+      "key": "audio_intro_session6",
+      "text": "Session 6 – Strike – CVR 11 ohms CCI 6 Amps"
+    },
+    {
+      "row": 15,
+      "key": "audio_intro_session7",
+      "text": "Session 7 – Freeze & Nuance Work – CVR 13 ohms CCI 8 Amps"
+    }
+  ]
+}

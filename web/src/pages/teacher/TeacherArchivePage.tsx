@@ -104,7 +104,7 @@ export function TeacherArchivePage() {
                   >
                     <div className="flex items-center justify-between">
                       <span className="archive-heat-q">Q{cell.sequenceHint}</span>
-                      <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: cell.color === 'red' ? '#ef4444' : cell.color === 'yellow' ? '#eab308' : cell.color === 'green' ? '#22c55e' : cell.color === 'purple' ? '#a855f7' : '#cbd5e1' }} />
+                      <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: cell.color === 'red' ? '#ef4444' : cell.color === 'yellow' ? '#f97316' : cell.color === 'green' ? '#22c55e' : cell.color === 'purple' ? '#a855f7' : '#cbd5e1' }} />
                     </div>
                     <span className="archive-heat-name">
                       {names.get(cell.learnerUserId) ?? 'Learner'}

@@ -49,7 +49,7 @@ export const METRIC_CATALOG: MetricCatalogEntry[] = [
     key: 'rfc',
     version: '1.0.0',
     status: 'operational',
-    definition: '(Red + Yellow) / finalized N',
+    definition: '(Red + Orange) / finalized sample',
     direction: 'lower_better',
     unit: 'ratio',
     minSample: 1,
@@ -58,7 +58,7 @@ export const METRIC_CATALOG: MetricCatalogEntry[] = [
     key: 'rac',
     version: '1.0.0',
     status: 'operational',
-    definition: '(Green + Purple) / finalized N',
+    definition: '(Green + Purple) / finalized sample',
     direction: 'higher_better',
     unit: 'ratio',
     minSample: 1,
@@ -67,7 +67,7 @@ export const METRIC_CATALOG: MetricCatalogEntry[] = [
     key: 'average_performance',
     version: '1.0.0',
     status: 'operational',
-    definition: 'mean color score 0..3 over finalized N',
+    definition: 'mean color score 0..3 over finalized sample',
     direction: 'higher_better',
     unit: 'score',
     minSample: 1,
@@ -76,7 +76,7 @@ export const METRIC_CATALOG: MetricCatalogEntry[] = [
     key: 'purple_mastery_rate',
     version: '1.0.0',
     status: 'operational',
-    definition: 'Purple / finalized N',
+    definition: 'Purple / finalized sample',
     direction: 'higher_better',
     unit: 'ratio',
     minSample: 1,
@@ -85,7 +85,7 @@ export const METRIC_CATALOG: MetricCatalogEntry[] = [
     key: 'clarification_rate',
     version: '1.0.0',
     status: 'operational',
-    definition: 'attempts entering probe flow / finalized N',
+    definition: 'attempts entering probe flow / finalized sample',
     direction: 'contextual',
     unit: 'ratio',
     minSample: 1,
@@ -94,7 +94,7 @@ export const METRIC_CATALOG: MetricCatalogEntry[] = [
     key: 'clarification_depth',
     version: '1.0.0',
     status: 'experimental',
-    definition: 'probe-event count / probed attempts (legacy alias of n depth avg)',
+    definition: 'chunks number / probed attempts (legacy alias of avg chunks number)',
     direction: 'contextual',
     unit: 'score',
     minSample: 1,
@@ -112,7 +112,7 @@ export const METRIC_CATALOG: MetricCatalogEntry[] = [
     key: 'n_depth_max',
     version: '1.0.0',
     status: 'operational',
-    definition: 'max probeCount among probed attempts (peak n depth; not session maxProbeCount)',
+    definition: 'max chunks number among probed attempts (not session maxProbeCount)',
     direction: 'contextual',
     unit: 'count',
     minSample: 1,
@@ -121,7 +121,7 @@ export const METRIC_CATALOG: MetricCatalogEntry[] = [
     key: 'n_depth_avg',
     version: '1.0.0',
     status: 'operational',
-    definition: 'mean probeCount among probed attempts (n depth avg)',
+    definition: 'mean chunks number among probed attempts',
     direction: 'contextual',
     unit: 'score',
     minSample: 1,
@@ -180,10 +180,10 @@ export function calculateMetrics(finalized: FinalizedAttempt[]): MetricObservati
   const purple = finalized.filter((a) => a.effectiveColor === 'purple').length
   const scoreSum = finalized.reduce((s, a) => s + COLOR_SCORE[a.effectiveColor], 0)
   const probed = finalized.filter((a) => a.enteredProbeFlow)
-  const probeEventTotal = probed.reduce((s, a) => s + a.probeEventCount, 0)
-  const probeDepthMax =
-    probed.length === 0 ? null : Math.max(...probed.map((a) => a.probeEventCount))
-  const probeDepthAvg = probed.length === 0 ? null : probeEventTotal / probed.length
+  const chunksNumbers = probed.map((a) => Math.max(1, a.probeEventCount + 1))
+  const chunksNumberTotal = chunksNumbers.reduce((s, value) => s + value, 0)
+  const probeDepthMax = probed.length === 0 ? null : Math.max(...chunksNumbers)
+  const probeDepthAvg = probed.length === 0 ? null : chunksNumberTotal / probed.length
   const recovered = probed.filter(
     (a) => a.effectiveColor === 'green' || a.effectiveColor === 'purple',
   ).length
@@ -192,7 +192,7 @@ export function calculateMetrics(finalized: FinalizedAttempt[]): MetricObservati
   const rac = observation('rac', ratio(greenPurple, n), n)
   const avg = observation('average_performance', n === 0 ? null : scoreSum / n, n)
   const purpleRate = observation('purple_mastery_rate', ratio(purple, n), n)
-  // Clarification rate: 0 when N>0 and none probed; null when N=0
+  // Clarification rate: 0 when finalized sample > 0 and none probed; null when sample = 0
   const clarRate = observation('clarification_rate', n === 0 ? null : probed.length / n, n)
   const clarDepth = observation('clarification_depth', probeDepthAvg, probed.length)
   const nCount = observation('n_count', n === 0 ? null : probed.length, n)

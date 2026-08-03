@@ -1,0 +1,62 @@
+{
+  "generatedAt": "2026-07-24T15:23:37.558Z",
+  "summary": {
+    "total": 2,
+    "generated": 2,
+    "generatedSilentPlaceholders": 0,
+    "skippedExisting": 0,
+    "failed": 0,
+    "audioDir": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio",
+    "reportPath": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\GREEN-TEST-49Q.tts-report.json"
+  },
+  "results": [
+    {
+      "key": "audio_intro_part_I",
+      "type": "part_intro",
+      "sessionOrder": null,
+      "itemOrder": null,
+      "language": "en",
+      "model": "gemini/gemini-3.1-flash-tts-preview/Kore",
+      "requiresTts": true,
+      "text": "Part I – LISTENING, you will listen to the idea in English 2 times, then execute your answer in English right after the bell",
+      "packageVersionId": "e0e61415-f370-53ed-a4ab-c4e3c8f57763",
+      "sectionId": null,
+      "itemId": null,
+      "part": 1,
+      "audioAssetId": "89ecc05e-f140-5ec6-aa46-bf5afc05addb",
+      "narrationVariantId": "f1c7bc8d-db18-51c1-ab24-bbe092690693",
+      "sourceTextHash": "sha256:a6eb64527ceec267e1c799062cac2995d3e582b9e02cdffc75fa513a1de299ad",
+      "storageBucket": "narration-audio",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/audio_intro_part_I.wav",
+      "status": "generated",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\audio_intro_part_I.wav",
+      "bytes": 422444,
+      "sha256": "sha256:f956e53ab9ab36becf955774262ffe1537446aefb11f0accae778716ae129b9c",
+      "responseFormat": "wav"
+    },
+    {
+      "key": "audio_intro_part_II",
+      "type": "part_intro",
+      "sessionOrder": null,
+      "itemOrder": null,
+      "language": "en",
+      "model": "gemini/gemini-3.1-flash-tts-preview/Kore",
+      "requiresTts": true,
+      "text": "Part II – SPEAKING, you will listen to the idea in Vietnamese 2 times, then execute your answer in English right after the bell",
+      "packageVersionId": "e0e61415-f370-53ed-a4ab-c4e3c8f57763",
+      "sectionId": null,
+      "itemId": null,
+      "part": 2,
+      "audioAssetId": "17a03075-99a8-59ad-9e37-e9ffdaff9592",
+      "narrationVariantId": "b25827b7-59c3-5bd8-83f9-2d713670c8fe",
+      "sourceTextHash": "sha256:c6de7dd15d926348c3c9b4838ab0caacc081ca14994123118c31ce07aa9ed2f3",
+      "storageBucket": "narration-audio",
+      "storagePath": "narrations/e0e61415-f370-53ed-a4ab-c4e3c8f57763/green-test-49q/audio_intro_part_II.wav",
+      "status": "generated",
+      "file": "C:\\Users\\gensh\\OneDrive\\Máy tính\\LUCY\\PROJECT-WORKPLACE\\CHUNKS\\CHUNKS-LMS\\Chunks-LMS-standalone-test\\supabase\\seeds\\green-test-49q\\audio\\audio_intro_part_II.wav",
+      "bytes": 497324,
+      "sha256": "sha256:0b1c89a70d2209c16e69616c55804f7733a2338fb2521849eee1cbd5e600fa67",
+      "responseFormat": "wav"
+    }
+  ]
+}

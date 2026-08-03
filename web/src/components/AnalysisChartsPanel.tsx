@@ -52,7 +52,7 @@ type Props = {
 }
 
 const METRIC_COLORS: Partial<Record<MetricKey, string>> = {
-  rfc: '#d97706',
+  rfc: '#dc2626',
   rac: '#16a34a',
   average_performance: '#4f46e5',
   purple_mastery_rate: '#7c3aed',
@@ -76,7 +76,7 @@ const FALLBACK_METRICS: MetricKey[] = [
 
 const COLOR_HEX: Record<ResultColor, string> = {
   red: '#f87171',
-  yellow: '#facc15',
+  yellow: '#f97316',
   green: '#4ade80',
   purple: '#c084fc',
 }
@@ -283,6 +283,68 @@ export function AnalysisChartsPanel({
     )
   }
 
+  const [cardOrder, setCardOrder] = useState<string[]>([
+    'trendLine',
+    'trendBar',
+    'colorStack',
+    'colorMix',
+    'combo',
+  ])
+  const [expandedCard, setExpandedCard] = useState<string | null>(null)
+
+  const cardData: Record<
+    string,
+    {
+      title: string
+      subtitle: string
+      isWide?: boolean
+      render: (height: number) => React.ReactNode
+    }
+  > = {
+    trendLine: {
+      title: 'RFC & %c by day',
+      subtitle: 'Line · lower RFC and higher %c are better',
+      render: (h) => trendChart('line', h),
+    },
+    trendBar: {
+      title: 'Metrics by day',
+      subtitle: 'Bar · multi metric',
+      render: (h) => trendChart('bar', h),
+    },
+    colorStack: {
+      title: 'Color stack by day',
+      subtitle: 'Stacked bar',
+      render: (h) => colorStackChart(h),
+    },
+    colorMix: {
+      title: 'Color mix',
+      subtitle: 'Pie · finalized counts only',
+      render: (h) =>
+        colorMixPie.length === 0 ? (
+          <p className="meta">No colors in scope.</p>
+        ) : (
+          colorPieChart(h)
+        ),
+    },
+    combo: {
+      title: 'Combo · lines + avg bar',
+      subtitle: 'Dual axis when Avg selected',
+      isWide: true,
+      render: (h) => trendChart('composed', h),
+    },
+  }
+
+  function moveCard(index: number, direction: 'prev' | 'next') {
+    const newOrder = [...cardOrder]
+    const targetIndex = direction === 'prev' ? index - 1 : index + 1
+    if (targetIndex >= 0 && targetIndex < newOrder.length) {
+      const temp = newOrder[index]
+      newOrder[index] = newOrder[targetIndex]
+      newOrder[targetIndex] = temp
+      setCardOrder(newOrder)
+    }
+  }
+
   if (points.length === 0) {
     return (
       <div className="empty-state analysis-empty">
@@ -470,7 +532,7 @@ export function AnalysisChartsPanel({
         <Tooltip />
         <Legend />
         <Bar dataKey="red" stackId="c" fill={COLOR_HEX.red} name="Red" radius={[0, 0, 0, 0]} />
-        <Bar dataKey="yellow" stackId="c" fill={COLOR_HEX.yellow} name="Yellow" />
+        <Bar dataKey="yellow" stackId="c" fill={COLOR_HEX.yellow} name="Orange" />
         <Bar dataKey="green" stackId="c" fill={COLOR_HEX.green} name="Green" />
         <Bar dataKey="purple" stackId="c" fill={COLOR_HEX.purple} name="Purple" radius={[4, 4, 0, 0]} />
       </BarChart>
@@ -600,71 +662,141 @@ export function AnalysisChartsPanel({
 
       {layout === 'multi' ? (
         <div className="analysis-charts-grid">
-          <article className="analysis-chart-card">
-            <header className="analysis-chart-card-head">
-              <h3>RFC &amp; %c by day</h3>
-              <span className="meta">Line · lower RFC and higher %c are better</span>
-            </header>
-            <div className="analysis-chart-body">{trendChart('line', 240)}</div>
-          </article>
-          <article className="analysis-chart-card">
-            <header className="analysis-chart-card-head">
-              <h3>Metrics by day</h3>
-              <span className="meta">Bar · multi metric</span>
-            </header>
-            <div className="analysis-chart-body">{trendChart('bar', 240)}</div>
-          </article>
-          <article className="analysis-chart-card">
-            <header className="analysis-chart-card-head">
-              <h3>Color stack by day</h3>
-              <span className="meta">Stacked bar</span>
-            </header>
-            <div className="analysis-chart-body">{colorStackChart(240)}</div>
-          </article>
-          <article className="analysis-chart-card">
-            <header className="analysis-chart-card-head">
-              <h3>Color mix</h3>
-              <span className="meta">Pie · finalized counts only</span>
-            </header>
-            <div className="analysis-chart-body">
-              {colorMixPie.length === 0 ? (
-                <p className="meta">No colors in scope.</p>
-              ) : (
-                colorPieChart(240)
-              )}
-            </div>
-          </article>
-          <article className="analysis-chart-card analysis-chart-card-wide">
-            <header className="analysis-chart-card-head">
-              <h3>Combo · lines + avg bar</h3>
-              <span className="meta">Dual axis when Avg selected</span>
-            </header>
-            <div className="analysis-chart-body">{trendChart('composed', 280)}</div>
-          </article>
+          {cardOrder.map((id, index) => {
+            const card = cardData[id]
+            if (!card) return null
+            return (
+              <article
+                key={id}
+                className={`analysis-chart-card${card.isWide ? ' analysis-chart-card-wide' : ''}`}
+              >
+                <header className="analysis-chart-card-head">
+                  <div>
+                    <h3>{card.title}</h3>
+                    <span className="meta">{card.subtitle}</span>
+                  </div>
+                  <div className="analysis-card-actions">
+                    <button
+                      type="button"
+                      disabled={index === 0}
+                      onClick={() => moveCard(index, 'prev')}
+                      className="analysis-action-btn"
+                      title="Move Up/Left"
+                      aria-label="Move up or left"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={index === cardOrder.length - 1}
+                      onClick={() => moveCard(index, 'next')}
+                      className="analysis-action-btn"
+                      title="Move Down/Right"
+                      aria-label="Move down or right"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedCard(id)}
+                      className="analysis-action-btn expand-btn"
+                      title="Expand View"
+                      aria-label="Expand chart view"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" />
+                      </svg>
+                    </button>
+                  </div>
+                </header>
+                <div className="analysis-chart-body">{card.render(240)}</div>
+              </article>
+            )
+          })}
         </div>
       ) : (
         <div className="analysis-charts-single">
           <article className="analysis-chart-card">
             <header className="analysis-chart-card-head">
-              <h3>
-                {chartKind === 'pie'
-                  ? 'Color mix (finalized)'
-                  : chartKind === 'composed'
-                    ? 'Combo trend'
-                    : `${chartKind[0]!.toUpperCase()}${chartKind.slice(1)} trend by day`}
-              </h3>
-              <span className="meta">{filtered.length} day(s)</span>
+              <div>
+                <h3>
+                  {chartKind === 'pie'
+                    ? 'Color mix (finalized)'
+                    : chartKind === 'composed'
+                      ? 'Combo trend'
+                      : `${chartKind[0]!.toUpperCase()}${chartKind.slice(1)} trend by day`}
+                </h3>
+                <span className="meta">{filtered.length} day(s)</span>
+              </div>
+              <div className="analysis-card-actions">
+                <button
+                  type="button"
+                  onClick={() => setExpandedCard(chartKind === 'pie' ? 'colorMix' : chartKind === 'composed' ? 'combo' : chartKind === 'line' ? 'trendLine' : 'trendBar')}
+                  className="analysis-action-btn expand-btn"
+                  title="Expand View"
+                  aria-label="Expand chart view"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" />
+                  </svg>
+                </button>
+              </div>
             </header>
             <div className="analysis-chart-body">{trendChart(chartKind, 320)}</div>
           </article>
           {(chartKind === 'bar' || chartKind === 'line') && (
             <article className="analysis-chart-card">
               <header className="analysis-chart-card-head">
-                <h3>Color stack (context)</h3>
+                <div>
+                  <h3>Color stack (context)</h3>
+                </div>
+                <div className="analysis-card-actions">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedCard('colorStack')}
+                    className="analysis-action-btn expand-btn"
+                    title="Expand View"
+                    aria-label="Expand chart view"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" />
+                    </svg>
+                  </button>
+                </div>
               </header>
               <div className="analysis-chart-body">{colorStackChart(220)}</div>
             </article>
           )}
+        </div>
+      )}
+
+      {expandedCard && (
+        <div className="analysis-modal-overlay" onClick={() => setExpandedCard(null)}>
+          <div className="analysis-modal-content" onClick={(e) => e.stopPropagation()}>
+            <header className="analysis-modal-header">
+              <div>
+                <h3>{cardData[expandedCard]?.title || 'Chart View'}</h3>
+                <span className="meta">{cardData[expandedCard]?.subtitle}</span>
+              </div>
+              <button
+                type="button"
+                className="analysis-modal-close"
+                onClick={() => setExpandedCard(null)}
+                aria-label="Close modal"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </header>
+            <div className="analysis-modal-body">
+              {cardData[expandedCard]?.render(420)}
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -328,7 +328,9 @@ begin
           public.live_test_v2_deterministic_uuid('canonical-standalone-item:' || run.source_sha256 || ':' || (v_session->>'sessionOrder') || ':' || (v_item->>'itemOrder')),
           v_version_id, v_section_id, (v_item->>'itemOrder')::int, v_item->>'sourceMaterial', v_item->>'sourceItemId',
           v_item->>'termVi', v_item->>'termEn', v_item->>'promptVi', v_item->>'promptEn',
-          (v_session->>'targetCvrOhm')::numeric, 1, 1,
+          coalesce((v_item->>'tc')::numeric, (v_session->>'targetCvrOhm')::numeric),
+          coalesce((v_item->>'lc')::numeric, 1),
+          coalesce((v_item->>'tl')::numeric, 1),
           jsonb_build_object('source','Chunks Resource.xlsx','sourceCciId',v_item->>'sourceCciId','sessionCciId',v_session->>'sourceCciId','sourceCvrId',(v_item->>'sourceCvrId')::numeric)
         );
       end loop;

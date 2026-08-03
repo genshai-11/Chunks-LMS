@@ -5,7 +5,7 @@ describe('probe action presentation', () => {
   it('maps neutral Fail, Pass, Done labels to existing lifecycle outcomes', () => {
     expect(PROBE_ACTIONS.map(({ label, outcome }) => [label, outcome])).toEqual([
       ['Fail', 'fail'],
-      ['Pass', 'continue'],
+      ['Continue', 'continue'],
       ['Done', 'done'],
     ])
   })
@@ -13,7 +13,7 @@ describe('probe action presentation', () => {
   it('uses visible-label keyboard shortcuts', () => {
     expect(PROBE_ACTIONS.map(({ label, shortcut }) => [label, shortcut])).toEqual([
       ['Fail', 'F'],
-      ['Pass', 'P'],
+      ['Continue', 'C'],
       ['Done', 'D'],
     ])
   })

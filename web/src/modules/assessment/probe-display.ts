@@ -1,23 +1,22 @@
 /**
  * Teacher-facing probe labels.
  *
- * - **n depth** = probeCount after Green (Pass/Continue / resolve steps).
- * - **n count** = session-level count of Green entries (see probe-metrics).
+ * - **chunks number** = displayed probe depth after Green; Green opens at 1.
+ * - **chunks count** = session-level count of Green entries (see probe-metrics).
  * - **ceiling** = maxProbeCount (configured session limit — not observed peak).
  *
- * Do not reuse "n" for sample size / finalized question count — use "finalized" or "sample".
+ * Do not reuse chunks number for sample size / finalized question count — use "finalized" or "sample".
  */
 
 import type { AssessmentSnapshot } from '../result-lifecycle/types'
-import { PROBE_METRIC_LABELS } from './probe-metrics'
+import { PROBE_METRIC_LABELS, probeChunksNumber } from './probe-metrics'
 
 export function probeN(snapshot: Pick<AssessmentSnapshot, 'probeCount' | 'enteredProbeFlow'> | null | undefined): number | null {
   if (!snapshot) return null
-  if (!snapshot.enteredProbeFlow && snapshot.probeCount <= 0) return null
-  return snapshot.probeCount
+  return probeChunksNumber(snapshot)
 }
 
-/** @deprecated Prefer naming as session ceiling, not n depth max */
+/** @deprecated Prefer naming as session ceiling, not max chunks number */
 export function probeDepthMax(
   snapshot: Pick<AssessmentSnapshot, 'maxProbeCount'> | null | undefined,
   fallbackMax = 0,
@@ -28,7 +27,7 @@ export function probeDepthMax(
   return fallbackMax
 }
 
-/** Compact cell text: "n depth=2" or "—" */
+/** Compact cell text: "chunks number=2" or "—" */
 export function formatProbeCell(
   snapshot: AssessmentSnapshot | null | undefined,
   _sessionMaxProbe?: number,
@@ -43,8 +42,9 @@ export function formatProbeLive(
   probeCount: number,
   maxProbeCount: number,
 ): { nLabel: string; depthLabel: string } {
+  const chunksNumber = probeChunksNumber({ enteredProbeFlow: true, probeCount }) ?? 1
   return {
-    nLabel: `${PROBE_METRIC_LABELS.nDepth}=${probeCount}`,
+    nLabel: `${PROBE_METRIC_LABELS.nDepth}=${chunksNumber}`,
     depthLabel: maxProbeCount > 0 ? `ceiling ${maxProbeCount}` : 'ceiling —',
   }
 }

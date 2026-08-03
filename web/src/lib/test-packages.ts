@@ -1,3 +1,4 @@
+import { cacheKey, cachedQuery, clearRequestCache } from './request-cache'
 import { getSupabase } from './supabase'
 import type {
   TestPackage,
@@ -40,15 +41,21 @@ function mapTestPackageVersion(row: any): TestPackageVersion {
 }
 
 export async function getTestPackageVersion(versionId: string): Promise<Result<TestPackageVersion | null>> {
-  const sb = client()
-  if (!sb) return { ok: false, error: 'Supabase is not configured' }
-  const { data, error } = await sb
-    .from('test_package_versions')
-    .select('*')
-    .eq('id', versionId)
-    .maybeSingle()
-  if (error) return { ok: false, error: error.message }
-  return { ok: true, data: data ? mapTestPackageVersion(data) : null }
+  return cachedQuery(
+    cacheKey(['catalog', 'version', versionId]),
+    async () => {
+      const sb = client()
+      if (!sb) return { ok: false, error: 'Supabase is not configured' }
+      const { data, error } = await sb
+        .from('test_package_versions')
+        .select('*')
+        .eq('id', versionId)
+        .maybeSingle()
+      if (error) return { ok: false, error: error.message }
+      return { ok: true, data: data ? mapTestPackageVersion(data) : null }
+    },
+    { ttlMs: 5 * 60_000, persist: true },
+  )
 }
 
 function mapTestSection(row: any): TestSection {
@@ -123,21 +130,27 @@ function mapSectionMeasurementSnapshot(row: any): SectionMeasurementSnapshot {
 }
 
 export async function listTestPackages(): Promise<Result<TestPackage[]>> {
-  const sb = client()
-  if (!sb) return { ok: false, error: 'Supabase is not configured' }
-  const { data, error } = await sb
-    .from('test_packages')
-    .select('*')
-    .is('archived_at', null)
-    .order('title')
-  if (error) return { ok: false, error: error.message }
-  const packages = (data ?? []).map(mapTestPackage).sort((a: TestPackage, b: TestPackage) => {
-    const aDefault = a.sourceMetadata?.isDefaultLiveTestPackage === true
-    const bDefault = b.sourceMetadata?.isDefaultLiveTestPackage === true
-    if (aDefault !== bDefault) return aDefault ? -1 : 1
-    return a.title.localeCompare(b.title)
-  })
-  return { ok: true, data: packages }
+  return cachedQuery(
+    cacheKey(['catalog', 'packages']),
+    async () => {
+      const sb = client()
+      if (!sb) return { ok: false, error: 'Supabase is not configured' }
+      const { data, error } = await sb
+        .from('test_packages')
+        .select('*')
+        .is('archived_at', null)
+        .order('title')
+      if (error) return { ok: false, error: error.message }
+      const packages = (data ?? []).map(mapTestPackage).sort((a: TestPackage, b: TestPackage) => {
+        const aDefault = a.sourceMetadata?.isDefaultLiveTestPackage === true
+        const bDefault = b.sourceMetadata?.isDefaultLiveTestPackage === true
+        if (aDefault !== bDefault) return aDefault ? -1 : 1
+        return a.title.localeCompare(b.title)
+      })
+      return { ok: true, data: packages }
+    },
+    { ttlMs: 5 * 60_000, persist: true },
+  )
 }
 
 export async function updateTestPackage(input: {
@@ -156,21 +169,28 @@ export async function updateTestPackage(input: {
     .select()
     .single()
   if (error) return { ok: false, error: error.message }
+  clearRequestCache('catalog')
   return { ok: true, data: mapTestPackage(data) }
 }
 
 export async function listTestPackageVersions(
   packageId: string,
 ): Promise<Result<TestPackageVersion[]>> {
-  const sb = client()
-  if (!sb) return { ok: false, error: 'Supabase is not configured' }
-  const { data, error } = await sb
-    .from('test_package_versions')
-    .select('*')
-    .eq('package_id', packageId)
-    .order('published_at', { ascending: false, nullsFirst: true })
-  if (error) return { ok: false, error: error.message }
-  return { ok: true, data: (data ?? []).map(mapTestPackageVersion) }
+  return cachedQuery(
+    cacheKey(['catalog', 'versions', packageId]),
+    async () => {
+      const sb = client()
+      if (!sb) return { ok: false, error: 'Supabase is not configured' }
+      const { data, error } = await sb
+        .from('test_package_versions')
+        .select('*')
+        .eq('package_id', packageId)
+        .order('published_at', { ascending: false, nullsFirst: true })
+      if (error) return { ok: false, error: error.message }
+      return { ok: true, data: (data ?? []).map(mapTestPackageVersion) }
+    },
+    { ttlMs: 5 * 60_000, persist: true },
+  )
 }
 
 export type TestPackagePublicationReadiness = {
@@ -221,27 +241,39 @@ export async function publishTestPackageVersion(input: {
 }
 
 export async function listTestSections(versionId: string): Promise<Result<TestSection[]>> {
-  const sb = client()
-  if (!sb) return { ok: false, error: 'Supabase is not configured' }
-  const { data, error } = await sb
-    .from('test_sections')
-    .select('*')
-    .eq('package_version_id', versionId)
-    .order('section_order')
-  if (error) return { ok: false, error: error.message }
-  return { ok: true, data: (data ?? []).map(mapTestSection) }
+  return cachedQuery(
+    cacheKey(['catalog', 'sections', versionId]),
+    async () => {
+      const sb = client()
+      if (!sb) return { ok: false, error: 'Supabase is not configured' }
+      const { data, error } = await sb
+        .from('test_sections')
+        .select('*')
+        .eq('package_version_id', versionId)
+        .order('section_order')
+      if (error) return { ok: false, error: error.message }
+      return { ok: true, data: (data ?? []).map(mapTestSection) }
+    },
+    { ttlMs: 5 * 60_000, persist: true },
+  )
 }
 
 export async function listTestItems(sectionId: string): Promise<Result<TestItem[]>> {
-  const sb = client()
-  if (!sb) return { ok: false, error: 'Supabase is not configured' }
-  const { data, error } = await sb
-    .from('test_items')
-    .select('*')
-    .eq('section_id', sectionId)
-    .order('item_order')
-  if (error) return { ok: false, error: error.message }
-  return { ok: true, data: (data ?? []).map(mapTestItem) }
+  return cachedQuery(
+    cacheKey(['catalog', 'items', sectionId]),
+    async () => {
+      const sb = client()
+      if (!sb) return { ok: false, error: 'Supabase is not configured' }
+      const { data, error } = await sb
+        .from('test_items')
+        .select('*')
+        .eq('section_id', sectionId)
+        .order('item_order')
+      if (error) return { ok: false, error: error.message }
+      return { ok: true, data: (data ?? []).map(mapTestItem) }
+    },
+    { ttlMs: 5 * 60_000, persist: true },
+  )
 }
 
 export async function listCciProfiles(): Promise<Result<CciProfile[]>> {

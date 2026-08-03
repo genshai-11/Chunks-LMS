@@ -11,20 +11,19 @@ function cloneSheets(manifestLike) {
   return structuredClone(manifestLike)
 }
 
-test('canonical workbook maps eight sessions, 80 items, CVR and CCI Ampe correctly', async () => {
+test('canonical workbook maps seven sessions, 49 items, CVR and CCI Ampe correctly', async () => {
   const manifest = await readCanonicalWorkbook(workbook)
   assert.equal(hasErrors(manifest), false)
-  assert.equal(manifest.sessions.length, 8)
-  assert.equal(manifest.sessions.flatMap((session) => session.items).length, 80)
-  assert.deepEqual(manifest.sessions.map((session) => session.targetCvrOhm), [3, 5, 7, 9, 11, 13, 15, 17])
-  assert.deepEqual(manifest.cciDefinitions.map((cci) => cci.ampe), [2, 2, 4, 4, 6, 6, 8, 8])
+  assert.equal(manifest.sessions.length, 7)
+  assert.equal(manifest.sessions.flatMap((session) => session.items).length, 49)
+  assert.deepEqual(manifest.sessions.map((session) => session.targetCvrOhm), [1, 3, 5, 7, 9, 11, 13])
+  assert.deepEqual(manifest.cciDefinitions.map((cci) => cci.ampe), [2, 2, 4, 4, 6, 6, 8])
   assert.deepEqual(manifest.cciDefinitions.map((cci) => cci.name), [
     'Give it a shot', 'Go with the flow', 'Chunks on the go', 'Freeze',
-    'Robot', 'Taichi', 'Strike', 'Nuance Work',
+    'Robot', 'Taichi', 'Strike',
   ])
   const warnings = manifest.issues.filter((issue) => issue.severity === 'warning')
-  assert.deepEqual(warnings.map((issue) => issue.code), ['ITEM_SESSION_CCI_MISMATCH'])
-  assert.match(warnings[0].message, /cci-002.*cci-001/)
+  assert.equal(warnings.length, 0)
 })
 
 test('missing required sheet is a structural error', () => {

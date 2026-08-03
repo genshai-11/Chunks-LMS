@@ -13,173 +13,78 @@ function StaffSignInForm() {
   const session = useStaffSession()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [authMethod, setAuthMethod] = useState<'magic' | 'password'>('magic')
-  const [isSignUp, setIsSignUp] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   return (
-    <div className="flex flex-col gap-4 w-full">
-      {/* Tabs */}
-      <div className="flex border-b border-slate-200 mb-2">
-        <button
-          type="button"
-          onClick={() => {
-            setAuthMethod('magic')
-            setError(null)
-            setMessage(null)
-          }}
-          className={`flex-1 pb-2.5 text-sm font-semibold text-center border-b-2 transition-colors ${
-            authMethod === 'magic'
-              ? 'border-red-500 text-red-600'
-              : 'border-transparent text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          Magic Link
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setAuthMethod('password')
-            setError(null)
-            setMessage(null)
-          }}
-          className={`flex-1 pb-2.5 text-sm font-semibold text-center border-b-2 transition-colors ${
-            authMethod === 'password'
-              ? 'border-red-500 text-red-600'
-              : 'border-transparent text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          Password
-        </button>
+    <div className="w-full rounded-3xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-200/60 sm:p-6">
+      <div className="mb-5 text-center">
+        <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-red-50 text-red-600">
+          <LogIn className="h-5 w-5" aria-hidden />
+        </div>
+        <h2 className="text-xl font-black tracking-tight text-slate-950">Sign in to Chunks</h2>
+        <p className="mt-1 text-sm font-medium text-slate-500">
+          Use your account email and password to continue.
+        </p>
       </div>
 
-      {authMethod === 'magic' ? (
-        <form
-          className="flex flex-col gap-4"
-          onSubmit={(e) => {
-            e.preventDefault()
-            setSubmitting(true)
-            setMessage(null)
-            setError(null)
-            void session
-              .signInWithEmail(email)
-              .then((result) => {
-                if (result.ok) setMessage('Check your email for the Supabase Auth sign-in link.')
-                else setError(result.error)
-              })
-              .finally(() => setSubmitting(false))
-          }}
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={(e) => {
+          e.preventDefault()
+          setSubmitting(true)
+          setMessage(null)
+          setError(null)
+
+          void session
+            .signInWithPassword(email, password)
+            .then((result) => {
+              if (result.ok) setMessage('Signed in successfully!')
+              else setError(result.error)
+            })
+            .finally(() => setSubmitting(false))
+        }}
+      >
+        <label className="flex flex-col gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">
+          <span>Email</span>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            required
+            autoComplete="username"
+            className="min-h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-800 shadow-3xs outline-none transition focus:border-red-500 focus:bg-white focus:ring-4 focus:ring-red-500/10"
+          />
+        </label>
+        <label className="flex flex-col gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">
+          <span>Password</span>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter your password"
+            required
+            autoComplete="current-password"
+            className="min-h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-800 shadow-3xs outline-none transition focus:border-red-500 focus:bg-white focus:ring-4 focus:ring-red-500/10"
+          />
+        </label>
+        <button
+          type="submit"
+          className="btn primary mt-1 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl text-sm font-black"
+          disabled={submitting}
         >
-          <label className="flex flex-col gap-1.5 text-xs font-semibold text-slate-500">
-            <span>Staff email</span>
-            <input
-              type="text"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="staff@example.com or admin"
-              required
-              autoComplete="username"
-              className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-700 shadow-3xs outline-none focus:border-red-500"
-            />
-          </label>
-          <button
-            type="submit"
-            className="btn primary w-full flex items-center justify-center gap-2"
-            disabled={submitting}
-          >
-            <LogIn className="h-4 w-4" aria-hidden />
-            <span>{submitting ? 'Sending magic link…' : 'Sign in with Magic Link'}</span>
-          </button>
-        </form>
-      ) : (
-        <div className="flex flex-col gap-4">
-          <form
-            className="flex flex-col gap-4"
-            onSubmit={(e) => {
-              e.preventDefault()
-              setSubmitting(true)
-              setMessage(null)
-              setError(null)
+          <LogIn className="h-4 w-4" aria-hidden />
+          <span>{submitting ? 'Signing in…' : 'Sign in'}</span>
+        </button>
+      </form>
 
-              const action = isSignUp
-                ? session.signUpWithPassword(email, password)
-                : session.signInWithPassword(email, password)
-
-              void action
-                .then((result) => {
-                  if (result.ok) {
-                    setMessage(
-                      isSignUp
-                        ? (result as any).message || 'Account created successfully!'
-                        : 'Signed in successfully!',
-                    )
-                  } else {
-                    setError(result.error)
-                  }
-                })
-                .finally(() => setSubmitting(false))
-            }}
-          >
-            <label className="flex flex-col gap-1.5 text-xs font-semibold text-slate-500">
-              <span>Staff email</span>
-              <input
-                type="text"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="staff@example.com or admin"
-                required
-                autoComplete="username"
-                className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-700 shadow-3xs outline-none focus:border-red-500"
-              />
-            </label>
-            <label className="flex flex-col gap-1.5 text-xs font-semibold text-slate-500">
-              <span>Password</span>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                autoComplete="current-password"
-                className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-700 shadow-3xs outline-none focus:border-red-500"
-              />
-            </label>
-            <button
-              type="submit"
-              className="btn primary w-full flex items-center justify-center gap-2"
-              disabled={submitting}
-            >
-              <LogIn className="h-4 w-4" aria-hidden />
-              <span>
-                {submitting
-                  ? 'Please wait…'
-                  : isSignUp
-                    ? 'Create Account'
-                    : 'Sign in with Password'}
-              </span>
-            </button>
-          </form>
-
-          <div className="text-center text-xs">
-            <button
-              type="button"
-              className="text-red-600 hover:text-red-500 font-semibold underline transition-colors"
-              onClick={() => {
-                setIsSignUp(!isSignUp)
-                setError(null)
-                setMessage(null)
-              }}
-            >
-              {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Create one"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {message ? <p className="banner ok text-center mt-2">{message}</p> : null}
-      {error ? <p className="banner err text-center mt-2">{error}</p> : null}
+      <p className="mt-4 rounded-2xl bg-slate-50 px-3 py-2 text-center text-xs font-semibold text-slate-500">
+        Account access only. Magic links and public sign-up are disabled on this screen.
+      </p>
+      {message ? <p className="banner ok mt-3 text-center">{message}</p> : null}
+      {error ? <p className="banner err mt-3 text-center">{error}</p> : null}
     </div>
   )
 }
@@ -236,7 +141,7 @@ export function AuthChrome({ children }: Props) {
               borderRadius: '8px',
             }}
           >
-            Staff Sign In
+            Sign in
           </Link>
           {children}
         </>

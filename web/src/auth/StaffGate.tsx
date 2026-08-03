@@ -1,4 +1,4 @@
-import { Lock, LogIn, ShieldAlert } from 'lucide-react'
+import { Lock, ShieldAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { PageHeader } from '../components/PageHeader'
@@ -22,7 +22,7 @@ export function StaffGate({ role, children }: Props) {
   if (!session.ready) {
     return (
       <div className="access-page">
-        <PageHeader icon={Lock} kicker="Staff" title="Checking sign-in…" subtitle="One moment." />
+        <PageHeader icon={Lock} kicker="Account" title="Checking sign-in…" subtitle="One moment." />
       </div>
     )
   }
@@ -32,46 +32,32 @@ export function StaffGate({ role, children }: Props) {
       <div className="access-page">
         <PageHeader
           icon={Lock}
-          kicker="Staff only"
-          title={role === 'admin' ? 'Admin sign-in required' : 'Teacher sign-in required'}
-          subtitle="Use your Supabase Auth staff account. Learners open a signed learner access link instead."
+          kicker="Account sign-in"
+          title="Welcome back"
+          subtitle="Sign in with your Chunks account to continue."
         />
         <div style={{ maxWidth: 460, margin: '0 auto', width: '100%' }}>
-          <Panel
-            icon={Lock}
-            title={role === 'admin' ? 'Admin Sign In' : 'Teacher Sign In'}
-            description="Sign in with email/password, create an account, or use a magic link."
-            collapsible={false}
-          >
-            {session.authEnabled ? (
-              <>
-                <StaffSignInForm />
-                <p
-                  className="meta"
-                  style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: '0.25rem' }}
-                >
-                  <LogIn className="h-4 w-4" aria-hidden /> Enter the magic link sent by Supabase
-                  Auth.
-                </p>
-              </>
-            ) : (
-              <p className="meta">
-                Supabase Auth is not configured. Set <code>VITE_SUPABASE_URL</code> and{' '}
-                <code>VITE_SUPABASE_ANON_KEY</code>, or enable <code>VITE_AUTH_BYPASS=true</code>{' '}
-                for local demos.
-              </p>
-            )}
-            <div
-              style={{ marginTop: '1.25rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}
+          {session.authEnabled ? (
+            <StaffSignInForm />
+          ) : (
+            <Panel
+              icon={Lock}
+              title="Account sign-in is not configured"
+              description="Configure Supabase Auth before signing in."
+              collapsible={false}
             >
               <p className="meta">
-                Student?{' '}
-                <Link to="/access" className="underline">
-                  Open learner portal
-                </Link>
+                Set <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code>, or
+                enable <code>VITE_AUTH_BYPASS=true</code> for local demos.
               </p>
-            </div>
-          </Panel>
+            </Panel>
+          )}
+          <p className="meta" style={{ marginTop: 16, textAlign: 'center' }}>
+            Learner access?{' '}
+            <Link to="/access" className="underline">
+              Open learner portal
+            </Link>
+          </p>
         </div>
       </div>
     )

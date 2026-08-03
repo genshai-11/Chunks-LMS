@@ -93,3 +93,4 @@ data/
 .env*
 web/public/audio/intros/
 web/public/audio/sound-selection/
+.chunks-resourcce/

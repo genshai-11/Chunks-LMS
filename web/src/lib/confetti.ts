@@ -34,7 +34,7 @@ export function triggerConfetti() {
     '#e9d5ff', // Purple lighter
     '#3b82f6', // Blue
     '#10b981', // Green
-    '#f59e0b', // Yellow
+    '#f97316', // Orange
     '#ef4444', // Red
   ]
 

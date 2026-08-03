@@ -38,21 +38,24 @@ External OAuth providers, including Google, are intentionally deferred and have 
 - A service-role-only database throttle allows 30 attempts per source IP and 8 per source-IP/username pair per five-minute window. It stores HMAC bucket hashes only—never raw IPs or usernames—and returns HTTP 429 when exhausted.
 - Username never grants access; active `staff_roles` remains authoritative.
 
-Required promote order after review:
+## Production rollout — 2026-08-03 21:13 GMT+7
 
-0. Reconcile production migration history first. As of 2026-08-03, remote contains six `20260801...` migrations absent from `master`; do not run `db push` until those exact remote migrations are recovered/reconciled.
-1. Apply `20260803124500_staff_usernames.sql`.
-2. Configure `USERNAME_LOGIN_ALLOWED_ORIGINS` with any additional exact Preview origin(s), comma-separated. Production and local Vite origins are built in.
-3. Deploy `username-login` with JWT verification disabled as declared in `supabase/config.toml`.
-4. Deploy the updated `admin-staff-account` function so Admin can create/edit usernames.
-5. Deploy the web preview and smoke both email and username login.
+Completed with explicit approval against `chunks-lms` (`ekubetkxfcuxlyahesrl`):
 
-```powershell
-# Production-impacting examples — run only after explicit approval.
-supabase db push --linked
-supabase functions deploy username-login --no-verify-jwt
-supabase functions deploy admin-staff-account
-```
+1. Applied additive migration `20260803141559_staff_usernames.sql`.
+2. Set `USERNAME_LOGIN_ALLOWED_ORIGINS` to the exact immutable and branch-alias URLs for PR #26.
+3. Deployed `username-login` version 1 with gateway JWT verification disabled.
+4. Verified both Preview origins return CORS preflight HTTP 200, while invalid credentials return one generic HTTP 401 response with `Cache-Control: no-store`.
+5. Verified two historical staff aliases were assigned and the throttle table/function remain inaccessible to `anon`.
+6. Re-ran Supabase advisors. The throttle table's “RLS enabled with no policy” notice is intentional: client grants are revoked, no client policy exists, and only `service_role` can execute the throttle function. Other security/performance findings predate this migration.
+
+Not deployed in this rollout:
+
+- no new `admin-staff-account`, `live-test-generation`, or `create-users` code was deployed; setting the shared Edge secret caused Supabase to roll their deployment version numbers while preserving their prior code hashes;
+- the production web artifact was not changed;
+- no Storage metadata or object was changed.
+
+Before any future `db push`, recover/reconcile the six hosted `20260801...` migration files absent from `master`. Deploy the updated `admin-staff-account` only together with a compatible web promotion; the currently hosted web still sends the older account payload.
 
 Never place `SUPABASE_SERVICE_ROLE_KEY` in Vite/Vercel browser variables. Edge Functions receive server secrets from Supabase.
 
@@ -62,13 +65,17 @@ Allowed magic-link origins must include:
 - the exact Vercel Preview branch alias
 - `https://chunks-lms.vercel.app/**`
 
-## Preview alias
+## Preview aliases
 
-The previous tagged preview is:
+Current username-login Preview for PR #26:
+
+`https://chunks-lms-git-feat-username-login-865d84-genshai-11s-projects.vercel.app`
+
+Previous standalone-test Preview:
 
 `https://chunks-lms-git-feat-standalone-lear-8567b4-genshai-11s-projects.vercel.app`
 
-A new push may receive a different immutable deployment URL while retaining the branch alias.
+A new push may receive a different immutable deployment URL while retaining its branch alias.
 
 ## Local validation — 2026-07-20
 
@@ -92,10 +99,11 @@ A new push may receive a different immutable deployment URL while retaining the 
 - TypeScript and production Vite build: passed.
 - Dependency audit: root 0 vulnerabilities; web reports 4 high-severity findings (3 in the production tree: PostCSS and React Router chain). Remediation is outside this auth change; the suggested Router fix is forced/breaking.
 - New pgTAP coverage is committed, but local execution remains blocked because Docker/Podman is unavailable.
-- No migration or Edge Function was applied/deployed; production migration drift must be reconciled first.
+- PR #26 GitHub CI and Vercel Preview checks passed before the approved production backend rollout recorded above.
 
 ## Rollback
 
 - Web: redeploy tag `preview-standalone-tests-20260719-2302` / commit `13e3dab`.
-- Auth data: no rollback is needed; native identities and domain links are preserved.
+- Username endpoint: remove the Preview origins and disable/delete `username-login`; email login remains available.
+- Database: leave the additive nullable username column and throttle objects in place unless a separately reviewed rollback migration is required; deleting them is not necessary to restore email login.
 - Auth settings: no provider change is part of this release; restore recorded redirect values if they are changed later.

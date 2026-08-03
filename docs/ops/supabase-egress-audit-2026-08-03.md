@@ -120,11 +120,11 @@ Success criteria:
 - daily average trends toward or below the sustainable quota;
 - login/authorization and private-bucket controls remain unchanged.
 
-## Production changes explicitly not performed
+## Production changes explicitly not performed during this audit
 
-- production migration history has six `20260801...` versions absent from `master`; reconcile that drift before any future `db push`;
-- no Supabase migration applied;
-- no Edge Function deployed;
+At audit time, no migration or function was changed. A later, separately approved auth rollout at 21:13 GMT+7 applied `20260803141559_staff_usernames.sql` and deployed only `username-login`; it did not alter this audit's Storage findings.
+
+- production migration history still has six `20260801...` versions absent from `master`; reconcile that drift before any future `db push`;
 - no Storage object metadata rewritten;
 - no object deleted;
 - no bucket visibility changed;

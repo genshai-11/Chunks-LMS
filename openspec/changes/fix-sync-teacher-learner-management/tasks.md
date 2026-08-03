@@ -40,3 +40,4 @@
 - [x] 6.3 Validate/apply migrations and production environment configuration
 - [x] 6.4 Add mobile icon/expand navigation, popup notifications, and tooltip titles for key metrics
 - [ ] 6.5 Deploy CI/CD and verify same-account sync in two browser contexts
+- [x] 6.6 Fix assigned-Class visibility and Teacher-owned atomic Learner creation; run targeted and full CI

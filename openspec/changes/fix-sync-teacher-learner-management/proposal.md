@@ -8,6 +8,7 @@ Production staff can authenticate with Clerk yet still receive a sync error or t
 - Route Admin and Teacher accounts directly to authorized role workspaces; configure `le.ntmkh@gmail.com` as Admin.
 - Add Teacher learner selection, visual learner profiles, learner-scoped reports, invite actions, and selected-learner session entry.
 - Allow Teachers to create/update assigned Classes and end Classes without deleting history.
+- Restore assigned Course/Class visibility under RLS and create Learners through a narrow Teacher-owned atomic enrollment command instead of Admin-oriented full-workspace sync.
 - Extend Admin People management with role-appropriate Copy and mail invitation actions.
 - Change sub-probe presentation to neutral **Fail / Pass / Done** buttons while preserving outcomes `fail / continue / done`.
 

@@ -586,6 +586,15 @@ export type Database = {
     }
     Views: Record<string, never>
     Functions: {
+      create_teacher_learner_and_enroll: {
+        Args: {
+          p_class_id: string
+          p_display_name: string
+          p_email?: string | null
+          p_avatar_url?: string | null
+        }
+        Returns: Json
+      }
       issue_learner_access_token: {
         Args: { p_learner_user_id: string; p_class_id: string; p_ttl_seconds?: number }
         Returns: Array<{ token_id: string; url_token: string; expires_at: string }>

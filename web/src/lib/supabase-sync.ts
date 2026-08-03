@@ -232,8 +232,14 @@ export async function ensureSupabaseStaffWorkspace(
     .maybeSingle()
   if (existingUser.error) return { ok: false, error: existingUser.error.message }
 
+  const canProvision = identity.roles.includes('admin')
   let userId = existingUser.data?.id as string | undefined
   if (!userId) {
+    // Database roles are authoritative. A Teacher-only browser must never turn
+    // its session claims into a new domain account, membership, or role grant.
+    if (!canProvision) {
+      return { ok: false, error: 'Teacher account must be pre-provisioned by Admin' }
+    }
     const inserted = await sb
       .from('users')
       .insert({
@@ -253,8 +259,29 @@ export async function ensureSupabaseStaffWorkspace(
       .update({ display_name: identity.displayName, email: identity.email })
       .eq('id', userId)
     if (updated.error) return { ok: false, error: updated.error.message }
+
+    const memberships = await sb
+      .from('organization_memberships')
+      .select('organization_id')
+      .eq('user_id', userId)
+      .in('role', identity.roles)
+    if (memberships.error) return { ok: false, error: memberships.error.message }
+
+    const existingOrganizationId = (memberships.data ?? []).find(
+      (membership) => membership.organization_id === LOCAL_ORG_ID,
+    )?.organization_id as string | undefined
+    const organizationId =
+      existingOrganizationId ?? (memberships.data?.[0]?.organization_id as string | undefined)
+    if (organizationId) return { ok: true, organizationId }
+
+    if (!canProvision) {
+      return { ok: false, error: 'Teacher organization membership is missing' }
+    }
   }
 
+  // Only an Admin may recover a genuinely missing workspace/membership. Normal
+  // Teacher and Admin boots return through their existing database membership
+  // above and never rewrite authoritative role rows.
   const orgs = await sb.from('organizations').select('id').order('created_at', { ascending: true })
   if (orgs.error) return { ok: false, error: orgs.error.message }
 

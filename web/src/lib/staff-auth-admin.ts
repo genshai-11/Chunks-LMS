@@ -8,6 +8,7 @@ type TeacherPayload = {
   userId: string
   authUserId: string | null
   email: string
+  username: string
   displayName: string
 }
 
@@ -26,6 +27,7 @@ async function invokeStaffAccount<T>(body: Record<string, unknown>): Promise<Sta
 export function createTeacherAuthAccount(input: {
   displayName: string
   email: string
+  username: string
   password: string
   avatarUrl?: string | null
 }) {
@@ -36,6 +38,7 @@ export function updateTeacherAuthAccount(input: {
   userId: string
   displayName: string
   email: string
+  username: string
   avatarUrl?: string | null
 }) {
   return invokeStaffAccount<TeacherPayload>({ action: 'updateTeacher', ...input })

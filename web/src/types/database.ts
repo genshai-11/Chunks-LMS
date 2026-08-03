@@ -30,6 +30,7 @@ export type Database = {
           legacy_clerk_user_id: string | null
           display_name: string
           email: string | null
+          username: string | null
           avatar_url: string | null
           account_status: 'active' | 'inactive'
           allow_multi_class: boolean
@@ -43,6 +44,7 @@ export type Database = {
           legacy_clerk_user_id?: string | null
           display_name: string
           email?: string | null
+          username?: string | null
           avatar_url?: string | null
           account_status?: 'active' | 'inactive'
           allow_multi_class?: boolean

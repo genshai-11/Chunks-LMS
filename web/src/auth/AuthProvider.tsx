@@ -11,7 +11,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 function StaffSignInForm() {
   const session = useStaffSession()
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -25,7 +25,7 @@ function StaffSignInForm() {
         </div>
         <h2 className="text-xl font-black tracking-tight text-slate-950">Sign in to Chunks</h2>
         <p className="mt-1 text-sm font-medium text-slate-500">
-          Use your account email and password to continue.
+          Use your account email or username and password to continue.
         </p>
       </div>
 
@@ -38,7 +38,7 @@ function StaffSignInForm() {
           setError(null)
 
           void session
-            .signInWithPassword(email, password)
+            .signInWithPassword(identifier, password)
             .then((result) => {
               if (result.ok) setMessage('Signed in successfully!')
               else setError(result.error)
@@ -47,14 +47,16 @@ function StaffSignInForm() {
         }}
       >
         <label className="flex flex-col gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">
-          <span>Email</span>
+          <span>Email or username</span>
           <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
+            type="text"
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+            placeholder="you@example.com or teacher.name"
             required
             autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
             className="min-h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-800 shadow-3xs outline-none transition focus:border-red-500 focus:bg-white focus:ring-4 focus:ring-red-500/10"
           />
         </label>

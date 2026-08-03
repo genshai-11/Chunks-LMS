@@ -91,6 +91,8 @@ data/
 /skills/
 .vercel
 .env*
+# CodeGraph local index (project MCP config is committed separately)
+/.codegraph/
 web/public/audio/intros/
 web/public/audio/sound-selection/
 .chunks-resourcce/

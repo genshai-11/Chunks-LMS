@@ -8,6 +8,18 @@ Before changing the project, read `CONTEXT.md`, relevant files under `docs/adr/`
 
 ## Agent skills
 
+### CodeGraph-first code reading
+
+**Before broad code search or reading implementation files, invoke `[skill:codegraph-advisor]`.**
+
+1. Run the CodeGraph preflight/status check and sync the graph when stale.
+2. Use `codegraph explore` for architecture, behavior, dependency, caller/callee, and impact questions.
+3. Use `codegraph query` for exact symbol lookup.
+4. Read only the relevant source files afterward to verify graph conclusions.
+5. If CodeGraph cannot index a language/file, report that limitation before falling back to normal search.
+
+The local `.codegraph/` index is machine-generated and must not be committed. Project MCP integration is declared in `.mcp.json`.
+
 Installed from [mattpocock/skills](https://github.com/mattpocock/skills) into:
 
 - `.agents/skills/` — canonical project skills
@@ -31,6 +43,7 @@ This is a single-context repository using root `CONTEXT.md` and `docs/adr/`. See
 
 | Skill | When |
 |---|---|
+| `[skill:codegraph-advisor]` | Required before broad code reading/search; trace architecture and blast radius with CodeGraph first |
 | `/grill-with-docs` | Align on a change; update glossary/ADRs while grilling |
 | `/triage` | Move GitHub issues through needs-triage → ready-for-agent |
 | `/to-spec` | Publish a discussed plan as a tracker issue |

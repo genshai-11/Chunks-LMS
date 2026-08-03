@@ -499,6 +499,7 @@ async function generateNarration(
     .from("narration-audio")
     .upload(storagePath, speech.bytes, {
       contentType: speech.mimeType,
+      cacheControl: "31536000",
       upsert: false,
     });
   if (uploadError) {

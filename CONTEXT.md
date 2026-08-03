@@ -16,6 +16,10 @@ _Avoid_: Auth account, transient session
 A native Supabase `auth.users` account linked to one domain User. It authenticates but does not authorize; active database `staff_roles` grant Admin/Teacher access.
 _Avoid_: Clerk subject, metadata role, frontend allowlist
 
+**Staff Username**:
+An optional, unique, normalized login identifier for an Admin or Teacher. A server-side resolver converts it to the linked Staff Auth Identity without exposing the account email; it never grants a role.
+_Avoid_: Authorization claim, learner username, public email alias
+
 **Account Status**:
 Active or inactive for a Teacher or Learner profile. Admin may deactivate without deleting history.
 _Avoid_: Banned, deleted
@@ -151,6 +155,7 @@ _Avoid_: Manually entered metric
 | [`docs/ops/hosted-e2e-checklist.md`](docs/ops/hosted-e2e-checklist.md) | Production pass/fail checklist |
 | [`docs/ops/ci-cd.md`](docs/ops/ci-cd.md) | GitHub Actions CI/CD, Vercel secrets, migration promote |
 | [`docs/ops/vercel-deploy.md`](docs/ops/vercel-deploy.md) | Manual / first-time Vercel deploy |
+| [`docs/ops/supabase-egress-audit-2026-08-03.md`](docs/ops/supabase-egress-audit-2026-08-03.md) | Measured Storage/API egress baseline and prioritized remediation |
 | [`docs/adr/`](docs/adr/) | Architecture decisions |
 
 CI/CD workflows: `.github/workflows/ci.yml`, `.github/workflows/cd.yml`. Domain terms above are the source of truth for product language; ops docs do not redefine them.

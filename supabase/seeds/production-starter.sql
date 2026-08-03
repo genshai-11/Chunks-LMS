@@ -23,38 +23,43 @@ on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------------
 -- Placeholder people (replace emails before sharing invites)
--- Staff still sign in via Clerk; these rows seed domain roster only.
+-- Staff authenticate through native Supabase Auth; these rows pre-provision domain profiles/roles.
 -- ---------------------------------------------------------------------------
-insert into public.users (id, clerk_user_id, display_name, email) values
+insert into public.users (id, clerk_user_id, display_name, email, username) values
   (
     'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1',
     'local_prod_admin',
     'Starter Admin',
-    'admin@example.com'
+    'admin@example.com',
+    'starter-admin'
   ),
   (
     'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2',
     'local_prod_teacher',
     'Starter Teacher',
-    'teacher@example.com'
+    'teacher@example.com',
+    'starter-teacher'
   ),
   (
     'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb3',
     'local_prod_learner_1',
     'Starter Learner 1',
-    'learner1@example.com'
+    'learner1@example.com',
+    null
   ),
   (
     'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb4',
     'local_prod_learner_2',
     'Starter Learner 2',
-    'learner2@example.com'
+    'learner2@example.com',
+    null
   ),
   (
     'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb5',
     'local_prod_learner_3',
     'Starter Learner 3',
-    'learner3@example.com'
+    'learner3@example.com',
+    null
   )
 on conflict (id) do nothing;
 

@@ -503,6 +503,7 @@ export async function loadWorkspaceFromSupabase(options?: {
           id: userId,
           displayName: u.display_name as string,
           email: (u.email as string | null) ?? null,
+          username: ((u as { username?: string | null }).username ?? null) as string | null,
           avatarUrl: ((u as { avatar_url?: string | null }).avatar_url ?? null) as string | null,
           roles: rolesForWorkspaceUser({
             userId,

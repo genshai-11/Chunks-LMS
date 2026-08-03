@@ -11,6 +11,7 @@ type StaffAction =
   | {
       action: "createTeacher";
       email: string;
+      username: string;
       displayName: string;
       password: string;
       avatarUrl?: string | null;
@@ -19,6 +20,7 @@ type StaffAction =
       action: "updateTeacher";
       userId: string;
       email: string;
+      username: string;
       displayName: string;
       avatarUrl?: string | null;
     }
@@ -26,6 +28,9 @@ type StaffAction =
   | { action: "deleteTeacher"; userId: string };
 
 type Json = Record<string, unknown>;
+// Edge functions intentionally use dynamic tables without generated database types.
+// deno-lint-ignore no-explicit-any
+type SupabaseClientLike = any;
 
 function json(body: Json, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -42,6 +47,22 @@ function normalizeName(raw: unknown): string {
   return String(raw ?? "").trim();
 }
 
+function requireUsername(raw: unknown): string {
+  const username = String(raw ?? "").normalize("NFKC").trim().toLowerCase();
+  if (!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(username)) {
+    throw new Error(
+      "Username must be 3-32 characters using lowercase letters, numbers, dot, underscore, or hyphen",
+    );
+  }
+  return username;
+}
+
+function usernameWriteError(error: { code?: string; message: string }): string {
+  return error.code === "23505" && error.message.includes("username")
+    ? "Username is already in use"
+    : error.message;
+}
+
 function requirePassword(raw: unknown): string {
   const password = String(raw ?? "");
   if (password.length < 6) throw new Error("Teacher password must be at least 6 characters");
@@ -54,18 +75,21 @@ function bearerToken(req: Request): string | null {
   return match?.[1] ?? null;
 }
 
-async function findAuthUserByEmail(admin: ReturnType<typeof createClient>, email: string) {
+async function findAuthUserByEmail(admin: SupabaseClientLike, email: string) {
   for (let page = 1; page <= 20; page += 1) {
     const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
     if (error) throw new Error(`Auth list users failed: ${error.message}`);
-    const found = data.users.find((user) => (user.email ?? "").toLowerCase() === email);
+    const found = data.users.find(
+      (user: { id: string; email?: string | null }) =>
+        (user.email ?? "").toLowerCase() === email,
+    );
     if (found) return found;
     if (data.users.length < 1000) return null;
   }
   throw new Error("Auth user lookup exceeded pagination limit");
 }
 
-async function requireAdmin(admin: ReturnType<typeof createClient>, token: string) {
+async function requireAdmin(admin: SupabaseClientLike, token: string) {
   const { data: authData, error: authError } = await admin.auth.getUser(token);
   if (authError || !authData.user) throw new Error("Invalid staff session");
 
@@ -100,7 +124,7 @@ async function requireAdmin(admin: ReturnType<typeof createClient>, token: strin
   return { authUserId: authData.user.id, userId: caller.id as string, organizationId: membership.organization_id as string };
 }
 
-async function assertTeacher(admin: ReturnType<typeof createClient>, userId: string) {
+async function assertTeacher(admin: SupabaseClientLike, userId: string) {
   const { data: role, error } = await admin
     .from("staff_roles")
     .select("user_id")
@@ -111,25 +135,46 @@ async function assertTeacher(admin: ReturnType<typeof createClient>, userId: str
   if (!role) throw new Error("Teacher account not found");
 }
 
+async function assertUsernameAvailable(
+  admin: SupabaseClientLike,
+  username: string,
+  allowedUserId?: string,
+) {
+  const { data, error } = await admin
+    .from("users")
+    .select("id")
+    .eq("username", username)
+    .maybeSingle();
+  if (error) throw new Error(`Username lookup failed: ${error.message}`);
+  if (data && data.id !== allowedUserId) throw new Error("Username is already in use");
+}
+
 async function upsertTeacherDomainUser(
-  admin: ReturnType<typeof createClient>,
-  input: { email: string; displayName: string; avatarUrl?: string | null; organizationId: string },
+  admin: SupabaseClientLike,
+  input: {
+    authUserId: string;
+    email: string;
+    username: string;
+    displayName: string;
+    avatarUrl?: string | null;
+    organizationId: string;
+  },
 ) {
   const existing = await admin
     .from("users")
-    .select("id, auth_user_id")
+    .select("id")
     .ilike("email", input.email)
     .maybeSingle();
   if (existing.error) throw new Error(`Teacher lookup failed: ${existing.error.message}`);
 
   let userId = existing.data?.id as string | undefined;
-  let authUserId = existing.data?.auth_user_id as string | null | undefined;
-
   if (userId) {
     const { error } = await admin
       .from("users")
       .update({
+        auth_user_id: input.authUserId,
         email: input.email,
+        username: input.username,
         display_name: input.displayName,
         avatar_url: input.avatarUrl ?? null,
         account_status: "active",
@@ -137,22 +182,23 @@ async function upsertTeacherDomainUser(
         updated_at: new Date().toISOString(),
       })
       .eq("id", userId);
-    if (error) throw new Error(`Teacher update failed: ${error.message}`);
+    if (error) throw new Error(`Teacher update failed: ${usernameWriteError(error)}`);
   } else {
     const { data, error } = await admin
       .from("users")
       .insert({
+        auth_user_id: input.authUserId,
         email: input.email,
+        username: input.username,
         display_name: input.displayName,
         avatar_url: input.avatarUrl ?? null,
         account_status: "active",
         allow_multi_class: false,
       })
-      .select("id, auth_user_id")
+      .select("id")
       .single();
-    if (error) throw new Error(`Teacher insert failed: ${error.message}`);
+    if (error) throw new Error(`Teacher insert failed: ${usernameWriteError(error)}`);
     userId = data.id as string;
-    authUserId = data.auth_user_id as string | null;
   }
 
   const { error: membershipError } = await admin.from("organization_memberships").upsert(
@@ -167,70 +213,104 @@ async function upsertTeacherDomainUser(
   );
   if (staffRoleError) throw new Error(`Teacher staff role failed: ${staffRoleError.message}`);
 
-  return { userId: userId!, authUserId: authUserId ?? null };
+  return { userId: userId! };
 }
 
-async function createTeacher(admin: ReturnType<typeof createClient>, actor: Awaited<ReturnType<typeof requireAdmin>>, body: StaffAction) {
+async function createTeacher(admin: SupabaseClientLike, actor: Awaited<ReturnType<typeof requireAdmin>>, body: StaffAction) {
   if (body.action !== "createTeacher") throw new Error("Invalid create action");
   const email = normalizeEmail(body.email);
+  const username = requireUsername(body.username);
   const displayName = normalizeName(body.displayName);
   const password = requirePassword(body.password);
   if (!email) throw new Error("Teacher email is required");
   if (!displayName) throw new Error("Teacher name is required");
 
-  const domain = await upsertTeacherDomainUser(admin, {
-    email,
-    displayName,
-    avatarUrl: body.avatarUrl ?? null,
-    organizationId: actor.organizationId,
-  });
+  const { data: existingDomain, error: domainLookupError } = await admin
+    .from("users")
+    .select("id, auth_user_id, username")
+    .ilike("email", email)
+    .maybeSingle();
+  if (domainLookupError) throw new Error(`Teacher lookup failed: ${domainLookupError.message}`);
+  await assertUsernameAvailable(admin, username, existingDomain?.id as string | undefined);
 
-  let authUserId = domain.authUserId;
-  const existingAuth = authUserId ? null : await findAuthUserByEmail(admin, email);
-  if (existingAuth) {
-    authUserId = existingAuth.id;
-    const { error } = await admin.auth.admin.updateUserById(existingAuth.id, {
-      email,
-      password,
-      user_metadata: { full_name: displayName, name: displayName },
-    });
-    if (error) throw new Error(`Auth user update failed: ${error.message}`);
-  } else if (authUserId) {
+  let authUserId = existingDomain?.auth_user_id as string | null | undefined;
+  let createdAuthUser = false;
+  if (authUserId) {
     const { error } = await admin.auth.admin.updateUserById(authUserId, {
       email,
       password,
-      user_metadata: { full_name: displayName, name: displayName },
+      user_metadata: { full_name: displayName, name: displayName, username },
     });
     if (error) throw new Error(`Auth user update failed: ${error.message}`);
   } else {
-    const { data, error } = await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { full_name: displayName, name: displayName },
-      app_metadata: { staff_role: "teacher" },
-    });
-    if (error || !data.user) throw new Error(`Auth user create failed: ${error?.message ?? "no user returned"}`);
-    authUserId = data.user.id;
+    const existingAuth = await findAuthUserByEmail(admin, email);
+    if (existingAuth) {
+      authUserId = existingAuth.id;
+      const { error } = await admin.auth.admin.updateUserById(existingAuth.id, {
+        email,
+        password,
+        user_metadata: { full_name: displayName, name: displayName, username },
+      });
+      if (error) throw new Error(`Auth user update failed: ${error.message}`);
+    } else {
+      const { data, error } = await admin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { full_name: displayName, name: displayName, username },
+        app_metadata: { staff_role: "teacher" },
+      });
+      if (error || !data.user) throw new Error(`Auth user create failed: ${error?.message ?? "no user returned"}`);
+      authUserId = data.user.id;
+      createdAuthUser = true;
+    }
   }
 
-  const { error: linkError } = await admin
-    .from("users")
-    .update({ auth_user_id: authUserId, updated_at: new Date().toISOString() })
-    .eq("id", domain.userId);
-  if (linkError) throw new Error(`Auth link failed: ${linkError.message}`);
+  if (!authUserId) throw new Error("Auth user provisioning returned no identity");
+  const provisionedAuthUserId = authUserId;
 
-  return { userId: domain.userId, authUserId, email, displayName };
+  try {
+    const domain = await upsertTeacherDomainUser(admin, {
+      authUserId: provisionedAuthUserId,
+      email,
+      username,
+      displayName,
+      avatarUrl: body.avatarUrl ?? null,
+      organizationId: actor.organizationId,
+    });
+    return {
+      userId: domain.userId,
+      authUserId: provisionedAuthUserId,
+      email,
+      username,
+      displayName,
+    };
+  } catch (error) {
+    if (createdAuthUser) {
+      await admin.auth.admin.deleteUser(provisionedAuthUserId);
+      await admin
+        .from("users")
+        .update({
+          auth_user_id: existingDomain?.auth_user_id ?? null,
+          username: existingDomain?.username ?? null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("auth_user_id", provisionedAuthUserId);
+    }
+    throw error;
+  }
 }
 
-async function updateTeacher(admin: ReturnType<typeof createClient>, body: StaffAction) {
+async function updateTeacher(admin: SupabaseClientLike, body: StaffAction) {
   if (body.action !== "updateTeacher") throw new Error("Invalid update action");
   const email = normalizeEmail(body.email);
+  const username = requireUsername(body.username);
   const displayName = normalizeName(body.displayName);
   if (!body.userId) throw new Error("Teacher id is required");
   if (!email) throw new Error("Teacher email is required");
   if (!displayName) throw new Error("Teacher name is required");
   await assertTeacher(admin, body.userId);
+  await assertUsernameAvailable(admin, username, body.userId);
 
   const { data: current, error: currentError } = await admin
     .from("users")
@@ -239,29 +319,52 @@ async function updateTeacher(admin: ReturnType<typeof createClient>, body: Staff
     .single();
   if (currentError) throw new Error(`Teacher lookup failed: ${currentError.message}`);
 
+  let previousAuthUser: { email?: string | null; user_metadata?: Record<string, unknown> } | null = null;
+  if (current.auth_user_id) {
+    const { data: previous, error: previousError } = await admin.auth.admin.getUserById(
+      current.auth_user_id,
+    );
+    if (previousError || !previous.user) {
+      throw new Error(`Auth user lookup failed: ${previousError?.message ?? "no user returned"}`);
+    }
+    previousAuthUser = previous.user;
+    const { error: authError } = await admin.auth.admin.updateUserById(current.auth_user_id, {
+      email,
+      user_metadata: { full_name: displayName, name: displayName, username },
+    });
+    if (authError) throw new Error(`Auth user update failed: ${authError.message}`);
+  }
+
   const { error } = await admin
     .from("users")
     .update({
       email,
+      username,
       display_name: displayName,
       avatar_url: body.avatarUrl ?? null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", body.userId);
-  if (error) throw new Error(`Teacher update failed: ${error.message}`);
-
-  if (current.auth_user_id) {
-    const { error: authError } = await admin.auth.admin.updateUserById(current.auth_user_id, {
-      email,
-      user_metadata: { full_name: displayName, name: displayName },
-    });
-    if (authError) throw new Error(`Auth user update failed: ${authError.message}`);
+  if (error) {
+    if (current.auth_user_id && previousAuthUser) {
+      await admin.auth.admin.updateUserById(current.auth_user_id, {
+        email: previousAuthUser.email ?? undefined,
+        user_metadata: previousAuthUser.user_metadata ?? {},
+      });
+    }
+    throw new Error(`Teacher update failed: ${usernameWriteError(error)}`);
   }
 
-  return { userId: body.userId, email, displayName, authUserId: current.auth_user_id ?? null };
+  return {
+    userId: body.userId,
+    email,
+    username,
+    displayName,
+    authUserId: current.auth_user_id ?? null,
+  };
 }
 
-async function setTeacherStatus(admin: ReturnType<typeof createClient>, body: StaffAction) {
+async function setTeacherStatus(admin: SupabaseClientLike, body: StaffAction) {
   if (body.action !== "setTeacherStatus") throw new Error("Invalid status action");
   if (!body.userId) throw new Error("Teacher id is required");
   await assertTeacher(admin, body.userId);
@@ -283,7 +386,7 @@ async function setTeacherStatus(admin: ReturnType<typeof createClient>, body: St
   return { userId: body.userId, accountStatus: body.accountStatus };
 }
 
-async function deleteTeacher(admin: ReturnType<typeof createClient>, body: StaffAction) {
+async function deleteTeacher(admin: SupabaseClientLike, body: StaffAction) {
   if (body.action !== "deleteTeacher") throw new Error("Invalid delete action");
   if (!body.userId) throw new Error("Teacher id is required");
   await assertTeacher(admin, body.userId);

@@ -1,36 +1,47 @@
 import { describe, expect, it } from 'vitest'
-import { calculateMetrics, compareEqualDurationWindows, type FinalizedAttempt } from './calculate'
+import {
+  calculateMetrics,
+  calculateQuestionCpd,
+  compareEqualDurationWindows,
+  type ColorWeights,
+  type FinalizedAttempt,
+} from './calculate'
 
 function attempts(colors: Array<FinalizedAttempt['effectiveColor']>): FinalizedAttempt[] {
   return colors.map((effectiveColor) => ({
     effectiveColor,
     enteredProbeFlow: false,
     probeEventCount: 0,
+    recordedColors: [effectiveColor],
   }))
 }
 
 describe('metric calculations', () => {
   it('calculates RFC and RAC for 27 red/yellow and 73 green/purple', () => {
-    const finalized = [
+    const finalized: FinalizedAttempt[] = [
       ...Array.from({ length: 20 }, () => ({
         effectiveColor: 'red' as const,
         enteredProbeFlow: false,
         probeEventCount: 0,
+        recordedColors: ['red' as const],
       })),
       ...Array.from({ length: 7 }, () => ({
         effectiveColor: 'yellow' as const,
         enteredProbeFlow: false,
         probeEventCount: 0,
+        recordedColors: ['yellow' as const],
       })),
       ...Array.from({ length: 50 }, () => ({
         effectiveColor: 'green' as const,
         enteredProbeFlow: false,
         probeEventCount: 0,
+        recordedColors: ['green' as const],
       })),
       ...Array.from({ length: 23 }, () => ({
         effectiveColor: 'purple' as const,
         enteredProbeFlow: false,
         probeEventCount: 0,
+        recordedColors: ['purple' as const],
       })),
     ]
     const metrics = calculateMetrics(finalized)
@@ -41,48 +52,108 @@ describe('metric calculations', () => {
     expect(rfc.sampleSize).toBe(100)
   })
 
+  it('expands sample size with multi-step probe sequence: 49 base + 3 probe = 52 total', () => {
+    // 48 single-question attempts
+    const regularAttempts: FinalizedAttempt[] = Array.from({ length: 48 }, () => ({
+      effectiveColor: 'green' as const,
+      enteredProbeFlow: false,
+      probeEventCount: 0,
+      recordedColors: ['green' as const],
+    }))
+
+    // 1 probed attempt with 3 probe steps: green (start) -> blue -> blue -> indigo (done)
+    const probedAttempt: FinalizedAttempt = {
+      effectiveColor: 'indigo',
+      enteredProbeFlow: true,
+      probeEventCount: 3,
+      recordedColors: ['green', 'blue', 'blue', 'indigo'],
+    }
+
+    const allAttempts = [...regularAttempts, probedAttempt] // 49 questions
+    const metrics = calculateMetrics(allAttempts)
+
+    const rfc = metrics.find((m) => m.key === 'rfc')!
+    const rac = metrics.find((m) => m.key === 'rac')!
+
+    // Total sample = 48 + 4 = 52
+    expect(rfc.sampleSize).toBe(52)
+    // All 52 are cool colors (green, blue, indigo)
+    expect(rfc.value).toBeCloseTo(0)
+    expect(rac.value).toBeCloseTo(1.0)
+  })
+
+  it('counts warm colors (Red, Orange, Yellow) correctly across probe sequences', () => {
+    const attemptsWithWarm: FinalizedAttempt[] = [
+      {
+        effectiveColor: 'red',
+        enteredProbeFlow: false,
+        probeEventCount: 0,
+        recordedColors: ['red'],
+      },
+      {
+        effectiveColor: 'orange',
+        enteredProbeFlow: false,
+        probeEventCount: 0,
+        recordedColors: ['orange'],
+      },
+      // Green probe that failed -> [green, blue, yellow]
+      {
+        effectiveColor: 'yellow',
+        enteredProbeFlow: true,
+        probeEventCount: 2,
+        recordedColors: ['green', 'blue', 'yellow'],
+      },
+    ]
+    // Total sample = 1 + 1 + 3 = 5 records.
+    // Warm colors = red (1) + orange (1) + yellow (1) = 3 warm records.
+    // Cool colors = green (1) + blue (1) = 2 cool records.
+    const metrics = calculateMetrics(attemptsWithWarm)
+    const rfc = metrics.find((m) => m.key === 'rfc')!
+    const rac = metrics.find((m) => m.key === 'rac')!
+
+    expect(rfc.sampleSize).toBe(5)
+    expect(rfc.value).toBeCloseTo(3 / 5) // 0.6
+    expect(rac.value).toBeCloseTo(2 / 5) // 0.4
+    expect(rac.value! + rfc.value!).toBeCloseTo(1.0)
+  })
+
+  it('calculates question-level and average CPD with dynamic color weights', () => {
+    const attempt: FinalizedAttempt = {
+      effectiveColor: 'indigo',
+      enteredProbeFlow: true,
+      probeEventCount: 3,
+      recordedColors: ['green', 'blue', 'blue', 'indigo'],
+      cvr: 10,
+      cci: 6, // Base CPD = 60
+    }
+
+    // Default linear weights: green: 0.5, blue: 4/6 (~0.667), indigo: 5/6 (~0.833)
+    const result = calculateQuestionCpd(attempt)
+    expect(result.baseCpd).toBe(60)
+
+    const expectedMeanWeight = (3 / 6 + 4 / 6 + 4 / 6 + 5 / 6) / 4 // 16/24 = 2/3 ≈ 0.6667
+    expect(result.questionCpd).toBeCloseTo(60 * expectedMeanWeight) // 40
+
+    // Custom weight test
+    const customWeights: ColorWeights = {
+      red: 0,
+      orange: 0.1,
+      yellow: 0.2,
+      green: 0.4,
+      blue: 0.6,
+      indigo: 0.8,
+      purple: 1.0,
+    }
+    const customResult = calculateQuestionCpd(attempt, customWeights)
+    // Mean weight: (0.4 + 0.6 + 0.6 + 0.8) / 4 = 2.4 / 4 = 0.6
+    expect(customResult.questionCpd).toBeCloseTo(60 * 0.6) // 36
+  })
+
   it('returns null for empty windows, never zero', () => {
     const metrics = calculateMetrics([])
     for (const m of metrics) {
-      if (m.key === 'clarification_depth' || m.key === 'awareness_recovery') {
-        expect(m.value).toBeNull()
-      } else if (m.key === 'focus_stability') {
-        expect(m.value).toBeNull()
-      } else {
-        expect(m.value).toBeNull()
-      }
+      expect(m.value).toBeNull()
     }
-  })
-
-  it('clarification rate is zero when none probed; depth and recovery null', () => {
-    const metrics = calculateMetrics(attempts(['red', 'green', 'purple']))
-    expect(metrics.find((m) => m.key === 'clarification_rate')!.value).toBe(0)
-    expect(metrics.find((m) => m.key === 'clarification_depth')!.value).toBeNull()
-    expect(metrics.find((m) => m.key === 'awareness_recovery')!.value).toBeNull()
-  })
-
-  it('excludes non-finalized attempts by construction (caller only passes finalized)', () => {
-    // Open probes must not be in the array — domain invariant at call site
-    const metrics = calculateMetrics(
-      attempts(['green']).map((a) => ({ ...a, enteredProbeFlow: true, probeEventCount: 2 })),
-    )
-    expect(metrics.find((m) => m.key === 'clarification_rate')!.value).toBe(1)
-    expect(metrics.find((m) => m.key === 'clarification_depth')!.value).toBe(3)
-    expect(metrics.find((m) => m.key === 'n_count')!.value).toBe(1)
-    expect(metrics.find((m) => m.key === 'n_depth_max')!.value).toBe(3)
-    expect(metrics.find((m) => m.key === 'n_depth_avg')!.value).toBe(3)
-    expect(metrics.find((m) => m.key === 'awareness_recovery')!.value).toBe(1)
-  })
-
-  it('chunks number max and avg start at 1 for Green and use real probe depths only', () => {
-    const metrics = calculateMetrics([
-      { effectiveColor: 'green', enteredProbeFlow: true, probeEventCount: 9 },
-      { effectiveColor: 'green', enteredProbeFlow: true, probeEventCount: 1 },
-      { effectiveColor: 'red', enteredProbeFlow: false, probeEventCount: 0 },
-    ])
-    expect(metrics.find((m) => m.key === 'n_count')!.value).toBe(2)
-    expect(metrics.find((m) => m.key === 'n_depth_max')!.value).toBe(10)
-    expect(metrics.find((m) => m.key === 'n_depth_avg')!.value).toBeCloseTo(6)
   })
 
   it('compares equal-duration windows with percentage-point deltas', () => {

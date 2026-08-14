@@ -55,6 +55,8 @@ function mergeMetricSettings(saved?: MetricSettingsState | null): MetricSettings
   const byKey = new Map(saved.metrics.map((m) => [m.key, m]))
   return {
     defaultMaxProbeCount: saved.defaultMaxProbeCount ?? defaults.defaultMaxProbeCount,
+    weightPreset: saved.weightPreset ?? defaults.weightPreset,
+    colorWeights: saved.colorWeights ? { ...defaults.colorWeights, ...saved.colorWeights } : defaults.colorWeights,
     metrics: defaults.metrics.map((d) => {
       const prev = byKey.get(d.key)
       if (!prev) return d

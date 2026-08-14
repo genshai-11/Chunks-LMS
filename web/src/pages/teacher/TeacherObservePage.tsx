@@ -69,19 +69,19 @@ import {
 import { getSupabase } from '../../lib/supabase'
 import { triggerConfetti } from '../../lib/confetti'
 
-const COLORS: { key: ResultColor; label: string; shortcut: string }[] = [
-  { key: 'red', label: 'Red', shortcut: '0' },
-  { key: 'yellow', label: 'Orange', shortcut: '1' },
-  { key: 'green', label: 'Green', shortcut: '2' },
-  { key: 'purple', label: 'Purple', shortcut: '3' },
+const PRIMARY_COLORS: { key: ResultColor; label: string; shortcut: string }[] = [
+  { key: 'red', label: 'Đỏ', shortcut: '0' },
+  { key: 'orange', label: 'Cam', shortcut: '1' },
+  { key: 'green', label: 'Xanh', shortcut: '2' },
+  { key: 'purple', label: 'Tím', shortcut: '3' },
 ]
 
 type ReactionKind = 'celebrate' | 'happy' | 'fight'
 type Reaction = { kind: ReactionKind; color: ResultColor; id: number } | null
 
 function reactionFor(color: ResultColor): ReactionKind {
-  if (color === 'purple') return 'celebrate'
-  if (color === 'green') return 'happy'
+  if (color === 'purple' || color === 'indigo') return 'celebrate'
+  if (color === 'green' || color === 'blue') return 'happy'
   return 'fight'
 }
 
@@ -964,6 +964,19 @@ export function TeacherObservePage() {
           setActiveSplitLearnerId(splitLearnerId === a ? (b ?? a ?? null) : (a ?? null))
           return
         }
+        if (splitProbeOpen) {
+          if (k === 'f' || k === '1') {
+            e.preventDefault()
+            resolveProbeForLearner(splitLearnerId, 'fail')
+          } else if (k === 'p' || k === 'c' || k === '2') {
+            e.preventDefault()
+            resolveProbeForLearner(splitLearnerId, 'continue')
+          } else if (k === 'd' || k === 'enter' || k === '3') {
+            e.preventDefault()
+            resolveProbeForLearner(splitLearnerId, 'done')
+          }
+          return
+        }
         if (k === '0') {
           e.preventDefault()
           recordColorForLearner(splitLearnerId, 'red')
@@ -971,7 +984,7 @@ export function TeacherObservePage() {
         }
         if (k === '1') {
           e.preventDefault()
-          recordColorForLearner(splitLearnerId, 'yellow')
+          recordColorForLearner(splitLearnerId, 'orange')
           return
         }
         if (k === '2') {
@@ -984,19 +997,24 @@ export function TeacherObservePage() {
           recordColorForLearner(splitLearnerId, 'purple')
           return
         }
-        if (splitProbeOpen) {
-          if (k === 'f') {
-            e.preventDefault()
-            resolveProbeForLearner(splitLearnerId, 'fail')
-          } else if (k === 'p' || k === 'c') {
-            e.preventDefault()
-            resolveProbeForLearner(splitLearnerId, 'continue')
-          } else if (k === 'd' || k === 'enter') {
-            e.preventDefault()
-            resolveProbeForLearner(splitLearnerId, 'done')
-          }
-        }
         return
+      }
+      if (probeOpen) {
+        if (k === 'f' || k === '1') {
+          e.preventDefault()
+          resolveProbe('fail')
+          return
+        }
+        if (k === 'p' || k === 'c' || k === '2') {
+          e.preventDefault()
+          resolveProbe('continue')
+          return
+        }
+        if (k === 'd' || k === 'enter' || k === '3') {
+          e.preventDefault()
+          resolveProbe('done')
+          return
+        }
       }
       if (k === '0') {
         e.preventDefault()
@@ -1005,7 +1023,7 @@ export function TeacherObservePage() {
       }
       if (k === '1') {
         e.preventDefault()
-        recordColor('yellow')
+        recordColor('orange')
         return
       }
       if (k === '2') {
@@ -1017,18 +1035,6 @@ export function TeacherObservePage() {
         e.preventDefault()
         recordColor('purple')
         return
-      }
-      if (probeOpen) {
-        if (k === 'f') {
-          e.preventDefault()
-          resolveProbe('fail')
-        } else if (k === 'p' || k === 'c') {
-          e.preventDefault()
-          resolveProbe('continue')
-        } else if (k === 'd' || k === 'enter') {
-          e.preventDefault()
-          resolveProbe('done')
-        }
       }
     }
     window.addEventListener('keydown', onKey)
@@ -1209,7 +1215,7 @@ export function TeacherObservePage() {
                   role="group"
                   aria-label={`Result color for ${user?.displayName ?? 'learner'}`}
                 >
-                  {COLORS.map((c) => (
+                  {PRIMARY_COLORS.map((c) => (
                     <button
                       key={c.key}
                       type="button"
@@ -1503,7 +1509,7 @@ export function TeacherObservePage() {
                   className="observe-heat-counts observe-color-pills observe-hide-phone"
                   aria-label="Color counts"
                 >
-                  {COLORS.map((c) => (
+                  {PRIMARY_COLORS.map((c) => (
                     <span
                       key={c.key}
                       className={`observe-heat-count is-${c.key}`}
@@ -1572,7 +1578,7 @@ export function TeacherObservePage() {
                 </div>
               ) : (
                 <div className="observe-dock-colors" role="group" aria-label="Result color">
-                  {COLORS.map((c) => (
+                  {PRIMARY_COLORS.map((c) => (
                     <button
                       key={c.key}
                       type="button"

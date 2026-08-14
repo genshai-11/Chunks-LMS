@@ -20,6 +20,7 @@ export function createDraftSnapshot(maxProbeCount = DEFAULT_MAX_PROBE_COUNT): As
     probeCount: 0,
     maxProbeCount,
     enteredProbeFlow: false,
+    recordedColors: [],
     finalizedAt: null,
   }
 }
@@ -28,12 +29,17 @@ function finalize(
   snapshot: AssessmentSnapshot,
   color: ResultColor,
   at: string,
+  updatedRecordedColors?: ResultColor[],
 ): AssessmentSnapshot {
+  const recorded = updatedRecordedColors ?? (
+    snapshot.recordedColors.length > 0 ? snapshot.recordedColors : [color]
+  )
   return {
     ...snapshot,
     status: 'finalized',
     effectiveColor: color,
     effectiveScore: COLOR_SCORE[color],
+    recordedColors: recorded,
     finalizedAt: at,
   }
 }
@@ -82,16 +88,17 @@ function recordProvisional(
         ...base,
         status: 'probe_open',
         enteredProbeFlow: true,
+        recordedColors: ['green'],
       },
       events,
     }
   }
 
-  // Red, Yellow, Purple finalize directly
+  // Directly finalizing colors (Red, Orange, Purple, etc.)
   events.push('result_finalized')
   return {
     ok: true,
-    snapshot: finalize(base, color, at),
+    snapshot: finalize(base, color, at, [color]),
     events,
   }
 }
@@ -105,8 +112,14 @@ function resolveProbe(
     return { ok: false, error: 'Probe resolution requires an open Green probe' }
   }
 
+  const currentRecorded: ResultColor[] =
+    snapshot.recordedColors && snapshot.recordedColors.length > 0
+      ? [...snapshot.recordedColors]
+      : ['green']
+
   if (outcome === 'fail') {
     const events: AssessmentEventType[] = ['probe_failed', 'result_finalized']
+    const nextRecorded: ResultColor[] = [...currentRecorded, 'yellow']
     return {
       ok: true,
       snapshot: finalize(
@@ -116,6 +129,7 @@ function resolveProbe(
         },
         'yellow',
         at,
+        nextRecorded,
       ),
       events,
     }
@@ -123,6 +137,7 @@ function resolveProbe(
 
   if (outcome === 'done') {
     const events: AssessmentEventType[] = ['probe_completed', 'result_finalized']
+    const nextRecorded: ResultColor[] = [...currentRecorded, 'indigo']
     return {
       ok: true,
       snapshot: finalize(
@@ -130,22 +145,23 @@ function resolveProbe(
           ...snapshot,
           probeCount: snapshot.probeCount + (snapshot.status === 'probe_open' ? 1 : 0),
         },
-        'green',
+        'indigo',
         at,
+        nextRecorded,
       ),
       events,
     }
   }
 
-  // Continue — unlimited depth. probeCount is the UI "n" (how deep we are).
-  // Legacy snapshots in resolution_required can still Fail/Done; Continue is allowed again
-  // so teachers are never hard-blocked by an old max.
+  // Continue — record 'blue' step, increment probeCount, keep probe open
   const nextCount = snapshot.probeCount + 1
+  const nextRecorded: ResultColor[] = [...currentRecorded, 'blue']
   return {
     ok: true,
     snapshot: {
       ...snapshot,
       probeCount: nextCount,
+      recordedColors: nextRecorded,
       status: 'probe_open',
     },
     events: ['probe_continued'],
@@ -172,6 +188,7 @@ function correctResult(
       status: 'corrected',
       effectiveColor: color,
       effectiveScore: COLOR_SCORE[color],
+      recordedColors: snapshot.recordedColors.length > 0 ? snapshot.recordedColors : [color],
       finalizedAt: at,
     },
     events: ['result_corrected'],

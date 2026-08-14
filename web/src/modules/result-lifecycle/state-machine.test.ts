@@ -4,8 +4,8 @@ import { applyLifecycleCommand, createDraftSnapshot, isFinalizedForMetrics } fro
 const at = '2026-07-11T10:00:00.000Z'
 
 describe('result lifecycle state machine', () => {
-  it('finalizes Red, Yellow, and Purple directly', () => {
-    for (const color of ['red', 'yellow', 'purple'] as const) {
+  it('finalizes Red, Orange, and Purple directly with 1-element recordedColors', () => {
+    for (const color of ['red', 'orange', 'purple'] as const) {
       const draft = createDraftSnapshot()
       const result = applyLifecycleCommand(draft, {
         type: 'record_provisional',
@@ -16,12 +16,13 @@ describe('result lifecycle state machine', () => {
       if (!result.ok) return
       expect(result.snapshot.status).toBe('finalized')
       expect(result.snapshot.effectiveColor).toBe(color)
+      expect(result.snapshot.recordedColors).toEqual([color])
       expect(isFinalizedForMetrics(result.snapshot)).toBe(true)
       expect(result.events).toEqual(['provisional_recorded', 'result_finalized'])
     }
   })
 
-  it('opens probe flow on Green and does not count until finalized', () => {
+  it('opens probe flow on Green and sets initial recordedColors to [green]', () => {
     const result = applyLifecycleCommand(createDraftSnapshot(), {
       type: 'record_provisional',
       color: 'green',
@@ -31,10 +32,11 @@ describe('result lifecycle state machine', () => {
     if (!result.ok) return
     expect(result.snapshot.status).toBe('probe_open')
     expect(result.snapshot.enteredProbeFlow).toBe(true)
+    expect(result.snapshot.recordedColors).toEqual(['green'])
     expect(isFinalizedForMetrics(result.snapshot)).toBe(false)
   })
 
-  it('Green then Fail finalizes Yellow with history', () => {
+  it('Green then Fail finalizes Yellow with [green, yellow]', () => {
     let snap = createDraftSnapshot()
     let r = applyLifecycleCommand(snap, { type: 'record_provisional', color: 'green', at })
     expect(r.ok).toBe(true)
@@ -45,32 +47,40 @@ describe('result lifecycle state machine', () => {
     if (!r.ok) return
     expect(r.snapshot.effectiveColor).toBe('yellow')
     expect(r.snapshot.status).toBe('finalized')
+    expect(r.snapshot.recordedColors).toEqual(['green', 'yellow'])
     expect(r.events).toContain('probe_failed')
   })
 
-  it('Green then Done finalizes Green', () => {
+  it('Green then Done finalizes Indigo with [green, indigo]', () => {
     let snap = createDraftSnapshot()
     let r = applyLifecycleCommand(snap, { type: 'record_provisional', color: 'green', at })
     if (!r.ok) throw new Error(r.error)
     r = applyLifecycleCommand(r.snapshot, { type: 'resolve_probe', outcome: 'done', at })
     expect(r.ok).toBe(true)
     if (!r.ok) return
-    expect(r.snapshot.effectiveColor).toBe('green')
+    expect(r.snapshot.effectiveColor).toBe('indigo')
+    expect(r.snapshot.recordedColors).toEqual(['green', 'indigo'])
   })
 
-  it('Continue is unlimited; probeCount tracks depth n without blocking', () => {
+  it('Continue appends Blue and Done appends Indigo preserving full sequence', () => {
     let snap = createDraftSnapshot(2)
     let r = applyLifecycleCommand(snap, { type: 'record_provisional', color: 'green', at })
     if (!r.ok) throw new Error(r.error)
 
-    for (let n = 1; n <= 5; n++) {
-      r = applyLifecycleCommand(r.snapshot, { type: 'resolve_probe', outcome: 'continue', at })
-      expect(r.ok).toBe(true)
-      if (!r.ok) return
-      expect(r.snapshot.probeCount).toBe(n)
-      expect(r.snapshot.status).toBe('probe_open')
-    }
+    // Two continue steps (Lam / Blue)
+    r = applyLifecycleCommand(r.snapshot, { type: 'resolve_probe', outcome: 'continue', at })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.snapshot.recordedColors).toEqual(['green', 'blue'])
+    expect(r.snapshot.probeCount).toBe(1)
 
+    r = applyLifecycleCommand(r.snapshot, { type: 'resolve_probe', outcome: 'continue', at })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.snapshot.recordedColors).toEqual(['green', 'blue', 'blue'])
+    expect(r.snapshot.probeCount).toBe(2)
+
+    // Complete with Done (Chàm / Indigo)
     const done = applyLifecycleCommand(r.snapshot, {
       type: 'resolve_probe',
       outcome: 'done',
@@ -78,8 +88,10 @@ describe('result lifecycle state machine', () => {
     })
     expect(done.ok).toBe(true)
     if (!done.ok) return
-    expect(done.snapshot.effectiveColor).toBe('green')
-    expect(done.snapshot.probeCount).toBe(6)
+    expect(done.snapshot.effectiveColor).toBe('indigo')
+    expect(done.snapshot.recordedColors).toEqual(['green', 'blue', 'blue', 'indigo'])
+    expect(done.snapshot.recordedColors.length).toBe(4)
+    expect(done.snapshot.probeCount).toBe(3)
   })
 
   it('corrections require reason and preserve finalization path', () => {

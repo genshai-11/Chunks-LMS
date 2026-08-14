@@ -9,8 +9,11 @@ export type LearnerSessionSummary = {
   startedAt: string
   status: LearningSession['status']
   red: number
+  orange: number
   yellow: number
   green: number
+  blue: number
+  indigo: number
   purple: number
   total: number
   rfc: number | null
@@ -18,7 +21,7 @@ export type LearnerSessionSummary = {
   probeTotal: number
 }
 
-const COLORS: ResultColor[] = ['red', 'yellow', 'green', 'purple']
+const COLORS: ResultColor[] = ['red', 'orange', 'yellow', 'green', 'blue', 'indigo', 'purple']
 
 export function summarizeLearnerSessions(input: {
   ledger: ResultRecord[]
@@ -51,7 +54,9 @@ export function summarizeLearnerSessions(input: {
     const session = byId.get(record.learningSessionId)
     if (!session) continue
     const row = rows.get(record.learningSessionId) ?? emptyRow(session)
-    row[record.effectiveColor] += 1
+    if (row[record.effectiveColor] !== undefined) {
+      row[record.effectiveColor] += 1
+    }
     row.total += 1
     row.probeTotal += record.enteredProbeFlow ? record.probeEventCount : 0
     rows.set(record.learningSessionId, row)
@@ -59,11 +64,11 @@ export function summarizeLearnerSessions(input: {
 
   const chronological = Array.from(rows.values())
     .map((row) => {
-      const redYellow = row.red + row.yellow
+      const warmCount = row.red + row.orange + row.yellow
       const score = COLORS.reduce((sum, color) => sum + row[color] * COLOR_SCORE[color], 0)
       return {
         ...row,
-        rfc: row.total === 0 ? null : redYellow / row.total,
+        rfc: row.total === 0 ? null : warmCount / row.total,
         scoreAvg: row.total === 0 ? null : score / row.total,
       }
     })
@@ -98,7 +103,7 @@ export function nextLearnerSessionNumber(input: {
       ids.add(session.id)
     } else if (!session.participantLearnerIds || session.participantLearnerIds.length === 0) {
       const hasResults = effective.some(
-        (r) => r.learningSessionId === session.id && r.learnerUserId === input.learnerUserId
+        (r) => r.learningSessionId === session.id && r.learnerUserId === input.learnerUserId,
       )
       if (hasResults) {
         ids.add(session.id)
@@ -132,7 +137,7 @@ export function learnerCurrentSessionNumber(input: {
       ids.add(session.id)
     } else if (!session.participantLearnerIds || session.participantLearnerIds.length === 0) {
       const hasResults = effective.some(
-        (r) => r.learningSessionId === session.id && r.learnerUserId === input.learnerUserId
+        (r) => r.learningSessionId === session.id && r.learnerUserId === input.learnerUserId,
       )
       if (hasResults) {
         ids.add(session.id)
@@ -164,8 +169,11 @@ function emptyRow(session: LearningSession): LearnerSessionSummary {
     startedAt: session.startedAt,
     status: session.status,
     red: 0,
+    orange: 0,
     yellow: 0,
     green: 0,
+    blue: 0,
+    indigo: 0,
     purple: 0,
     total: 0,
     rfc: null,

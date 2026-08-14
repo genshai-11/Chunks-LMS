@@ -2328,12 +2328,19 @@
       inset 0 -9px 12px rgb(69 10 10 / 0.42),
       0 0 18px rgb(239 68 68 / 0.45);
   }
-  .observe-dock-color.is-yellow {
-    @apply border-slate-950 bg-gradient-to-b from-orange-300 via-orange-500 to-orange-700 text-white hover:brightness-110;
+  .observe-dock-color.is-orange {
+    @apply border-slate-950 bg-gradient-to-b from-orange-400 via-orange-500 to-orange-700 text-white hover:brightness-110;
     box-shadow:
       inset 0 7px 10px rgb(255 255 255 / 0.36),
       inset 0 -9px 12px rgb(124 45 18 / 0.42),
       0 0 18px rgb(249 115 22 / 0.5);
+  }
+  .observe-dock-color.is-yellow {
+    @apply border-slate-950 bg-gradient-to-b from-amber-300 via-yellow-400 to-yellow-600 text-slate-950 hover:brightness-110;
+    box-shadow:
+      inset 0 7px 10px rgb(255 255 255 / 0.4),
+      inset 0 -9px 12px rgb(113 63 18 / 0.42),
+      0 0 18px rgb(234 179 8 / 0.5);
   }
   .observe-dock-color.is-green {
     @apply border-slate-950 bg-gradient-to-b from-emerald-300 via-emerald-500 to-emerald-700 text-white hover:brightness-110;
@@ -2341,6 +2348,20 @@
       inset 0 7px 10px rgb(255 255 255 / 0.34),
       inset 0 -9px 12px rgb(6 78 59 / 0.4),
       0 0 18px rgb(16 185 129 / 0.45);
+  }
+  .observe-dock-color.is-blue {
+    @apply border-slate-950 bg-gradient-to-b from-sky-300 via-sky-500 to-blue-700 text-white hover:brightness-110;
+    box-shadow:
+      inset 0 7px 10px rgb(255 255 255 / 0.34),
+      inset 0 -9px 12px rgb(30 58 138 / 0.4),
+      0 0 18px rgb(14 165 233 / 0.45);
+  }
+  .observe-dock-color.is-indigo {
+    @apply border-slate-950 bg-gradient-to-b from-indigo-300 via-indigo-600 to-indigo-800 text-white hover:brightness-110;
+    box-shadow:
+      inset 0 7px 10px rgb(255 255 255 / 0.34),
+      inset 0 -9px 12px rgb(49 46 129 / 0.4),
+      0 0 18px rgb(79 70 229 / 0.45);
   }
   .observe-dock-color.is-purple {
     @apply border-slate-950 bg-gradient-to-b from-fuchsia-300 via-purple-500 to-violet-700 text-white hover:brightness-110;
@@ -2371,19 +2392,31 @@
   .observe-dock.is-glowing.is-red .observe-dock-colors {
     --dock-glow: 239 68 68;
   }
-  .observe-dock.is-glowing.is-yellow .observe-dock-colors {
+  .observe-dock.is-glowing.is-orange .observe-dock-colors {
     --dock-glow: 249 115 22;
+  }
+  .observe-dock.is-glowing.is-yellow .observe-dock-colors {
+    --dock-glow: 234 179 8;
   }
   .observe-dock.is-glowing.is-green .observe-dock-colors {
     --dock-glow: 16 185 129;
+  }
+  .observe-dock.is-glowing.is-blue .observe-dock-colors {
+    --dock-glow: 14 165 233;
+  }
+  .observe-dock.is-glowing.is-indigo .observe-dock-colors {
+    --dock-glow: 79 70 229;
   }
   .observe-dock.is-glowing.is-purple .observe-dock-colors {
     --dock-glow: 192 132 252;
   }
 
   .observe-dock.is-glowing.is-red .observe-dock-color.is-red,
+  .observe-dock.is-glowing.is-orange .observe-dock-color.is-orange,
   .observe-dock.is-glowing.is-yellow .observe-dock-color.is-yellow,
   .observe-dock.is-glowing.is-green .observe-dock-color.is-green,
+  .observe-dock.is-glowing.is-blue .observe-dock-color.is-blue,
+  .observe-dock.is-glowing.is-indigo .observe-dock-color.is-indigo,
   .observe-dock.is-glowing.is-purple .observe-dock-color.is-purple {
     animation: observe-active-light 1.15s ease-out both;
   }
@@ -2431,11 +2464,20 @@
   .observe-dock-color.is-red.is-selected {
     @apply bg-gradient-to-b from-[#ff3b30] to-[#e50914] text-white opacity-100 border-white/40 scale-105 shadow-[0_0_25px_8px_#ef4444,_inset_0_2px_6px_rgba(255,255,255,0.55)];
   }
-  .observe-dock-color.is-yellow.is-selected {
+  .observe-dock-color.is-orange.is-selected {
     @apply bg-gradient-to-b from-[#fb923c] to-[#ea580c] text-white opacity-100 border-white/40 scale-105 shadow-[0_0_25px_8px_#f97316,_inset_0_2px_6px_rgba(255,255,255,0.55)];
+  }
+  .observe-dock-color.is-yellow.is-selected {
+    @apply bg-gradient-to-b from-[#fde047] to-[#eab308] text-slate-950 opacity-100 border-white/40 scale-105 shadow-[0_0_25px_8px_#eab308,_inset_0_2px_6px_rgba(255,255,255,0.55)];
   }
   .observe-dock-color.is-green.is-selected {
     @apply bg-gradient-to-b from-[#34c759] to-[#099268] text-white opacity-100 border-white/40 scale-105 shadow-[0_0_25px_8px_#10b981,_inset_0_2px_6px_rgba(255,255,255,0.55)];
+  }
+  .observe-dock-color.is-blue.is-selected {
+    @apply bg-gradient-to-b from-[#38bdf8] to-[#0284c7] text-white opacity-100 border-white/40 scale-105 shadow-[0_0_25px_8px_#0ea5e9,_inset_0_2px_6px_rgba(255,255,255,0.55)];
+  }
+  .observe-dock-color.is-indigo.is-selected {
+    @apply bg-gradient-to-b from-[#818cf8] to-[#4f46e5] text-white opacity-100 border-white/40 scale-105 shadow-[0_0_25px_8px_#6366f1,_inset_0_2px_6px_rgba(255,255,255,0.55)];
   }
   .observe-dock-color.is-purple.is-selected {
     @apply bg-gradient-to-b from-[#af52de] to-[#7048e8] text-white opacity-100 border-white/40 scale-105 shadow-[0_0_25px_8px_#a855f7,_inset_0_2px_6px_rgba(255,255,255,0.55)];
@@ -2461,14 +2503,20 @@
       0 8px 18px rgb(0 0 0 / 0.32);
   }
 
-  .observe-dock-probe-btn.fail {
-    @apply border-yellow-300/60 bg-yellow-950/80 text-yellow-100 hover:bg-yellow-900;
+  .observe-dock-probe-btn.fail,
+  .observe-dock-probe-btn.probe-yellow {
+    @apply border-yellow-300/80 bg-gradient-to-b from-amber-400 to-yellow-600 text-slate-950 font-black hover:brightness-110;
+    box-shadow: 0 0 20px rgb(234 179 8 / 0.4);
   }
-  .observe-dock-probe-btn.pass {
-    @apply border-blue-300/60 bg-blue-950/80 text-blue-100 hover:bg-blue-900;
+  .observe-dock-probe-btn.pass,
+  .observe-dock-probe-btn.probe-blue {
+    @apply border-sky-300/80 bg-gradient-to-b from-sky-400 to-blue-600 text-white font-black hover:brightness-110;
+    box-shadow: 0 0 20px rgb(14 165 233 / 0.4);
   }
-  .observe-dock-probe-btn.done {
-    @apply border-indigo-300/60 bg-indigo-950/80 text-indigo-100 hover:bg-indigo-900;
+  .observe-dock-probe-btn.done,
+  .observe-dock-probe-btn.probe-indigo {
+    @apply border-indigo-300/80 bg-gradient-to-b from-indigo-400 to-indigo-700 text-white font-black hover:brightness-110;
+    box-shadow: 0 0 20px rgb(79 70 229 / 0.4);
   }
 
   .observe-dock-probe-btn kbd {

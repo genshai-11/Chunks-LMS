@@ -309,8 +309,11 @@ export function sessionColorSummary(state: CaptureSessionState): {
 } {
   const byColor: Record<ResultColor | 'open' | 'draft', number> = {
     red: 0,
+    orange: 0,
     yellow: 0,
     green: 0,
+    blue: 0,
+    indigo: 0,
     purple: 0,
     open: 0,
     draft: 0,

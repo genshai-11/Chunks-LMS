@@ -84,13 +84,32 @@ const TIME_SCOPES: { kind: ReportWindowKind; label: string; hint: string }[] = [
 ]
 
 function colorCounts(records: ResultRecord[]): Record<ResultColor, number> {
-  const c: Record<ResultColor, number> = { red: 0, yellow: 0, green: 0, purple: 0 }
-  for (const r of records) c[r.effectiveColor] += 1
+  const c: Record<ResultColor, number> = {
+    red: 0,
+    orange: 0,
+    yellow: 0,
+    green: 0,
+    blue: 0,
+    indigo: 0,
+    purple: 0,
+  }
+  for (const r of records) {
+    if (c[r.effectiveColor] !== undefined) c[r.effectiveColor] += 1
+  }
   return c
 }
 
 function resultColorLabel(color: ResultColor): string {
-  return color === 'yellow' ? 'orange' : color
+  const labels: Record<ResultColor, string> = {
+    red: 'Đỏ',
+    orange: 'Cam',
+    yellow: 'Vàng',
+    green: 'Xanh',
+    blue: 'Lam',
+    indigo: 'Chàm',
+    purple: 'Tím',
+  }
+  return labels[color] ?? color
 }
 
 function pct(n: number, total: number): number {
@@ -867,7 +886,7 @@ export function ProgressAnalysisView({
                 <p className="meta" style={{ marginTop: 0 }}>
                   Finalized results in current filter · sample={total}
                   {total > 0
-                    ? ` · R${counts.red} Y${counts.yellow} G${counts.green} P${counts.purple}`
+                    ? ` · Đỏ ${counts.red} · Cam ${counts.orange} · Vàng ${counts.yellow} · Lục ${counts.green} · Lam ${counts.blue} · Chàm ${counts.indigo} · Tím ${counts.purple}`
                     : ''}
                 </p>
                 {total === 0 ? (
@@ -875,7 +894,7 @@ export function ProgressAnalysisView({
                 ) : (
                   <div className="flex flex-col sm:flex-row gap-6 items-center w-full">
                     <div className="dist-bars flex-1 w-full">
-                      {(['red', 'yellow', 'green', 'purple'] as ResultColor[]).map((color) => {
+                      {(['red', 'orange', 'yellow', 'green', 'blue', 'indigo', 'purple'] as ResultColor[]).map((color) => {
                         const n = counts[color]
                         const p = pct(n, total)
                         const width = `${Math.max(n ? 8 : 0, (n / Math.max(maxBar, 1)) * 100)}%`

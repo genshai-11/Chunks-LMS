@@ -4,17 +4,17 @@ import { PROBE_ACTIONS } from './probe-actions'
 describe('probe action presentation', () => {
   it('maps neutral Fail, Pass, Done labels to existing lifecycle outcomes', () => {
     expect(PROBE_ACTIONS.map(({ label, outcome }) => [label, outcome])).toEqual([
-      ['Fail', 'fail'],
-      ['Continue', 'continue'],
-      ['Done', 'done'],
+      ['Vàng', 'fail'],
+      ['Lam', 'continue'],
+      ['Chàm', 'done'],
     ])
   })
 
   it('uses visible-label keyboard shortcuts', () => {
     expect(PROBE_ACTIONS.map(({ label, shortcut }) => [label, shortcut])).toEqual([
-      ['Fail', 'F'],
-      ['Continue', 'C'],
-      ['Done', 'D'],
+      ['Vàng', 'F'],
+      ['Lam', 'C'],
+      ['Chàm', 'D'],
     ])
   })
 })

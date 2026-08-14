@@ -1,5 +1,6 @@
 import type { LiveTestItem } from '../assessment/live-test'
 import { deriveCpd, liveTestItemIdFromExternalRef } from '../assessment/live-test'
+import type { ResultColor } from '../result-lifecycle/types'
 import type { ResultRecord } from './progress'
 
 export type LiveTestResultRecord = ResultRecord & {
@@ -47,13 +48,24 @@ export function bandFor(value: number | null | undefined, cuts: { lowMax: number
   return 'high'
 }
 
+export type ColorDistribution = Record<ResultColor, number> & { sample: number }
+
 export function colorDistributionByBand(
   rows: LiveTestResultRecord[],
   metric: 'cciValue' | 'cvrValue' | 'cpdValue',
   cuts: { lowMax: number; mediumMax: number },
-): Record<BandKey, { red: number; yellow: number; green: number; purple: number; sample: number }> {
-  const empty = () => ({ red: 0, yellow: 0, green: 0, purple: 0, sample: 0 })
-  const out: Record<BandKey, { red: number; yellow: number; green: number; purple: number; sample: number }> = {
+): Record<BandKey, ColorDistribution> {
+  const empty = (): ColorDistribution => ({
+    red: 0,
+    orange: 0,
+    yellow: 0,
+    green: 0,
+    blue: 0,
+    indigo: 0,
+    purple: 0,
+    sample: 0,
+  })
+  const out: Record<BandKey, ColorDistribution> = {
     low: empty(),
     medium: empty(),
     high: empty(),
@@ -61,7 +73,9 @@ export function colorDistributionByBand(
   }
   for (const row of rows) {
     const band = bandFor(row[metric], cuts)
-    out[band][row.effectiveColor] += 1
+    if (out[band][row.effectiveColor] !== undefined) {
+      out[band][row.effectiveColor] += 1
+    }
     out[band].sample += 1
   }
   return out

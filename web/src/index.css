@@ -1778,6 +1778,15 @@
   .observe-heat-dot-btn .dot-probe-badge {
     @apply absolute -top-1 -right-1 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-indigo-600 px-1 text-[8px] font-black text-white shadow ring-1 ring-slate-950;
   }
+  .live-test-heat-item {
+    @apply flex min-w-7 flex-col items-center gap-0.5;
+  }
+  .live-test-probe-trail {
+    @apply flex max-w-9 flex-wrap items-center justify-center gap-px;
+  }
+  .live-test-probe-trail i {
+    @apply block h-1.5 w-1.5 rounded-full ring-1 ring-slate-950;
+  }
   .observe-heat-dot-btn.is-open {
     @apply bg-amber-400 text-amber-950 animate-pulse;
   }
@@ -4677,6 +4686,22 @@
   }
   .live-test-dock-compact .observe-dock-label {
     @apply text-[10px] sm:text-xs;
+  }
+  .live-test-dock-compact .observe-dock-colors.is-correction {
+    @apply max-w-[30rem] flex-row flex-wrap gap-1.5 rounded-2xl p-2;
+  }
+  .live-test-dock-compact .observe-dock-colors.is-correction .observe-dock-color {
+    @apply h-12 w-12 p-1 sm:h-14 sm:w-14;
+  }
+  .live-test-dock-compact .observe-dock-colors.is-correction .observe-dock-num {
+    @apply text-xs sm:text-sm;
+  }
+  .live-test-dock-compact .observe-dock-colors.is-correction .observe-dock-label {
+    display: block !important;
+    @apply text-[8px] leading-none sm:text-[9px];
+  }
+  .live-test-correction-label {
+    @apply block w-full text-center text-[10px] font-black uppercase tracking-wide text-indigo-200;
   }
 }
 

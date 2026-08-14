@@ -60,7 +60,7 @@ export const METRIC_CATALOG: MetricCatalogEntry[] = [
     key: 'rfc',
     version: '2.0.0',
     status: 'operational',
-    definition: 'Warm colors (Red + Orange + Yellow) / expanded sample (including probe steps)',
+    definition: 'Warm finalized main results (Red + Orange + Yellow) / finalized main results',
     direction: 'lower_better',
     unit: 'ratio',
     minSample: 1,
@@ -69,7 +69,7 @@ export const METRIC_CATALOG: MetricCatalogEntry[] = [
     key: 'rac',
     version: '2.0.0',
     status: 'operational',
-    definition: '1 - RFC (Cool colors Green + Blue + Indigo + Purple / expanded sample)',
+    definition: '1 - RFC (Cool finalized main results Green + Blue + Indigo + Purple / finalized main results)',
     direction: 'higher_better',
     unit: 'ratio',
     minSample: 1,
@@ -78,7 +78,7 @@ export const METRIC_CATALOG: MetricCatalogEntry[] = [
     key: 'average_performance',
     version: '2.0.0',
     status: 'operational',
-    definition: 'mean normalized color weight 0..1 over expanded sample',
+    definition: 'mean normalized effective-result color weight 0..1 over finalized main results',
     direction: 'higher_better',
     unit: 'score',
     minSample: 1,
@@ -159,7 +159,7 @@ export const METRIC_CATALOG: MetricCatalogEntry[] = [
     key: 'average_cpd',
     version: '2.0.0',
     status: 'operational',
-    definition: 'mean Question CPD (CVR × CCI × mean question color weight) across finalized attempts',
+    definition: 'mean Question CPD (CVR × CCI × effective-result color weight) across finalized main results',
     direction: 'higher_better',
     unit: 'score',
     minSample: 1,
@@ -204,10 +204,9 @@ export function calculateQuestionCpd(
 ): QuestionCpdResult {
   const cvr = attempt.cvr ?? null
   const cci = attempt.cci ?? null
-  const colors: ResultColor[] = attempt.recordedColors && attempt.recordedColors.length > 0
-    ? attempt.recordedColors
-    : [attempt.effectiveColor]
-
+  // Probe history is reported separately. Only the finalized effective main result
+  // contributes to CPD and other operational metrics.
+  const colors: ResultColor[] = [attempt.effectiveColor]
   const appliedWeights = colors.map((c) => weights[c] ?? DEFAULT_COLOR_WEIGHTS[c])
 
   if (cvr == null || cci == null) {
@@ -236,18 +235,16 @@ export function calculateMetrics(
   colorWeights: ColorWeights = DEFAULT_COLOR_WEIGHTS,
 ): MetricObservation[] {
   const questionCount = finalized.length
-
-  // Flatten all recorded colors across all questions for expanded sample N_total
-  const allRecordedColors: ResultColor[] = finalized.flatMap((a) =>
-    a.recordedColors && a.recordedColors.length > 0 ? a.recordedColors : [a.effectiveColor],
-  )
-  const totalExpandedSample = allRecordedColors.length
-
-  const warmCount = allRecordedColors.filter(isWarmColor).length
+  const effectiveColors = finalized.map((attempt) => attempt.effectiveColor)
+  const warmCount = effectiveColors.filter(isWarmColor).length
+  const coolCount = effectiveColors.filter(isCoolColor).length
   const purpleCount = finalized.filter((a) => a.effectiveColor === 'purple').length
 
-  const totalScore = allRecordedColors.reduce((sum, c) => sum + (colorWeights[c] ?? DEFAULT_COLOR_WEIGHTS[c]), 0)
-  const avgPerformance = totalExpandedSample === 0 ? null : totalScore / totalExpandedSample
+  const totalScore = effectiveColors.reduce(
+    (sum, color) => sum + (colorWeights[color] ?? DEFAULT_COLOR_WEIGHTS[color]),
+    0,
+  )
+  const avgPerformance = questionCount === 0 ? null : totalScore / questionCount
 
   const probed = finalized.filter((a) => a.enteredProbeFlow)
   const chunksNumbers = probed.map((a) =>
@@ -269,12 +266,13 @@ export function calculateMetrics(
     ? null
     : cpdResults.reduce((s, r) => s + (r.questionCpd ?? 0), 0) / cpdResults.length
 
-  const rfcVal = ratio(warmCount, totalExpandedSample)
-  const racVal = rfcVal !== null ? 1 - rfcVal : null
+  const rfcVal = ratio(warmCount, questionCount)
+  // Seven colors form an exhaustive partition, so RAC is both cool/main and 1 - RFC.
+  const racVal = questionCount === 0 ? null : ratio(coolCount, questionCount)
 
-  const rfc = observation('rfc', rfcVal, totalExpandedSample)
-  const rac = observation('rac', racVal, totalExpandedSample)
-  const avg = observation('average_performance', avgPerformance, totalExpandedSample)
+  const rfc = observation('rfc', rfcVal, questionCount)
+  const rac = observation('rac', racVal, questionCount)
+  const avg = observation('average_performance', avgPerformance, questionCount)
   const purpleRate = observation('purple_mastery_rate', ratio(purpleCount, questionCount), questionCount)
   const clarRate = observation('clarification_rate', questionCount === 0 ? null : probed.length / questionCount, questionCount)
   const clarDepth = observation('clarification_depth', probeDepthAvg, probed.length)

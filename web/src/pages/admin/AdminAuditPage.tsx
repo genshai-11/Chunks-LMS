@@ -7,11 +7,13 @@ import { useFlash } from '../../hooks/useFlash'
 import { filterAuditEvents } from '../../modules/ops/audit'
 import { effectiveResults, resultKey } from '../../modules/ops/effective-results'
 import type { OpsAuditEventType } from '../../modules/ops/types'
-import type { ResultColor } from '../../modules/result-lifecycle/types'
+import {
+  RESULT_COLORS,
+  RESULT_COLOR_META,
+  type ResultColor,
+} from '../../modules/result-lifecycle/types'
 import { useAppState } from '../../state/useAppState'
 import { useStaffSession } from '../../auth/useStaffSession'
-
-const COLORS: ResultColor[] = ['red', 'yellow', 'green', 'purple']
 
 const TYPE_LABEL: Record<OpsAuditEventType, string> = {
   result_finalized: 'Finalized',
@@ -224,9 +226,9 @@ export function AdminAuditPage() {
                 value={color}
                 onChange={(e) => setColor(e.target.value as ResultColor)}
               >
-                {COLORS.map((c) => (
+                {RESULT_COLORS.map((c) => (
                   <option key={c} value={c}>
-                    {c}
+                    {RESULT_COLOR_META[c].label}
                   </option>
                 ))}
               </select>

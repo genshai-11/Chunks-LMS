@@ -10,18 +10,21 @@ import {
   updateMetricSetting,
   type WeightPreset,
 } from '../../modules/metrics/settings'
-import type { ResultColor } from '../../modules/result-lifecycle/types'
+import {
+  RESULT_COLORS,
+  RESULT_COLOR_META,
+  isWarmColor,
+  type ResultColor,
+} from '../../modules/result-lifecycle/types'
 import { useAppState } from '../../state/useAppState'
 
-const SEVEN_COLORS: { key: ResultColor; label: string; bgHex: string; textHex: string; isWarm: boolean }[] = [
-  { key: 'red', label: 'Đỏ (Red)', bgHex: '#dc2626', textHex: '#ffffff', isWarm: true },
-  { key: 'orange', label: 'Cam (Orange)', bgHex: '#ea580c', textHex: '#ffffff', isWarm: true },
-  { key: 'yellow', label: 'Vàng (Yellow)', bgHex: '#eab308', textHex: '#1e293b', isWarm: true },
-  { key: 'green', label: 'Lục/Xanh (Green)', bgHex: '#16a34a', textHex: '#ffffff', isWarm: false },
-  { key: 'blue', label: 'Lam (Blue)', bgHex: '#0284c7', textHex: '#ffffff', isWarm: false },
-  { key: 'indigo', label: 'Chàm (Indigo)', bgHex: '#4f46e5', textHex: '#ffffff', isWarm: false },
-  { key: 'purple', label: 'Tím (Purple)', bgHex: '#9333ea', textHex: '#ffffff', isWarm: false },
-]
+const SEVEN_COLORS = RESULT_COLORS.map((key) => ({
+  key,
+  label: RESULT_COLOR_META[key].label,
+  bgHex: RESULT_COLOR_META[key].hex,
+  textHex: key === 'yellow' ? '#1e293b' : '#ffffff',
+  isWarm: isWarmColor(key),
+}))
 
 export function AdminMetricsPage() {
   const { metricSettings, setMetricSettings } = useAppState()

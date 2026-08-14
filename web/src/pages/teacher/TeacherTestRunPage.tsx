@@ -35,13 +35,11 @@ import { probeChunksNumber } from '../../modules/assessment/probe-metrics'
 import { listActiveLearners } from '../../modules/roster/service'
 import { getTestPackageVersion, listTestSections } from '../../lib/test-packages'
 import {
+  clearRequestCache,
   completeStandaloneRun,
   findLatestApprovedNarrationVariant,
+  getStandaloneAssignmentView,
   getStandaloneRun,
-  getStandaloneRunRuntime,
-  listStandaloneAssignments,
-  listStandaloneRunItems,
-  listStandaloneRuns,
   prepareStandaloneRun,
   recordStandaloneResult,
   resolveStandaloneProbe,
@@ -59,8 +57,19 @@ type PartIntroNumber = 1 | 2 | 3
 
 import {
   DEFAULT_COLOR_WEIGHTS,
+  PRIMARY_OBSERVATION_COLORS,
+  RESULT_COLORS,
+  RESULT_COLOR_META,
   type ResultColor,
 } from '../../modules/result-lifecycle/types'
+import { LastActionWinsCoordinator } from '../../modules/standalone-tests/last-action-wins'
+import {
+  correctionColorForShortcut,
+  isStandaloneCorrectionMode,
+  optimisticStandaloneProbePatch,
+  standaloneResultColorChoices,
+} from '../../modules/standalone-tests/result-entry-mode'
+import { projectStandaloneRunItems } from '../../modules/standalone-tests/run-projection'
 
 type ReactionKind = 'celebrate' | 'happy' | 'fight'
 type Reaction = { kind: ReactionKind; color: ResultColor; id: number } | null
@@ -68,22 +77,19 @@ type Reaction = { kind: ReactionKind; color: ResultColor; id: number } | null
 type TestItem = Record<string, any>
 type ItemPlaybackCacheEntry = { variantId: string; signedUrl: string; isSilent?: boolean }
 
-const PRIMARY_COLORS: Array<{ key: ResultColor; label: string; num: string; hex: string }> = [
-  { key: 'red', label: 'Red', num: '0', hex: '#ef4444' },
-  { key: 'orange', label: 'Orange', num: '1', hex: '#f97316' },
-  { key: 'green', label: 'Green', num: '2', hex: '#22c55e' },
-  { key: 'purple', label: 'Purple', num: '3', hex: '#a855f7' },
-]
+const PRIMARY_COLORS = PRIMARY_OBSERVATION_COLORS.map((key) => ({
+  key,
+  label: RESULT_COLOR_META[key].label,
+  num: RESULT_COLOR_META[key].shortcut,
+  hex: RESULT_COLOR_META[key].hex,
+}))
 
-const COLORS: Array<{ key: ResultColor; label: string; num: string; hex: string }> = [
-  { key: 'red', label: 'Red', num: '0', hex: '#ef4444' },
-  { key: 'orange', label: 'Orange', num: '1', hex: '#f97316' },
-  { key: 'yellow', label: 'Yellow', num: 'F', hex: '#eab308' },
-  { key: 'green', label: 'Green', num: '2', hex: '#22c55e' },
-  { key: 'blue', label: 'Blue', num: 'C', hex: '#0ea5e9' },
-  { key: 'indigo', label: 'Indigo', num: 'D', hex: '#6366f1' },
-  { key: 'purple', label: 'Purple', num: '3', hex: '#a855f7' },
-]
+const COLORS = RESULT_COLORS.map((key) => ({
+  key,
+  label: RESULT_COLOR_META[key].label,
+  num: RESULT_COLOR_META[key].shortcut,
+  hex: RESULT_COLOR_META[key].hex,
+}))
 
 const RAIL_W_KEY = 'chunks-lms:live-test-rail-w'
 const RAIL_MIN = 168
@@ -318,6 +324,8 @@ export function TeacherTestRunPage() {
   const packageEndPlayedRef = useRef(false)
   const enteringProbeRef = useRef<string | null>(null)
   const pendingItemAudioRef = useRef<{ signedUrl: string | null; variantId: string; isSilent?: boolean } | null>(null)
+  const resultCoordinatorRef = useRef(new LastActionWinsCoordinator())
+  const loadPromiseRef = useRef<Promise<void> | null>(null)
 
   const markAudioReady = useCallback((options: { suppressAutoPlay?: boolean; persist?: boolean; assignmentId?: string | null } = {}) => {
     liveAudioStartedRef.current = true
@@ -489,58 +497,79 @@ export function TeacherTestRunPage() {
 
   const load = useCallback(async () => {
     if (!runId) return
-    setIsRestoringRun(true)
-    const primaryRunResult = await getStandaloneRun(runId)
-    if (!primaryRunResult.ok || !primaryRunResult.data) {
-      setMessage(primaryRunResult.ok ? 'Run not found' : primaryRunResult.error)
-      setIsRestoringRun(false)
-      return
-    }
+    if (loadPromiseRef.current) return loadPromiseRef.current
 
-    const currentRun = primaryRunResult.data
-    setRunDetails(currentRun)
-    const assignmentId = assignmentIdParam || currentRun.assignmentId
-    let targetRuns: StandaloneTestRunRow[] = [currentRun]
-    let packageVersionId: string | null = null
-
-    if (assignmentId) {
-      const assignmentRes = await listStandaloneAssignments()
-      if (assignmentRes.ok) {
-        const assignment = assignmentRes.data.find((a) => a.id === assignmentId)
-        if (assignment) {
-          packageVersionId = assignment.packageVersionId
-          const sectionsRes = await listTestSections(assignment.packageVersionId)
-          const versionRes = await getTestPackageVersion(assignment.packageVersionId)
-          const languagePolicy = versionRes.ok ? versionRes.data?.sourceMetadata?.languagePolicy : null
-          const existingRunsRes = await listStandaloneRuns(assignmentId)
-          const existingRuns = existingRunsRes.ok ? existingRunsRes.data : []
-          const existingSectionIds = new Set(existingRuns.map((r) => r.testSectionId))
-          if (sectionsRes.ok) {
-            for (const sec of sectionsRes.data) {
-              if (existingSectionIds.has(sec.id)) continue
-              const prep = await prepareStandaloneRun(
-                assignmentId,
-                sec.id,
-                languageForSectionOrder(sec.sectionOrder, currentRun.promptLanguage || 'vi', languagePolicy),
-                currentRun.voiceId || 'default',
-              )
-              if (prep.ok && prep.data.canStart) {
-                await startStandaloneRun(prep.data.runId, prep.data.readinessToken)
-              }
-            }
-          }
-        }
+    const task = (async () => {
+      setIsRestoringRun(true)
+      const primaryRunResult = await getStandaloneRun(runId)
+      if (!primaryRunResult.ok || !primaryRunResult.data) {
+        setMessage(primaryRunResult.ok ? 'Run not found' : primaryRunResult.error)
+        setIsRestoringRun(false)
+        return
       }
 
-      const runsResult = await listStandaloneRuns(assignmentId)
-      if (runsResult.ok && runsResult.data.length > 0) targetRuns = runsResult.data
-    }
-    setAllRuns(targetRuns)
+      const currentRun = primaryRunResult.data
+      const assignmentId = assignmentIdParam || currentRun.assignmentId
+      const initialView = await getStandaloneAssignmentView(assignmentId)
+      if (!initialView.ok) {
+        setMessage(initialView.error)
+        setIsRestoringRun(false)
+        return
+      }
 
-    if (packageVersionId) {
-      const partOneLanguage = targetRuns.find((run) => run.sessionNumber === 1)?.promptLanguage ?? targetRuns[0]?.promptLanguage ?? currentRun.promptLanguage ?? 'vi'
-      const partTwoLanguage = targetRuns.find((run) => run.sessionNumber === 4)?.promptLanguage ?? targetRuns[3]?.promptLanguage ?? partOneLanguage
-      const partThreeLanguage = targetRuns.find((run) => run.sessionNumber === 7)?.promptLanguage ?? targetRuns[6]?.promptLanguage ?? partOneLanguage
+      let assignmentView = initialView.data
+      const packageVersionId = assignmentView.assignment.packageVersionId
+      const [sectionsRes, versionRes] = await Promise.all([
+        listTestSections(packageVersionId),
+        getTestPackageVersion(packageVersionId),
+      ])
+      const languagePolicy = versionRes.ok ? versionRes.data?.sourceMetadata?.languagePolicy : null
+      const existingSectionIds = new Set(assignmentView.runs.map((candidate) => candidate.testSectionId))
+      const missingSections = sectionsRes.ok
+        ? sectionsRes.data.filter((section) => !existingSectionIds.has(section.id))
+        : []
+
+      if (missingSections.length > 0) {
+        const prepared = await Promise.all(
+          missingSections.map((section) =>
+            prepareStandaloneRun(
+              assignmentId,
+              section.id,
+              languageForSectionOrder(
+                section.sectionOrder,
+                currentRun.promptLanguage || 'vi',
+                languagePolicy,
+              ),
+              currentRun.voiceId || 'default',
+            ),
+          ),
+        )
+        await Promise.all(
+          prepared.map((result) =>
+            result.ok && result.data.canStart
+              ? startStandaloneRun(result.data.runId, result.data.readinessToken)
+              : Promise.resolve(result),
+          ),
+        )
+        clearRequestCache('standalone:assignment-view')
+        const refreshed = await getStandaloneAssignmentView(assignmentId)
+        if (refreshed.ok) assignmentView = refreshed.data
+      }
+
+      const targetRuns = assignmentView.runs
+      const currentViewRun = targetRuns.find((candidate) => candidate.id === runId) ?? currentRun
+      setRunDetails(currentViewRun)
+      setAllRuns(targetRuns)
+
+      const nextIntroBySession = Object.fromEntries(
+        targetRuns.map((candidate) => [candidate.sessionNumber, candidate.introNarrationVariantId]),
+      )
+      setSessionIntroVariantIds(nextIntroBySession)
+      setIntroVariantId(nextIntroBySession[currentViewRun.sessionNumber] ?? null)
+
+      const partOneLanguage = targetRuns.find((candidate) => candidate.sessionNumber === 1)?.promptLanguage ?? targetRuns[0]?.promptLanguage ?? currentRun.promptLanguage ?? 'vi'
+      const partTwoLanguage = targetRuns.find((candidate) => candidate.sessionNumber === 4)?.promptLanguage ?? targetRuns[3]?.promptLanguage ?? partOneLanguage
+      const partThreeLanguage = targetRuns.find((candidate) => candidate.sessionNumber === 7)?.promptLanguage ?? targetRuns[6]?.promptLanguage ?? partOneLanguage
       const findPartIntroAudio = async (part: PartIntroNumber, preferredLanguage: 'vi' | 'en') => {
         const preferred = await findLatestApprovedNarrationVariant({
           target: 'part_intro',
@@ -548,8 +577,6 @@ export function TeacherTestRunPage() {
           part,
           language: preferredLanguage,
         })
-        // GREEN-TEST-49Q package-level intro scripts are authored/approved in English even
-        // when the next session's item language is Vietnamese. Fallback keeps Part II visible.
         if ((preferred.ok && preferred.data) || preferredLanguage === 'en') return preferred
         return findLatestApprovedNarrationVariant({
           target: 'part_intro',
@@ -580,83 +607,44 @@ export function TeacherTestRunPage() {
         3: partThreeAudio.ok && partThreeAudio.data ? partThreeAudio.data.id : null,
       })
       setPackageEndVariantId(endAudio.ok && endAudio.data ? endAudio.data.id : null)
-    } else {
-      setPackageStartVariantId(null)
-      setPartIntroVariantIds({ 1: null, 2: null, 3: null })
-      setPackageEndVariantId(null)
-    }
 
-    const runtimeResults = await Promise.all(targetRuns.map((r) => getStandaloneRunRuntime(r.id)))
-    const latestIntroResults = await Promise.all(
-      targetRuns.map((r) =>
-        findLatestApprovedNarrationVariant({
-          target: 'section_intro',
-          language: r.promptLanguage,
-          testSectionId: r.testSectionId,
-        }),
-      ),
-    )
-    const nextIntroBySession: Record<number, string | null> = {}
-    runtimeResults.forEach((runtimeResult, index) => {
-      const sessionNumber = targetRuns[index]?.sessionNumber ?? index + 1
-      const latestIntro = latestIntroResults[index]
-      nextIntroBySession[sessionNumber] = latestIntro?.ok && latestIntro.data
-        ? latestIntro.data.id
-        : runtimeResult.ok
-          ? runtimeResult.data.introNarrationVariantId
-          : null
-    })
-    setSessionIntroVariantIds(nextIntroBySession)
-    setIntroVariantId(nextIntroBySession[currentRun.sessionNumber] ?? null)
-
-    const itemResults = await Promise.all(targetRuns.map((r) => listStandaloneRunItems(r.id)))
-    let globalItemIndex = 1
-    const combinedItems: TestItem[] = []
-    for (let i = 0; i < targetRuns.length; i += 1) {
-      const runItemRes = itemResults[i]
-      if (!runItemRes?.ok) continue
-      for (const item of runItemRes.data) {
-        combinedItems.push({
-          ...item,
-          global_item_order: globalItemIndex,
-          parent_run_id: targetRuns[i]!.id,
-          session_number: targetRuns[i]!.sessionNumber,
-          prompt_language: targetRuns[i]!.promptLanguage,
-          voice_id: targetRuns[i]!.voiceId,
-          test_section_id: targetRuns[i]!.testSectionId,
-          prompt_vi: (item as any).test_items?.prompt_vi ?? (item as any).prompt_vi ?? null,
-          prompt_en: (item as any).test_items?.prompt_en ?? (item as any).prompt_en ?? null,
-          cvr: targetRuns[i]!.targetCvrOhm,
-          cci: targetRuns[i]!.cciValue,
-          cpd: targetRuns[i]!.itemCpd,
-        })
-        globalItemIndex += 1
+      const combinedItems = assignmentView.items
+      for (const item of combinedItems) {
+        const revision = Number(getItemSnapshot(item)?.client_revision ?? 0)
+        resultCoordinatorRef.current.seed(String(item.id), revision)
       }
-    }
-    setItems(combinedItems)
+      setItems(combinedItems)
 
-    const completed = combinedItems.filter(isItemFinalized).length
-    const restoredReady = readLiveAudioReady(runId, assignmentId)
-    if (completed > 0 || restoredReady) {
-      markAudioReady({ suppressAutoPlay: true, persist: completed > 0, assignmentId })
-      setAudioState((current) => (current === 'idle' ? 'ready' : current))
-      setAudioLabel((current) => (current === 'Current item' ? 'Live test restored' : current))
-      if (restoredReady && completed === 0) {
-        setMessage('Live test restored. Audio is ready; auto-play is paused until you press Play or score the next item.')
+      const completed = combinedItems.filter(isItemFinalized).length
+      const restoredReady = readLiveAudioReady(runId, assignmentId)
+      if (completed > 0 || restoredReady) {
+        markAudioReady({ suppressAutoPlay: true, persist: completed > 0, assignmentId })
+        setAudioState((current) => (current === 'idle' ? 'ready' : current))
+        setAudioLabel((current) => (current === 'Current item' ? 'Live test restored' : current))
+        if (restoredReady && completed === 0) {
+          setMessage('Live test restored. Audio is ready; auto-play is paused until you press Play or score the next item.')
+        }
       }
-    }
 
-    const firstUnfinalized = combinedItems.findIndex((item) => !isItemFinalized(item))
-    if (firstUnfinalized !== -1) {
-      setSelectedIndex(firstUnfinalized)
-      setIsSummaryShown(false)
-    } else if (combinedItems.length > 0) {
-      setSelectedIndex(combinedItems.length - 1)
-      setIsSummaryShown(true)
-      triggerConfetti()
+      const firstUnfinalized = combinedItems.findIndex((item) => !isItemFinalized(item))
+      if (firstUnfinalized !== -1) {
+        setSelectedIndex(firstUnfinalized)
+        setIsSummaryShown(false)
+      } else if (combinedItems.length > 0) {
+        setSelectedIndex(combinedItems.length - 1)
+        setIsSummaryShown(true)
+        triggerConfetti()
+      }
+      enteringProbeRef.current = null
+      setIsRestoringRun(false)
+    })()
+
+    loadPromiseRef.current = task
+    try {
+      await task
+    } finally {
+      if (loadPromiseRef.current === task) loadPromiseRef.current = null
     }
-    enteringProbeRef.current = null
-    setIsRestoringRun(false)
   }, [markAudioReady, runId, assignmentIdParam])
 
   useEffect(() => {
@@ -667,9 +655,11 @@ export function TeacherTestRunPage() {
 
   const currentItem = useMemo(() => items[selectedIndex] ?? null, [items, selectedIndex])
   const completedCount = useMemo(() => items.filter(isItemFinalized).length, [items])
-  const currentAttempt = getItemAttempt(currentItem)
   const currentSnapshot = getItemSnapshot(currentItem)
-  const probeOpen = currentSnapshot?.status === 'probe_open' || currentSnapshot?.status === 'resolution_required'
+  const resultEntryStatus = currentSnapshot?.status ?? 'draft'
+  const probeOpen = resultEntryStatus === 'probe_open' || resultEntryStatus === 'resolution_required'
+  const correctionMode = isStandaloneCorrectionMode(resultEntryStatus)
+  const resultColorChoices = standaloneResultColorChoices(resultEntryStatus)
   const probeCount = Number(currentSnapshot?.probe_count ?? currentSnapshot?.probeCount ?? 0)
   const chunksNumber = probeChunksNumber({ enteredProbeFlow: Boolean(currentSnapshot?.entered_probe_flow ?? currentSnapshot?.enteredProbeFlow ?? probeOpen), probeCount }) ?? 1
   const currentSessionNumber = currentItem?.session_number || 1
@@ -766,15 +756,9 @@ export function TeacherTestRunPage() {
     const cacheKey = String(item.id)
     const cached = itemPlaybackCacheRef.current[cacheKey]
     if (cached) return cached
-    const language = (item.prompt_language ?? runDetails?.promptLanguage ?? 'vi') as 'vi' | 'en'
-    const latest = await findLatestApprovedNarrationVariant({
-      target: 'test_item',
-      language,
-      testItemId: String(item.test_item_id),
-    })
-    if (!latest.ok || !latest.data) return null
-    const { id: variantId, voiceId } = latest.data
-    const isSilent = voiceId === 'manual-read-direct/silent-placeholder'
+    const variantId = String(item.narration_variant_id ?? '')
+    if (!variantId) return null
+    const isSilent = item.voice_id === 'manual-read-direct/silent-placeholder'
     let signedUrl = ''
     if (!isSilent) {
       const playback = await getNarrationPlaybackUrl(variantId)
@@ -783,7 +767,7 @@ export function TeacherTestRunPage() {
     const next = { variantId, signedUrl, isSilent }
     itemPlaybackCacheRef.current[cacheKey] = next
     return next
-  }, [runDetails?.promptLanguage])
+  }, [])
 
   const playCurrentItemAudio = useCallback(
     async (shouldPlay = true) => {
@@ -796,20 +780,6 @@ export function TeacherTestRunPage() {
         variantId = cached.variantId
         signedUrl = cached.signedUrl
         isSilent = cached.isSilent === true
-      } else {
-        const latest = await findLatestApprovedNarrationVariant({
-          target: 'test_item',
-          language: currentItemLanguage,
-          testItemId: String(currentItem?.test_item_id),
-        })
-        if (latest.ok && latest.data) {
-          variantId = latest.data.id
-          isSilent = latest.data.voiceId === 'manual-read-direct/silent-placeholder'
-          if (!isSilent) {
-            const playback = await getNarrationPlaybackUrl(variantId)
-            signedUrl = playback.signedUrl
-          }
-        }
       }
 
       if (!variantId) {
@@ -844,7 +814,7 @@ export function TeacherTestRunPage() {
         }
       }
     },
-    [activateAudioUrl, currentItem, currentItemLanguage, currentItemNumber, loadAudioVariant, primeItemPlaybackUrl, resumeAudioAutoFlow],
+    [activateAudioUrl, currentItem, currentItemNumber, loadAudioVariant, primeItemPlaybackUrl, resumeAudioAutoFlow],
   )
 
   const playPackageStartAudio = useCallback(
@@ -899,15 +869,7 @@ export function TeacherTestRunPage() {
   const playSessionIntroAudio = useCallback(
     async (sessionNumber: number, shouldPlay = true, playFirstItemAfterIntro = true) => {
       const sessionRun = allRuns.find((run) => run.sessionNumber === sessionNumber) ?? null
-      let variantId = sessionIntroVariantIds[sessionNumber] ?? null
-      if (sessionRun?.testSectionId) {
-        const latest = await findLatestApprovedNarrationVariant({
-          target: 'section_intro',
-          language: sessionRun.promptLanguage,
-          testSectionId: sessionRun.testSectionId,
-        })
-        if (latest.ok && latest.data?.id) variantId = latest.data.id
-      }
+      const variantId = sessionIntroVariantIds[sessionNumber] ?? sessionRun?.introNarrationVariantId ?? null
       if (!variantId) {
         setMessage(`No approved Session ${sessionNumber} intro audio is available.`)
         return
@@ -1099,7 +1061,7 @@ export function TeacherTestRunPage() {
   useEffect(() => {
     if (!items.length) return
     const upcoming = items
-      .slice(selectedIndex, selectedIndex + 4)
+      .slice(selectedIndex, selectedIndex + 2)
       .filter((item) => item?.id && item.session_number === currentItem?.session_number && !isItemFinalized(item))
     if (upcoming.length === 0) return
     void Promise.allSettled(upcoming.map((item) => primeItemPlaybackUrl(item))).catch(() => {
@@ -1231,189 +1193,202 @@ export function TeacherTestRunPage() {
     void playCurrentItemAudio(true)
   }, [activateAudioUrl, autoPlayItems, autoPlayPartIntro, autoPlaySessionIntro, canPlayCurrentItemAudio, canPlayCurrentSessionIntro, currentItemNumber, items, loadAudioVariant, navigate, partIntroVariantIds, playCurrentItemAudio, playCurrentSessionIntro, playPartIntroAudio, probeOpen, selectedIndex])
 
+  const reloadAuthoritativeItems = useCallback(
+    async (focusItemId: string) => {
+      const assignmentId = assignmentIdParam || runDetails?.assignmentId
+      if (!assignmentId) return
+      clearRequestCache('standalone:assignment-view')
+      const refreshed = await getStandaloneAssignmentView(assignmentId)
+      if (!refreshed.ok) {
+        setMessage(refreshed.error)
+        return
+      }
+      for (const item of refreshed.data.items) {
+        resultCoordinatorRef.current.seed(
+          String(item.id),
+          Number(getItemSnapshot(item)?.client_revision ?? 0),
+        )
+      }
+      setAllRuns(refreshed.data.runs)
+      setItems(refreshed.data.items)
+      const focusIndex = refreshed.data.items.findIndex((item) => String(item.id) === focusItemId)
+      if (focusIndex >= 0) setSelectedIndex(focusIndex)
+    },
+    [assignmentIdParam, runDetails?.assignmentId],
+  )
+
+  const patchItemSnapshot = useCallback((
+    itemId: string,
+    patch: Record<string, unknown>,
+    attemptId?: string,
+  ) => {
+    setItems((previous) =>
+      previous.map((item) => {
+        if (String(item.id) !== itemId) return item
+        const previousAttempt = getItemAttempt(item)
+        return {
+          ...item,
+          standalone_test_attempts: [
+            {
+              ...(previousAttempt ?? {}),
+              ...(attemptId ? { id: attemptId } : {}),
+              run_item_id: item.id,
+              standalone_test_attempt_snapshots: {
+                ...(previousAttempt?.standalone_test_attempt_snapshots ?? {}),
+                ...patch,
+              },
+            },
+          ],
+        }
+      }),
+    )
+  }, [])
+
   const handleRecord = useCallback(
     async (color: ResultColor) => {
       if (!currentItem || probeOpen) return
-      resumeAudioAutoFlow()
+      const itemId = String(currentItem.id)
+      const previousSnapshot = getItemSnapshot(currentItem)
       const isFinalOutstandingItem =
-        !isItemFinalized(currentItem) && items.filter((item) => !isItemFinalized(item)).length === 1
+        color !== 'green' &&
+        !isItemFinalized(currentItem) &&
+        items.filter((item) => !isItemFinalized(item)).length === 1
+
+      resumeAudioAutoFlow()
       playReaction(color)
       if (color !== 'green') {
         playScoreFeedbackThenNext(color)
       } else {
-        enteringProbeRef.current = String(currentItem.id)
+        enteringProbeRef.current = itemId
         activateAudioUrl('/audio/green.wav', 'green result', true, 'result_reaction')
       }
 
-      // Optimistic in-memory update for instantaneous UI response
-      setItems((prev) =>
-        prev.map((it) => {
-          if (it.id !== currentItem.id) return it
-          const prevAttempt = getItemAttempt(it)
-          const nextStatus = color === 'green' ? 'probe_open' : 'finalized'
-          const nextSnapshot = {
-            ...(prevAttempt?.standalone_test_attempt_snapshots ?? {}),
-            status: nextStatus,
+      const coordinated = await resultCoordinatorRef.current.run({
+        key: itemId,
+        optimistic: (revision) => {
+          const wasCorrected = ['finalized', 'corrected'].includes(String(previousSnapshot?.status ?? ''))
+          patchItemSnapshot(itemId, {
+            status: color === 'green' ? 'probe_open' : wasCorrected ? 'corrected' : 'finalized',
             effective_color: color === 'green' ? null : color,
             provisional_color: color,
-            entered_probe_flow: color === 'green',
-            probe_count: 0,
-          }
-          return {
-            ...it,
-            standalone_test_attempts: [
-              {
-                ...(prevAttempt ?? {}),
-                run_item_id: it.id,
-                standalone_test_attempt_snapshots: nextSnapshot,
-              },
-            ],
-          }
-        }),
-      )
+            entered_probe_flow: Boolean(previousSnapshot?.entered_probe_flow) || color === 'green',
+            probe_count: color === 'green' ? 0 : Number(previousSnapshot?.probe_count ?? 0),
+            client_revision: revision,
+          })
+        },
+        persist: (revision) => recordStandaloneResult(itemId, color, revision),
+        commit: (data) => {
+          patchItemSnapshot(
+            itemId,
+            {
+              status: data.status,
+              effective_color: data.effectiveColor,
+              provisional_color: color,
+              entered_probe_flow: Boolean(previousSnapshot?.entered_probe_flow) || color === 'green',
+              probe_count: data.probeCount,
+              client_revision: data.clientRevision,
+            },
+            data.attemptId,
+          )
+          setMessage('')
+        },
+        rollback: async (error) => {
+          setMessage(error)
+          await reloadAuthoritativeItems(itemId)
+        },
+      })
 
-      const result = await recordStandaloneResult(currentItem.id, color)
-      if (!result.ok) {
-        setMessage(result.error)
-        return
+      if (coordinated.kind === 'committed' && isFinalOutstandingItem) {
+        await playEndAfterFinalScore()
       }
-
-      // Sync official result from RPC
-      setItems((prev) =>
-        prev.map((it) => {
-          if (it.id !== currentItem.id) return it
-          const prevAttempt = getItemAttempt(it)
-          const nextSnapshot = {
-            ...(prevAttempt?.standalone_test_attempt_snapshots ?? {}),
-            status: result.data.status,
-            effective_color: result.data.effectiveColor,
-            provisional_color: color,
-            entered_probe_flow: color === 'green',
-            probe_count: result.data.probeCount,
-          }
-          return {
-            ...it,
-            standalone_test_attempts: [
-              {
-                ...(prevAttempt ?? {}),
-                id: result.data.attemptId,
-                run_item_id: it.id,
-                standalone_test_attempt_snapshots: nextSnapshot,
-              },
-            ],
-          }
-        }),
-      )
-
-      if (isFinalOutstandingItem) await playEndAfterFinalScore()
     },
     [
       activateAudioUrl,
       currentItem,
       items,
+      patchItemSnapshot,
       playEndAfterFinalScore,
       playReaction,
       playScoreFeedbackThenNext,
       probeOpen,
+      reloadAuthoritativeItems,
       resumeAudioAutoFlow,
     ],
   )
 
   const handleProbe = useCallback(
     async (outcome: 'fail' | 'continue' | 'done') => {
-      if (!currentAttempt?.id || !probeOpen) return
-      resumeAudioAutoFlow()
+      if (!currentItem || !probeOpen) return
+      const itemId = String(currentItem.id)
+      const previousSnapshot = getItemSnapshot(currentItem)
       const isFinalOutstandingItem =
         outcome !== 'continue' &&
-        currentItem &&
         !isItemFinalized(currentItem) &&
         items.filter((item) => !isItemFinalized(item)).length === 1
 
+      resumeAudioAutoFlow()
       if (outcome !== 'continue') {
-        const finalColor: ResultColor = outcome === 'fail' ? 'yellow' : 'indigo'
-        playScoreFeedbackThenNext(finalColor)
+        const finalColor = outcome === 'fail' ? 'yellow' : 'indigo'
+        // Keep the just-finalized item selected so its seven-color correction palette
+        // appears immediately, before persistence resolves.
+        activateAudioUrl(`/audio/${finalColor}.wav`, `${finalColor} result`, true, 'result_reaction')
       } else {
         activateAudioUrl('/audio/yellow.wav', 'continue result', true, 'result_reaction')
       }
 
-      // Optimistic in-memory update
-      setItems((prev) =>
-        prev.map((it) => {
-          if (it.id !== currentItem.id) return it
-          const prevAttempt = getItemAttempt(it)
-          const prevSnap = prevAttempt?.standalone_test_attempt_snapshots ?? {}
-          const currentCount = Number(prevSnap.probe_count ?? 0)
-          const nextCount = outcome === 'continue' ? currentCount + 1 : currentCount
-          const nextStatus = outcome === 'continue' ? 'probe_open' : 'finalized'
-          const nextEffective = outcome === 'fail' ? 'yellow' : outcome === 'done' ? 'indigo' : null
-          const nextSnapshot = {
-            ...prevSnap,
-            status: nextStatus,
-            effective_color: nextEffective,
-            probe_count: nextCount,
+      const coordinated = await resultCoordinatorRef.current.run({
+        key: itemId,
+        optimistic: (revision) => {
+          patchItemSnapshot(
+            itemId,
+            optimisticStandaloneProbePatch(
+              outcome,
+              Number(previousSnapshot?.probe_count ?? 0),
+              revision,
+            ),
+          )
+        },
+        persist: (revision) => resolveStandaloneProbe(itemId, outcome, revision),
+        commit: (data) => {
+          patchItemSnapshot(
+            itemId,
+            {
+              status: data.status,
+              effective_color: data.effectiveColor,
+              entered_probe_flow: true,
+              probe_count: data.probeCount,
+              client_revision: data.clientRevision,
+            },
+            data.attemptId,
+          )
+          if (outcome === 'continue') {
+            setMessage(
+              `n depth=${probeChunksNumber({ enteredProbeFlow: true, probeCount: data.probeCount }) ?? 1}`,
+            )
+          } else {
+            playReaction(outcome === 'fail' ? 'yellow' : 'indigo')
+            setMessage('')
           }
-          return {
-            ...it,
-            standalone_test_attempts: [
-              {
-                ...(prevAttempt ?? {}),
-                standalone_test_attempt_snapshots: nextSnapshot,
-              },
-            ],
-          }
-        }),
-      )
+        },
+        rollback: async (error) => {
+          setMessage(error)
+          await reloadAuthoritativeItems(itemId)
+        },
+      })
 
-      const result = await resolveStandaloneProbe(String(currentAttempt.id), outcome)
-      if (!result.ok) {
-        setMessage(result.error)
-        return
+      if (coordinated.kind === 'committed' && isFinalOutstandingItem) {
+        await playEndAfterFinalScore()
       }
-
-      if (outcome === 'continue') {
-        setMessage(
-          `Chunks Number=${probeChunksNumber({ enteredProbeFlow: true, probeCount: result.data.probeCount }) ?? 1}`,
-        )
-      } else {
-        playReaction(outcome === 'fail' ? 'yellow' : 'indigo')
-        setMessage('')
-      }
-
-      // Sync official result from RPC
-      setItems((prev) =>
-        prev.map((it) => {
-          if (it.id !== currentItem.id) return it
-          const prevAttempt = getItemAttempt(it)
-          const nextSnapshot = {
-            ...(prevAttempt?.standalone_test_attempt_snapshots ?? {}),
-            status: result.data.status,
-            effective_color: result.data.effectiveColor,
-            probe_count: result.data.probeCount,
-          }
-          return {
-            ...it,
-            standalone_test_attempts: [
-              {
-                ...(prevAttempt ?? {}),
-                id: result.data.attemptId,
-                standalone_test_attempt_snapshots: nextSnapshot,
-              },
-            ],
-          }
-        }),
-      )
-
-      if (isFinalOutstandingItem) await playEndAfterFinalScore()
     },
     [
       activateAudioUrl,
-      currentAttempt?.id,
       currentItem,
       items,
+      patchItemSnapshot,
       playEndAfterFinalScore,
       playReaction,
-      playScoreFeedbackThenNext,
       probeOpen,
+      reloadAuthoritativeItems,
       resumeAudioAutoFlow,
     ],
   )
@@ -1450,15 +1425,17 @@ export function TeacherTestRunPage() {
         }
         return
       }
-      const found = PRIMARY_COLORS.find((k) => k.num === e.key)
-      if (found) {
+      const correctionColor = correctionColorForShortcut(resultEntryStatus, e.key)
+      const initialColor = PRIMARY_COLORS.find((choice) => choice.num === e.key)?.key ?? null
+      const selectedColor = correctionMode ? correctionColor : initialColor
+      if (selectedColor) {
         e.preventDefault()
-        void handleRecord(found.key)
+        void handleRecord(selectedColor)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [currentItem, handleProbe, handleRecord, probeOpen])
+  }, [correctionMode, currentItem, handleProbe, handleRecord, probeOpen, resultEntryStatus])
 
   async function completeAll() {
     const assignmentId = assignmentIdParam || runDetails?.assignmentId
@@ -1511,15 +1488,9 @@ export function TeacherTestRunPage() {
     }))
   }, [items])
 
-  const totalProbeSteps = useMemo(() => {
-    return items.reduce((sum, item) => {
-      const snap = getItemSnapshot(item)
-      const count = Number(snap?.probe_count ?? snap?.probeCount ?? 0)
-      return sum + (snap?.entered_probe_flow || count > 0 ? count : 0)
-    }, 0)
-  }, [items])
-
-  const expandedTotalItems = items.length + totalProbeSteps
+  const runProjection = useMemo(() => projectStandaloneRunItems(items), [items])
+  const totalProbeSteps = runProjection.probeSteps
+  const expandedTotalItems = runProjection.expandedTotal
 
   const summaryMetrics = useMemo(() => {
     const redCount = items.filter((i) => getItemColor(i) === 'red').length
@@ -1533,13 +1504,7 @@ export function TeacherTestRunPage() {
     const cpdValues = items.map(achievedCpdValue).filter((v): v is number => v !== null)
     const finalized = completedCount
 
-    const sampleTotal = items.reduce((sum, item) => {
-      if (!isItemFinalized(item)) return sum
-      const snap = getItemSnapshot(item)
-      const count = Number(snap?.probe_count ?? snap?.probeCount ?? 0)
-      return sum + 1 + (snap?.entered_probe_flow || count > 0 ? count : 0)
-    }, 0)
-
+    const sampleTotal = finalized
     const warmCount = redCount + orangeCount + yellowCount
     const rfc = sampleTotal > 0 ? Math.round((warmCount / sampleTotal) * 100) : 0
     const rac = sampleTotal > 0 ? 100 - rfc : 0
@@ -1692,7 +1657,7 @@ export function TeacherTestRunPage() {
                 <span className="observe-learner-rfc is-percent-c">%c {summaryMetrics.rac}%</span>
                 <span className="observe-learner-rfc is-cpd">Max CPD {formatVolt(summaryMetrics.maxCpd)}</span>
               </div>
-              <p className="observe-rail-n">{completedCount}/{items.length} scored {totalProbeSteps > 0 ? `(+${totalProbeSteps} probes)` : ''}</p>
+              <p className="observe-rail-n">Completed main questions: {completedCount}/{items.length} · Probe sub-items/steps: {totalProbeSteps}</p>
             </>
           ) : null}
         </div>
@@ -1701,8 +1666,8 @@ export function TeacherTestRunPage() {
           <div className="observe-rail-map">
             <div className="observe-heat layout-column">
               <div className="observe-heat-summary">
-                <span className="observe-heat-metric">Items <strong>{items.length}</strong></span>
-                <span className="observe-heat-metric muted">Done <strong>{completedCount}</strong></span>
+                <span className="observe-heat-metric">Main <strong>{items.length}</strong></span>
+                <span className="observe-heat-metric muted">Completed <strong>{completedCount}/{items.length}</strong></span>
                 <span className="observe-heat-metric tabular">CPD <strong>{formatVoltRange(summaryMetrics.minCpd, summaryMetrics.maxCpd)}</strong></span>
                 <span className="observe-heat-counts" aria-label="Color counts">
                   {COLORS.map((c) => (
@@ -1771,23 +1736,35 @@ export function TeacherTestRunPage() {
                             const idx = items.findIndex((candidate) => candidate.id === item.id)
                             const color = getItemColor(item)
                             const statusClass = isItemFinalized(item) && color ? `is-${color}` : 'is-empty'
-                            const snap = getItemSnapshot(item)
-                            const count = Number(snap?.probe_count ?? snap?.probeCount ?? 0)
-                            const hasProbe = Boolean(snap?.entered_probe_flow || count > 0)
+                            const projected = runProjection.items.find((entry) => entry.item === item)
+                            const probeSteps = projected?.probeSteps ?? []
+                            const hasProbe = probeSteps.length > 0
                             return (
-                              <button
-                                key={item.id}
-                                type="button"
-                                className={`observe-heat-dot-btn ${statusClass}${idx === selectedIndex ? ' is-current' : ''}${hasProbe ? ' has-probe' : ''}`}
-                                title={`Session ${sessionNum} · Q${item.global_item_order}: ${item.prompt_text ?? ''}${hasProbe ? ` (n=${count})` : ''}`}
-                                onClick={() => {
-                                  setSelectedIndex(idx)
-                                  setIsSummaryShown(false)
-                                }}
-                              >
-                                <span>{item.global_item_order}</span>
-                                {hasProbe ? <span className="dot-probe-badge">+{count}</span> : null}
-                              </button>
+                              <div key={item.id} className="live-test-heat-item">
+                                <button
+                                  type="button"
+                                  className={`observe-heat-dot-btn ${statusClass}${idx === selectedIndex ? ' is-current' : ''}${hasProbe ? ' has-probe' : ''}`}
+                                  title={`Session ${sessionNum} · Main Q${item.global_item_order}: ${item.prompt_text ?? ''}${hasProbe ? ` · n depth=${projected?.nDepth ?? '—'} · ${probeSteps.length} probe steps` : ''}`}
+                                  onClick={() => {
+                                    setSelectedIndex(idx)
+                                    setIsSummaryShown(false)
+                                  }}
+                                >
+                                  <span>{item.global_item_order}</span>
+                                  {hasProbe ? <span className="dot-probe-badge">+{probeSteps.length}</span> : null}
+                                </button>
+                                {hasProbe ? (
+                                  <span className="live-test-probe-trail" aria-label={`Main question ${item.global_item_order} probe history`}>
+                                    {probeSteps.map((step, stepIndex) => (
+                                      <i
+                                        key={`${step.eventSequence}-${stepIndex}`}
+                                        style={{ background: RESULT_COLOR_META[step.color].hex }}
+                                        title={`${stepIndex + 1}. ${RESULT_COLOR_META[step.color].label} · ${step.label}`}
+                                      />
+                                    ))}
+                                  </span>
+                                ) : null}
+                              </div>
                             )
                           })}
                         </div>
@@ -1979,7 +1956,7 @@ export function TeacherTestRunPage() {
                 </div>
               ) : probeOpen ? (
                 <div className="observe-dock-probe live-test-probe-dock" role="group" aria-label="Resolve probe">
-                  <p className="live-test-probe-depth">CHUNKS NUMBER <strong>{chunksNumber}</strong></p>
+                  <p className="live-test-probe-depth">n depth <strong>{chunksNumber}</strong></p>
                   {PROBE_ACTIONS.map((action) => (
                     <button
                       key={action.outcome}
@@ -1994,17 +1971,34 @@ export function TeacherTestRunPage() {
                   ))}
                 </div>
               ) : (
-                <div className="observe-dock-colors" role="group" aria-label="Result color">
-                  {PRIMARY_COLORS.map((c) => (
-                    <button key={c.key} type="button" className={`observe-dock-color is-${c.key}${currentColor === c.key ? ' is-selected' : ''}`} onClick={() => void handleRecord(c.key)} disabled={!currentItem} title={`${c.num} · ${c.label}`}>
-                      <span className="observe-dock-num">{c.num}</span>
-                      <span className="observe-dock-label">{c.label}</span>
-                    </button>
-                  ))}
+                <div
+                  className={`observe-dock-colors${correctionMode ? ' is-correction' : ''}`}
+                  role="group"
+                  aria-label={correctionMode ? 'Correct finalized result using seven colors' : 'Initial result color'}
+                >
+                  {correctionMode ? (
+                    <span className="live-test-correction-label">Correction · appends history · 7 colors</span>
+                  ) : null}
+                  {resultColorChoices.map((key) => {
+                    const color = RESULT_COLOR_META[key]
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        className={`observe-dock-color is-${key}${currentColor === key ? ' is-selected' : ''}`}
+                        onClick={() => void handleRecord(key)}
+                        disabled={!currentItem}
+                        title={`${color.shortcut} · ${color.label}${correctionMode ? ' correction' : ''}`}
+                      >
+                        <span className="observe-dock-num">{color.shortcut}</span>
+                        <span className="observe-dock-label">{color.label}</span>
+                      </button>
+                    )
+                  })}
                 </div>
               )}
               <div className="observe-dock-tools observe-split-tools">
-                <p className="observe-day-line live-test-day-line">Session {currentSessionNumber} · Q{currentItemNumber}/{items.length} {totalProbeSteps > 0 ? `(+${totalProbeSteps} probes)` : ''} · {completedCount}/{items.length} finalized</p>
+                <p className="observe-day-line live-test-day-line">Session {currentSessionNumber} · Main Q{currentItemNumber}/{items.length} · Completed {completedCount}/{items.length} · Probe steps {totalProbeSteps} · Expanded {expandedTotalItems}</p>
               </div>
             </div>
 
@@ -2053,7 +2047,7 @@ export function TeacherTestRunPage() {
             <Panel
               icon={BarChart3}
               title={`Live Test Results & Analysis · ${learnerName}`}
-              description={`Package Total: ${items.length} Questions ${totalProbeSteps > 0 ? `(+${totalProbeSteps} probe steps = ${expandedTotalItems} total items)` : ''} | Scored: ${summaryMetrics.finalized}/${items.length} questions`}
+              description={`Main questions: ${items.length} · Completed main questions: ${summaryMetrics.finalized}/${items.length} · Probe sub-items/steps: ${totalProbeSteps} · Expanded total: ${items.length} + ${totalProbeSteps} = ${expandedTotalItems}`}
               collapsible={false}
             >
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 my-3">
@@ -2069,14 +2063,14 @@ export function TeacherTestRunPage() {
               <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-900 p-4 text-xs font-mono text-white shadow-inner sm:grid-cols-6">
                 <div><span className="text-slate-400">RFC </span><strong className="text-red-400">{summaryMetrics.rfc}%</strong></div>
                 <div><span className="text-slate-400">%c (RAC) </span><strong className="text-emerald-400">{summaryMetrics.rac}%</strong></div>
-                <div><span className="text-slate-400">Total Steps </span><strong className="text-indigo-300">{summaryMetrics.sampleTotal}</strong></div>
+                <div><span className="text-slate-400">sample=</span><strong className="text-indigo-300">{summaryMetrics.sampleTotal}</strong><span className="text-slate-500"> main</span></div>
                 <div><span className="text-slate-400">CPD min </span><strong className="text-blue-300">{formatVolt(summaryMetrics.minCpd)}</strong></div>
                 <div><span className="text-slate-400">CPD max </span><strong className="text-blue-300">{formatVolt(summaryMetrics.maxCpd)}</strong></div>
                 <div><span className="text-slate-400">CPD avg </span><strong className="text-blue-300">{formatVolt(summaryMetrics.avgCpd)}</strong></div>
               </div>
 
               <div className="space-y-2 pt-5">
-                <h3 className="font-bold text-sm flex items-center gap-2"><BarChart3 className="h-4 w-4 text-indigo-500" /> CPD & result colors ({items.length} items)</h3>
+                <h3 className="font-bold text-sm flex items-center gap-2"><BarChart3 className="h-4 w-4 text-indigo-500" /> CPD & finalized main result colors (sample={summaryMetrics.sampleTotal})</h3>
                 <div className="h-72 w-full pt-4">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>

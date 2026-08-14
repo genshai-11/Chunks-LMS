@@ -503,7 +503,7 @@ export function TeacherSessionPage() {
       <Panel
         icon={Users}
         title="By learner (columns)"
-        description="Each question is assigned to one learner only. Tracking splits by learner — Q count and chunks number stats are real capture data."
+        description="Each question is assigned to one learner only. Tracking splits by learner — Q count and n depth stats are real capture data."
       >
         <div className="table-wrap">
           <table>
@@ -645,7 +645,7 @@ export function TeacherSessionPage() {
             <p className="meta mt-2">
               <strong>{PROBE_METRIC_LABELS.nDepth}</strong> = {PROBE_METRIC_TOOLTIPS.nDepth}{' '}
               <strong>{PROBE_METRIC_LABELS.nCount}</strong> this session = {probeAgg?.nCount ?? 0}.
-              Sample/finalized counts are never labeled chunks number.
+              Sample/finalized counts are never labeled n depth.
             </p>
           </div>
         )}

@@ -27,8 +27,14 @@ import {
   type SessionMetricPoint,
 } from '../modules/reporting/session-series'
 import type { DomainUser } from '../modules/roster/types'
-import type { ResultColor } from '../modules/result-lifecycle/types'
-import { COLOR_SCORE } from '../modules/result-lifecycle/types'
+import {
+  COLOR_SCORE,
+  RESULT_COLORS,
+  RESULT_COLOR_META,
+  emptyResultColorCounts,
+  resultColorLabel,
+  type ResultColor,
+} from '../modules/result-lifecycle/types'
 import type { MetricSettingsState } from '../modules/metrics/settings'
 import { getEnabledMetricKeys } from '../modules/metrics/settings'
 import type { MetricKey, MetricObservation } from '../modules/metrics/calculate'
@@ -84,32 +90,9 @@ const TIME_SCOPES: { kind: ReportWindowKind; label: string; hint: string }[] = [
 ]
 
 function colorCounts(records: ResultRecord[]): Record<ResultColor, number> {
-  const c: Record<ResultColor, number> = {
-    red: 0,
-    orange: 0,
-    yellow: 0,
-    green: 0,
-    blue: 0,
-    indigo: 0,
-    purple: 0,
-  }
-  for (const r of records) {
-    if (c[r.effectiveColor] !== undefined) c[r.effectiveColor] += 1
-  }
-  return c
-}
-
-function resultColorLabel(color: ResultColor): string {
-  const labels: Record<ResultColor, string> = {
-    red: 'Red',
-    orange: 'Orange',
-    yellow: 'Yellow',
-    green: 'Green',
-    blue: 'Blue',
-    indigo: 'Indigo',
-    purple: 'Purple',
-  }
-  return labels[color] ?? color
+  const counts = emptyResultColorCounts()
+  for (const record of records) counts[record.effectiveColor] += 1
+  return counts
 }
 
 function pct(n: number, total: number): number {
@@ -300,12 +283,11 @@ export function ProgressAnalysisView({
   const maxBar = Math.max(1, ...Object.values(counts))
 
   const pieData = useMemo(() => {
-    return [
-      { name: 'Red', value: counts.red, color: '#ef4444' },
-      { name: 'Orange', value: counts.yellow, color: '#f97316' },
-      { name: 'Green', value: counts.green, color: '#22c55e' },
-      { name: 'Purple', value: counts.purple, color: '#a855f7' },
-    ].filter((d) => d.value > 0)
+    return RESULT_COLORS.map((color) => ({
+      name: RESULT_COLOR_META[color].label,
+      value: counts[color],
+      color: RESULT_COLOR_META[color].hex,
+    })).filter((entry) => entry.value > 0)
   }, [counts])
 
   const rfc = comparison ? pickMetric(comparison.current, 'rfc', metricSettings) : null
@@ -403,7 +385,7 @@ export function ProgressAnalysisView({
   }, [scopedLedger, orderedSessions, courseId, classId, focusLearnerId, dayMetricOptions, selectedLearnerIds])
 
   function metricLabel(key: MetricKey): string {
-    if (key === 'rac') return '%c'
+    if (key === 'rac') return '%c (RAC)'
     return metricSettings?.metrics.find((m) => m.key === key)?.label ?? key
   }
 
@@ -638,7 +620,7 @@ export function ProgressAnalysisView({
           {kind === 'session' ? ` · ${selectedSessionLabel}` : window ? ` · ${window.label}` : ''}
           {' · '}
           <strong>{total} finalized</strong>
-          <span className="text-slate-400"> (sample size, not chunks number)</span>
+          <span className="text-slate-400"> (sample size, not n depth)</span>
         </p>
       </section>
 
@@ -736,7 +718,7 @@ export function ProgressAnalysisView({
                 <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
                   <Info className="h-3.5 w-3.5" />
                   <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
-                    <strong>Struggle (RFC)</strong> = (Red + Orange) ÷ finalized sample. Lower RFC is better. Source: assessment ledger only (no mock).
+                    <strong>Struggle (RFC)</strong> = (Red + Orange + Yellow) ÷ finalized main sample. Lower RFC is better. Source: assessment ledger only (no mock).
                   </span>
                 </span>
               </p>
@@ -753,11 +735,11 @@ export function ProgressAnalysisView({
             </div>
             <div className={`stat-card analysis-kpi-rac${racTone === 'up' ? ' is-good' : racTone === 'down' ? ' is-warn' : ''}`}>
               <p className="stat-label flex items-center gap-1">
-                <span>Success (%c)</span>
+                <span>%c (RAC)</span>
                 <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
                   <Info className="h-3.5 w-3.5" />
                   <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
-                    <strong>Success (%c)</strong> = (Green + Purple) ÷ sample. Higher %c is better.
+                    <strong>%c (RAC)</strong> = Green + Blue + Indigo + Purple ÷ finalized main sample = 1 - RFC. Higher RAC is better.
                   </span>
                 </span>
               </p>
@@ -783,7 +765,7 @@ export function ProgressAnalysisView({
 
           <div className="analysis-additional-section" style={{ marginTop: 24, marginBottom: 24 }}>
             <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
-              Chunks Number metrics (from finalized ledger)
+              n depth metrics (from finalized ledger)
             </h3>
             <div className="stat-grid" style={{ marginBottom: 24 }}>
               <div
@@ -791,11 +773,11 @@ export function ProgressAnalysisView({
                 title="Number of finalized attempts where teacher selected Green (2) and entered probe"
               >
                 <p className="stat-label flex items-center gap-1">
-                  <span>chunks count</span>
+                  <span>n count</span>
                   <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
                     <Info className="h-3.5 w-3.5" />
                     <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
-                      <strong>chunks count</strong> = number of times the teacher selected Green (2). Values use real observations only.
+                      <strong>n count</strong> = number of times the teacher selected Green (2). Values use real observations only.
                     </span>
                   </span>
                 </p>
@@ -804,37 +786,37 @@ export function ProgressAnalysisView({
               </div>
               <div
                 className="stat-card"
-                title="Mean chunks number among probed attempts"
+                title="Mean n depth among probed attempts"
               >
                 <p className="stat-label flex items-center gap-1">
-                  <span>avg chunks number</span>
+                  <span>n depth avg</span>
                   <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
                     <Info className="h-3.5 w-3.5" />
                     <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
-                      <strong>avg chunks number</strong> = mean chunks number on probed questions. Green opens at 1; each Continue adds 1. Example: Green + Continue ×8 + Done → chunks number 9.
+                      <strong>n depth avg</strong> = mean n depth on probed questions. Green opens at 1; each Continue adds 1. Example: Green + Continue ×8 + Done → n depth 9.
                     </span>
                   </span>
                 </p>
                 <p className="stat-value">
                   {probeStats.count > 0 ? probeStats.avg.toFixed(1) : '—'}
                 </p>
-                <p className="meta">Mean chunks number on probed Qs</p>
+                <p className="meta">Mean n depth on probed Qs</p>
               </div>
               <div
                 className="stat-card"
-                title="Max chunks number among probed attempts (observed peak, not session ceiling)"
+                title="n depth max among probed attempts (observed peak, not session ceiling)"
               >
                 <p className="stat-label flex items-center gap-1">
-                  <span>max chunks number</span>
+                  <span>n depth max</span>
                   <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
                     <Info className="h-3.5 w-3.5" />
                     <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
-                      <strong>max chunks number</strong> = maximum observed chunks number on one question. Example: Green + Continue ×8 + Done → chunks number 9.
+                      <strong>n depth max</strong> = maximum observed n depth on one question. Example: Green + Continue ×8 + Done → n depth 9.
                     </span>
                   </span>
                 </p>
                 <p className="stat-value">{probeStats.count > 0 ? probeStats.max : '—'}</p>
-                <p className="meta">Peak observed chunks number</p>
+                <p className="meta">Peak observed n depth</p>
               </div>
             </div>
           </div>
@@ -894,7 +876,7 @@ export function ProgressAnalysisView({
                 ) : (
                   <div className="flex flex-col sm:flex-row gap-6 items-center w-full">
                     <div className="dist-bars flex-1 w-full">
-                      {(['red', 'orange', 'yellow', 'green', 'blue', 'indigo', 'purple'] as ResultColor[]).map((color) => {
+                      {RESULT_COLORS.map((color) => {
                         const n = counts[color]
                         const p = pct(n, total)
                         const width = `${Math.max(n ? 8 : 0, (n / Math.max(maxBar, 1)) * 100)}%`
@@ -1073,7 +1055,7 @@ export function ProgressAnalysisView({
                 <thead>
                   <tr>
                     <th scope="col">Day</th>
-                    <th scope="col" title="Finalized results that day (sample size, not chunks number)">
+                    <th scope="col" title="Finalized results that day (sample size, not n depth)">
                       sample
                     </th>
                     {visibleDayColumns.map((key) => (

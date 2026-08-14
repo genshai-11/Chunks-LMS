@@ -119,7 +119,7 @@ function formatFinishSummary(
     `1 Orange: ${summary.byColor.yellow}`,
     `2 Green: ${summary.byColor.green}`,
     `3 Purple: ${summary.byColor.purple}`,
-    `Max chunks number: ${summary.maxProbeDepth}`,
+    `n depth max: ${summary.maxProbeDepth}`,
     unresolved > 0
       ? `Left unfinalized when session closed: ${unresolved}`
       : 'All captured attempts finalized.',
@@ -652,7 +652,7 @@ export function TeacherObservePage() {
           } catch (e) {
             console.warn('[observe] audio init failed:', e)
           }
-          flash(`Chunks Number=${probeChunksNumber(result.data.snapshot) ?? 1}`)
+          flash(`n depth=${probeChunksNumber(result.data.snapshot) ?? 1}`)
         }
       } finally {
         setLiveSaving(false)
@@ -771,7 +771,7 @@ export function TeacherObservePage() {
           } catch (e) {
             console.warn('[observe] audio init failed:', e)
           }
-          flash(`Chunks Number=${probeChunksNumber(result.data.snapshot) ?? 1}`)
+          flash(`n depth=${probeChunksNumber(result.data.snapshot) ?? 1}`)
         }
       } finally {
         setLiveSaving(false)
@@ -1162,8 +1162,8 @@ export function TeacherObservePage() {
               </span>
             </div>
             {paneProbeOpen ? (
-              <p className="observe-depth-inline" title="Chunks Number starts at 1 when Green opens probe; each Continue adds 1.">
-                CHUNKS NUMBER <strong>{paneChunksNumber}</strong>
+              <p className="observe-depth-inline" title="n depth starts at 1 when Green opens probe; each Continue adds 1.">
+                n depth <strong>{paneChunksNumber}</strong>
               </p>
             ) : null}
           </div>
@@ -1365,7 +1365,7 @@ export function TeacherObservePage() {
               <>
                 <p className="observe-rail-name">{learner?.displayName ?? 'Learner'}</p>
                 {probeOpen ? (
-                  <p className="observe-rail-n" title="Chunks Number starts at 1 when Green opens probe">
+                  <p className="observe-rail-n" title="n depth starts at 1 when Green opens probe">
                     chunks={chunksNumber}
                   </p>
                 ) : null}
@@ -1522,8 +1522,8 @@ export function TeacherObservePage() {
                 </div>
               </div>
               {probeOpen ? (
-                <p className="observe-depth-inline" title="Chunks Number starts at 1 when Green opens probe; each Continue adds 1.">
-                  CHUNKS NUMBER <strong>{chunksNumber}</strong>
+                <p className="observe-depth-inline" title="n depth starts at 1 when Green opens probe; each Continue adds 1.">
+                  n depth <strong>{chunksNumber}</strong>
                 </p>
               ) : null}
               {isLiveTest ? (
@@ -1866,7 +1866,7 @@ export function TeacherObservePage() {
 
                 {/* Additional metrics */}
                 <div className="flex justify-between items-center text-xs pt-1 border-t border-white/5">
-                  <span className="text-slate-400">Max chunks number:</span>
+                  <span className="text-slate-400">n depth max:</span>
                   <span className="font-mono font-bold text-white">{finishMetrics.maxProbeDepth}</span>
                 </div>
 

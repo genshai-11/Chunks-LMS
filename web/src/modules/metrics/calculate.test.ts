@@ -52,16 +52,13 @@ describe('metric calculations', () => {
     expect(rfc.sampleSize).toBe(100)
   })
 
-  it('expands sample size with multi-step probe sequence: 49 base + 3 probe = 52 total', () => {
-    // 48 single-question attempts
+  it('keeps probe steps outside the finalized-main metric denominator', () => {
     const regularAttempts: FinalizedAttempt[] = Array.from({ length: 48 }, () => ({
       effectiveColor: 'green' as const,
       enteredProbeFlow: false,
       probeEventCount: 0,
       recordedColors: ['green' as const],
     }))
-
-    // 1 probed attempt with 3 probe steps: green (start) -> blue -> blue -> indigo (done)
     const probedAttempt: FinalizedAttempt = {
       effectiveColor: 'indigo',
       enteredProbeFlow: true,
@@ -69,55 +66,42 @@ describe('metric calculations', () => {
       recordedColors: ['green', 'blue', 'blue', 'indigo'],
     }
 
-    const allAttempts = [...regularAttempts, probedAttempt] // 49 questions
-    const metrics = calculateMetrics(allAttempts)
-
+    const metrics = calculateMetrics([...regularAttempts, probedAttempt])
     const rfc = metrics.find((m) => m.key === 'rfc')!
     const rac = metrics.find((m) => m.key === 'rac')!
 
-    // Total sample = 48 + 4 = 52
-    expect(rfc.sampleSize).toBe(52)
-    // All 52 are cool colors (green, blue, indigo)
+    expect(rfc.sampleSize).toBe(49)
+    expect(rac.sampleSize).toBe(49)
     expect(rfc.value).toBeCloseTo(0)
-    expect(rac.value).toBeCloseTo(1.0)
+    expect(rac.value).toBeCloseTo(1)
   })
 
-  it('counts warm colors (Red, Orange, Yellow) correctly across probe sequences', () => {
-    const attemptsWithWarm: FinalizedAttempt[] = [
-      {
-        effectiveColor: 'red',
-        enteredProbeFlow: false,
-        probeEventCount: 0,
-        recordedColors: ['red'],
-      },
-      {
-        effectiveColor: 'orange',
-        enteredProbeFlow: false,
-        probeEventCount: 0,
-        recordedColors: ['orange'],
-      },
-      // Green probe that failed -> [green, blue, yellow]
+  it('uses warm effective results for RFC and defines RAC as its exact complement', () => {
+    const finalized: FinalizedAttempt[] = [
+      { effectiveColor: 'red', enteredProbeFlow: false, probeEventCount: 0 },
+      { effectiveColor: 'orange', enteredProbeFlow: false, probeEventCount: 0 },
       {
         effectiveColor: 'yellow',
         enteredProbeFlow: true,
         probeEventCount: 2,
         recordedColors: ['green', 'blue', 'yellow'],
       },
+      { effectiveColor: 'green', enteredProbeFlow: false, probeEventCount: 0 },
+      { effectiveColor: 'blue', enteredProbeFlow: false, probeEventCount: 0 },
+      { effectiveColor: 'indigo', enteredProbeFlow: false, probeEventCount: 0 },
+      { effectiveColor: 'purple', enteredProbeFlow: false, probeEventCount: 0 },
     ]
-    // Total sample = 1 + 1 + 3 = 5 records.
-    // Warm colors = red (1) + orange (1) + yellow (1) = 3 warm records.
-    // Cool colors = green (1) + blue (1) = 2 cool records.
-    const metrics = calculateMetrics(attemptsWithWarm)
+    const metrics = calculateMetrics(finalized)
     const rfc = metrics.find((m) => m.key === 'rfc')!
     const rac = metrics.find((m) => m.key === 'rac')!
 
-    expect(rfc.sampleSize).toBe(5)
-    expect(rfc.value).toBeCloseTo(3 / 5) // 0.6
-    expect(rac.value).toBeCloseTo(2 / 5) // 0.4
-    expect(rac.value! + rfc.value!).toBeCloseTo(1.0)
+    expect(rfc.sampleSize).toBe(7)
+    expect(rfc.value).toBeCloseTo(3 / 7)
+    expect(rac.value).toBeCloseTo(4 / 7)
+    expect(rac.value! + rfc.value!).toBeCloseTo(1)
   })
 
-  it('calculates question-level and average CPD with dynamic color weights', () => {
+  it('calculates question-level and average CPD from only the finalized effective result', () => {
     const attempt: FinalizedAttempt = {
       effectiveColor: 'indigo',
       enteredProbeFlow: true,
@@ -127,12 +111,10 @@ describe('metric calculations', () => {
       cci: 6, // Base CPD = 60
     }
 
-    // Default linear weights: green: 0.5, blue: 4/6 (~0.667), indigo: 5/6 (~0.833)
     const result = calculateQuestionCpd(attempt)
     expect(result.baseCpd).toBe(60)
-
-    const expectedMeanWeight = (3 / 6 + 4 / 6 + 4 / 6 + 5 / 6) / 4 // 16/24 = 2/3 ≈ 0.6667
-    expect(result.questionCpd).toBeCloseTo(60 * expectedMeanWeight) // 40
+    expect(result.colors).toEqual(['indigo'])
+    expect(result.questionCpd).toBeCloseTo(60 * (5 / 6))
 
     // Custom weight test
     const customWeights: ColorWeights = {
@@ -145,8 +127,7 @@ describe('metric calculations', () => {
       purple: 1.0,
     }
     const customResult = calculateQuestionCpd(attempt, customWeights)
-    // Mean weight: (0.4 + 0.6 + 0.6 + 0.8) / 4 = 2.4 / 4 = 0.6
-    expect(customResult.questionCpd).toBeCloseTo(60 * 0.6) // 36
+    expect(customResult.questionCpd).toBeCloseTo(60 * 0.8)
   })
 
   it('returns null for empty windows, never zero', () => {

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { aggregateProbeMetrics, attemptNDepth } from './probe-metrics'
 
-describe('probe metrics (chunks count / chunks number)', () => {
-  it('treats Green entry as chunks count and displays chunks number starting at 1', () => {
-    // Green + 8 Continue + Done → stored probeCount 8, displayed chunks number 9
+describe('probe metrics (n count / n depth)', () => {
+  it('treats Green entry as n count and displays n depth starting at 1', () => {
+    // Green + 8 Continue + Done → stored probeCount 8, displayed n depth 9
     const deep = { enteredProbeFlow: true, probeCount: 8 }
     expect(attemptNDepth(deep)).toBe(9)
 
@@ -14,7 +14,7 @@ describe('probe metrics (chunks count / chunks number)', () => {
     expect(attemptNDepth(none)).toBeNull()
   })
 
-  it('aggregates chunks count, max chunks number, and avg chunks number from real attempts', () => {
+  it('aggregates n count, n depth max, and n depth avg from real attempts', () => {
     const agg = aggregateProbeMetrics([
       { enteredProbeFlow: true, probeCount: 8 },
       { enteredProbeFlow: true, probeCount: 1 },
@@ -27,7 +27,7 @@ describe('probe metrics (chunks count / chunks number)', () => {
     expect(agg.probedCount).toBe(3)
   })
 
-  it('returns null chunks number stats when no probe entries', () => {
+  it('returns null n depth stats when no probe entries', () => {
     const agg = aggregateProbeMetrics([
       { enteredProbeFlow: false, probeCount: 0 },
       { enteredProbeFlow: false, probeCount: 0 },

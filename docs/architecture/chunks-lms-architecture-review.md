@@ -217,9 +217,9 @@ Let `F` be finalized responses in the selected scope/window; `N = count(F)`.
 
 | Metric | Definition | Empty behavior | Direction |
 |---|---|---|---|
-| RFC | `(Red + Yellow) / N` | null | lower is better |
-| RAC | `(Green + Purple) / N` | null | higher is better |
-| Average Performance | `sum(color score 0..3) / N` | null | higher is better |
+| RFC | `(Red + Orange + Yellow) / finalized MAIN sample` | null | lower is better |
+| RAC / %c | `(Green + Blue + Indigo + Purple) / finalized MAIN sample = 1 - RFC` | null | higher is better |
+| Average Performance | `sum(normalized effective-color weight 0..1) / finalized MAIN sample` | null | higher is better |
 | Purple Mastery Rate | `Purple / N` | null | higher is better |
 | Clarification Rate | attempts entering probe flow / `N` | null | contextual |
 | Clarification Depth | probe-event count / probed attempts | null if no probes | contextual |

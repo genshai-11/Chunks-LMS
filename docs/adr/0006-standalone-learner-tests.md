@@ -16,7 +16,7 @@ Create a separate Standalone Test Assignment/Run aggregate:
 - one active Learner and one published package version per assignment;
 - one Test Section per run;
 - frozen CVR, CCI ID/Name/Ampe, language, voice, approved narration, and ordered Test Items;
-- separate attempts, append-only events, and current snapshots using the accepted color/probe/correction semantics;
+- separate attempts, append-only events, and current snapshots using the accepted seven-color/probe/correction semantics; command revisions order rapid UI actions without erasing earlier events;
 - separate Teacher routes/state and learner-profile Test Results;
 - no Class, Enrollment, Learning Session, Session Question, or live capture dependency.
 
@@ -28,3 +28,4 @@ Canonical CPD is reproducible as session `CVR-id × CCI.Ampe (A)`. Item-level so
 - The standalone module duplicates the event/snapshot storage shape but shares measurement semantics.
 - Published package/history rows remain immutable; the explicitly requested obsolete test reset is a separately previewed, guarded, confirmed transaction.
 - Runtime cannot start until current approved intro and all ten item narrations exist for the selected language/voice.
+- RFC/RAC and CPD metrics consume finalized effective MAIN item results only. Probe steps remain visible/countable history but are excluded from the metric denominator.

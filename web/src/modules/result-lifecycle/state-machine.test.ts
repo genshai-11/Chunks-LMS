@@ -67,7 +67,7 @@ describe('result lifecycle state machine', () => {
     let r = applyLifecycleCommand(snap, { type: 'record_provisional', color: 'green', at })
     if (!r.ok) throw new Error(r.error)
 
-    // Two continue steps (Lam / Blue)
+    // Two Continue steps (Blue)
     r = applyLifecycleCommand(r.snapshot, { type: 'resolve_probe', outcome: 'continue', at })
     expect(r.ok).toBe(true)
     if (!r.ok) return
@@ -80,7 +80,7 @@ describe('result lifecycle state machine', () => {
     expect(r.snapshot.recordedColors).toEqual(['green', 'blue', 'blue'])
     expect(r.snapshot.probeCount).toBe(2)
 
-    // Complete with Done (Chàm / Indigo)
+    // Complete with Done (Indigo)
     const done = applyLifecycleCommand(r.snapshot, {
       type: 'resolve_probe',
       outcome: 'done',

@@ -27,7 +27,11 @@ import {
   toChartRows,
   type SessionMetricPoint,
 } from '../modules/reporting/session-series'
-import type { ResultColor } from '../modules/result-lifecycle/types'
+import {
+  RESULT_COLORS,
+  RESULT_COLOR_META,
+  emptyResultColorCounts,
+} from '../modules/result-lifecycle/types'
 
 export type AnalysisChartKind = 'line' | 'bar' | 'area' | 'composed' | 'pie'
 
@@ -73,16 +77,6 @@ const FALLBACK_METRICS: MetricKey[] = [
   'n_depth_max',
   'n_depth_avg',
 ]
-
-const COLOR_HEX: Record<ResultColor, string> = {
-  red: '#f87171',
-  orange: '#fb923c',
-  yellow: '#facc15',
-  green: '#4ade80',
-  blue: '#38bdf8',
-  indigo: '#818cf8',
-  purple: '#c084fc',
-}
 
 const CHART_KINDS: { id: AnalysisChartKind; label: string }[] = [
   { id: 'line', label: 'Line' },
@@ -141,15 +135,7 @@ function colorByDay(
   totalDays?: number | null,
 ): Array<Record<string, string | number>> {
   return points.map((p) => {
-    const counts: Record<ResultColor, number> = {
-      red: 0,
-      orange: 0,
-      yellow: 0,
-      green: 0,
-      blue: 0,
-      indigo: 0,
-      purple: 0,
-    }
+    const counts = emptyResultColorCounts()
     for (const r of ledger) {
       if (r.learningSessionId !== p.learningSessionId) continue
       if (counts[r.effectiveColor] !== undefined) counts[r.effectiveColor] += 1
@@ -257,15 +243,7 @@ export function AnalysisChartsPanel({
   )
 
   const colorMixPie = useMemo(() => {
-    const counts: Record<ResultColor, number> = {
-      red: 0,
-      orange: 0,
-      yellow: 0,
-      green: 0,
-      blue: 0,
-      indigo: 0,
-      purple: 0,
-    }
+    const counts = emptyResultColorCounts()
     // Scope to selected days when set; otherwise all days that have series points
     const ids = new Set(
       (selectedDays.length > 0 ? filtered : points).map((p) => p.learningSessionId),
@@ -278,11 +256,11 @@ export function AnalysisChartsPanel({
       if (ids.size > 0 && !ids.has(r.learningSessionId)) continue
       if (counts[r.effectiveColor] !== undefined) counts[r.effectiveColor] += 1
     }
-    return (Object.keys(counts) as ResultColor[]).map((c) => ({
-      name: c,
-      value: counts[c],
-      fill: COLOR_HEX[c],
-    })).filter((d) => d.value > 0)
+    return RESULT_COLORS.map((color) => ({
+      name: RESULT_COLOR_META[color].label,
+      value: counts[color],
+      fill: RESULT_COLOR_META[color].hex,
+    })).filter((entry) => entry.value > 0)
   }, [filtered, points, selectedDays, ledger, learnerUserId, classId, courseId])
 
   const colorMixTotal = colorMixPie.reduce((s, d) => s + d.value, 0)
@@ -551,10 +529,16 @@ export function AnalysisChartsPanel({
         <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
         <Tooltip />
         <Legend />
-        <Bar dataKey="red" stackId="c" fill={COLOR_HEX.red} name="Red" radius={[0, 0, 0, 0]} />
-        <Bar dataKey="yellow" stackId="c" fill={COLOR_HEX.yellow} name="Orange" />
-        <Bar dataKey="green" stackId="c" fill={COLOR_HEX.green} name="Green" />
-        <Bar dataKey="purple" stackId="c" fill={COLOR_HEX.purple} name="Purple" radius={[4, 4, 0, 0]} />
+        {RESULT_COLORS.map((color, index) => (
+          <Bar
+            key={color}
+            dataKey={color}
+            stackId="c"
+            fill={RESULT_COLOR_META[color].hex}
+            name={RESULT_COLOR_META[color].label}
+            radius={index === RESULT_COLORS.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+          />
+        ))}
       </BarChart>
     </ResponsiveContainer>
   )

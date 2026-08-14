@@ -1754,14 +1754,29 @@
   .observe-heat-dot-btn.is-red {
     @apply bg-red-500 text-white;
   }
-  .observe-heat-dot-btn.is-yellow {
+  .observe-heat-dot-btn.is-orange {
     @apply bg-orange-500 text-white;
   }
+  .observe-heat-dot-btn.is-yellow {
+    @apply bg-amber-400 text-slate-950 font-black;
+  }
   .observe-heat-dot-btn.is-green {
-    @apply bg-green-500 text-white;
+    @apply bg-emerald-500 text-white;
+  }
+  .observe-heat-dot-btn.is-blue {
+    @apply bg-sky-500 text-white;
+  }
+  .observe-heat-dot-btn.is-indigo {
+    @apply bg-indigo-500 text-white;
   }
   .observe-heat-dot-btn.is-purple {
     @apply bg-purple-500 text-white;
+  }
+  .observe-heat-dot-btn.has-probe {
+    @apply relative;
+  }
+  .observe-heat-dot-btn .dot-probe-badge {
+    @apply absolute -top-1 -right-1 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-indigo-600 px-1 text-[8px] font-black text-white shadow ring-1 ring-slate-950;
   }
   .observe-heat-dot-btn.is-open {
     @apply bg-amber-400 text-amber-950 animate-pulse;

@@ -55,14 +55,28 @@ function requestOrigin(req: Request): string | null {
 
 function isAllowedOrigin(req: Request): boolean {
   const origin = requestOrigin(req);
-  return !origin || allowedOrigins().has(origin);
+  if (!origin) return true;
+  if (allowedOrigins().has(origin)) return true;
+  try {
+    const url = new URL(origin);
+    if (
+      url.hostname === "localhost" ||
+      url.hostname === "127.0.0.1" ||
+      url.hostname.endsWith(".vercel.app")
+    ) {
+      return true;
+    }
+  } catch {
+    // ignore
+  }
+  return false;
 }
 
 function corsHeaders(req: Request): Record<string, string> {
   const origin = requestOrigin(req);
+  const allowed = origin && isAllowedOrigin(req) ? origin : "*";
   return {
-    "Access-Control-Allow-Origin":
-      origin && isAllowedOrigin(req) ? origin : DEFAULT_ALLOWED_ORIGINS[0],
+    "Access-Control-Allow-Origin": allowed,
     "Access-Control-Allow-Headers":
       "authorization, x-client-info, apikey, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",

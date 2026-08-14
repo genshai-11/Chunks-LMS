@@ -70,10 +70,10 @@ import { getSupabase } from '../../lib/supabase'
 import { triggerConfetti } from '../../lib/confetti'
 
 const PRIMARY_COLORS: { key: ResultColor; label: string; shortcut: string }[] = [
-  { key: 'red', label: 'Đỏ', shortcut: '0' },
-  { key: 'orange', label: 'Cam', shortcut: '1' },
-  { key: 'green', label: 'Xanh', shortcut: '2' },
-  { key: 'purple', label: 'Tím', shortcut: '3' },
+  { key: 'red', label: 'Red', shortcut: '0' },
+  { key: 'orange', label: 'Orange', shortcut: '1' },
+  { key: 'green', label: 'Green', shortcut: '2' },
+  { key: 'purple', label: 'Purple', shortcut: '3' },
 ]
 
 type ReactionKind = 'celebrate' | 'happy' | 'fight'

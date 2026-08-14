@@ -13,7 +13,7 @@ export const PROBE_ACTIONS: ProbeAction[] = [
   {
     outcome: 'fail',
     color: 'yellow',
-    label: 'Vàng',
+    label: 'Yellow',
     subLabel: 'Fail',
     shortcut: 'F',
     className: 'probe-yellow',
@@ -21,7 +21,7 @@ export const PROBE_ACTIONS: ProbeAction[] = [
   {
     outcome: 'continue',
     color: 'blue',
-    label: 'Lam',
+    label: 'Blue',
     subLabel: 'Continue',
     shortcut: 'C',
     className: 'probe-blue',
@@ -29,7 +29,7 @@ export const PROBE_ACTIONS: ProbeAction[] = [
   {
     outcome: 'done',
     color: 'indigo',
-    label: 'Chàm',
+    label: 'Indigo',
     subLabel: 'Done',
     shortcut: 'D',
     className: 'probe-indigo',

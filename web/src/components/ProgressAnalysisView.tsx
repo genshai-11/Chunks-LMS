@@ -101,13 +101,13 @@ function colorCounts(records: ResultRecord[]): Record<ResultColor, number> {
 
 function resultColorLabel(color: ResultColor): string {
   const labels: Record<ResultColor, string> = {
-    red: 'Đỏ',
-    orange: 'Cam',
-    yellow: 'Vàng',
-    green: 'Xanh',
-    blue: 'Lam',
-    indigo: 'Chàm',
-    purple: 'Tím',
+    red: 'Red',
+    orange: 'Orange',
+    yellow: 'Yellow',
+    green: 'Green',
+    blue: 'Blue',
+    indigo: 'Indigo',
+    purple: 'Purple',
   }
   return labels[color] ?? color
 }
@@ -886,7 +886,7 @@ export function ProgressAnalysisView({
                 <p className="meta" style={{ marginTop: 0 }}>
                   Finalized results in current filter · sample={total}
                   {total > 0
-                    ? ` · Đỏ ${counts.red} · Cam ${counts.orange} · Vàng ${counts.yellow} · Lục ${counts.green} · Lam ${counts.blue} · Chàm ${counts.indigo} · Tím ${counts.purple}`
+                    ? ` · Red ${counts.red} · Orange ${counts.orange} · Yellow ${counts.yellow} · Green ${counts.green} · Blue ${counts.blue} · Indigo ${counts.indigo} · Purple ${counts.purple}`
                     : ''}
                 </p>
                 {total === 0 ? (

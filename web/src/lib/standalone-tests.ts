@@ -182,9 +182,11 @@ export const startStandaloneRun = (runId: string, readinessToken: string) =>
     p_readiness_token: readinessToken,
   })
 
+import type { ResultColor } from '../modules/result-lifecycle/types'
+
 export const recordStandaloneResult = (
   runItemId: string,
-  color: 'red' | 'yellow' | 'green' | 'purple',
+  color: ResultColor,
 ) =>
   rpc<{ attemptId: string; status: string; effectiveColor: string | null; probeCount: number }>(
     'record_standalone_provisional_result',

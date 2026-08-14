@@ -35,7 +35,6 @@ import { probeChunksNumber } from '../../modules/assessment/probe-metrics'
 import { listActiveLearners } from '../../modules/roster/service'
 import { getTestPackageVersion, listTestSections } from '../../lib/test-packages'
 import {
-  clearRequestCache,
   completeStandaloneRun,
   findLatestApprovedNarrationVariant,
   getStandaloneRun,
@@ -57,17 +56,32 @@ import { useAppState } from '../../state/useAppState'
 type AudioState = 'idle' | 'loading' | 'ready' | 'playing' | 'played' | 'error'
 type AudioTarget = 'item' | 'result_reaction' | 'session_intro' | 'package_start' | 'part_intro_1' | 'part_intro_2' | 'part_intro_3' | 'package_end' | 'item_prefix'
 type PartIntroNumber = 1 | 2 | 3
-type ResultColor = 'red' | 'yellow' | 'green' | 'purple'
+
+import {
+  DEFAULT_COLOR_WEIGHTS,
+  type ResultColor,
+} from '../../modules/result-lifecycle/types'
+
 type ReactionKind = 'celebrate' | 'happy' | 'fight'
 type Reaction = { kind: ReactionKind; color: ResultColor; id: number } | null
 
 type TestItem = Record<string, any>
 type ItemPlaybackCacheEntry = { variantId: string; signedUrl: string; isSilent?: boolean }
 
+const PRIMARY_COLORS: Array<{ key: ResultColor; label: string; num: string; hex: string }> = [
+  { key: 'red', label: 'Red', num: '0', hex: '#ef4444' },
+  { key: 'orange', label: 'Orange', num: '1', hex: '#f97316' },
+  { key: 'green', label: 'Green', num: '2', hex: '#22c55e' },
+  { key: 'purple', label: 'Purple', num: '3', hex: '#a855f7' },
+]
+
 const COLORS: Array<{ key: ResultColor; label: string; num: string; hex: string }> = [
   { key: 'red', label: 'Red', num: '0', hex: '#ef4444' },
-  { key: 'yellow', label: 'Orange', num: '1', hex: '#f97316' },
+  { key: 'orange', label: 'Orange', num: '1', hex: '#f97316' },
+  { key: 'yellow', label: 'Yellow', num: 'F', hex: '#eab308' },
   { key: 'green', label: 'Green', num: '2', hex: '#22c55e' },
+  { key: 'blue', label: 'Blue', num: 'C', hex: '#0ea5e9' },
+  { key: 'indigo', label: 'Indigo', num: 'D', hex: '#6366f1' },
   { key: 'purple', label: 'Purple', num: '3', hex: '#a855f7' },
 ]
 
@@ -114,8 +128,8 @@ function writeLiveAudioReady(runId?: string | null, assignmentId?: string | null
 }
 
 function reactionFor(color: ResultColor): ReactionKind {
-  if (color === 'purple') return 'celebrate'
-  if (color === 'green') return 'happy'
+  if (color === 'purple' || color === 'indigo') return 'celebrate'
+  if (color === 'green' || color === 'blue') return 'happy'
   return 'fight'
 }
 
@@ -142,22 +156,14 @@ function cpdValue(item: TestItem | null | undefined): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-function resultColorScore(color: ResultColor | null): number | null {
-  if (!color) return null
-  if (color === 'red') return 0
-  if (color === 'yellow') return 1
-  if (color === 'green') return 2
-  return 3
-}
-
 function achievedCpdValue(item: TestItem | null | undefined): number | null {
   if (!isItemFinalized(item)) return null
   const baseCpd = cpdValue(item)
   if (baseCpd == null) return null
-  const snapshot = getItemSnapshot(item)
-  const storedScore = Number(snapshot?.effective_score ?? snapshot?.effectiveScore)
-  const score = Number.isFinite(storedScore) ? storedScore : resultColorScore(getItemColor(item))
-  return score == null ? null : Math.round(baseCpd * score * 100) / 100
+  const color = getItemColor(item)
+  if (!color) return null
+  const weight = DEFAULT_COLOR_WEIGHTS[color] ?? 0
+  return Math.round(baseCpd * weight * 100) / 100
 }
 
 function metricNumber(value: unknown): number | null {
@@ -1229,7 +1235,8 @@ export function TeacherTestRunPage() {
     async (color: ResultColor) => {
       if (!currentItem || probeOpen) return
       resumeAudioAutoFlow()
-      const isFinalOutstandingItem = !isItemFinalized(currentItem) && items.filter((item) => !isItemFinalized(item)).length === 1
+      const isFinalOutstandingItem =
+        !isItemFinalized(currentItem) && items.filter((item) => !isItemFinalized(item)).length === 1
       playReaction(color)
       if (color !== 'green') {
         playScoreFeedbackThenNext(color)
@@ -1237,44 +1244,178 @@ export function TeacherTestRunPage() {
         enteringProbeRef.current = String(currentItem.id)
         activateAudioUrl('/audio/green.wav', 'green result', true, 'result_reaction')
       }
+
+      // Optimistic in-memory update for instantaneous UI response
+      setItems((prev) =>
+        prev.map((it) => {
+          if (it.id !== currentItem.id) return it
+          const prevAttempt = getItemAttempt(it)
+          const nextStatus = color === 'green' ? 'probe_open' : 'finalized'
+          const nextSnapshot = {
+            ...(prevAttempt?.standalone_test_attempt_snapshots ?? {}),
+            status: nextStatus,
+            effective_color: color === 'green' ? null : color,
+            provisional_color: color,
+            entered_probe_flow: color === 'green',
+            probe_count: 0,
+          }
+          return {
+            ...it,
+            standalone_test_attempts: [
+              {
+                ...(prevAttempt ?? {}),
+                run_item_id: it.id,
+                standalone_test_attempt_snapshots: nextSnapshot,
+              },
+            ],
+          }
+        }),
+      )
+
       const result = await recordStandaloneResult(currentItem.id, color)
       if (!result.ok) {
         setMessage(result.error)
         return
       }
-      clearRequestCache()
-      await load()
+
+      // Sync official result from RPC
+      setItems((prev) =>
+        prev.map((it) => {
+          if (it.id !== currentItem.id) return it
+          const prevAttempt = getItemAttempt(it)
+          const nextSnapshot = {
+            ...(prevAttempt?.standalone_test_attempt_snapshots ?? {}),
+            status: result.data.status,
+            effective_color: result.data.effectiveColor,
+            provisional_color: color,
+            entered_probe_flow: color === 'green',
+            probe_count: result.data.probeCount,
+          }
+          return {
+            ...it,
+            standalone_test_attempts: [
+              {
+                ...(prevAttempt ?? {}),
+                id: result.data.attemptId,
+                run_item_id: it.id,
+                standalone_test_attempt_snapshots: nextSnapshot,
+              },
+            ],
+          }
+        }),
+      )
+
       if (isFinalOutstandingItem) await playEndAfterFinalScore()
     },
-    [activateAudioUrl, currentItem, items, load, playEndAfterFinalScore, playReaction, playScoreFeedbackThenNext, probeOpen, resumeAudioAutoFlow],
+    [
+      activateAudioUrl,
+      currentItem,
+      items,
+      playEndAfterFinalScore,
+      playReaction,
+      playScoreFeedbackThenNext,
+      probeOpen,
+      resumeAudioAutoFlow,
+    ],
   )
 
   const handleProbe = useCallback(
     async (outcome: 'fail' | 'continue' | 'done') => {
       if (!currentAttempt?.id || !probeOpen) return
       resumeAudioAutoFlow()
-      const isFinalOutstandingItem = outcome !== 'continue' && currentItem && !isItemFinalized(currentItem) && items.filter((item) => !isItemFinalized(item)).length === 1
+      const isFinalOutstandingItem =
+        outcome !== 'continue' &&
+        currentItem &&
+        !isItemFinalized(currentItem) &&
+        items.filter((item) => !isItemFinalized(item)).length === 1
+
       if (outcome !== 'continue') {
-        playScoreFeedbackThenNext(outcome === 'fail' ? 'red' : 'green')
+        const finalColor: ResultColor = outcome === 'fail' ? 'yellow' : 'indigo'
+        playScoreFeedbackThenNext(finalColor)
       } else {
         activateAudioUrl('/audio/yellow.wav', 'continue result', true, 'result_reaction')
       }
+
+      // Optimistic in-memory update
+      setItems((prev) =>
+        prev.map((it) => {
+          if (it.id !== currentItem.id) return it
+          const prevAttempt = getItemAttempt(it)
+          const prevSnap = prevAttempt?.standalone_test_attempt_snapshots ?? {}
+          const currentCount = Number(prevSnap.probe_count ?? 0)
+          const nextCount = outcome === 'continue' ? currentCount + 1 : currentCount
+          const nextStatus = outcome === 'continue' ? 'probe_open' : 'finalized'
+          const nextEffective = outcome === 'fail' ? 'yellow' : outcome === 'done' ? 'indigo' : null
+          const nextSnapshot = {
+            ...prevSnap,
+            status: nextStatus,
+            effective_color: nextEffective,
+            probe_count: nextCount,
+          }
+          return {
+            ...it,
+            standalone_test_attempts: [
+              {
+                ...(prevAttempt ?? {}),
+                standalone_test_attempt_snapshots: nextSnapshot,
+              },
+            ],
+          }
+        }),
+      )
+
       const result = await resolveStandaloneProbe(String(currentAttempt.id), outcome)
       if (!result.ok) {
         setMessage(result.error)
         return
       }
-      clearRequestCache()
+
       if (outcome === 'continue') {
-        setMessage(`Chunks Number=${probeChunksNumber({ enteredProbeFlow: true, probeCount: result.data.probeCount }) ?? 1}`)
+        setMessage(
+          `Chunks Number=${probeChunksNumber({ enteredProbeFlow: true, probeCount: result.data.probeCount }) ?? 1}`,
+        )
       } else {
-        playReaction(outcome === 'fail' ? 'red' : 'green')
+        playReaction(outcome === 'fail' ? 'yellow' : 'indigo')
         setMessage('')
       }
-      await load()
+
+      // Sync official result from RPC
+      setItems((prev) =>
+        prev.map((it) => {
+          if (it.id !== currentItem.id) return it
+          const prevAttempt = getItemAttempt(it)
+          const nextSnapshot = {
+            ...(prevAttempt?.standalone_test_attempt_snapshots ?? {}),
+            status: result.data.status,
+            effective_color: result.data.effectiveColor,
+            probe_count: result.data.probeCount,
+          }
+          return {
+            ...it,
+            standalone_test_attempts: [
+              {
+                ...(prevAttempt ?? {}),
+                id: result.data.attemptId,
+                standalone_test_attempt_snapshots: nextSnapshot,
+              },
+            ],
+          }
+        }),
+      )
+
       if (isFinalOutstandingItem) await playEndAfterFinalScore()
     },
-    [activateAudioUrl, currentAttempt?.id, currentItem, items, load, playEndAfterFinalScore, playReaction, playScoreFeedbackThenNext, probeOpen, resumeAudioAutoFlow],
+    [
+      activateAudioUrl,
+      currentAttempt?.id,
+      currentItem,
+      items,
+      playEndAfterFinalScore,
+      playReaction,
+      playScoreFeedbackThenNext,
+      probeOpen,
+      resumeAudioAutoFlow,
+    ],
   )
 
   useEffect(() => {
@@ -1292,23 +1433,24 @@ export function TeacherTestRunPage() {
         return
       }
       if (probeOpen) {
-        if (e.key.toLowerCase() === 'f') {
+        if (e.key.toLowerCase() === 'f' || e.key === '1') {
           e.preventDefault()
           void handleProbe('fail')
           return
         }
-        if (e.key.toLowerCase() === 'c' || e.key.toLowerCase() === 'p') {
+        if (e.key.toLowerCase() === 'c' || e.key.toLowerCase() === 'p' || e.key === '2') {
           e.preventDefault()
           void handleProbe('continue')
           return
         }
-        if (e.key.toLowerCase() === 'd' || e.key === 'Enter') {
+        if (e.key.toLowerCase() === 'd' || e.key === 'Enter' || e.key === '3') {
           e.preventDefault()
           void handleProbe('done')
           return
         }
+        return
       }
-      const found = COLORS.find((k) => k.num === e.key)
+      const found = PRIMARY_COLORS.find((k) => k.num === e.key)
       if (found) {
         e.preventDefault()
         void handleRecord(found.key)
@@ -1369,21 +1511,60 @@ export function TeacherTestRunPage() {
     }))
   }, [items])
 
+  const totalProbeSteps = useMemo(() => {
+    return items.reduce((sum, item) => {
+      const snap = getItemSnapshot(item)
+      const count = Number(snap?.probe_count ?? snap?.probeCount ?? 0)
+      return sum + (snap?.entered_probe_flow || count > 0 ? count : 0)
+    }, 0)
+  }, [items])
+
+  const expandedTotalItems = items.length + totalProbeSteps
+
   const summaryMetrics = useMemo(() => {
     const redCount = items.filter((i) => getItemColor(i) === 'red').length
+    const orangeCount = items.filter((i) => getItemColor(i) === 'orange').length
     const yellowCount = items.filter((i) => getItemColor(i) === 'yellow').length
     const greenCount = items.filter((i) => getItemColor(i) === 'green').length
+    const blueCount = items.filter((i) => getItemColor(i) === 'blue').length
+    const indigoCount = items.filter((i) => getItemColor(i) === 'indigo').length
     const purpleCount = items.filter((i) => getItemColor(i) === 'purple').length
+
     const cpdValues = items.map(achievedCpdValue).filter((v): v is number => v !== null)
     const finalized = completedCount
-    const rfc = finalized > 0 ? Math.round(((redCount + yellowCount) / finalized) * 100) : 0
-    const rac = finalized > 0 ? Math.round(((greenCount + purpleCount) / finalized) * 100) : 0
+
+    const sampleTotal = items.reduce((sum, item) => {
+      if (!isItemFinalized(item)) return sum
+      const snap = getItemSnapshot(item)
+      const count = Number(snap?.probe_count ?? snap?.probeCount ?? 0)
+      return sum + 1 + (snap?.entered_probe_flow || count > 0 ? count : 0)
+    }, 0)
+
+    const warmCount = redCount + orangeCount + yellowCount
+    const rfc = sampleTotal > 0 ? Math.round((warmCount / sampleTotal) * 100) : 0
+    const rac = sampleTotal > 0 ? 100 - rfc : 0
+
     const avgCpd = cpdValues.length
       ? Math.round(cpdValues.reduce((acc, value) => acc + value, 0) / cpdValues.length)
       : 0
     const minCpd = cpdValues.length ? Math.min(...cpdValues) : null
     const maxCpd = cpdValues.length ? Math.max(...cpdValues) : null
-    return { redCount, yellowCount, greenCount, purpleCount, finalized, rfc, rac, avgCpd, minCpd, maxCpd }
+    return {
+      redCount,
+      orangeCount,
+      yellowCount,
+      greenCount,
+      blueCount,
+      indigoCount,
+      purpleCount,
+      finalized,
+      sampleTotal,
+      rfc,
+      rac,
+      avgCpd,
+      minCpd,
+      maxCpd,
+    }
   }, [items, completedCount])
 
   const chartData = useMemo(
@@ -1511,7 +1692,7 @@ export function TeacherTestRunPage() {
                 <span className="observe-learner-rfc is-percent-c">%c {summaryMetrics.rac}%</span>
                 <span className="observe-learner-rfc is-cpd">Max CPD {formatVolt(summaryMetrics.maxCpd)}</span>
               </div>
-              <p className="observe-rail-n">{completedCount}/{items.length} scored</p>
+              <p className="observe-rail-n">{completedCount}/{items.length} scored {totalProbeSteps > 0 ? `(+${totalProbeSteps} probes)` : ''}</p>
             </>
           ) : null}
         </div>
@@ -1590,18 +1771,22 @@ export function TeacherTestRunPage() {
                             const idx = items.findIndex((candidate) => candidate.id === item.id)
                             const color = getItemColor(item)
                             const statusClass = isItemFinalized(item) && color ? `is-${color}` : 'is-empty'
+                            const snap = getItemSnapshot(item)
+                            const count = Number(snap?.probe_count ?? snap?.probeCount ?? 0)
+                            const hasProbe = Boolean(snap?.entered_probe_flow || count > 0)
                             return (
                               <button
                                 key={item.id}
                                 type="button"
-                                className={`observe-heat-dot-btn ${statusClass}${idx === selectedIndex ? ' is-current' : ''}`}
-                                title={`Session ${sessionNum} · Q${item.global_item_order}: ${item.prompt_text ?? ''}`}
+                                className={`observe-heat-dot-btn ${statusClass}${idx === selectedIndex ? ' is-current' : ''}${hasProbe ? ' has-probe' : ''}`}
+                                title={`Session ${sessionNum} · Q${item.global_item_order}: ${item.prompt_text ?? ''}${hasProbe ? ` (n=${count})` : ''}`}
                                 onClick={() => {
                                   setSelectedIndex(idx)
                                   setIsSummaryShown(false)
                                 }}
                               >
-                                {item.global_item_order}
+                                <span>{item.global_item_order}</span>
+                                {hasProbe ? <span className="dot-probe-badge">+{count}</span> : null}
                               </button>
                             )
                           })}
@@ -1623,18 +1808,14 @@ export function TeacherTestRunPage() {
                   <strong>{audioState}</strong>
                   {audioPanelOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                 </button>
-                <div className="live-test-audio-body" hidden={!audioPanelOpen}>
+                <div className="live-test-audio-body">
+                  <div className="live-test-audio-controls">
                     <audio
                       ref={audioRef}
-                      id="live-test-current-audio"
                       controls
-                      onPlay={() => {
-                        markAudioReady({ suppressAutoPlay: false })
-                        if ((audioTargetRef.current === 'item' || audioTargetRef.current === 'item_prefix') && currentItem?.id) {
-                          autoPlayedItemIdsRef.current.add(String(currentItem.id))
-                        }
-                        setAudioState('playing')
-                      }}
+                      preload="auto"
+                      onPlay={() => setAudioState('playing')}
+                      onPause={() => setAudioState((current) => (current === 'playing' ? 'ready' : current))}
                       onEnded={handleAudioEnded}
                       onError={() => setAudioState('error')}
                       className="live-test-audio-el"
@@ -1725,6 +1906,7 @@ export function TeacherTestRunPage() {
                       </label>
                     </div>
                   </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1749,7 +1931,7 @@ export function TeacherTestRunPage() {
         ) : null}
       </aside>
 
-      <main className="observe-stage observe-stage-tight live-test-stage">
+      <main className="observe-main">
         {!isSummaryShown ? (
           <>
             <div className="observe-stage-hero live-test-stage-hero">
@@ -1767,13 +1949,13 @@ export function TeacherTestRunPage() {
                 </button>
               </h1>
 
-              {showKeys ? <p className="observe-depth-inline live-test-shortcuts">Shortcuts: 0 Red · 1 Orange · 2 Green · 3 Purple · H map · ? keys</p> : null}
+              {showKeys ? <p className="observe-depth-inline live-test-shortcuts">Shortcuts: 0 Red · 1 Orange · 2 Green · 3 Purple · F Yellow · C Blue · D Indigo · H map · ? keys</p> : null}
             </div>
 
             {reaction ? (
               <div key={reaction.id} className={`observe-react observe-react-${reaction.kind}`} aria-hidden>
                 <span className="observe-react-symbol"><Check aria-hidden /></span>
-                <span className="observe-react-label">{reaction.kind === 'celebrate' ? 'Xuất sắc!' : reaction.kind === 'happy' ? 'Tập trung tốt!' : 'Cần hỗ trợ'}</span>
+                <span className="observe-react-label">{reaction.kind === 'celebrate' ? 'Excellent!' : reaction.kind === 'happy' ? 'Great Focus!' : 'Need Support'}</span>
                 <Sparkles className="observe-react-sparkles" aria-hidden />
                 <span className="observe-react-burst" />
               </div>
@@ -1804,7 +1986,7 @@ export function TeacherTestRunPage() {
                       type="button"
                       className={`observe-dock-probe-btn ${action.className}`}
                       onClick={() => void handleProbe(action.outcome)}
-                      aria-label={`${action.label} probe`}
+                      aria-label={`${action.label} (${action.subLabel})`}
                     >
                       <span>{action.label}</span>
                       <kbd>{action.shortcut}</kbd>
@@ -1813,7 +1995,7 @@ export function TeacherTestRunPage() {
                 </div>
               ) : (
                 <div className="observe-dock-colors" role="group" aria-label="Result color">
-                  {COLORS.map((c) => (
+                  {PRIMARY_COLORS.map((c) => (
                     <button key={c.key} type="button" className={`observe-dock-color is-${c.key}${currentColor === c.key ? ' is-selected' : ''}`} onClick={() => void handleRecord(c.key)} disabled={!currentItem} title={`${c.num} · ${c.label}`}>
                       <span className="observe-dock-num">{c.num}</span>
                       <span className="observe-dock-label">{c.label}</span>
@@ -1822,7 +2004,7 @@ export function TeacherTestRunPage() {
                 </div>
               )}
               <div className="observe-dock-tools observe-split-tools">
-                <p className="observe-day-line live-test-day-line">Session {currentSessionNumber} · Q{currentItemNumber}/{items.length} · {completedCount}/{items.length} finalized</p>
+                <p className="observe-day-line live-test-day-line">Session {currentSessionNumber} · Q{currentItemNumber}/{items.length} {totalProbeSteps > 0 ? `(+${totalProbeSteps} probes)` : ''} · {completedCount}/{items.length} finalized</p>
               </div>
             </div>
 
@@ -1868,17 +2050,26 @@ export function TeacherTestRunPage() {
           </>
         ) : (
           <div className="min-h-0 w-full max-w-4xl overflow-y-auto p-4">
-            <Panel icon={BarChart3} title={`Màn hình Ghi nhận & Xem Kết quả · ${learnerName}`} description={`Tổng số câu trong Package: ${items.length} | Đã hoàn thành: ${summaryMetrics.finalized}/${items.length}`} collapsible={false}>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-3">
-                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-center"><div className="text-2xl font-bold text-red-500">{summaryMetrics.redCount}</div><div className="text-xs text-red-400 font-semibold">0 · Red</div></div>
-                <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/30 text-center"><div className="text-2xl font-bold text-orange-500">{summaryMetrics.yellowCount}</div><div className="text-xs text-orange-400 font-semibold">1 · Orange</div></div>
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center"><div className="text-2xl font-bold text-emerald-500">{summaryMetrics.greenCount}</div><div className="text-xs text-emerald-400 font-semibold">2 · Green</div></div>
-                <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/30 text-center"><div className="text-2xl font-bold text-purple-500">{summaryMetrics.purpleCount}</div><div className="text-xs text-purple-400 font-semibold">3 · Purple</div></div>
+            <Panel
+              icon={BarChart3}
+              title={`Live Test Results & Analysis · ${learnerName}`}
+              description={`Package Total: ${items.length} Questions ${totalProbeSteps > 0 ? `(+${totalProbeSteps} probe steps = ${expandedTotalItems} total items)` : ''} | Scored: ${summaryMetrics.finalized}/${items.length} questions`}
+              collapsible={false}
+            >
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 my-3">
+                <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-center"><div className="text-xl font-bold text-red-500">{summaryMetrics.redCount}</div><div className="text-xs text-red-400 font-semibold">Red (0)</div></div>
+                <div className="p-2.5 rounded-xl bg-orange-500/10 border border-orange-500/30 text-center"><div className="text-xl font-bold text-orange-500">{summaryMetrics.orangeCount}</div><div className="text-xs text-orange-400 font-semibold">Orange (1)</div></div>
+                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-center"><div className="text-xl font-bold text-amber-400">{summaryMetrics.yellowCount}</div><div className="text-xs text-amber-300 font-semibold">Yellow (F)</div></div>
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center"><div className="text-xl font-bold text-emerald-500">{summaryMetrics.greenCount}</div><div className="text-xs text-emerald-400 font-semibold">Green (2)</div></div>
+                <div className="p-2.5 rounded-xl bg-sky-500/10 border border-sky-500/30 text-center"><div className="text-xl font-bold text-sky-400">{summaryMetrics.blueCount}</div><div className="text-xs text-sky-300 font-semibold">Blue (C)</div></div>
+                <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-center"><div className="text-xl font-bold text-indigo-400">{summaryMetrics.indigoCount}</div><div className="text-xs text-indigo-300 font-semibold">Indigo (D)</div></div>
+                <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-center"><div className="text-xl font-bold text-purple-400">{summaryMetrics.purpleCount}</div><div className="text-xs text-purple-300 font-semibold">Purple (3)</div></div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-900 p-4 text-xs font-mono text-white shadow-inner sm:grid-cols-5">
+              <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-900 p-4 text-xs font-mono text-white shadow-inner sm:grid-cols-6">
                 <div><span className="text-slate-400">RFC </span><strong className="text-red-400">{summaryMetrics.rfc}%</strong></div>
-                <div><span className="text-slate-400">%c </span><strong className="text-emerald-400">{summaryMetrics.rac}%</strong></div>
+                <div><span className="text-slate-400">%c (RAC) </span><strong className="text-emerald-400">{summaryMetrics.rac}%</strong></div>
+                <div><span className="text-slate-400">Total Steps </span><strong className="text-indigo-300">{summaryMetrics.sampleTotal}</strong></div>
                 <div><span className="text-slate-400">CPD min </span><strong className="text-blue-300">{formatVolt(summaryMetrics.minCpd)}</strong></div>
                 <div><span className="text-slate-400">CPD max </span><strong className="text-blue-300">{formatVolt(summaryMetrics.maxCpd)}</strong></div>
                 <div><span className="text-slate-400">CPD avg </span><strong className="text-blue-300">{formatVolt(summaryMetrics.avgCpd)}</strong></div>

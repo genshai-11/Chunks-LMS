@@ -1,6 +1,7 @@
 import { cacheKey, cachedQuery, clearRequestCache } from './request-cache'
 export { clearRequestCache } from './request-cache'
 import { getSupabase } from './supabase'
+import type { ResultColor } from '../modules/result-lifecycle/types'
 import type {
   PromptLanguage,
   StandaloneAssignmentStatus,
@@ -36,6 +37,22 @@ export type StandaloneTestRunRow = {
   cciValue: number
   itemCpd: number
   status: StandaloneRunStatus
+  introNarrationVariantId: string | null
+}
+
+export type StandaloneAssignmentView = {
+  assignment: StandaloneTestAssignmentRow
+  runs: StandaloneTestRunRow[]
+  items: Array<Record<string, any>>
+}
+
+export type StandaloneResultState = {
+  attemptId: string
+  status: string
+  effectiveColor: ResultColor | null
+  probeCount: number
+  clientRevision: number
+  stale: boolean
 }
 
 function client() {
@@ -72,6 +89,7 @@ function run(row: any): StandaloneTestRunRow {
     cciValue: Number(row.cci_value),
     itemCpd: Number(row.item_cpd),
     status: row.status,
+    introNarrationVariantId: row.intro_narration_variant_id ?? null,
   }
 }
 
@@ -137,12 +155,16 @@ export async function getStandaloneRun(
   )
 }
 
-async function rpc<T>(name: string, args: Record<string, unknown>): Promise<Result<T>> {
+async function rpc<T>(
+  name: string,
+  args: Record<string, unknown>,
+  invalidatePrefix = 'standalone',
+): Promise<Result<T>> {
   const sb = client()
   if (!sb) return { ok: false, error: 'Supabase is not configured' }
   const { data, error } = await sb.rpc(name, args)
   if (error) return { ok: false, error: error.message }
-  clearRequestCache('standalone')
+  clearRequestCache(invalidatePrefix)
   return { ok: true, data: data as T }
 }
 
@@ -184,17 +206,36 @@ export const startStandaloneRun = (runId: string, readinessToken: string) =>
 
 export const recordStandaloneResult = (
   runItemId: string,
-  color: 'red' | 'yellow' | 'green' | 'purple',
+  color: ResultColor,
+  clientRevision: number,
 ) =>
-  rpc<{ attemptId: string; status: string; effectiveColor: string | null; probeCount: number }>(
-    'record_standalone_provisional_result',
-    { p_run_item_id: runItemId, p_color: color },
+  rpc<StandaloneResultState>(
+    'apply_standalone_result_command',
+    {
+      p_run_item_id: runItemId,
+      p_action: 'record',
+      p_color: color,
+      p_outcome: null,
+      p_client_revision: clientRevision,
+    },
+    'standalone:assignment-view',
   )
 
-export const resolveStandaloneProbe = (attemptId: string, outcome: 'fail' | 'continue' | 'done') =>
-  rpc<{ attemptId: string; status: string; effectiveColor: string | null; probeCount: number }>(
-    'resolve_standalone_probe',
-    { p_attempt_id: attemptId, p_outcome: outcome },
+export const resolveStandaloneProbe = (
+  runItemId: string,
+  outcome: 'fail' | 'continue' | 'done',
+  clientRevision: number,
+) =>
+  rpc<StandaloneResultState>(
+    'apply_standalone_result_command',
+    {
+      p_run_item_id: runItemId,
+      p_action: 'probe',
+      p_color: null,
+      p_outcome: outcome,
+      p_client_revision: clientRevision,
+    },
+    'standalone:assignment-view',
   )
 
 export const completeStandaloneRun = (runId: string) =>
@@ -329,6 +370,85 @@ export async function findLatestApprovedNarrationVariant(input: {
   )
 }
 
+export async function getStandaloneAssignmentView(
+  assignmentId: string,
+): Promise<Result<StandaloneAssignmentView>> {
+  return cachedQuery(
+    cacheKey(['standalone', 'assignment-view', assignmentId]),
+    async () => {
+      const sb = client()
+      if (!sb) return { ok: false, error: 'Supabase is not configured' }
+      const { data, error } = await sb
+        .from('standalone_test_assignments')
+        .select(`
+          *,
+          standalone_test_runs(
+            *,
+            standalone_test_run_items(
+              *,
+              test_items(prompt_vi,prompt_en),
+              standalone_test_attempts(
+                *,
+                standalone_test_attempt_snapshots(*),
+                standalone_test_events(event_sequence,event_type,payload,created_at)
+              )
+            )
+          )
+        `)
+        .eq('id', assignmentId)
+        .maybeSingle()
+      if (error) return { ok: false, error: error.message }
+      if (!data) return { ok: false, error: 'Standalone Test Assignment not found' }
+
+      const rawRuns = [...((data as any).standalone_test_runs ?? [])].sort(
+        (a, b) => Number(a.session_number) - Number(b.session_number) || Number(a.attempt_number) - Number(b.attempt_number),
+      )
+      const runs = rawRuns.map(run)
+      let globalItemOrder = 1
+      const items: Array<Record<string, any>> = []
+      rawRuns.forEach((rawRun, runIndex) => {
+        const mappedRun = runs[runIndex]!
+        const runItems = [...(rawRun.standalone_test_run_items ?? [])].sort(
+          (a, b) => Number(a.item_order) - Number(b.item_order),
+        )
+        for (const item of runItems) {
+          const attempts = [...(item.standalone_test_attempts ?? [])].map((attempt) => ({
+            ...attempt,
+            standalone_test_events: [...(attempt.standalone_test_events ?? [])].sort(
+              (a, b) => Number(a.event_sequence) - Number(b.event_sequence),
+            ),
+          }))
+          items.push({
+            ...item,
+            standalone_test_attempts: attempts,
+            global_item_order: globalItemOrder,
+            parent_run_id: mappedRun.id,
+            session_number: mappedRun.sessionNumber,
+            prompt_language: mappedRun.promptLanguage,
+            voice_id: mappedRun.voiceId,
+            test_section_id: mappedRun.testSectionId,
+            prompt_vi: item.test_items?.prompt_vi ?? null,
+            prompt_en: item.test_items?.prompt_en ?? null,
+            cvr: mappedRun.targetCvrOhm,
+            cci: mappedRun.cciValue,
+            cpd: Number(item.item_cpd ?? mappedRun.itemCpd),
+          })
+          globalItemOrder += 1
+        }
+      })
+      return {
+        ok: true,
+        data: {
+          assignment: assignment(data),
+          runs,
+          items,
+        },
+      }
+    },
+    { ttlMs: 10_000 },
+  )
+}
+
 export async function deleteStandaloneAssignment(assignmentId: string): Promise<Result<true>> {
   const sb = client()
   if (!sb) return { ok: false, error: 'Supabase is not configured' }
@@ -337,42 +457,8 @@ export async function deleteStandaloneAssignment(assignmentId: string): Promise<
   return { ok: true, data: true }
 }
 
-export async function getStandaloneAssignmentAnalysis(assignmentId: string): Promise<
-  Result<{
-    assignment: StandaloneTestAssignmentRow | null
-    runs: StandaloneTestRunRow[]
-    items: Array<Record<string, unknown>>
-  }>
-> {
-  const assignments = await listStandaloneAssignments()
-  if (!assignments.ok) return assignments
-  const runs = await listStandaloneRuns(assignmentId)
-  if (!runs.ok) return runs
-  const itemResults = await Promise.all(runs.data.map((r) => listStandaloneRunItems(r.id)))
-  const items: Array<Record<string, unknown>> = []
-  for (let i = 0; i < runs.data.length; i += 1) {
-    const result = itemResults[i]
-    if (!result?.ok) return result ?? { ok: false, error: 'Could not load run items' }
-    for (const item of result.data) {
-      items.push({
-        ...item,
-        parent_run_id: runs.data[i]!.id,
-        session_number: runs.data[i]!.sessionNumber,
-        prompt_language: runs.data[i]!.promptLanguage,
-        voice_id: runs.data[i]!.voiceId,
-        target_cvr_ohm: runs.data[i]!.targetCvrOhm,
-        cci_name: runs.data[i]!.cciName,
-        cci_value: runs.data[i]!.cciValue,
-        item_cpd: runs.data[i]!.itemCpd,
-      })
-    }
-  }
-  return {
-    ok: true,
-    data: {
-      assignment: assignments.data.find((a) => a.id === assignmentId) ?? null,
-      runs: runs.data,
-      items,
-    },
-  }
+export async function getStandaloneAssignmentAnalysis(
+  assignmentId: string,
+): Promise<Result<StandaloneAssignmentView>> {
+  return getStandaloneAssignmentView(assignmentId)
 }

@@ -1,11 +1,11 @@
 /**
  * Teacher-facing probe labels.
  *
- * - **chunks number** = displayed probe depth after Green; Green opens at 1.
- * - **chunks count** = session-level count of Green entries (see probe-metrics).
+ * - **n depth** = displayed probe depth after Green; Green opens at 1.
+ * - **n count** = session-level count of Green entries (see probe-metrics).
  * - **ceiling** = maxProbeCount (configured session limit — not observed peak).
  *
- * Do not reuse chunks number for sample size / finalized question count — use "finalized" or "sample".
+ * Do not reuse n depth for sample size / finalized question count — use "finalized" or "sample".
  */
 
 import type { AssessmentSnapshot } from '../result-lifecycle/types'
@@ -16,7 +16,7 @@ export function probeN(snapshot: Pick<AssessmentSnapshot, 'probeCount' | 'entere
   return probeChunksNumber(snapshot)
 }
 
-/** @deprecated Prefer naming as session ceiling, not max chunks number */
+/** @deprecated Prefer naming as session ceiling, not n depth max */
 export function probeDepthMax(
   snapshot: Pick<AssessmentSnapshot, 'maxProbeCount'> | null | undefined,
   fallbackMax = 0,
@@ -27,7 +27,7 @@ export function probeDepthMax(
   return fallbackMax
 }
 
-/** Compact cell text: "chunks number=2" or "—" */
+/** Compact cell text: "n depth=2" or "—" */
 export function formatProbeCell(
   snapshot: AssessmentSnapshot | null | undefined,
   _sessionMaxProbe?: number,

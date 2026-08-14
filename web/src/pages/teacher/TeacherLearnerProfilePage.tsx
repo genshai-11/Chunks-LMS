@@ -39,7 +39,7 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
   total: 'Total',
   rfc: 'RFC',
   scoreAvg: 'Score avg',
-  probeTotal: 'Chunks Number',
+  probeTotal: 'n depth',
 }
 
 export function TeacherLearnerProfilePage() {
@@ -317,7 +317,7 @@ export function TeacherLearnerProfilePage() {
         <Panel
           icon={BarChart3}
           title="RFC summary"
-          description="RFC = (Red + Orange) / total finalized observations per session."
+          description="RFC = (Red + Orange + Yellow) / finalized main observations per session; %c (RAC) = 1 - RFC."
         >
           <div className="stat-grid compact">
             <StatCard
@@ -391,12 +391,12 @@ export function TeacherLearnerProfilePage() {
                     {columns.purple ? <th scope="col">Purple</th> : null}
                     {columns.total ? <th scope="col">Total session</th> : null}
                     {columns.rfc ? (
-                      <th scope="col" title="(Red + Orange) / total">
+                      <th scope="col" title="(Red + Orange + Yellow) / finalized main sample">
                         RFC
                       </th>
                     ) : null}
                     {columns.scoreAvg ? <th scope="col">Score avg</th> : null}
-                    {columns.probeTotal ? <th scope="col">Chunks Number</th> : null}
+                    {columns.probeTotal ? <th scope="col">n depth</th> : null}
                   </tr>
                 </thead>
                 <tbody>

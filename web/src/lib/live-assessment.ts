@@ -110,6 +110,7 @@ function snapshotFromDb(row: DbSnapshot): AssessmentSnapshot {
     probeCount: row.probe_count,
     maxProbeCount: row.max_probe_count,
     enteredProbeFlow: row.entered_probe_flow,
+    recordedColors: row.effective_color ? [row.effective_color] : [],
     finalizedAt: row.finalized_at,
   }
 }

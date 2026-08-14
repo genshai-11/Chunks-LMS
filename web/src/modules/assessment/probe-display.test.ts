@@ -6,7 +6,7 @@ import { applyLifecycleCommand } from '../result-lifecycle/state-machine'
 const at = '2026-07-12T10:00:00.000Z'
 
 describe('probe-display', () => {
-  it('treats chunks number as starting at 1 after Green, not sample size', () => {
+  it('treats n depth as starting at 1 after Green, not sample size', () => {
     let r = applyLifecycleCommand(createDraftSnapshot(3), {
       type: 'record_provisional',
       color: 'green',
@@ -19,12 +19,12 @@ describe('probe-display', () => {
     if (!r.ok) throw new Error(r.error)
     expect(probeN(r.snapshot)).toBe(2)
     expect(probeDepthMax(r.snapshot)).toBe(3)
-    expect(formatProbeCell(r.snapshot)).toBe('chunks number=2')
+    expect(formatProbeCell(r.snapshot)).toBe('n depth=2')
   })
 
-  it('formatProbeLive shows chunks number and ceiling', () => {
+  it('formatProbeLive shows n depth and ceiling', () => {
     expect(formatProbeLive(2, 5)).toEqual({
-      nLabel: 'chunks number=3',
+      nLabel: 'n depth=3',
       depthLabel: 'ceiling 5',
     })
   })

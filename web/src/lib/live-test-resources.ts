@@ -1,8 +1,13 @@
+/**
+ * Live test package / block / item queries.
+ * Wrapped with lightweight in-memory cache to prevent re-fetching on tab transitions.
+ */
 import type {
   LiveTestBlock,
   LiveTestItem,
   LiveTestResource,
 } from '../modules/assessment/live-test'
+import { cachedApi } from './api-cache'
 import { getSupabase } from './supabase'
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: string }
@@ -77,50 +82,58 @@ function itemFromDb(row: any): LiveTestItem {
 }
 
 export async function listLiveTestResources(): Promise<Result<LiveTestResource[]>> {
-  const sb = client()
-  if (!sb) return { ok: false, error: 'Supabase is not configured' }
-  const { data, error } = await sb
-    .from('live_test_resources')
-    .select('*')
-    .order('title')
-  if (error) return { ok: false, error: error.message }
-  return { ok: true, data: (data ?? []).map(resourceFromDb) }
+  return cachedApi('live_test_resources:all', async () => {
+    const sb = client()
+    if (!sb) return { ok: false, error: 'Supabase is not configured' }
+    const { data, error } = await sb
+      .from('live_test_resources')
+      .select('*')
+      .order('title')
+    if (error) return { ok: false, error: error.message }
+    return { ok: true, data: (data ?? []).map(resourceFromDb) }
+  }, { ttlMs: 60_000 })
 }
 
 export async function listLiveTestBlocks(resourceId: string): Promise<Result<LiveTestBlock[]>> {
-  const sb = client()
-  if (!sb) return { ok: false, error: 'Supabase is not configured' }
-  const { data, error } = await sb
-    .from('live_test_blocks')
-    .select('*')
-    .eq('resource_id', resourceId)
-    .order('block_number')
-  if (error) return { ok: false, error: error.message }
-  return { ok: true, data: (data ?? []).map(blockFromDb) }
+  return cachedApi(`live_test_blocks:${resourceId}`, async () => {
+    const sb = client()
+    if (!sb) return { ok: false, error: 'Supabase is not configured' }
+    const { data, error } = await sb
+      .from('live_test_blocks')
+      .select('*')
+      .eq('resource_id', resourceId)
+      .order('block_number')
+    if (error) return { ok: false, error: error.message }
+    return { ok: true, data: (data ?? []).map(blockFromDb) }
+  }, { ttlMs: 60_000 })
 }
 
 export async function listLiveTestItems(blockId: string): Promise<Result<LiveTestItem[]>> {
-  const sb = client()
-  if (!sb) return { ok: false, error: 'Supabase is not configured' }
-  const { data, error } = await sb
-    .from('live_test_items')
-    .select('*')
-    .eq('block_id', blockId)
-    .order('item_number')
-  if (error) return { ok: false, error: error.message }
-  return { ok: true, data: (data ?? []).map(itemFromDb) }
+  return cachedApi(`live_test_items:${blockId}`, async () => {
+    const sb = client()
+    if (!sb) return { ok: false, error: 'Supabase is not configured' }
+    const { data, error } = await sb
+      .from('live_test_items')
+      .select('*')
+      .eq('block_id', blockId)
+      .order('item_number')
+    if (error) return { ok: false, error: error.message }
+    return { ok: true, data: (data ?? []).map(itemFromDb) }
+  }, { ttlMs: 60_000 })
 }
 
 export async function audioUrl(assetId: string | null | undefined): Promise<string | null> {
   if (!assetId) return null
-  const sb = client()
-  if (!sb) return null
-  const { data, error } = await sb
-    .from('audio_assets')
-    .select('storage_bucket,storage_path')
-    .eq('id', assetId)
-    .maybeSingle()
-  if (error || !data) return null
-  const pub = sb.storage.from(data.storage_bucket).getPublicUrl(data.storage_path)
-  return pub.data.publicUrl ?? null
+  return cachedApi(`audio_asset_url:${assetId}`, async () => {
+    const sb = client()
+    if (!sb) return null
+    const { data, error } = await sb
+      .from('audio_assets')
+      .select('storage_bucket,storage_path')
+      .eq('id', assetId)
+      .maybeSingle()
+    if (error || !data) return null
+    const pub = sb.storage.from(data.storage_bucket).getPublicUrl(data.storage_path)
+    return pub.data.publicUrl ?? null
+  }, { ttlMs: 300_000 })
 }

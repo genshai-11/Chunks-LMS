@@ -69,9 +69,9 @@ import {
 import { getSupabase } from '../../lib/supabase'
 import { triggerConfetti } from '../../lib/confetti'
 
-const COLORS: { key: ResultColor; label: string; shortcut: string }[] = [
+const PRIMARY_COLORS: { key: ResultColor; label: string; shortcut: string }[] = [
   { key: 'red', label: 'Red', shortcut: '0' },
-  { key: 'yellow', label: 'Orange', shortcut: '1' },
+  { key: 'orange', label: 'Orange', shortcut: '1' },
   { key: 'green', label: 'Green', shortcut: '2' },
   { key: 'purple', label: 'Purple', shortcut: '3' },
 ]
@@ -80,8 +80,8 @@ type ReactionKind = 'celebrate' | 'happy' | 'fight'
 type Reaction = { kind: ReactionKind; color: ResultColor; id: number } | null
 
 function reactionFor(color: ResultColor): ReactionKind {
-  if (color === 'purple') return 'celebrate'
-  if (color === 'green') return 'happy'
+  if (color === 'purple' || color === 'indigo') return 'celebrate'
+  if (color === 'green' || color === 'blue') return 'happy'
   return 'fight'
 }
 
@@ -119,7 +119,7 @@ function formatFinishSummary(
     `1 Orange: ${summary.byColor.yellow}`,
     `2 Green: ${summary.byColor.green}`,
     `3 Purple: ${summary.byColor.purple}`,
-    `Max chunks number: ${summary.maxProbeDepth}`,
+    `n depth max: ${summary.maxProbeDepth}`,
     unresolved > 0
       ? `Left unfinalized when session closed: ${unresolved}`
       : 'All captured attempts finalized.',
@@ -652,7 +652,7 @@ export function TeacherObservePage() {
           } catch (e) {
             console.warn('[observe] audio init failed:', e)
           }
-          flash(`Chunks Number=${probeChunksNumber(result.data.snapshot) ?? 1}`)
+          flash(`n depth=${probeChunksNumber(result.data.snapshot) ?? 1}`)
         }
       } finally {
         setLiveSaving(false)
@@ -771,7 +771,7 @@ export function TeacherObservePage() {
           } catch (e) {
             console.warn('[observe] audio init failed:', e)
           }
-          flash(`Chunks Number=${probeChunksNumber(result.data.snapshot) ?? 1}`)
+          flash(`n depth=${probeChunksNumber(result.data.snapshot) ?? 1}`)
         }
       } finally {
         setLiveSaving(false)
@@ -964,6 +964,19 @@ export function TeacherObservePage() {
           setActiveSplitLearnerId(splitLearnerId === a ? (b ?? a ?? null) : (a ?? null))
           return
         }
+        if (splitProbeOpen) {
+          if (k === 'f' || k === '1') {
+            e.preventDefault()
+            resolveProbeForLearner(splitLearnerId, 'fail')
+          } else if (k === 'p' || k === 'c' || k === '2') {
+            e.preventDefault()
+            resolveProbeForLearner(splitLearnerId, 'continue')
+          } else if (k === 'd' || k === 'enter' || k === '3') {
+            e.preventDefault()
+            resolveProbeForLearner(splitLearnerId, 'done')
+          }
+          return
+        }
         if (k === '0') {
           e.preventDefault()
           recordColorForLearner(splitLearnerId, 'red')
@@ -971,7 +984,7 @@ export function TeacherObservePage() {
         }
         if (k === '1') {
           e.preventDefault()
-          recordColorForLearner(splitLearnerId, 'yellow')
+          recordColorForLearner(splitLearnerId, 'orange')
           return
         }
         if (k === '2') {
@@ -984,19 +997,24 @@ export function TeacherObservePage() {
           recordColorForLearner(splitLearnerId, 'purple')
           return
         }
-        if (splitProbeOpen) {
-          if (k === 'f') {
-            e.preventDefault()
-            resolveProbeForLearner(splitLearnerId, 'fail')
-          } else if (k === 'p' || k === 'c') {
-            e.preventDefault()
-            resolveProbeForLearner(splitLearnerId, 'continue')
-          } else if (k === 'd' || k === 'enter') {
-            e.preventDefault()
-            resolveProbeForLearner(splitLearnerId, 'done')
-          }
-        }
         return
+      }
+      if (probeOpen) {
+        if (k === 'f' || k === '1') {
+          e.preventDefault()
+          resolveProbe('fail')
+          return
+        }
+        if (k === 'p' || k === 'c' || k === '2') {
+          e.preventDefault()
+          resolveProbe('continue')
+          return
+        }
+        if (k === 'd' || k === 'enter' || k === '3') {
+          e.preventDefault()
+          resolveProbe('done')
+          return
+        }
       }
       if (k === '0') {
         e.preventDefault()
@@ -1005,7 +1023,7 @@ export function TeacherObservePage() {
       }
       if (k === '1') {
         e.preventDefault()
-        recordColor('yellow')
+        recordColor('orange')
         return
       }
       if (k === '2') {
@@ -1017,18 +1035,6 @@ export function TeacherObservePage() {
         e.preventDefault()
         recordColor('purple')
         return
-      }
-      if (probeOpen) {
-        if (k === 'f') {
-          e.preventDefault()
-          resolveProbe('fail')
-        } else if (k === 'p' || k === 'c') {
-          e.preventDefault()
-          resolveProbe('continue')
-        } else if (k === 'd' || k === 'enter') {
-          e.preventDefault()
-          resolveProbe('done')
-        }
       }
     }
     window.addEventListener('keydown', onKey)
@@ -1156,8 +1162,8 @@ export function TeacherObservePage() {
               </span>
             </div>
             {paneProbeOpen ? (
-              <p className="observe-depth-inline" title="Chunks Number starts at 1 when Green opens probe; each Continue adds 1.">
-                CHUNKS NUMBER <strong>{paneChunksNumber}</strong>
+              <p className="observe-depth-inline" title="n depth starts at 1 when Green opens probe; each Continue adds 1.">
+                n depth <strong>{paneChunksNumber}</strong>
               </p>
             ) : null}
           </div>
@@ -1209,7 +1215,7 @@ export function TeacherObservePage() {
                   role="group"
                   aria-label={`Result color for ${user?.displayName ?? 'learner'}`}
                 >
-                  {COLORS.map((c) => (
+                  {PRIMARY_COLORS.map((c) => (
                     <button
                       key={c.key}
                       type="button"
@@ -1359,7 +1365,7 @@ export function TeacherObservePage() {
               <>
                 <p className="observe-rail-name">{learner?.displayName ?? 'Learner'}</p>
                 {probeOpen ? (
-                  <p className="observe-rail-n" title="Chunks Number starts at 1 when Green opens probe">
+                  <p className="observe-rail-n" title="n depth starts at 1 when Green opens probe">
                     chunks={chunksNumber}
                   </p>
                 ) : null}
@@ -1503,7 +1509,7 @@ export function TeacherObservePage() {
                   className="observe-heat-counts observe-color-pills observe-hide-phone"
                   aria-label="Color counts"
                 >
-                  {COLORS.map((c) => (
+                  {PRIMARY_COLORS.map((c) => (
                     <span
                       key={c.key}
                       className={`observe-heat-count is-${c.key}`}
@@ -1516,8 +1522,8 @@ export function TeacherObservePage() {
                 </div>
               </div>
               {probeOpen ? (
-                <p className="observe-depth-inline" title="Chunks Number starts at 1 when Green opens probe; each Continue adds 1.">
-                  CHUNKS NUMBER <strong>{chunksNumber}</strong>
+                <p className="observe-depth-inline" title="n depth starts at 1 when Green opens probe; each Continue adds 1.">
+                  n depth <strong>{chunksNumber}</strong>
                 </p>
               ) : null}
               {isLiveTest ? (
@@ -1572,7 +1578,7 @@ export function TeacherObservePage() {
                 </div>
               ) : (
                 <div className="observe-dock-colors" role="group" aria-label="Result color">
-                  {COLORS.map((c) => (
+                  {PRIMARY_COLORS.map((c) => (
                     <button
                       key={c.key}
                       type="button"
@@ -1860,7 +1866,7 @@ export function TeacherObservePage() {
 
                 {/* Additional metrics */}
                 <div className="flex justify-between items-center text-xs pt-1 border-t border-white/5">
-                  <span className="text-slate-400">Max chunks number:</span>
+                  <span className="text-slate-400">n depth max:</span>
                   <span className="font-mono font-bold text-white">{finishMetrics.maxProbeDepth}</span>
                 </div>
 

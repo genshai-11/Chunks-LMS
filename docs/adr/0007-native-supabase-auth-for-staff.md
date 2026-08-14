@@ -27,5 +27,5 @@ Email/password account creation/sign-in, confirmation, and magic links are suppo
 - `@clerk/react`, Clerk environment settings, providers, hooks, and token bridges are removed.
 - Legacy Clerk identifiers remain migration and rollback evidence until a separately reviewed cleanup.
 - Magic-link redirects must allow each deployed origin; external OAuth requires a future reviewed change.
-- Username login requires the additive username/throttle migration and a separately deployed `username-login` Edge Function with `verify_jwt = false`, generic credential failures, HMAC-only five-minute rate-limit buckets, a uniform dummy-Auth failure path, no-store responses, and an explicit origin allowlist.
+- Username login requires the additive username/throttle migration and a separately deployed `username-login` Edge Function with `verify_jwt = false`, generic credential failures, HMAC-only five-minute rate-limit buckets, a uniform dummy-Auth failure path, no-store responses, and an explicit origin allowlist. Hosted exceptions are limited to validated HTTPS previews for the `chunks` project under `genshai-11s-projects`; other/custom origins must be added exactly through the comma-separated `USERNAME_LOGIN_ALLOWED_ORIGINS` secret. Rejected origins never receive wildcard or reflected ACAO.
 - Rolling back the web app does not require rewriting identity rows.

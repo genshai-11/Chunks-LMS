@@ -1754,14 +1754,38 @@
   .observe-heat-dot-btn.is-red {
     @apply bg-red-500 text-white;
   }
-  .observe-heat-dot-btn.is-yellow {
+  .observe-heat-dot-btn.is-orange {
     @apply bg-orange-500 text-white;
   }
+  .observe-heat-dot-btn.is-yellow {
+    @apply bg-amber-400 text-slate-950 font-black;
+  }
   .observe-heat-dot-btn.is-green {
-    @apply bg-green-500 text-white;
+    @apply bg-emerald-500 text-white;
+  }
+  .observe-heat-dot-btn.is-blue {
+    @apply bg-sky-500 text-white;
+  }
+  .observe-heat-dot-btn.is-indigo {
+    @apply bg-indigo-500 text-white;
   }
   .observe-heat-dot-btn.is-purple {
     @apply bg-purple-500 text-white;
+  }
+  .observe-heat-dot-btn.has-probe {
+    @apply relative;
+  }
+  .observe-heat-dot-btn .dot-probe-badge {
+    @apply absolute -top-1 -right-1 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-indigo-600 px-1 text-[8px] font-black text-white shadow ring-1 ring-slate-950;
+  }
+  .live-test-heat-item {
+    @apply flex min-w-7 flex-col items-center gap-0.5;
+  }
+  .live-test-probe-trail {
+    @apply flex max-w-9 flex-wrap items-center justify-center gap-px;
+  }
+  .live-test-probe-trail i {
+    @apply block h-1.5 w-1.5 rounded-full ring-1 ring-slate-950;
   }
   .observe-heat-dot-btn.is-open {
     @apply bg-amber-400 text-amber-950 animate-pulse;
@@ -2328,12 +2352,19 @@
       inset 0 -9px 12px rgb(69 10 10 / 0.42),
       0 0 18px rgb(239 68 68 / 0.45);
   }
-  .observe-dock-color.is-yellow {
-    @apply border-slate-950 bg-gradient-to-b from-orange-300 via-orange-500 to-orange-700 text-white hover:brightness-110;
+  .observe-dock-color.is-orange {
+    @apply border-slate-950 bg-gradient-to-b from-orange-400 via-orange-500 to-orange-700 text-white hover:brightness-110;
     box-shadow:
       inset 0 7px 10px rgb(255 255 255 / 0.36),
       inset 0 -9px 12px rgb(124 45 18 / 0.42),
       0 0 18px rgb(249 115 22 / 0.5);
+  }
+  .observe-dock-color.is-yellow {
+    @apply border-slate-950 bg-gradient-to-b from-amber-300 via-yellow-400 to-yellow-600 text-slate-950 hover:brightness-110;
+    box-shadow:
+      inset 0 7px 10px rgb(255 255 255 / 0.4),
+      inset 0 -9px 12px rgb(113 63 18 / 0.42),
+      0 0 18px rgb(234 179 8 / 0.5);
   }
   .observe-dock-color.is-green {
     @apply border-slate-950 bg-gradient-to-b from-emerald-300 via-emerald-500 to-emerald-700 text-white hover:brightness-110;
@@ -2341,6 +2372,20 @@
       inset 0 7px 10px rgb(255 255 255 / 0.34),
       inset 0 -9px 12px rgb(6 78 59 / 0.4),
       0 0 18px rgb(16 185 129 / 0.45);
+  }
+  .observe-dock-color.is-blue {
+    @apply border-slate-950 bg-gradient-to-b from-sky-300 via-sky-500 to-blue-700 text-white hover:brightness-110;
+    box-shadow:
+      inset 0 7px 10px rgb(255 255 255 / 0.34),
+      inset 0 -9px 12px rgb(30 58 138 / 0.4),
+      0 0 18px rgb(14 165 233 / 0.45);
+  }
+  .observe-dock-color.is-indigo {
+    @apply border-slate-950 bg-gradient-to-b from-indigo-300 via-indigo-600 to-indigo-800 text-white hover:brightness-110;
+    box-shadow:
+      inset 0 7px 10px rgb(255 255 255 / 0.34),
+      inset 0 -9px 12px rgb(49 46 129 / 0.4),
+      0 0 18px rgb(79 70 229 / 0.45);
   }
   .observe-dock-color.is-purple {
     @apply border-slate-950 bg-gradient-to-b from-fuchsia-300 via-purple-500 to-violet-700 text-white hover:brightness-110;
@@ -2371,19 +2416,31 @@
   .observe-dock.is-glowing.is-red .observe-dock-colors {
     --dock-glow: 239 68 68;
   }
-  .observe-dock.is-glowing.is-yellow .observe-dock-colors {
+  .observe-dock.is-glowing.is-orange .observe-dock-colors {
     --dock-glow: 249 115 22;
+  }
+  .observe-dock.is-glowing.is-yellow .observe-dock-colors {
+    --dock-glow: 234 179 8;
   }
   .observe-dock.is-glowing.is-green .observe-dock-colors {
     --dock-glow: 16 185 129;
+  }
+  .observe-dock.is-glowing.is-blue .observe-dock-colors {
+    --dock-glow: 14 165 233;
+  }
+  .observe-dock.is-glowing.is-indigo .observe-dock-colors {
+    --dock-glow: 79 70 229;
   }
   .observe-dock.is-glowing.is-purple .observe-dock-colors {
     --dock-glow: 192 132 252;
   }
 
   .observe-dock.is-glowing.is-red .observe-dock-color.is-red,
+  .observe-dock.is-glowing.is-orange .observe-dock-color.is-orange,
   .observe-dock.is-glowing.is-yellow .observe-dock-color.is-yellow,
   .observe-dock.is-glowing.is-green .observe-dock-color.is-green,
+  .observe-dock.is-glowing.is-blue .observe-dock-color.is-blue,
+  .observe-dock.is-glowing.is-indigo .observe-dock-color.is-indigo,
   .observe-dock.is-glowing.is-purple .observe-dock-color.is-purple {
     animation: observe-active-light 1.15s ease-out both;
   }
@@ -2431,11 +2488,20 @@
   .observe-dock-color.is-red.is-selected {
     @apply bg-gradient-to-b from-[#ff3b30] to-[#e50914] text-white opacity-100 border-white/40 scale-105 shadow-[0_0_25px_8px_#ef4444,_inset_0_2px_6px_rgba(255,255,255,0.55)];
   }
-  .observe-dock-color.is-yellow.is-selected {
+  .observe-dock-color.is-orange.is-selected {
     @apply bg-gradient-to-b from-[#fb923c] to-[#ea580c] text-white opacity-100 border-white/40 scale-105 shadow-[0_0_25px_8px_#f97316,_inset_0_2px_6px_rgba(255,255,255,0.55)];
+  }
+  .observe-dock-color.is-yellow.is-selected {
+    @apply bg-gradient-to-b from-[#fde047] to-[#eab308] text-slate-950 opacity-100 border-white/40 scale-105 shadow-[0_0_25px_8px_#eab308,_inset_0_2px_6px_rgba(255,255,255,0.55)];
   }
   .observe-dock-color.is-green.is-selected {
     @apply bg-gradient-to-b from-[#34c759] to-[#099268] text-white opacity-100 border-white/40 scale-105 shadow-[0_0_25px_8px_#10b981,_inset_0_2px_6px_rgba(255,255,255,0.55)];
+  }
+  .observe-dock-color.is-blue.is-selected {
+    @apply bg-gradient-to-b from-[#38bdf8] to-[#0284c7] text-white opacity-100 border-white/40 scale-105 shadow-[0_0_25px_8px_#0ea5e9,_inset_0_2px_6px_rgba(255,255,255,0.55)];
+  }
+  .observe-dock-color.is-indigo.is-selected {
+    @apply bg-gradient-to-b from-[#818cf8] to-[#4f46e5] text-white opacity-100 border-white/40 scale-105 shadow-[0_0_25px_8px_#6366f1,_inset_0_2px_6px_rgba(255,255,255,0.55)];
   }
   .observe-dock-color.is-purple.is-selected {
     @apply bg-gradient-to-b from-[#af52de] to-[#7048e8] text-white opacity-100 border-white/40 scale-105 shadow-[0_0_25px_8px_#a855f7,_inset_0_2px_6px_rgba(255,255,255,0.55)];
@@ -2461,14 +2527,20 @@
       0 8px 18px rgb(0 0 0 / 0.32);
   }
 
-  .observe-dock-probe-btn.fail {
-    @apply border-yellow-300/60 bg-yellow-950/80 text-yellow-100 hover:bg-yellow-900;
+  .observe-dock-probe-btn.fail,
+  .observe-dock-probe-btn.probe-yellow {
+    @apply border-yellow-300/80 bg-gradient-to-b from-amber-400 to-yellow-600 text-slate-950 font-black hover:brightness-110;
+    box-shadow: 0 0 20px rgb(234 179 8 / 0.4);
   }
-  .observe-dock-probe-btn.pass {
-    @apply border-blue-300/60 bg-blue-950/80 text-blue-100 hover:bg-blue-900;
+  .observe-dock-probe-btn.pass,
+  .observe-dock-probe-btn.probe-blue {
+    @apply border-sky-300/80 bg-gradient-to-b from-sky-400 to-blue-600 text-white font-black hover:brightness-110;
+    box-shadow: 0 0 20px rgb(14 165 233 / 0.4);
   }
-  .observe-dock-probe-btn.done {
-    @apply border-indigo-300/60 bg-indigo-950/80 text-indigo-100 hover:bg-indigo-900;
+  .observe-dock-probe-btn.done,
+  .observe-dock-probe-btn.probe-indigo {
+    @apply border-indigo-300/80 bg-gradient-to-b from-indigo-400 to-indigo-700 text-white font-black hover:brightness-110;
+    box-shadow: 0 0 20px rgb(79 70 229 / 0.4);
   }
 
   .observe-dock-probe-btn kbd {
@@ -4615,6 +4687,22 @@
   .live-test-dock-compact .observe-dock-label {
     @apply text-[10px] sm:text-xs;
   }
+  .live-test-dock-compact .observe-dock-colors.is-correction {
+    @apply max-w-[30rem] flex-row flex-wrap gap-1.5 rounded-2xl p-2;
+  }
+  .live-test-dock-compact .observe-dock-colors.is-correction .observe-dock-color {
+    @apply h-12 w-12 p-1 sm:h-14 sm:w-14;
+  }
+  .live-test-dock-compact .observe-dock-colors.is-correction .observe-dock-num {
+    @apply text-xs sm:text-sm;
+  }
+  .live-test-dock-compact .observe-dock-colors.is-correction .observe-dock-label {
+    display: block !important;
+    @apply text-[8px] leading-none sm:text-[9px];
+  }
+  .live-test-correction-label {
+    @apply block w-full text-center text-[10px] font-black uppercase tracking-wide text-indigo-200;
+  }
 }
 
 @layer components {
@@ -4633,13 +4721,22 @@
       min-height: 0;
       overflow: hidden;
     }
+    .observe-root:has(.live-test-stage) .observe-bar {
+      min-height: 3rem;
+      overflow: visible;
+      z-index: 70;
+    }
+    .observe-root:not(.is-header-hidden):has(.live-test-stage) .observe-finish-fab {
+      display: none;
+    }
   }
   .live-test-stage {
-    @apply min-h-0 flex-col justify-center overflow-y-auto overflow-x-hidden;
+    @apply min-h-0 w-full flex-col items-center justify-center overflow-y-auto overflow-x-hidden;
     height: 100%;
-    padding-block: clamp(0.35rem, 1.2dvh, 0.75rem);
-    padding-bottom: max(clamp(0.75rem, 2dvh, 1.25rem), env(safe-area-inset-bottom));
-    gap: clamp(0.25rem, 1dvh, 0.75rem);
+    padding-inline: clamp(0.75rem, 2vw, 2rem);
+    padding-block: clamp(0.75rem, 2dvh, 1.25rem);
+    padding-bottom: max(clamp(1rem, 2.5dvh, 1.5rem), env(safe-area-inset-bottom));
+    gap: clamp(0.45rem, 1.2dvh, 0.9rem);
     -ms-overflow-style: none;
     scrollbar-width: thin;
   }
@@ -4651,9 +4748,12 @@
   }
   .live-test-stage-hero {
     transform: none !important;
-    @apply shrink-0;
-    max-width: min(92vw, 34rem);
+    @apply w-full shrink-0;
+    max-width: min(70vw, 47.5rem, 100%);
     gap: clamp(0.1rem, 0.5dvh, 0.35rem);
+  }
+  .live-test-session-context {
+    @apply m-0 text-center text-xs font-bold tracking-wide text-slate-300;
   }
   .live-test-day-line {
     font-size: clamp(0.62rem, 1.45dvh, 0.78rem);
@@ -4691,26 +4791,25 @@
     @apply border-cyan-400/30 bg-cyan-500/15 text-cyan-100;
   }
 
-  /* Keep Live Test dock vertical and central; it scales by viewport height instead of forcing browser zoom-out. */
+  /* Desktop action dock: wide and horizontal so the prompt remains the visual anchor. */
   .live-test-dock-compact {
-    @apply mx-auto flex-col items-center justify-center;
-    width: fit-content;
-    max-width: none;
+    @apply mx-auto w-full flex-col items-center justify-center;
+    max-width: min(70vw, 47.5rem, 100%);
     gap: clamp(0.25rem, 0.8dvh, 0.65rem);
   }
   .live-test-dock-compact .observe-dock-colors {
-    @apply flex-col rounded-[3rem] border-4;
-    gap: clamp(0.35rem, 1.1dvh, 0.85rem);
-    padding: clamp(0.45rem, 1.25dvh, 0.95rem);
+    @apply flex-row rounded-[2.25rem] border-[3px];
+    gap: clamp(0.45rem, 1vw, 0.75rem);
+    padding: clamp(0.45rem, 1dvh, 0.75rem);
   }
   .live-test-dock-compact .observe-dock-color {
-    width: clamp(4.15rem, 14dvh, 7.25rem) !important;
-    height: clamp(4.15rem, 14dvh, 7.25rem) !important;
-    border-width: clamp(2px, 0.45dvh, 4px);
-    padding: clamp(0.2rem, 0.7dvh, 0.5rem);
+    width: clamp(3.75rem, 9dvh, 4.75rem) !important;
+    height: clamp(3.75rem, 9dvh, 4.75rem) !important;
+    border-width: clamp(2px, 0.35dvh, 3px);
+    padding: clamp(0.2rem, 0.55dvh, 0.4rem);
   }
   .live-test-dock-compact .observe-dock-num {
-    font-size: clamp(1.25rem, 4dvh, 2.55rem) !important;
+    font-size: clamp(1.1rem, 2.8dvh, 1.65rem) !important;
   }
   .live-test-dock-compact .observe-dock-label {
     @apply hidden!;
@@ -4718,7 +4817,7 @@
 
   .live-test-focus-card {
     @apply shrink-0;
-    width: min(92vw, 34rem);
+    width: min(70vw, 47.5rem, 100%);
     margin-top: clamp(0.2rem, 0.8dvh, 0.5rem) !important;
     padding: clamp(0.45rem, 1.1dvh, 0.75rem) !important;
   }
@@ -4808,7 +4907,7 @@
       gap: 0.2rem;
     }
     .live-test-focus-card {
-      width: min(94vw, 32rem);
+      width: min(78vw, 44rem);
     }
     .live-test-prompt-box strong {
       font-size: clamp(0.78rem, 2.4dvh, 0.95rem) !important;

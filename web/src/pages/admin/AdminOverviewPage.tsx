@@ -118,7 +118,7 @@ export function AdminOverviewPage() {
             to="/admin/metrics"
             step="4"
             title="Metrics"
-            description="Enable RFC, %c, chunks count / max chunks number / avg chunks number for charts."
+            description="Enable RFC, %c, n count / n depth max / n depth avg for charts."
             icon={Gauge}
           />
           <NavTile

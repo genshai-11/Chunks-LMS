@@ -126,12 +126,12 @@ An explicit period and population over which Metric Observations are calculated 
 _Avoid_: Filter, date range
 
 **RFC**:
-The share of finalized Assessment Attempts ending Red or Yellow in a Report Window.
-_Avoid_: Failure score
+The share of finalized MAIN Assessment Attempts ending in a warm result (Red, Orange, or Yellow) in a Report Window. Probe sub-items/steps are reported separately and never enter this denominator.
+_Avoid_: Failure score, probe-expanded sample
 
 **RAC**:
-The share of finalized Assessment Attempts ending Green or Purple in a Report Window.
-_Avoid_: Success score
+The share of finalized MAIN Assessment Attempts ending in a cool result (Green, Blue, Indigo, or Purple) in the same Report Window. The seven-color partition is exhaustive, so `RAC = 1 - RFC`; `%c` is the RAC display label.
+_Avoid_: Success score, probe-expanded sample
 
 **CVR**:
 Semantic Complexity Value Rating for a Test Item prompt, calculated from Estimated TC × LC × TL.

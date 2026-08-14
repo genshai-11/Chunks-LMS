@@ -23,7 +23,7 @@ export function ObserveHeatmap({
   layout = 'column',
 }: Props) {
   const summary = sessionColorSummary(capture)
-  // Sample size for RFC/%c — not chunks number.
+  // Sample size for RFC/%c — not n depth.
   const finalized = summary.done
   const ry = summary.byColor.red + summary.byColor.yellow
   const gp = summary.byColor.green + summary.byColor.purple
@@ -51,7 +51,7 @@ export function ObserveHeatmap({
         </span>
         <span
           className="observe-heat-metric muted tabular"
-          title={`Finalized questions · max chunks number=${summary.maxProbeDepth}`}
+          title={`Finalized questions · n depth max=${summary.maxProbeDepth}`}
         >
           {summary.done}/{Math.max(summary.total, 1)}
           {summary.maxProbeDepth > 0 ? ` · max chunks=${summary.maxProbeDepth}` : ''}
@@ -74,7 +74,7 @@ export function ObserveHeatmap({
           const cls = open ? 'is-open' : draft ? 'is-draft' : color ? `is-${color}` : 'is-empty'
           const chunksNumber = snap ? probeChunksNumber(snap) : null
           const probeBit =
-            chunksNumber != null ? ` · chunks number=${chunksNumber}` : open ? ' · probe open' : ''
+            chunksNumber != null ? ` · n depth=${chunksNumber}` : open ? ' · probe open' : ''
           return (
             <button
               key={q.id}
@@ -87,7 +87,7 @@ export function ObserveHeatmap({
               aria-label={`Question ${q.sequenceNumber}, ${learnerName(
                 q.assignedLearnerUserId,
               )}, ${color ?? (open ? 'probe open' : 'not assessed')}${
-                chunksNumber != null ? `, chunks number=${chunksNumber}` : ''
+                chunksNumber != null ? `, n depth=${chunksNumber}` : ''
               }`}
               aria-current={active ? 'step' : undefined}
               onClick={() => onSelectQuestion(i)}

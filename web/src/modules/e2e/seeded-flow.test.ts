@@ -12,6 +12,6 @@ describe('seeded end-to-end flow', () => {
     expect(result.reportSampleSize).toBe(3)
 
     const colors = result.ledger.map((r) => r.effectiveColor).sort()
-    expect(colors).toEqual(['green', 'purple', 'red'])
+    expect(colors).toEqual(['indigo', 'purple', 'red'])
   })
 })

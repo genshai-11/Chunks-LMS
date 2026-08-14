@@ -1,4 +1,9 @@
-import { COLOR_SCORE, type ResultColor } from '../result-lifecycle/types'
+import {
+  DEFAULT_COLOR_WEIGHTS,
+  isCoolColor,
+  isWarmColor,
+  type ResultColor,
+} from '../result-lifecycle/types'
 
 export type MetricKey =
   | 'rfc'
@@ -12,6 +17,7 @@ export type MetricKey =
   | 'n_depth_avg'
   | 'awareness_recovery'
   | 'focus_stability'
+  | 'average_cpd'
 
 export type MetricStatus = 'operational' | 'experimental'
 
@@ -19,6 +25,11 @@ export type FinalizedAttempt = {
   effectiveColor: ResultColor
   enteredProbeFlow: boolean
   probeEventCount: number
+  /** Complete ordered sequence of colors recorded for this question (e.g. ['green', 'blue', 'indigo']). */
+  recordedColors?: ResultColor[]
+  /** Optional test metadata for CPD derivation */
+  cvr?: number | null
+  cci?: number | null
   /** Ordered score history for focus stability (learner-adjacent). */
   learnerId?: string
   sequenceIndex?: number
@@ -47,36 +58,36 @@ export type MetricCatalogEntry = {
 export const METRIC_CATALOG: MetricCatalogEntry[] = [
   {
     key: 'rfc',
-    version: '1.0.0',
+    version: '2.0.0',
     status: 'operational',
-    definition: '(Red + Orange) / finalized sample',
+    definition: 'Warm finalized main results (Red + Orange + Yellow) / finalized main results',
     direction: 'lower_better',
     unit: 'ratio',
     minSample: 1,
   },
   {
     key: 'rac',
-    version: '1.0.0',
+    version: '2.0.0',
     status: 'operational',
-    definition: '(Green + Purple) / finalized sample',
+    definition: '1 - RFC (Cool finalized main results Green + Blue + Indigo + Purple / finalized main results)',
     direction: 'higher_better',
     unit: 'ratio',
     minSample: 1,
   },
   {
     key: 'average_performance',
-    version: '1.0.0',
+    version: '2.0.0',
     status: 'operational',
-    definition: 'mean color score 0..3 over finalized sample',
+    definition: 'mean normalized effective-result color weight 0..1 over finalized main results',
     direction: 'higher_better',
     unit: 'score',
     minSample: 1,
   },
   {
     key: 'purple_mastery_rate',
-    version: '1.0.0',
+    version: '2.0.0',
     status: 'operational',
-    definition: 'Purple / finalized sample',
+    definition: 'Purple / finalized question sample',
     direction: 'higher_better',
     unit: 'ratio',
     minSample: 1,
@@ -85,7 +96,7 @@ export const METRIC_CATALOG: MetricCatalogEntry[] = [
     key: 'clarification_rate',
     version: '1.0.0',
     status: 'operational',
-    definition: 'attempts entering probe flow / finalized sample',
+    definition: 'attempts entering probe flow / finalized questions',
     direction: 'contextual',
     unit: 'ratio',
     minSample: 1,
@@ -94,7 +105,7 @@ export const METRIC_CATALOG: MetricCatalogEntry[] = [
     key: 'clarification_depth',
     version: '1.0.0',
     status: 'experimental',
-    definition: 'chunks number / probed attempts (legacy alias of avg chunks number)',
+    definition: 'probe steps / probed attempts (legacy alias of avg probe steps)',
     direction: 'contextual',
     unit: 'score',
     minSample: 1,
@@ -103,7 +114,7 @@ export const METRIC_CATALOG: MetricCatalogEntry[] = [
     key: 'n_count',
     version: '1.0.0',
     status: 'operational',
-    definition: 'count of finalized attempts where teacher selected Green (2) / entered probe',
+    definition: 'count of finalized attempts where teacher selected Green / entered probe',
     direction: 'contextual',
     unit: 'count',
     minSample: 1,
@@ -112,7 +123,7 @@ export const METRIC_CATALOG: MetricCatalogEntry[] = [
     key: 'n_depth_max',
     version: '1.0.0',
     status: 'operational',
-    definition: 'max chunks number among probed attempts (not session maxProbeCount)',
+    definition: 'max probe depth among probed attempts',
     direction: 'contextual',
     unit: 'count',
     minSample: 1,
@@ -121,28 +132,37 @@ export const METRIC_CATALOG: MetricCatalogEntry[] = [
     key: 'n_depth_avg',
     version: '1.0.0',
     status: 'operational',
-    definition: 'mean chunks number among probed attempts',
+    definition: 'mean probe depth among probed attempts',
     direction: 'contextual',
     unit: 'score',
     minSample: 1,
   },
   {
     key: 'awareness_recovery',
-    version: '1.0.0',
+    version: '2.0.0',
     status: 'experimental',
-    definition: 'probed attempts ending Green or Purple / probed attempts',
+    definition: 'probed attempts ending in Cool colors (Indigo/Green) / probed attempts',
     direction: 'higher_better',
     unit: 'ratio',
     minSample: 1,
   },
   {
     key: 'focus_stability',
-    version: '1.0.0',
+    version: '2.0.0',
     status: 'experimental',
     definition: 'normalized inverse of adjacent score movement per learner',
     direction: 'contextual',
     unit: 'score',
     minSample: 2,
+  },
+  {
+    key: 'average_cpd',
+    version: '2.0.0',
+    status: 'operational',
+    definition: 'mean Question CPD (CVR × CCI × effective-result color weight) across finalized main results',
+    direction: 'higher_better',
+    unit: 'score',
+    minSample: 1,
   },
 ]
 
@@ -169,33 +189,94 @@ function observation(
   }
 }
 
-export function calculateMetrics(finalized: FinalizedAttempt[]): MetricObservation[] {
-  const n = finalized.length
-  const redYellow = finalized.filter(
-    (a) => a.effectiveColor === 'red' || a.effectiveColor === 'yellow',
-  ).length
-  const greenPurple = finalized.filter(
-    (a) => a.effectiveColor === 'green' || a.effectiveColor === 'purple',
-  ).length
-  const purple = finalized.filter((a) => a.effectiveColor === 'purple').length
-  const scoreSum = finalized.reduce((s, a) => s + COLOR_SCORE[a.effectiveColor], 0)
+export type ColorWeights = Record<ResultColor, number>
+
+export type QuestionCpdResult = {
+  baseCpd: number | null
+  questionCpd: number | null
+  colors: ResultColor[]
+  weights: number[]
+}
+
+export function calculateQuestionCpd(
+  attempt: FinalizedAttempt,
+  weights: ColorWeights = DEFAULT_COLOR_WEIGHTS,
+): QuestionCpdResult {
+  const cvr = attempt.cvr ?? null
+  const cci = attempt.cci ?? null
+  // Probe history is reported separately. Only the finalized effective main result
+  // contributes to CPD and other operational metrics.
+  const colors: ResultColor[] = [attempt.effectiveColor]
+  const appliedWeights = colors.map((c) => weights[c] ?? DEFAULT_COLOR_WEIGHTS[c])
+
+  if (cvr == null || cci == null) {
+    return {
+      baseCpd: null,
+      questionCpd: null,
+      colors,
+      weights: appliedWeights,
+    }
+  }
+
+  const baseCpd = cvr * cci
+  const meanWeight = appliedWeights.reduce((s, w) => s + w, 0) / appliedWeights.length
+  const questionCpd = baseCpd * meanWeight
+
+  return {
+    baseCpd,
+    questionCpd,
+    colors,
+    weights: appliedWeights,
+  }
+}
+
+export function calculateMetrics(
+  finalized: FinalizedAttempt[],
+  colorWeights: ColorWeights = DEFAULT_COLOR_WEIGHTS,
+): MetricObservation[] {
+  const questionCount = finalized.length
+  const effectiveColors = finalized.map((attempt) => attempt.effectiveColor)
+  const warmCount = effectiveColors.filter(isWarmColor).length
+  const coolCount = effectiveColors.filter(isCoolColor).length
+  const purpleCount = finalized.filter((a) => a.effectiveColor === 'purple').length
+
+  const totalScore = effectiveColors.reduce(
+    (sum, color) => sum + (colorWeights[color] ?? DEFAULT_COLOR_WEIGHTS[color]),
+    0,
+  )
+  const avgPerformance = questionCount === 0 ? null : totalScore / questionCount
+
   const probed = finalized.filter((a) => a.enteredProbeFlow)
-  const chunksNumbers = probed.map((a) => Math.max(1, a.probeEventCount + 1))
+  const chunksNumbers = probed.map((a) =>
+    a.recordedColors && a.recordedColors.length > 1
+      ? a.recordedColors.length
+      : Math.max(1, a.probeEventCount + 1),
+  )
   const chunksNumberTotal = chunksNumbers.reduce((s, value) => s + value, 0)
   const probeDepthMax = probed.length === 0 ? null : Math.max(...chunksNumbers)
   const probeDepthAvg = probed.length === 0 ? null : chunksNumberTotal / probed.length
-  const recovered = probed.filter(
-    (a) => a.effectiveColor === 'green' || a.effectiveColor === 'purple',
-  ).length
 
-  const rfc = observation('rfc', ratio(redYellow, n), n)
-  const rac = observation('rac', ratio(greenPurple, n), n)
-  const avg = observation('average_performance', n === 0 ? null : scoreSum / n, n)
-  const purpleRate = observation('purple_mastery_rate', ratio(purple, n), n)
-  // Clarification rate: 0 when finalized sample > 0 and none probed; null when sample = 0
-  const clarRate = observation('clarification_rate', n === 0 ? null : probed.length / n, n)
+  const recovered = probed.filter((a) => isCoolColor(a.effectiveColor)).length
+
+  // Calculate CPD across attempts with CVR/CCI metadata
+  const cpdResults = finalized
+    .map((a) => calculateQuestionCpd(a, colorWeights))
+    .filter((r) => r.questionCpd !== null)
+  const avgCpd = cpdResults.length === 0
+    ? null
+    : cpdResults.reduce((s, r) => s + (r.questionCpd ?? 0), 0) / cpdResults.length
+
+  const rfcVal = ratio(warmCount, questionCount)
+  // Seven colors form an exhaustive partition, so RAC is both cool/main and 1 - RFC.
+  const racVal = questionCount === 0 ? null : ratio(coolCount, questionCount)
+
+  const rfc = observation('rfc', rfcVal, questionCount)
+  const rac = observation('rac', racVal, questionCount)
+  const avg = observation('average_performance', avgPerformance, questionCount)
+  const purpleRate = observation('purple_mastery_rate', ratio(purpleCount, questionCount), questionCount)
+  const clarRate = observation('clarification_rate', questionCount === 0 ? null : probed.length / questionCount, questionCount)
   const clarDepth = observation('clarification_depth', probeDepthAvg, probed.length)
-  const nCount = observation('n_count', n === 0 ? null : probed.length, n)
+  const nCount = observation('n_count', questionCount === 0 ? null : probed.length, questionCount)
   const nDepthMax = observation('n_depth_max', probeDepthMax, probed.length)
   const nDepthAvg = observation('n_depth_avg', probeDepthAvg, probed.length)
   const awareness = observation(
@@ -203,7 +284,8 @@ export function calculateMetrics(finalized: FinalizedAttempt[]): MetricObservati
     probed.length === 0 ? null : recovered / probed.length,
     probed.length,
   )
-  const stability = observation('focus_stability', focusStability(finalized), n)
+  const stability = observation('focus_stability', focusStability(finalized, colorWeights), questionCount)
+  const cpdObs = observation('average_cpd', avgCpd, cpdResults.length)
 
   return [
     rfc,
@@ -217,6 +299,7 @@ export function calculateMetrics(finalized: FinalizedAttempt[]): MetricObservati
     nDepthAvg,
     awareness,
     stability,
+    cpdObs,
   ]
 }
 
@@ -224,14 +307,17 @@ export function calculateMetrics(finalized: FinalizedAttempt[]): MetricObservati
  * Normalized inverse of mean adjacent absolute score deltas across learners.
  * Returns null if fewer than two observations overall.
  */
-function focusStability(finalized: FinalizedAttempt[]): number | null {
+function focusStability(
+  finalized: FinalizedAttempt[],
+  weights: ColorWeights = DEFAULT_COLOR_WEIGHTS,
+): number | null {
   if (finalized.length < 2) return null
 
   const byLearner = new Map<string, number[]>()
   for (const a of finalized) {
     const id = a.learnerId ?? '_all'
     const list = byLearner.get(id) ?? []
-    list.push(COLOR_SCORE[a.effectiveColor])
+    list.push(weights[a.effectiveColor] ?? DEFAULT_COLOR_WEIGHTS[a.effectiveColor])
     byLearner.set(id, list)
   }
 
@@ -245,8 +331,8 @@ function focusStability(finalized: FinalizedAttempt[]): number | null {
   if (deltas.length === 0) return null
 
   const meanDelta = deltas.reduce((s, d) => s + d, 0) / deltas.length
-  // max adjacent move is 3 (0↔3); stability in [0,1]
-  return 1 - meanDelta / 3
+  // max adjacent move is 1.0 (0.0 ↔ 1.0); stability in [0, 1]
+  return Math.max(0, 1 - meanDelta)
 }
 
 export type WindowComparison = {
@@ -259,12 +345,13 @@ export type WindowComparison = {
 export function compareEqualDurationWindows(
   currentFinalized: FinalizedAttempt[],
   previousFinalized: FinalizedAttempt[] | null,
+  colorWeights: ColorWeights = DEFAULT_COLOR_WEIGHTS,
 ): WindowComparison {
-  const current = calculateMetrics(currentFinalized)
+  const current = calculateMetrics(currentFinalized, colorWeights)
   if (previousFinalized === null) {
     return { current, previous: null, deltas: {} }
   }
-  const previous = calculateMetrics(previousFinalized)
+  const previous = calculateMetrics(previousFinalized, colorWeights)
   const deltas: WindowComparison['deltas'] = {}
   for (const c of current) {
     const p = previous.find((x) => x.key === c.key)

@@ -1,10 +1,10 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import {
+  buildCorsHeaders,
+  isAllowedUsernameLoginOrigin,
+  parseAllowedOrigins,
+} from "../_shared/username-login-origin-policy.ts";
 
-const DEFAULT_ALLOWED_ORIGINS = [
-  "https://chunks-lms.vercel.app",
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-];
 const USERNAME_PATTERN = /^[a-z0-9][a-z0-9._-]{2,31}$/;
 
 class InvalidCredentialsError extends Error {}
@@ -42,33 +42,21 @@ function publishableKey(): string {
 }
 
 function allowedOrigins(): Set<string> {
-  const configured = (getEnv("USERNAME_LOGIN_ALLOWED_ORIGINS") ?? "")
-    .split(",")
-    .map((origin) => origin.trim().replace(/\/$/, ""))
-    .filter(Boolean);
-  return new Set([...DEFAULT_ALLOWED_ORIGINS, ...configured]);
+  // Add exact preview/custom origins through USERNAME_LOGIN_ALLOWED_ORIGINS when
+  // they do not match the narrowly constrained Chunks project preview pattern.
+  return parseAllowedOrigins(getEnv("USERNAME_LOGIN_ALLOWED_ORIGINS"));
 }
 
 function requestOrigin(req: Request): string | null {
-  return req.headers.get("Origin")?.trim().replace(/\/$/, "") ?? null;
+  return req.headers.get("Origin")?.trim() ?? null;
 }
 
 function isAllowedOrigin(req: Request): boolean {
-  const origin = requestOrigin(req);
-  return !origin || allowedOrigins().has(origin);
+  return isAllowedUsernameLoginOrigin(requestOrigin(req), allowedOrigins());
 }
 
 function corsHeaders(req: Request): Record<string, string> {
-  const origin = requestOrigin(req);
-  return {
-    "Access-Control-Allow-Origin":
-      origin && isAllowedOrigin(req) ? origin : DEFAULT_ALLOWED_ORIGINS[0],
-    "Access-Control-Allow-Headers":
-      "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Cache-Control": "no-store",
-    Vary: "Origin",
-  };
+  return buildCorsHeaders(requestOrigin(req), allowedOrigins());
 }
 
 function json(

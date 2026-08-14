@@ -64,6 +64,13 @@ import {
 } from '../../modules/result-lifecycle/types'
 import { LastActionWinsCoordinator } from '../../modules/standalone-tests/last-action-wins'
 import {
+  LIVE_TEST_RAIL_DEFAULT,
+  LIVE_TEST_RAIL_MAX,
+  LIVE_TEST_RAIL_MIN,
+  resolveLiveTestAudioPanelOpen,
+  resolveLiveTestRailWidth,
+} from '../../modules/standalone-tests/live-test-layout'
+import {
   correctionColorForShortcut,
   isStandaloneCorrectionMode,
   optimisticStandaloneProbePatch,
@@ -92,9 +99,6 @@ const COLORS = RESULT_COLORS.map((key) => ({
 }))
 
 const RAIL_W_KEY = 'chunks-lms:live-test-rail-w'
-const RAIL_MIN = 168
-const RAIL_MAX = 460
-const RAIL_DEFAULT = 244
 const RAIL_COLLAPSED = 48
 const AUDIO_AUTOPLAY_ITEMS_KEY = 'chunks-lms:live-test-autoplay-items'
 const AUDIO_AUTOPLAY_INTRO_KEY = 'chunks-lms:live-test-autoplay-intro'
@@ -104,7 +108,7 @@ const AUDIO_AUTOPLAY_PACKAGE_END_KEY = 'chunks-lms:live-test-autoplay-package-en
 const AUDIO_STANDARD_FLOW_KEY = 'chunks-lms:live-test-standard-audio-flow-v1'
 const AUDIO_RATE_KEY = 'chunks-lms:live-test-audio-rate'
 const AUDIO_VOLUME_KEY = 'chunks-lms:live-test-audio-volume'
-const AUDIO_PANEL_OPEN_KEY = 'chunks-lms:live-test-audio-panel-open'
+const AUDIO_PANEL_OPEN_KEY = 'chunks-lms:live-test-audio-panel-open-v2'
 const AUDIO_RUN_READY_PREFIX = 'chunks-lms:live-test-audio-ready:'
 const AUDIO_RUN_READY_TTL_MS = 12 * 60 * 60 * 1000
 
@@ -202,12 +206,10 @@ function formatVoltRange(min: unknown, max: unknown): string {
 
 function readSavedRailWidth(): number {
   try {
-    const n = Number(window.localStorage.getItem(RAIL_W_KEY))
-    if (Number.isFinite(n)) return Math.min(RAIL_MAX, Math.max(RAIL_MIN, n))
+    return resolveLiveTestRailWidth(window.localStorage.getItem(RAIL_W_KEY))
   } catch {
-    /* ignore */
+    return LIVE_TEST_RAIL_DEFAULT
   }
-  return RAIL_DEFAULT
 }
 
 function readSavedBoolean(key: string, fallback: boolean): boolean {
@@ -293,17 +295,17 @@ export function TeacherTestRunPage() {
   const [autoPlayPackageStart, setAutoPlayPackageStart] = useState(true)
   const [autoPlayPartIntro, setAutoPlayPartIntro] = useState(true)
   const [autoPlayPackageEnd, setAutoPlayPackageEnd] = useState(true)
-  const [audioPanelOpen, setAudioPanelOpen] = useState(true)
+  const [audioPanelOpen, setAudioPanelOpen] = useState(false)
   const [liveAudioStarted, setLiveAudioStarted] = useState(false)
   const [isRestoringRun, setIsRestoringRun] = useState(true)
   const [reaction, setReaction] = useState<Reaction>(null)
   const [message, setMessage] = useState('')
-  const [showHeader, setShowHeader] = useState(false)
+  const [showHeader, setShowHeader] = useState(true)
   const [showKeys, setShowKeys] = useState(false)
   const [mapOpen, setMapOpen] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(min-width: 640px)').matches : true,
   )
-  const [railWidth, setRailWidth] = useState(RAIL_DEFAULT)
+  const [railWidth, setRailWidth] = useState(LIVE_TEST_RAIL_DEFAULT)
   const [resizing, setResizing] = useState(false)
   const railWidthRef = useRef(railWidth)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -380,7 +382,9 @@ export function TeacherTestRunPage() {
     setAutoPlayPackageEnd(forceStandardFlow ? true : readSavedBoolean(AUDIO_AUTOPLAY_PACKAGE_END_KEY, true))
     setAudioRate(clampAudioRate(forceStandardFlow ? 1 : readSavedNumber(AUDIO_RATE_KEY, 1, 0.5, 3)))
     setAudioVolume(readSavedVolume())
-    setAudioPanelOpen(readSavedBoolean(AUDIO_PANEL_OPEN_KEY, true))
+    setAudioPanelOpen(
+      resolveLiveTestAudioPanelOpen(window.localStorage.getItem(AUDIO_PANEL_OPEN_KEY)),
+    )
   }, [])
 
   useEffect(() => {
@@ -466,7 +470,10 @@ export function TeacherTestRunPage() {
       setResizing(true)
 
       const onMove = (ev: PointerEvent) => {
-        const next = Math.min(RAIL_MAX, Math.max(RAIL_MIN, startW + (ev.clientX - startX)))
+        const next = Math.min(
+          LIVE_TEST_RAIL_MAX,
+          Math.max(LIVE_TEST_RAIL_MIN, startW + (ev.clientX - startX)),
+        )
         railWidthRef.current = next
         setRailWidth(next)
       }
@@ -684,7 +691,7 @@ export function TeacherTestRunPage() {
   )
 
   useEffect(() => {
-    setShowHeader(false)
+    setShowHeader(true)
   }, [currentSessionNumber])
 
   const activateAudioUrl = useCallback((
@@ -1785,7 +1792,7 @@ export function TeacherTestRunPage() {
                   <strong>{audioState}</strong>
                   {audioPanelOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                 </button>
-                <div className="live-test-audio-body">
+                <div className="live-test-audio-body" hidden={!audioPanelOpen}>
                   <div className="live-test-audio-controls">
                     <audio
                       ref={audioRef}
@@ -1908,7 +1915,7 @@ export function TeacherTestRunPage() {
         ) : null}
       </aside>
 
-      <main className="observe-main">
+      <main className="observe-stage observe-stage-tight live-test-stage">
         {!isSummaryShown ? (
           <>
             <div className="observe-stage-hero live-test-stage-hero">
@@ -1925,6 +1932,9 @@ export function TeacherTestRunPage() {
                   <Volume2 className="h-3.5 w-3.5" />
                 </button>
               </h1>
+              <p className="live-test-session-context">
+                Session {currentSessionNumber} of {totalSessions} · Question {currentItemNumber} of {items.length}
+              </p>
 
               {showKeys ? <p className="observe-depth-inline live-test-shortcuts">Shortcuts: 0 Red · 1 Orange · 2 Green · 3 Purple · F Yellow · C Blue · D Indigo · H map · ? keys</p> : null}
             </div>
@@ -1937,6 +1947,46 @@ export function TeacherTestRunPage() {
                 <span className="observe-react-burst" />
               </div>
             ) : null}
+
+            <div className="live-test-focus-card">
+              <div className="live-test-focus-actions">
+                <button type="button" className="ghost" disabled={selectedIndex === 0} onClick={() => setSelectedIndex((prev) => Math.max(0, prev - 1))}>
+                  <ChevronLeft className="h-4 w-4" /> Prev
+                </button>
+                <button
+                  type="button"
+                  className="live-test-wave-play"
+                  onClick={() => void playCurrentItemAudio(true)}
+                  aria-label={audioState === 'error' ? 'Retry current item audio' : 'Play current item audio'}
+                >
+                  {audioState === 'error' ? <RotateCcw className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                  <span className="live-test-wave" aria-hidden><i /><i /><i /><i /></span>
+                  <span>{audioState === 'error' ? 'Retry' : 'Play'}</span>
+                </button>
+                <button type="button" className="ghost" disabled={selectedIndex === items.length - 1} onClick={() => setSelectedIndex((prev) => Math.min(items.length - 1, prev + 1))}>
+                  Next <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="live-test-prompt-box">
+                <p>Item text · Q{currentItemNumber}</p>
+                <strong>“{currentPrimaryPrompt}”</strong>
+                {alternatePrompt ? (
+                  <span className="live-test-prompt-subtitle">
+                    {alternateLanguageLabel}: “{alternatePrompt}”
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="live-test-cpd-row">
+                <span className="metric-cvr">CVR {formatOhm(currentItem?.cvr)}</span>
+                <span className="metric-cci">CCI {formatAmp(currentItem?.cci)}</span>
+                <span className="is-strong metric-cpd">CPD {formatVolt(currentCpd)}</span>
+                <span className="metric-cpd">Min {formatVolt(summaryMetrics.minCpd)}</span>
+                <span className="metric-cpd">Max {formatVolt(summaryMetrics.maxCpd)}</span>
+                <span className="metric-cpd">Avg {formatVolt(summaryMetrics.avgCpd)}</span>
+              </div>
+            </div>
 
             <div className={`observe-dock observe-dock-lg live-test-dock-compact${reaction ? ` is-glowing is-${reaction.color}` : ''}`}>
               {showStartCard ? (
@@ -1997,49 +2047,6 @@ export function TeacherTestRunPage() {
                   })}
                 </div>
               )}
-              <div className="observe-dock-tools observe-split-tools">
-                <p className="observe-day-line live-test-day-line">Session {currentSessionNumber} · Main Q{currentItemNumber}/{items.length} · Completed {completedCount}/{items.length} · Probe steps {totalProbeSteps} · Expanded {expandedTotalItems}</p>
-              </div>
-            </div>
-
-            <div className="live-test-focus-card">
-              <div className="live-test-focus-actions">
-                <button type="button" className="ghost" disabled={selectedIndex === 0} onClick={() => setSelectedIndex((prev) => Math.max(0, prev - 1))}>
-                  <ChevronLeft className="h-4 w-4" /> Prev
-                </button>
-                <button
-                  type="button"
-                  className="live-test-wave-play"
-                  onClick={() => void playCurrentItemAudio(true)}
-                  aria-label={audioState === 'error' ? 'Retry current item audio' : 'Play current item audio'}
-                >
-                  {audioState === 'error' ? <RotateCcw className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-                  <span className="live-test-wave" aria-hidden><i /><i /><i /><i /></span>
-                  <span>{audioState === 'error' ? 'Retry' : 'Play'}</span>
-                </button>
-                <button type="button" className="ghost" disabled={selectedIndex === items.length - 1} onClick={() => setSelectedIndex((prev) => Math.min(items.length - 1, prev + 1))}>
-                  Next <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-
-              <div className="live-test-prompt-box">
-                <p>Item text · Q{currentItemNumber}</p>
-                <strong>“{currentPrimaryPrompt}”</strong>
-                {alternatePrompt ? (
-                  <span className="live-test-prompt-subtitle">
-                    {alternateLanguageLabel}: “{alternatePrompt}”
-                  </span>
-                ) : null}
-              </div>
-
-              <div className="live-test-cpd-row">
-                <span className="metric-cvr">CVR {formatOhm(currentItem?.cvr)}</span>
-                <span className="metric-cci">CCI {formatAmp(currentItem?.cci)}</span>
-                <span className="is-strong metric-cpd">CPD {formatVolt(currentCpd)}</span>
-                <span className="metric-cpd">Min {formatVolt(summaryMetrics.minCpd)}</span>
-                <span className="metric-cpd">Max {formatVolt(summaryMetrics.maxCpd)}</span>
-                <span className="metric-cpd">Avg {formatVolt(summaryMetrics.avgCpd)}</span>
-              </div>
             </div>
           </>
         ) : (
@@ -2050,14 +2057,14 @@ export function TeacherTestRunPage() {
               description={`Main questions: ${items.length} · Completed main questions: ${summaryMetrics.finalized}/${items.length} · Probe sub-items/steps: ${totalProbeSteps} · Expanded total: ${items.length} + ${totalProbeSteps} = ${expandedTotalItems}`}
               collapsible={false}
             >
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 my-3">
-                <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-center"><div className="text-xl font-bold text-red-500">{summaryMetrics.redCount}</div><div className="text-xs text-red-400 font-semibold">Red (0)</div></div>
-                <div className="p-2.5 rounded-xl bg-orange-500/10 border border-orange-500/30 text-center"><div className="text-xl font-bold text-orange-500">{summaryMetrics.orangeCount}</div><div className="text-xs text-orange-400 font-semibold">Orange (1)</div></div>
-                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-center"><div className="text-xl font-bold text-amber-400">{summaryMetrics.yellowCount}</div><div className="text-xs text-amber-300 font-semibold">Yellow (F)</div></div>
-                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center"><div className="text-xl font-bold text-emerald-500">{summaryMetrics.greenCount}</div><div className="text-xs text-emerald-400 font-semibold">Green (2)</div></div>
-                <div className="p-2.5 rounded-xl bg-sky-500/10 border border-sky-500/30 text-center"><div className="text-xl font-bold text-sky-400">{summaryMetrics.blueCount}</div><div className="text-xs text-sky-300 font-semibold">Blue (C)</div></div>
-                <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-center"><div className="text-xl font-bold text-indigo-400">{summaryMetrics.indigoCount}</div><div className="text-xs text-indigo-300 font-semibold">Indigo (D)</div></div>
-                <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-center"><div className="text-xl font-bold text-purple-400">{summaryMetrics.purpleCount}</div><div className="text-xs text-purple-300 font-semibold">Purple (3)</div></div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 my-3">
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-center"><div className="text-2xl font-bold text-red-500">{summaryMetrics.redCount}</div><div className="text-xs text-red-400 font-semibold">Red (0)</div></div>
+                <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/30 text-center"><div className="text-2xl font-bold text-orange-500">{summaryMetrics.orangeCount}</div><div className="text-xs text-orange-400 font-semibold">Orange (1)</div></div>
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-center"><div className="text-2xl font-bold text-amber-400">{summaryMetrics.yellowCount}</div><div className="text-xs text-amber-300 font-semibold">Yellow (F)</div></div>
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center"><div className="text-2xl font-bold text-emerald-500">{summaryMetrics.greenCount}</div><div className="text-xs text-emerald-400 font-semibold">Green (2)</div></div>
+                <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/30 text-center"><div className="text-2xl font-bold text-sky-400">{summaryMetrics.blueCount}</div><div className="text-xs text-sky-300 font-semibold">Blue (C)</div></div>
+                <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-center"><div className="text-2xl font-bold text-indigo-400">{summaryMetrics.indigoCount}</div><div className="text-xs text-indigo-300 font-semibold">Indigo (D)</div></div>
+                <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/30 text-center"><div className="text-2xl font-bold text-purple-400">{summaryMetrics.purpleCount}</div><div className="text-xs text-purple-300 font-semibold">Purple (3)</div></div>
               </div>
 
               <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-900 p-4 text-xs font-mono text-white shadow-inner sm:grid-cols-6">

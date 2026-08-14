@@ -4721,13 +4721,22 @@
       min-height: 0;
       overflow: hidden;
     }
+    .observe-root:has(.live-test-stage) .observe-bar {
+      min-height: 3rem;
+      overflow: visible;
+      z-index: 70;
+    }
+    .observe-root:not(.is-header-hidden):has(.live-test-stage) .observe-finish-fab {
+      display: none;
+    }
   }
   .live-test-stage {
-    @apply min-h-0 flex-col justify-center overflow-y-auto overflow-x-hidden;
+    @apply min-h-0 w-full flex-col items-center justify-center overflow-y-auto overflow-x-hidden;
     height: 100%;
-    padding-block: clamp(0.35rem, 1.2dvh, 0.75rem);
-    padding-bottom: max(clamp(0.75rem, 2dvh, 1.25rem), env(safe-area-inset-bottom));
-    gap: clamp(0.25rem, 1dvh, 0.75rem);
+    padding-inline: clamp(0.75rem, 2vw, 2rem);
+    padding-block: clamp(0.75rem, 2dvh, 1.25rem);
+    padding-bottom: max(clamp(1rem, 2.5dvh, 1.5rem), env(safe-area-inset-bottom));
+    gap: clamp(0.45rem, 1.2dvh, 0.9rem);
     -ms-overflow-style: none;
     scrollbar-width: thin;
   }
@@ -4739,9 +4748,12 @@
   }
   .live-test-stage-hero {
     transform: none !important;
-    @apply shrink-0;
-    max-width: min(92vw, 34rem);
+    @apply w-full shrink-0;
+    max-width: min(70vw, 47.5rem, 100%);
     gap: clamp(0.1rem, 0.5dvh, 0.35rem);
+  }
+  .live-test-session-context {
+    @apply m-0 text-center text-xs font-bold tracking-wide text-slate-300;
   }
   .live-test-day-line {
     font-size: clamp(0.62rem, 1.45dvh, 0.78rem);
@@ -4779,26 +4791,25 @@
     @apply border-cyan-400/30 bg-cyan-500/15 text-cyan-100;
   }
 
-  /* Keep Live Test dock vertical and central; it scales by viewport height instead of forcing browser zoom-out. */
+  /* Desktop action dock: wide and horizontal so the prompt remains the visual anchor. */
   .live-test-dock-compact {
-    @apply mx-auto flex-col items-center justify-center;
-    width: fit-content;
-    max-width: none;
+    @apply mx-auto w-full flex-col items-center justify-center;
+    max-width: min(70vw, 47.5rem, 100%);
     gap: clamp(0.25rem, 0.8dvh, 0.65rem);
   }
   .live-test-dock-compact .observe-dock-colors {
-    @apply flex-col rounded-[3rem] border-4;
-    gap: clamp(0.35rem, 1.1dvh, 0.85rem);
-    padding: clamp(0.45rem, 1.25dvh, 0.95rem);
+    @apply flex-row rounded-[2.25rem] border-[3px];
+    gap: clamp(0.45rem, 1vw, 0.75rem);
+    padding: clamp(0.45rem, 1dvh, 0.75rem);
   }
   .live-test-dock-compact .observe-dock-color {
-    width: clamp(4.15rem, 14dvh, 7.25rem) !important;
-    height: clamp(4.15rem, 14dvh, 7.25rem) !important;
-    border-width: clamp(2px, 0.45dvh, 4px);
-    padding: clamp(0.2rem, 0.7dvh, 0.5rem);
+    width: clamp(3.75rem, 9dvh, 4.75rem) !important;
+    height: clamp(3.75rem, 9dvh, 4.75rem) !important;
+    border-width: clamp(2px, 0.35dvh, 3px);
+    padding: clamp(0.2rem, 0.55dvh, 0.4rem);
   }
   .live-test-dock-compact .observe-dock-num {
-    font-size: clamp(1.25rem, 4dvh, 2.55rem) !important;
+    font-size: clamp(1.1rem, 2.8dvh, 1.65rem) !important;
   }
   .live-test-dock-compact .observe-dock-label {
     @apply hidden!;
@@ -4806,7 +4817,7 @@
 
   .live-test-focus-card {
     @apply shrink-0;
-    width: min(92vw, 34rem);
+    width: min(70vw, 47.5rem, 100%);
     margin-top: clamp(0.2rem, 0.8dvh, 0.5rem) !important;
     padding: clamp(0.45rem, 1.1dvh, 0.75rem) !important;
   }
@@ -4896,7 +4907,7 @@
       gap: 0.2rem;
     }
     .live-test-focus-card {
-      width: min(94vw, 32rem);
+      width: min(78vw, 44rem);
     }
     .live-test-prompt-box strong {
       font-size: clamp(0.78rem, 2.4dvh, 0.95rem) !important;

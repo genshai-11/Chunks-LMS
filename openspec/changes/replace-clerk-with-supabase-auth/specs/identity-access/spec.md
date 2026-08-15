@@ -33,6 +33,11 @@ The system SHALL maintain one stable domain User linked by `auth_user_id` to the
 - **WHEN** a new Supabase Auth account has no matching domain email
 - **THEN** the provisioning trigger creates one active domain User linked to that Auth identity
 
+#### Scenario: Clerk webhook is delivered twice
+
+- **WHEN** the same Supabase Auth provisioning event is processed more than once
+- **THEN** the system retains one domain User and applies the latest valid profile state
+
 ## ADDED Requirements
 
 ### Requirement: Native account actions

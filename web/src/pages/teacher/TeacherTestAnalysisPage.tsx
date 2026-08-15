@@ -21,23 +21,35 @@ import { listActiveLearners } from '../../modules/roster/service'
 import { getStandaloneAssignmentAnalysis, type StandaloneTestRunRow } from '../../lib/standalone-tests'
 import { useAppState } from '../../state/useAppState'
 import { probeChunksNumber } from '../../modules/assessment/probe-metrics'
+import { calculateSpectrumStepBreakdown } from '../../modules/metrics/calculate'
+import { COLOR_SCORE, COOL_COLORS, SPECTRUM_COLORS, WARM_COLORS, type ResultColor } from '../../modules/result-lifecycle/types'
 
-type ResultColor = 'red' | 'yellow' | 'green' | 'purple'
 type AnalysisItem = Record<string, any>
 
 const COLOR_HEX: Record<string, string> = {
   red: '#ef4444',
-  yellow: '#f97316',
+  orange: '#f97316',
+  yellow: '#facc15',
   green: '#22c55e',
+  blue: '#38bdf8',
+  indigo: '#6366f1',
   purple: '#a855f7',
   pending: '#64748b',
 }
 
 const COLOR_LABELS: Record<ResultColor, string> = {
   red: 'Red',
-  yellow: 'Orange',
+  orange: 'Orange',
+  yellow: 'Yellow',
   green: 'Green',
+  blue: 'Blue',
+  indigo: 'Indigo',
   purple: 'Purple',
+}
+
+const COLOR_GROUPS = {
+  warm: [...WARM_COLORS] as ResultColor[],
+  cool: [...COOL_COLORS] as ResultColor[],
 }
 
 const METRIC_HEX = {
@@ -46,13 +58,6 @@ const METRIC_HEX = {
   cvr: '#dc2626',
   cci: '#16a34a',
   cpd: '#2563eb',
-}
-
-const COLOR_SCORE: Record<ResultColor, number> = {
-  red: 0,
-  yellow: 1,
-  green: 2,
-  purple: 3,
 }
 
 function snapshot(item: AnalysisItem) {
@@ -121,7 +126,7 @@ export function TeacherTestAnalysisPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [selectedSessions, setSelectedSessions] = useState<number[]>([])
-  const [selectedColors, setSelectedColors] = useState<ResultColor[]>(['red', 'yellow', 'green', 'purple'])
+  const [selectedColors, setSelectedColors] = useState<ResultColor[]>([...SPECTRUM_COLORS])
   const [showChartLabels, setShowChartLabels] = useState(true)
   const [sessionBrushRange, setSessionBrushRange] = useState<{ startIndex?: number; endIndex?: number }>({})
 
@@ -170,6 +175,8 @@ export function TeacherTestAnalysisPage() {
           baseCpd,
           resultScore: score,
           cpd: finalCpd,
+          enteredProbeFlow: Boolean(snap?.entered_probe_flow ?? snap?.enteredProbeFlow),
+          probeEventCount: num(snap?.probe_count ?? snap?.probeCount, 0),
           probeDepth: probeChunksNumber({
             enteredProbeFlow: Boolean(snap?.entered_probe_flow ?? snap?.enteredProbeFlow),
             probeCount: num(snap?.probe_count ?? snap?.probeCount, 0),
@@ -200,13 +207,26 @@ export function TeacherTestAnalysisPage() {
   const metrics = useMemo(() => {
     const finalized = chartRows.filter((row) => row.finalized)
     const count = Math.max(finalized.length, 1)
-    const redYellow = finalized.filter((row) => row.color === 'red' || row.color === 'yellow').length
-    const greenPurple = finalized.filter((row) => row.color === 'green' || row.color === 'purple').length
+    const spectrum = calculateSpectrumStepBreakdown(
+      finalized
+        .filter((row) => row.color !== 'pending')
+        .map((row) => ({
+          effectiveColor: row.color as ResultColor,
+          enteredProbeFlow: row.enteredProbeFlow,
+          probeEventCount: row.probeEventCount,
+        })),
+    )
     return {
       finalized: finalized.length,
       total: chartRows.length,
-      rfc: finalized.length ? (redYellow / count) * 100 : 0,
-      percentC: finalized.length ? (greenPurple / count) * 100 : 0,
+      nTotal: spectrum.totalRecords,
+      warmSteps: spectrum.warmSteps,
+      coolSteps: spectrum.coolSteps,
+      rfc: spectrum.rfc == null ? 0 : spectrum.rfc * 100,
+      percentC: spectrum.rac == null ? 0 : spectrum.rac * 100,
+      rfcTitle: `RFC = warm records / N_total = ${spectrum.warmSteps} / ${spectrum.totalRecords}. Warm = Red + Orange + Yellow.`,
+      percentCTitle: `%c = cool records / N_total = ${spectrum.coolSteps} / ${spectrum.totalRecords}. Cool = Green + Blue + Indigo + Purple.`,
+      nTotalTitle: `N_total = primary records + probe records = ${spectrum.primaryRecords} + ${spectrum.probeRecords} = ${spectrum.totalRecords}.`,
       avgCvr: finalized.reduce((sum, row) => sum + row.cvr, 0) / count,
       avgCci: finalized.reduce((sum, row) => sum + row.cci, 0) / count,
       avgCpd: finalized.reduce((sum, row) => sum + row.cpd, 0) / count,
@@ -224,11 +244,16 @@ export function TeacherTestAnalysisPage() {
       .sort(([a], [b]) => a - b)
       .map(([session, group]) => {
         const finalized = group.filter((row) => row.finalized)
+        const spectrum = calculateSpectrumStepBreakdown(
+          finalized
+            .filter((row) => row.color !== 'pending')
+            .map((row) => ({
+              effectiveColor: row.color as ResultColor,
+              enteredProbeFlow: row.enteredProbeFlow,
+              probeEventCount: row.probeEventCount,
+            })),
+        )
         const denom = Math.max(finalized.length, 1)
-        const red = finalized.filter((row) => row.color === 'red').length
-        const yellow = finalized.filter((row) => row.color === 'yellow').length
-        const green = finalized.filter((row) => row.color === 'green').length
-        const purple = finalized.filter((row) => row.color === 'purple').length
         const avgCpd = finalized.length
           ? finalized.reduce((sum, row) => sum + row.cpd, 0) / denom
           : 0
@@ -236,15 +261,15 @@ export function TeacherTestAnalysisPage() {
           session,
           label: `Session ${session}`,
           shortLabel: `S${session}`,
-          percentC: finalized.length ? Math.round(((green + purple) / denom) * 100) : 0,
+          percentC: spectrum.rac == null ? 0 : Math.round(spectrum.rac * 100),
           avgCpd: Number(avgCpd.toFixed(2)),
-          percentCLabel: finalized.length ? `${Math.round(((green + purple) / denom) * 100)}%` : '—',
+          percentCLabel: spectrum.rac == null ? '—' : `${Math.round(spectrum.rac * 100)}%`,
           avgCpdLabel: finalized.length ? `CPD ${avgCpd.toFixed(0)}V` : 'CPD —',
           finalized: finalized.length,
-          red,
-          yellow,
-          green,
-          purple,
+          nTotal: spectrum.totalRecords,
+          warmSteps: spectrum.warmSteps,
+          coolSteps: spectrum.coolSteps,
+          byColor: spectrum.byColor,
         }
       })
   }, [chartRows])
@@ -307,7 +332,7 @@ export function TeacherTestAnalysisPage() {
       if (current.includes(color)) {
         const next = current.filter((value) => value !== color)
         if (next.length === 0) {
-          return ['red', 'yellow', 'green', 'purple']
+          return [...SPECTRUM_COLORS]
         }
         return next
       }
@@ -315,10 +340,23 @@ export function TeacherTestAnalysisPage() {
     })
   }, [])
 
+  const selectColorGroup = useCallback((group: 'warm' | 'cool') => {
+    setSelectedColors([...COLOR_GROUPS[group]])
+  }, [])
+
+  const selectedColorGroup = useMemo(() => {
+    const selected = new Set(selectedColors)
+    const isWarm = COLOR_GROUPS.warm.length === selectedColors.length && COLOR_GROUPS.warm.every((color) => selected.has(color))
+    const isCool = COLOR_GROUPS.cool.length === selectedColors.length && COLOR_GROUPS.cool.every((color) => selected.has(color))
+    if (isWarm) return 'warm'
+    if (isCool) return 'cool'
+    return 'custom'
+  }, [selectedColors])
+
   const colorDistribution = useMemo(() => {
     const finalized = chartRows.filter((row) => row.finalized && row.color !== 'pending')
     const total = Math.max(finalized.length, 1)
-    return (['red', 'yellow', 'green', 'purple'] as ResultColor[]).map((color) => {
+    return SPECTRUM_COLORS.map((color) => {
       const count = finalized.filter((row) => row.color === color).length
       return {
         color,
@@ -348,35 +386,40 @@ export function TeacherTestAnalysisPage() {
       />
 
       <div className="standalone-analysis-grid">
-        <div className="standalone-metric-card metric-rfc">
+        <div className="standalone-metric-card metric-rfc" title={metrics.rfcTitle}>
           <Activity className="h-5 w-5" />
           <span>RFC</span>
           <strong>{pct(metrics.rfc)}</strong>
         </div>
-        <div className="standalone-metric-card metric-percent-c">
+        <div className="standalone-metric-card metric-percent-c" title={metrics.percentCTitle}>
           <Target className="h-5 w-5" />
           <span>%c</span>
           <strong>{pct(metrics.percentC)}</strong>
         </div>
-        <div className="standalone-metric-card metric-cvr">
+        <div className="standalone-metric-card metric-cvr" title={`Average CVR across ${metrics.finalized} finalized questions in the current filter.`}>
           <Gauge className="h-5 w-5" />
           <span>Avg CVR</span>
           <strong>{ohm(metrics.avgCvr)}</strong>
         </div>
-        <div className="standalone-metric-card metric-cci">
+        <div className="standalone-metric-card metric-cci" title={`Average CCI across ${metrics.finalized} finalized questions in the current filter.`}>
           <Brain className="h-5 w-5" />
           <span>Avg CCI</span>
           <strong>{amp(metrics.avgCci)}</strong>
         </div>
-        <div className="standalone-metric-card metric-cpd">
+        <div className="standalone-metric-card metric-cpd" title={`Average Final CPD = mean(CVR x CCI x color factor) across ${metrics.finalized} finalized questions.`}>
           <Zap className="h-5 w-5" />
           <span>Avg Final CPD</span>
           <strong>{volt(metrics.avgCpd)}</strong>
         </div>
-        <div className="standalone-metric-card">
+        <div className="standalone-metric-card" title="Maximum chunks number in the current filter. Green opens at 1; each Continue adds 1.">
           <LineChartIcon className="h-5 w-5 text-rose-300" />
           <span>Max Chunks Number</span>
           <strong>{metrics.peakProbeDepth}</strong>
+        </div>
+        <div className="standalone-metric-card" title={metrics.nTotalTitle}>
+          <BarChart3 className="h-5 w-5 text-slate-400" />
+          <span>N_total</span>
+          <strong>{metrics.nTotal}</strong>
         </div>
       </div>
 
@@ -425,13 +468,29 @@ export function TeacherTestAnalysisPage() {
             <div className="test-analysis-color-list">
               <button
                 type="button"
-                className={`test-analysis-color-chip${selectedColors.length === 4 ? ' is-active' : ''}`}
-                onClick={() => setSelectedColors(['red', 'yellow', 'green', 'purple'])}
+                className={`test-analysis-color-chip${selectedColors.length === SPECTRUM_COLORS.length ? ' is-active' : ''}`}
+                onClick={() => setSelectedColors([...SPECTRUM_COLORS])}
               >
                 All
               </button>
-              {(['red', 'yellow', 'green', 'purple'] as ResultColor[]).map((color) => {
-                const active = selectedColors.length < 4 && selectedColors.includes(color)
+              <button
+                type="button"
+                className={`test-analysis-color-chip${selectedColorGroup === 'warm' ? ' is-active' : ''}`}
+                onClick={() => selectColorGroup('warm')}
+                title="Warm = Red + Orange + Yellow"
+              >
+                Warm
+              </button>
+              <button
+                type="button"
+                className={`test-analysis-color-chip${selectedColorGroup === 'cool' ? ' is-active' : ''}`}
+                onClick={() => selectColorGroup('cool')}
+                title="Cool = Green + Blue + Indigo + Purple"
+              >
+                Cool
+              </button>
+              {SPECTRUM_COLORS.map((color) => {
+                const active = selectedColors.length < SPECTRUM_COLORS.length && selectedColors.includes(color)
                 return (
                   <button
                     key={color}
@@ -491,7 +550,7 @@ export function TeacherTestAnalysisPage() {
                             <div>Final CPD: <strong style={{ color: METRIC_HEX.cpd }}>{volt(row.cpd)}</strong></div>
                             <div>Formula: {volt(row.baseCpd)} × {row.resultScore}</div>
                             <div>CVR: <strong style={{ color: METRIC_HEX.cvr }}>{ohm(row.cvr)}</strong> · CCI: <strong style={{ color: METRIC_HEX.cci }}>{amp(row.cci)}</strong></div>
-                            <div>Result: <strong className="capitalize" style={{ color: row.colorHex }}>{row.color === 'yellow' ? 'orange' : row.color}</strong></div>
+                            <div>Result: <strong className="capitalize" style={{ color: row.colorHex }}>{row.color}</strong></div>
                             <div>Session: <strong>{row.session}</strong> · {row.language}</div>
                             {row.prompt ? <div className="mt-1 max-w-xs text-slate-600">“{row.prompt}”</div> : null}
                           </div>
@@ -528,7 +587,7 @@ export function TeacherTestAnalysisPage() {
               className="test-analysis-panel"
               icon={LineChartIcon}
               title="%c by Session"
-              description="%c = Green + Purple results divided by finalized questions in each session."
+              description="%c = cool records / N_total for each session. Cool = Green + Blue + Indigo + Purple."
               collapsible={false}
             >
               <div className="standalone-chart-wrap">
@@ -553,12 +612,12 @@ export function TeacherTestAnalysisPage() {
                           <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
                             <div className="mb-1 font-black text-slate-950">{row.label}</div>
                             <div>%c: <strong style={{ color: METRIC_HEX.percentC }}>{row.percentC}%</strong></div>
+                            <div>Formula: <strong>{row.coolSteps} / {row.nTotal}</strong> cool records / N_total</div>
                             <div>Finalized: <strong>{row.finalized}</strong> questions</div>
                             <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1">
-                              <span style={{ color: COLOR_HEX.red }}>Red: {row.red}</span>
-                              <span style={{ color: COLOR_HEX.yellow }}>Orange: {row.yellow}</span>
-                              <span style={{ color: COLOR_HEX.green }}>Green: {row.green}</span>
-                              <span style={{ color: COLOR_HEX.purple }}>Purple: {row.purple}</span>
+                              {SPECTRUM_COLORS.map((color) => (
+                                <span key={color} style={{ color: COLOR_HEX[color] }}>{COLOR_LABELS[color]}: {row.byColor[color]}</span>
+                              ))}
                             </div>
                           </div>
                         )
@@ -633,6 +692,7 @@ export function TeacherTestAnalysisPage() {
                           <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
                             <div className="mb-1 font-black text-slate-950">{row.label}</div>
                             <div>%c: <strong style={{ color: METRIC_HEX.percentC }}>{row.percentC}%</strong></div>
+                            <div>Formula: <strong>{row.coolSteps} / {row.nTotal}</strong> cool records / N_total</div>
                             <div>Avg CPD: <strong style={{ color: METRIC_HEX.cpd }}>{volt(row.avgCpd)}</strong></div>
                             <div>Finalized: <strong>{row.finalized}</strong> questions</div>
                           </div>
@@ -685,7 +745,7 @@ export function TeacherTestAnalysisPage() {
               className="test-analysis-panel"
               icon={PieChartIcon}
             title="Result Color Distribution"
-            description="Distribution of finalized results across Red, Orange, Green, and Purple."
+            description="Distribution of finalized effective results across the 7-color spectrum."
             collapsible={false}
           >
             <div className="standalone-chart-wrap">

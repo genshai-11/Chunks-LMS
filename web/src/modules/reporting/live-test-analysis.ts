@@ -1,5 +1,6 @@
 import type { LiveTestItem } from '../assessment/live-test'
 import { deriveCpd, liveTestItemIdFromExternalRef } from '../assessment/live-test'
+import { SPECTRUM_COLORS, type ResultColor } from '../result-lifecycle/types'
 import type { ResultRecord } from './progress'
 
 export type LiveTestResultRecord = ResultRecord & {
@@ -51,9 +52,13 @@ export function colorDistributionByBand(
   rows: LiveTestResultRecord[],
   metric: 'cciValue' | 'cvrValue' | 'cpdValue',
   cuts: { lowMax: number; mediumMax: number },
-): Record<BandKey, { red: number; yellow: number; green: number; purple: number; sample: number }> {
-  const empty = () => ({ red: 0, yellow: 0, green: 0, purple: 0, sample: 0 })
-  const out: Record<BandKey, { red: number; yellow: number; green: number; purple: number; sample: number }> = {
+): Record<BandKey, Record<ResultColor, number> & { sample: number }> {
+  const empty = () =>
+    ({
+      ...Object.fromEntries(SPECTRUM_COLORS.map((color) => [color, 0])),
+      sample: 0,
+    }) as Record<ResultColor, number> & { sample: number }
+  const out: Record<BandKey, Record<ResultColor, number> & { sample: number }> = {
     low: empty(),
     medium: empty(),
     high: empty(),

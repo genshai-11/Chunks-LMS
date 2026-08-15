@@ -34,7 +34,6 @@ begin
 
   return jsonb_build_object('learnerUserId',p_learner_user_id,'runCount',v_total,'averageLearnerCpdScore',v_avg,'runs',v_runs);
 end $$;
-
 revoke execute on function public.get_learner_standalone_test_results(uuid,uuid) from public,anon;
 grant execute on function public.get_learner_standalone_test_results(uuid,uuid) to authenticated,service_role;
 comment on function public.get_learner_standalone_test_results(uuid,uuid) is 'Separate finalized/corrected standalone Test Results with immutable package/measurement/CPD provenance.';

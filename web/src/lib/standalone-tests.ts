@@ -6,6 +6,7 @@ import type {
   StandaloneAssignmentStatus,
   StandaloneRunStatus,
 } from '../modules/standalone-tests/types'
+import type { ProvisionalColor } from '../modules/result-lifecycle/types'
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: string }
 
@@ -18,6 +19,12 @@ export type StandaloneTestAssignmentRow = {
   assignmentNumber: number
   status: StandaloneAssignmentStatus
   assignedAt: string
+}
+
+export type StandaloneAssignmentProgress = {
+  assignmentId: string
+  completedQuestions: number
+  totalQuestions: number
 }
 
 export type StandaloneTestRunRow = {
@@ -184,7 +191,7 @@ export const startStandaloneRun = (runId: string, readinessToken: string) =>
 
 export const recordStandaloneResult = (
   runItemId: string,
-  color: 'red' | 'yellow' | 'green' | 'purple',
+  color: ProvisionalColor,
 ) =>
   rpc<{ attemptId: string; status: string; effectiveColor: string | null; probeCount: number }>(
     'record_standalone_provisional_result',
@@ -375,4 +382,23 @@ export async function getStandaloneAssignmentAnalysis(assignmentId: string): Pro
       items,
     },
   }
+}
+
+export async function getStandaloneAssignmentProgress(
+  assignmentId: string,
+): Promise<Result<StandaloneAssignmentProgress>> {
+  const runs = await listStandaloneRuns(assignmentId)
+  if (!runs.ok) return runs
+  let completedQuestions = 0
+  let totalQuestions = 0
+  for (const runRow of runs.data) {
+    const items = await listStandaloneRunItems(runRow.id)
+    if (!items.ok) return items
+    totalQuestions += items.data.length
+    completedQuestions += items.data.filter((item) => {
+      const snapshot = (item as any)?.standalone_test_attempts?.[0]?.standalone_test_attempt_snapshots
+      return ['finalized', 'corrected'].includes(snapshot?.status)
+    }).length
+  }
+  return { ok: true, data: { assignmentId, completedQuestions, totalQuestions } }
 }

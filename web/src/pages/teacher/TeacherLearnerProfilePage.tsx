@@ -7,6 +7,13 @@ import { UserAvatar } from '../../components/UserAvatar'
 import { EmptyState, Panel, StatCard } from '../../components/ui'
 import { useFlash } from '../../hooks/useFlash'
 import { readImageAsDataUrl } from '../../lib/readImageFile'
+import {
+  getStandaloneAssignmentProgress,
+  listStandaloneAssignments,
+  type StandaloneAssignmentProgress,
+  type StandaloneTestAssignmentRow,
+} from '../../lib/standalone-tests'
+import { listTestPackages, listTestPackageVersions } from '../../lib/test-packages'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import { updateUserProfile, endEnrollment, enrollLearner } from '../../modules/roster/service'
 import {
@@ -29,6 +36,12 @@ const DEFAULT_COLUMNS = {
 }
 
 type ColumnKey = keyof typeof DEFAULT_COLUMNS
+
+type LearnerTestSummary = {
+  assignment: StandaloneTestAssignmentRow
+  packageLabel: string
+  progress: StandaloneAssignmentProgress | null
+}
 
 const COLUMN_LABELS: Record<ColumnKey, string> = {
   date: 'Date',
@@ -55,6 +68,8 @@ export function TeacherLearnerProfilePage() {
   const [showTable, setShowTable] = useState(true)
   const [columns, setColumns] = useState(DEFAULT_COLUMNS)
   const [isEditing, setIsEditing] = useState(false)
+  const [testAnalysisAssignmentId, setTestAnalysisAssignmentId] = useState<string | null>(null)
+  const [learnerTestSummary, setLearnerTestSummary] = useState<LearnerTestSummary | null>(null)
 
   const enrollment = useMemo(() => {
     if (!learner) return null
@@ -80,6 +95,69 @@ export function TeacherLearnerProfilePage() {
     setEmail(learner?.email ?? '')
     setAvatarUrl(learner?.avatarUrl ?? '')
   }, [learner?.displayName, learner?.email, learner?.avatarUrl, learner?.id])
+
+  useEffect(() => {
+    if (!learner?.id) {
+      setTestAnalysisAssignmentId(null)
+      setLearnerTestSummary(null)
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const result = await listStandaloneAssignments(learner.id)
+      if (cancelled) return
+      if (!result.ok) {
+        setTestAnalysisAssignmentId(null)
+        setLearnerTestSummary(null)
+        return
+      }
+      const latest = [...result.data].sort(
+        (a, b) =>
+          new Date(b.assignedAt).getTime() - new Date(a.assignedAt).getTime() ||
+          b.assignmentNumber - a.assignmentNumber,
+      )[0]
+      setTestAnalysisAssignmentId(latest?.id ?? null)
+      if (!latest) {
+        setLearnerTestSummary(null)
+        return
+      }
+
+      let packageLabel = 'Package test'
+      const packages = await listTestPackages()
+      if (packages.ok) {
+        for (const pkg of packages.data) {
+          const versions = await listTestPackageVersions(pkg.id)
+          const version = versions.ok
+            ? versions.data.find((candidate) => candidate.id === latest.packageVersionId)
+            : null
+          if (version) {
+            packageLabel = `${pkg.title} · ${version.versionLabel}`
+            break
+          }
+        }
+      }
+
+      const progress = await getStandaloneAssignmentProgress(latest.id)
+      if (!cancelled) {
+        setLearnerTestSummary({
+          assignment: latest,
+          packageLabel,
+          progress: progress.ok ? progress.data : null,
+        })
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [learner?.id])
+
+  const testCompletionPercent = learnerTestSummary?.progress?.totalQuestions
+    ? Math.round(
+        (learnerTestSummary.progress.completedQuestions /
+          learnerTestSummary.progress.totalQuestions) *
+          100,
+      )
+    : 0
 
   const rows = useMemo(
     () =>
@@ -183,12 +261,27 @@ export function TeacherLearnerProfilePage() {
               <Play className="h-4 w-4" aria-hidden />
               <span>Start session</span>
             </Link>
+            {testAnalysisAssignmentId ? (
+              <Link
+                to={`/teacher/tests/analysis/${testAnalysisAssignmentId}`}
+                className="btn ghost"
+                title="View Tests 1-1 standalone analysis for this learner"
+              >
+                <BarChart3 className="h-4 w-4" aria-hidden />
+                <span>Tests 1-1 analysis</span>
+              </Link>
+            ) : null}
           </div>
         }
       />
       <div className="btn-row" role="tablist" aria-label="Learner profile tabs" style={{ marginBottom: '1rem' }}>
         <Link className="btn primary" role="tab" aria-selected="true" to={`/teacher/learner/${learner.id}`}>Profile & Session Results</Link>
         <Link className="btn ghost" role="tab" aria-selected="false" to={`/teacher/learner/${learner.id}/tests`}>Test Results</Link>
+        {testAnalysisAssignmentId ? (
+          <Link className="btn ghost" role="tab" aria-selected="false" to={`/teacher/tests/analysis/${testAnalysisAssignmentId}`}>
+            Tests 1-1 Analysis
+          </Link>
+        ) : null}
       </div>
       <Flash message={message} error={error} />
 
@@ -218,6 +311,30 @@ export function TeacherLearnerProfilePage() {
                       Class: {currentClass?.name || 'Unassigned'}
                     </span>
                   </div>
+                  {learnerTestSummary ? (
+                    <div className="mt-3 w-full rounded-xl border border-slate-200 bg-white/80 p-3 text-sm text-slate-700">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-semibold text-slate-900">
+                          {learnerTestSummary.packageLabel}
+                        </span>
+                        <span className={learnerTestSummary.assignment.status === 'completed' ? 'badge completed' : 'badge success'}>
+                          {learnerTestSummary.assignment.status}
+                        </span>
+                      </div>
+                      {learnerTestSummary.assignment.status === 'active' ? (
+                        <p className="mt-2 text-xs text-slate-600">
+                          {testCompletionPercent}% complete ·{' '}
+                          {learnerTestSummary.progress?.completedQuestions ?? 0}/
+                          {learnerTestSummary.progress?.totalQuestions ?? 0} questions
+                        </p>
+                      ) : learnerTestSummary.progress ? (
+                        <p className="mt-2 text-xs text-slate-600">
+                          {learnerTestSummary.progress.completedQuestions}/
+                          {learnerTestSummary.progress.totalQuestions} questions finalized
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                   <button
                     type="button"
                     className="btn ghost mt-4 border border-slate-700/50 hover:bg-slate-800"

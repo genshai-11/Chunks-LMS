@@ -5,6 +5,7 @@ import {
   type AssessmentSnapshot,
   type LifecycleCommand,
   type LifecycleResult,
+  type ProvisionalColor,
   type ResultColor,
 } from './types'
 
@@ -62,7 +63,7 @@ export function applyLifecycleCommand(
 
 function recordProvisional(
   snapshot: AssessmentSnapshot,
-  color: ResultColor,
+  color: ProvisionalColor,
   at: string,
 ): LifecycleResult {
   if (snapshot.status !== 'draft') {
@@ -87,7 +88,7 @@ function recordProvisional(
     }
   }
 
-  // Red, Yellow, Purple finalize directly
+  // Red, Orange, Purple finalize directly. Green enters probe flow above.
   events.push('result_finalized')
   return {
     ok: true,
@@ -130,7 +131,7 @@ function resolveProbe(
           ...snapshot,
           probeCount: snapshot.probeCount + (snapshot.status === 'probe_open' ? 1 : 0),
         },
-        'green',
+        'indigo',
         at,
       ),
       events,

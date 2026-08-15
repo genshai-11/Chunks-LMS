@@ -159,4 +159,4 @@ $$;
 revoke all on function public.consume_username_login_attempt(text, integer)
   from public, anon, authenticated;
 grant execute on function public.consume_username_login_attempt(text, integer)
-  to service_role;
+  to service_role;;

@@ -6,13 +6,13 @@ Measurement-focused LMS for learner **Focus** and **Awareness** via teacher-obse
 
 Foundation OpenSpec change is **archived**; main specs under `openspec/specs/`. Phases **A–E** engineering complete for first hosted class.
 
-- React + TypeScript app under `web/` (Admin, Teacher, Learner)
+- React + TypeScript app under `web/` (Admin, Teacher)
 - Domain modules + unit tests (lifecycle, metrics, roster, scheduling, ops, sync, e2e)
 - Supabase migrations + local `seed.sql` + idempotent `supabase/seeds/production-starter.sql`
 - GitHub Actions **CI** + **CD** (Vercel)
 - **Ship docs:** [production runbook](docs/ops/production-runbook.md) · [hosted e2e checklist](docs/ops/hosted-e2e-checklist.md)
 
-**V1 identity:** Clerk = Admin + Teacher; learners = email profile + share link (no membership).
+**V1 identity:** Native Supabase Auth = Admin + Teacher; learners = staff-managed profile records, with no learner portal/share-link access.
 
 ## Start here
 

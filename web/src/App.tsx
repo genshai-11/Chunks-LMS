@@ -29,11 +29,6 @@ import { TeacherTestSetupPage } from './pages/teacher/TeacherTestSetupPage'
 import { TeacherTestRunPage } from './pages/teacher/TeacherTestRunPage'
 import { TeacherTestAnalysisPage } from './pages/teacher/TeacherTestAnalysisPage'
 import { TeacherLearnerTestResultsPage } from './pages/teacher/TeacherLearnerTestResultsPage'
-import { LearnerLayout } from './pages/learner/LearnerLayout'
-import { LearnerOverviewPage } from './pages/learner/LearnerOverviewPage'
-import { LearnerEnrollmentsPage } from './pages/learner/LearnerEnrollmentsPage'
-import { LearnerAnalysisPage } from './pages/learner/LearnerAnalysisPage'
-import { LearnerAccessPage } from './pages/LearnerAccessPage'
 import { AppStateProvider } from './state/AppState'
 
 export default function App() {
@@ -45,7 +40,6 @@ export default function App() {
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/chunker" element={<ChunkerPage />} />
-              <Route path="/access" element={<LearnerAccessPage />} />
 
               <Route
                 path="/admin"
@@ -98,17 +92,6 @@ export default function App() {
                 <Route path="analysis" element={<TeacherAnalysisPage />} />
                 <Route path="progress" element={<Navigate to="/teacher/analysis" replace />} />
               </Route>
-
-              {/* Learner portal — scoped share link, separate from staff Supabase Auth */}
-              <Route path="/learner" element={<LearnerLayout />}>
-                <Route index element={<LearnerOverviewPage />} />
-                <Route path="enrollments" element={<LearnerEnrollmentsPage />} />
-                <Route path="attendance" element={<Navigate to="/learner" replace />} />
-                <Route path="results" element={<Navigate to="/learner/analysis" replace />} />
-                <Route path="analysis" element={<LearnerAnalysisPage />} />
-                <Route path="progress" element={<Navigate to="/learner/analysis" replace />} />
-              </Route>
-
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </AppShell>

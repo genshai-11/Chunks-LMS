@@ -133,4 +133,4 @@ values (
 )
 on conflict (organization_id) do nothing;
 
--- Done. Next: staff Clerk sign-in → Admin UI → real emails → invite links → Day 1.
+-- Done. Next: staff Supabase sign-in → Admin UI → real accounts → Day 1.

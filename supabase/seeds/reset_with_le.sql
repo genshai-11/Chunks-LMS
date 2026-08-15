@@ -17,7 +17,6 @@ delete from public.schedule_definitions;
 delete from public.enrollments;
 delete from public.classes;
 delete from public.courses;
-delete from public.learner_access_tokens;
 
 -- Clear standalone test tracking data
 delete from public.standalone_test_attempt_snapshots;

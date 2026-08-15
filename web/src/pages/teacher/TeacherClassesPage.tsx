@@ -318,7 +318,7 @@ export function TeacherClassesPage() {
                 />
               </label>
               <label>
-                Email (portal invite)
+                Email
                 <input
                   type="email"
                   value={newLearnerEmail}

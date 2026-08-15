@@ -18,7 +18,6 @@ as $$
 $$;
 revoke execute on function private.catalog_reset_allows_profile_delete(uuid) from public, anon, authenticated;
 grant execute on function private.catalog_reset_allows_profile_delete(uuid) to service_role;
-
 create or replace function public.ensure_section_parent_version_is_draft()
 returns trigger
 language plpgsql
@@ -34,7 +33,6 @@ begin
   return old;
 end;
 $$;
-
 create or replace function public.ensure_item_parent_version_is_draft()
 returns trigger
 language plpgsql
@@ -56,7 +54,6 @@ begin
   return old;
 end;
 $$;
-
 create or replace function public.ensure_narration_parent_version_is_draft()
 returns trigger
 language plpgsql
@@ -72,7 +69,6 @@ begin
   return old;
 end;
 $$;
-
 create or replace function public.prevent_measurement_snapshot_rewrite()
 returns trigger
 language plpgsql
@@ -104,7 +100,6 @@ begin
   return new;
 end;
 $$;
-
 create or replace function public.ensure_cci_profile_is_draft()
 returns trigger
 language plpgsql
@@ -123,7 +118,6 @@ begin
   return old;
 end;
 $$;
-
 revoke execute on function public.ensure_section_parent_version_is_draft() from public, anon, authenticated;
 revoke execute on function public.ensure_item_parent_version_is_draft() from public, anon, authenticated;
 revoke execute on function public.ensure_narration_parent_version_is_draft() from public, anon, authenticated;

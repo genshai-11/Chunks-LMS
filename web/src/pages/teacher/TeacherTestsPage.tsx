@@ -5,14 +5,27 @@ import { PageHeader } from '../../components/PageHeader'
 import { EmptyState, Panel } from '../../components/ui'
 import { listActiveLearners } from '../../modules/roster/service'
 import { useAppState } from '../../state/useAppState'
-import { listTestPackages, listTestPackageVersions, listTestSections } from '../../lib/test-packages'
+import { listTestItems, listTestPackages, listTestPackageVersions, listTestSections } from '../../lib/test-packages'
 import {
   createStandaloneAssignment,
   deleteStandaloneAssignment,
+  getStandaloneAssignmentProgress,
   listStandaloneAssignments,
   listStandaloneRuns,
+  type StandaloneAssignmentProgress,
   type StandaloneTestAssignmentRow,
 } from '../../lib/standalone-tests'
+
+async function packageQuestionCount(packageVersionId: string): Promise<number> {
+  const sections = await listTestSections(packageVersionId)
+  if (!sections.ok) return 0
+  let total = 0
+  for (const section of sections.data) {
+    const items = await listTestItems(section.id)
+    if (items.ok) total += items.data.length
+  }
+  return total
+}
 
 export function TeacherTestsPage() {
   const { roster } = useAppState()
@@ -25,6 +38,10 @@ export function TeacherTestsPage() {
   const [assignments, setAssignments] = useState<StandaloneTestAssignmentRow[]>([])
   const [busyAssignmentId, setBusyAssignmentId] = useState<string | null>(null)
   const [selectedAssignmentIds, setSelectedAssignmentIds] = useState<Set<string>>(new Set())
+  const [assignmentStatusFilter, setAssignmentStatusFilter] = useState<'all' | 'active' | 'completed'>('all')
+  const [assignmentLearnerSearch, setAssignmentLearnerSearch] = useState('')
+  const [assignmentPackageFilter, setAssignmentPackageFilter] = useState('all')
+  const [assignmentProgress, setAssignmentProgress] = useState<Record<string, StandaloneAssignmentProgress>>({})
 
   const loadAssignments = useCallback(async () => {
     const result = await listStandaloneAssignments()
@@ -60,6 +77,55 @@ export function TeacherTestsPage() {
       return new Set(Array.from(current).filter((id) => validIds.has(id)))
     })
   }, [assignments])
+
+  useEffect(() => {
+    let cancelled = false
+    const activeAssignments = assignments.filter((assignment) => assignment.status === 'active')
+    if (activeAssignments.length === 0) {
+      setAssignmentProgress({})
+      return
+    }
+
+    void (async () => {
+      const packageTotals = new Map<string, number>()
+      const next: Record<string, StandaloneAssignmentProgress> = {}
+      for (const assignment of activeAssignments) {
+        let totalQuestions = packageTotals.get(assignment.packageVersionId)
+        if (totalQuestions == null) {
+          totalQuestions = await packageQuestionCount(assignment.packageVersionId)
+          packageTotals.set(assignment.packageVersionId, totalQuestions)
+        }
+        const progress = await getStandaloneAssignmentProgress(assignment.id)
+        next[assignment.id] = {
+          assignmentId: assignment.id,
+          completedQuestions: progress.ok ? progress.data.completedQuestions : 0,
+          totalQuestions: Math.max(progress.ok ? progress.data.totalQuestions : 0, totalQuestions),
+        }
+        if (!cancelled) {
+          setAssignmentProgress((current) => ({ ...current, [assignment.id]: next[assignment.id]! }))
+        }
+      }
+      if (!cancelled) setAssignmentProgress(next)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [assignments])
+
+  const filteredAssignments = assignments.filter((assignment) => {
+    if (assignmentStatusFilter !== 'all' && assignment.status !== assignmentStatusFilter) return false
+    if (assignmentPackageFilter !== 'all' && assignment.packageVersionId !== assignmentPackageFilter) return false
+    const q = assignmentLearnerSearch.trim().toLowerCase()
+    if (!q) return true
+    const learnerName = learners.find((learner) => learner.id === assignment.learnerUserId)?.displayName ?? ''
+    const learnerEmail = learners.find((learner) => learner.id === assignment.learnerUserId)?.email ?? ''
+    return (
+      learnerName.toLowerCase().includes(q) ||
+      learnerEmail.toLowerCase().includes(q) ||
+      assignment.learnerUserId.toLowerCase().includes(q)
+    )
+  })
 
   async function start() {
     if (!learnerId || !versionId) {
@@ -140,7 +206,7 @@ export function TeacherTestsPage() {
   }
 
   async function removeSelectedAssignments() {
-    const selectedAssignments = assignments.filter((assignment) => selectedAssignmentIds.has(assignment.id))
+    const selectedAssignments = filteredAssignments.filter((assignment) => selectedAssignmentIds.has(assignment.id))
     if (selectedAssignments.length === 0) return
     if (
       !window.confirm(
@@ -164,12 +230,26 @@ export function TeacherTestsPage() {
     await loadAssignments()
   }
 
-  const selectedCount = selectedAssignmentIds.size
-  const allSelected = assignments.length > 0 && selectedCount === assignments.length
+  const visibleAssignmentIds = filteredAssignments.map((assignment) => assignment.id)
+  const visibleSelectedCount = visibleAssignmentIds.filter((id) => selectedAssignmentIds.has(id)).length
+  const allSelected = visibleAssignmentIds.length > 0 && visibleSelectedCount === visibleAssignmentIds.length
   const statusBadgeClass = (status: string) => {
     if (status === 'completed') return 'badge completed'
     if (status === 'active') return 'badge success'
     return 'badge info'
+  }
+  const packageLabel = (versionId: string) =>
+    versions.find((version) => version.id === versionId)?.label ?? 'Unknown package'
+  const progressLabel = (assignmentId: string) => {
+    const progress = assignmentProgress[assignmentId] ?? {
+      assignmentId,
+      completedQuestions: 0,
+      totalQuestions: 0,
+    }
+    const pct = progress.totalQuestions
+      ? Math.round((progress.completedQuestions / progress.totalQuestions) * 100)
+      : 0
+    return `${pct}% complete · ${progress.completedQuestions}/${progress.totalQuestions} questions`
   }
 
   return (
@@ -225,7 +305,17 @@ export function TeacherTestsPage() {
             <button
               type="button"
               className="ghost"
-              onClick={() => setSelectedAssignmentIds(allSelected ? new Set() : new Set(assignments.map((assignment) => assignment.id)))}
+              onClick={() => {
+                if (allSelected) {
+                  setSelectedAssignmentIds((current) => {
+                    const next = new Set(current)
+                    for (const id of visibleAssignmentIds) next.delete(id)
+                    return next
+                  })
+                } else {
+                  setSelectedAssignmentIds((current) => new Set([...current, ...visibleAssignmentIds]))
+                }
+              }}
             >
               {allSelected ? 'Clear' : 'Select all'}
             </button>
@@ -233,9 +323,9 @@ export function TeacherTestsPage() {
               type="button"
               className="ghost danger"
               onClick={() => void removeSelectedAssignments()}
-              disabled={selectedCount === 0 || busyAssignmentId !== null}
+              disabled={visibleSelectedCount === 0 || busyAssignmentId !== null}
             >
-              <Trash2 className="h-4 w-4" /> Delete selected {selectedCount ? `(${selectedCount})` : ''}
+              <Trash2 className="h-4 w-4" /> Delete selected {visibleSelectedCount ? `(${visibleSelectedCount})` : ''}
             </button>
           </div>
         ) : null}
@@ -244,15 +334,69 @@ export function TeacherTestsPage() {
         {assignments.length === 0 ? (
           <EmptyState icon={ClipboardCheck} title="No standalone assignments" />
         ) : (
-          <div className="table-wrap">
-            <table>
+          <>
+            <div className="analysis-filter-row mb-3">
+              <label className="analysis-filter-block analysis-filter-grow">
+                <span className="analysis-filter-label">Search learner</span>
+                <input
+                  className="analysis-select"
+                  type="search"
+                  value={assignmentLearnerSearch}
+                  onChange={(event) => setAssignmentLearnerSearch(event.target.value)}
+                  placeholder="Name, email, or learner ID"
+                />
+              </label>
+              <label className="analysis-filter-block">
+                <span className="analysis-filter-label">Package test</span>
+                <select
+                  className="analysis-select"
+                  value={assignmentPackageFilter}
+                  onChange={(event) => setAssignmentPackageFilter(event.target.value)}
+                >
+                  <option value="all">All packages</option>
+                  {versions.map((version) => (
+                    <option key={version.id} value={version.id}>
+                      {version.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="analysis-filter-block">
+                <span className="analysis-filter-label">Status</span>
+                <select
+                  className="analysis-select"
+                  value={assignmentStatusFilter}
+                  onChange={(event) => setAssignmentStatusFilter(event.target.value as typeof assignmentStatusFilter)}
+                >
+                  <option value="all">All</option>
+                  <option value="active">Active</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </label>
+            </div>
+
+            {filteredAssignments.length === 0 ? (
+              <EmptyState icon={ClipboardCheck} title="No assignments match filters" description="Clear search or switch filters." />
+            ) : (
+              <div className="table-wrap">
+                <table>
               <thead>
                 <tr>
                   <th className="w-10">
                     <input
                       type="checkbox"
                       checked={allSelected}
-                      onChange={() => setSelectedAssignmentIds(allSelected ? new Set() : new Set(assignments.map((assignment) => assignment.id)))}
+                      onChange={() => {
+                        if (allSelected) {
+                          setSelectedAssignmentIds((current) => {
+                            const next = new Set(current)
+                            for (const id of visibleAssignmentIds) next.delete(id)
+                            return next
+                          })
+                        } else {
+                          setSelectedAssignmentIds((current) => new Set([...current, ...visibleAssignmentIds]))
+                        }
+                      }}
                       aria-label={allSelected ? 'Clear selected assignments' : 'Select all assignments'}
                     />
                   </th>
@@ -263,7 +407,7 @@ export function TeacherTestsPage() {
                 </tr>
               </thead>
               <tbody>
-                {assignments.map((assignment) => (
+                {filteredAssignments.map((assignment) => (
                   <tr key={assignment.id} className={selectedAssignmentIds.has(assignment.id) ? 'is-selected' : ''}>
                     <td>
                       <input
@@ -279,11 +423,14 @@ export function TeacherTestsPage() {
                           assignment.learnerUserId}
                       </strong>
                       <div className="test-assignment-meta">
-                        Assignment #{assignment.assignmentNumber}
+                        {packageLabel(assignment.packageVersionId)}
                       </div>
                     </td>
                     <td>
                       <span className={statusBadgeClass(assignment.status)}>{assignment.status}</span>
+                      {assignment.status === 'active' ? (
+                        <div className="test-assignment-meta">{progressLabel(assignment.id)}</div>
+                      ) : null}
                     </td>
                     <td className="test-assignment-date">
                       {new Date(assignment.assignedAt).toLocaleDateString()}
@@ -321,7 +468,9 @@ export function TeacherTestsPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+              </div>
+            )}
+          </>
         )}
       </Panel>
     </div>

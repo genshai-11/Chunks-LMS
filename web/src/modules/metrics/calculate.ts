@@ -1,4 +1,4 @@
-import { COLOR_SCORE, type ResultColor } from '../result-lifecycle/types'
+import { COLOR_SCORE, COOL_COLORS, WARM_COLORS, type ResultColor } from '../result-lifecycle/types'
 
 export type MetricKey =
   | 'rfc'
@@ -22,6 +22,17 @@ export type FinalizedAttempt = {
   /** Ordered score history for focus stability (learner-adjacent). */
   learnerId?: string
   sequenceIndex?: number
+}
+
+export type SpectrumStepBreakdown = {
+  byColor: Record<ResultColor, number>
+  primaryRecords: number
+  probeRecords: number
+  totalRecords: number
+  warmSteps: number
+  coolSteps: number
+  rfc: number | null
+  rac: number | null
 }
 
 export type MetricObservation = {
@@ -49,7 +60,7 @@ export const METRIC_CATALOG: MetricCatalogEntry[] = [
     key: 'rfc',
     version: '1.0.0',
     status: 'operational',
-    definition: '(Red + Orange) / finalized sample',
+    definition: 'warm spectrum steps / N_total',
     direction: 'lower_better',
     unit: 'ratio',
     minSample: 1,
@@ -58,7 +69,7 @@ export const METRIC_CATALOG: MetricCatalogEntry[] = [
     key: 'rac',
     version: '1.0.0',
     status: 'operational',
-    definition: '(Green + Purple) / finalized sample',
+    definition: 'cool spectrum steps / N_total',
     direction: 'higher_better',
     unit: 'ratio',
     minSample: 1,
@@ -67,7 +78,7 @@ export const METRIC_CATALOG: MetricCatalogEntry[] = [
     key: 'average_performance',
     version: '1.0.0',
     status: 'operational',
-    definition: 'mean color score 0..3 over finalized sample',
+    definition: 'mean normalized spectrum factor 0..1 over finalized sample',
     direction: 'higher_better',
     unit: 'score',
     minSample: 1,
@@ -151,6 +162,60 @@ function ratio(num: number, den: number): number | null {
   return num / den
 }
 
+function emptySpectrumCounts(): Record<ResultColor, number> {
+  return {
+    red: 0,
+    orange: 0,
+    yellow: 0,
+    green: 0,
+    blue: 0,
+    indigo: 0,
+    purple: 0,
+  }
+}
+
+export function calculateSpectrumStepBreakdown(
+  finalized: FinalizedAttempt[],
+): SpectrumStepBreakdown {
+  const byColor = emptySpectrumCounts()
+  let primaryRecords = 0
+  let probeRecords = 0
+
+  for (const attempt of finalized) {
+    primaryRecords += 1
+    if (attempt.enteredProbeFlow) {
+      byColor.green += 1
+      const probeCount = Math.max(0, attempt.probeEventCount)
+      probeRecords += probeCount
+      if (attempt.effectiveColor === 'yellow') {
+        byColor.yellow += 1
+        byColor.blue += Math.max(0, probeCount - 1)
+      } else if (attempt.effectiveColor === 'indigo') {
+        byColor.indigo += 1
+        byColor.blue += Math.max(0, probeCount - 1)
+      } else {
+        byColor.blue += probeCount
+      }
+    } else {
+      byColor[attempt.effectiveColor] += 1
+    }
+  }
+
+  const totalRecords = primaryRecords + probeRecords
+  const warmSteps = WARM_COLORS.reduce((sum, color) => sum + byColor[color], 0)
+  const coolSteps = COOL_COLORS.reduce((sum, color) => sum + byColor[color], 0)
+  return {
+    byColor,
+    primaryRecords,
+    probeRecords,
+    totalRecords,
+    warmSteps,
+    coolSteps,
+    rfc: ratio(warmSteps, totalRecords),
+    rac: ratio(coolSteps, totalRecords),
+  }
+}
+
 function observation(
   key: MetricKey,
   value: number | null,
@@ -171,12 +236,7 @@ function observation(
 
 export function calculateMetrics(finalized: FinalizedAttempt[]): MetricObservation[] {
   const n = finalized.length
-  const redYellow = finalized.filter(
-    (a) => a.effectiveColor === 'red' || a.effectiveColor === 'yellow',
-  ).length
-  const greenPurple = finalized.filter(
-    (a) => a.effectiveColor === 'green' || a.effectiveColor === 'purple',
-  ).length
+  const spectrum = calculateSpectrumStepBreakdown(finalized)
   const purple = finalized.filter((a) => a.effectiveColor === 'purple').length
   const scoreSum = finalized.reduce((s, a) => s + COLOR_SCORE[a.effectiveColor], 0)
   const probed = finalized.filter((a) => a.enteredProbeFlow)
@@ -185,11 +245,11 @@ export function calculateMetrics(finalized: FinalizedAttempt[]): MetricObservati
   const probeDepthMax = probed.length === 0 ? null : Math.max(...chunksNumbers)
   const probeDepthAvg = probed.length === 0 ? null : chunksNumberTotal / probed.length
   const recovered = probed.filter(
-    (a) => a.effectiveColor === 'green' || a.effectiveColor === 'purple',
+    (a) => a.effectiveColor === 'indigo' || a.effectiveColor === 'purple',
   ).length
 
-  const rfc = observation('rfc', ratio(redYellow, n), n)
-  const rac = observation('rac', ratio(greenPurple, n), n)
+  const rfc = observation('rfc', spectrum.rfc, spectrum.totalRecords)
+  const rac = observation('rac', spectrum.rac, spectrum.totalRecords)
   const avg = observation('average_performance', n === 0 ? null : scoreSum / n, n)
   const purpleRate = observation('purple_mastery_rate', ratio(purple, n), n)
   // Clarification rate: 0 when finalized sample > 0 and none probed; null when sample = 0

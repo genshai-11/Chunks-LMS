@@ -75,6 +75,5 @@ begin
   );
 end;
 $$;
-
 grant execute on function public.create_session_question_attempt(uuid, uuid, uuid, text)
   to authenticated, anon;

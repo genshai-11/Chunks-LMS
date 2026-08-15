@@ -1,10 +1,8 @@
 import { useMemo, useState } from 'react'
 import {
-  ClipboardCopy,
   Eye,
   Home,
   LayoutGrid,
-  Link2,
   List,
   Play,
   School,
@@ -19,8 +17,6 @@ import { useFlash } from '../../hooks/useFlash'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import {
   enrollLearner,
-  formatClassInviteClipboard,
-  learnerInviteUrl,
   listActiveLearners,
 } from '../../modules/roster/service'
 import {
@@ -110,7 +106,6 @@ export function TeacherOverviewPage() {
         name: user.displayName,
         avatarUrl: user.avatarUrl ?? null,
         email: user.email ?? null,
-        invite: learnerInviteUrl(user),
         accountStatus: user.accountStatus ?? 'active',
         classIds: activeEnrollmentRows.map((e) => e.classId),
         assignedToActiveClass,
@@ -134,7 +129,6 @@ export function TeacherOverviewPage() {
     return mapped.filter((learner) => learner.assignedToSelectedClasses)
   }, [classRow, ledger, roster, scheduling, selectedClassIds])
 
-  const inviteReady = learners.filter((learner) => learner.invite).length
   const selectedLearner =
     learners.find((learner) => learner.id === activeLearnerUserId) ?? learners[0] ?? null
 
@@ -307,26 +301,6 @@ export function TeacherOverviewPage() {
         icon={Users}
         title="Learners"
         description="Manage learner list, open profile, track RFC progress, or start a session for one learner."
-        actions={
-          inviteReady > 0 && classRow ? (
-            <button
-              type="button"
-              className="ghost"
-              onClick={async () => {
-                const text = formatClassInviteClipboard(roster, classRow.id)
-                try {
-                  await navigator.clipboard.writeText(text)
-                  ok(`Copied ${inviteReady} invite link(s)`)
-                } catch {
-                  err('Could not copy — copy links from the learner cards')
-                }
-              }}
-            >
-              <ClipboardCopy className="h-3.5 w-3.5" aria-hidden />
-              <span>Copy all links</span>
-            </button>
-          ) : undefined
-        }
       >
         {learners.length === 0 ? (
           <EmptyState
@@ -351,7 +325,6 @@ export function TeacherOverviewPage() {
                   if (learner.preferredClassId) setActiveClassId(learner.preferredClassId)
                 }}
                 onStart={() => void startFastSession(learner.id, learner.preferredClassId)}
-                onCopied={(text) => ok(text)}
               />
             ))}
           </div>
@@ -477,14 +450,12 @@ function LearnerCard({
   onAssignActiveClass,
   onSelect,
   onStart,
-  onCopied,
 }: {
   learner: {
     id: string
     name: string
     avatarUrl: string | null
     email: string | null
-    invite: string | null
     sessions: number
     finalized: number
     rfcMin: number | null
@@ -502,7 +473,6 @@ function LearnerCard({
   onAssignActiveClass: () => void
   onSelect: () => void
   onStart: () => void
-  onCopied: (message: string) => void
 }) {
   return (
     <article className={`teacher-learner-card${selected ? ' is-selected' : ''}`}>
@@ -557,23 +527,6 @@ function LearnerCard({
             {starting ? 'Starting…' : 'Start now'}
           </button>
         )}
-        {learner.invite ? (
-          <button
-            type="button"
-            className="ghost"
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(learner.invite!)
-                onCopied(`Invite copied for ${learner.name}`)
-              } catch {
-                onCopied(learner.invite!)
-              }
-            }}
-            title="Copy learner portal invite link"
-          >
-            <Link2 className="h-4 w-4" aria-hidden />
-          </button>
-        ) : null}
       </div>
     </article>
   )

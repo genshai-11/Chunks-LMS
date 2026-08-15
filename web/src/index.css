@@ -1316,11 +1316,20 @@
   .capture-dot.red {
     @apply border-red-100 bg-red-50 text-red-700;
   }
-  .capture-dot.yellow {
+  .capture-dot.orange {
     @apply border-orange-100 bg-orange-50 text-orange-700;
+  }
+  .capture-dot.yellow {
+    @apply border-yellow-100 bg-yellow-50 text-yellow-700;
   }
   .capture-dot.green {
     @apply border-green-100 bg-green-50 text-green-700;
+  }
+  .capture-dot.blue {
+    @apply border-sky-100 bg-sky-50 text-sky-700;
+  }
+  .capture-dot.indigo {
+    @apply border-indigo-100 bg-indigo-50 text-indigo-700;
   }
   .capture-dot.purple {
     @apply border-purple-100 bg-purple-50 text-purple-700;
@@ -1726,14 +1735,26 @@
   .observe-heat-count.is-red i {
     @apply bg-red-500;
   }
-  .observe-heat-count.is-yellow i {
+  .observe-heat-count.is-orange i {
     @apply bg-orange-500;
+  }
+  .observe-heat-count.is-yellow i {
+    @apply bg-yellow-400;
   }
   .observe-heat-count.is-green i {
     @apply bg-green-500;
   }
+  .observe-heat-count.is-blue i {
+    @apply bg-sky-500;
+  }
+  .observe-heat-count.is-indigo i {
+    @apply bg-indigo-500;
+  }
   .observe-heat-count.is-purple i {
     @apply bg-purple-500;
+  }
+  .observe-heat-count.is-total {
+    @apply ml-1 rounded-full border border-white/10 bg-white/10 px-1.5 text-slate-100;
   }
 
   .observe-heat-grid {
@@ -1746,7 +1767,7 @@
   }
 
   .observe-heat-dot-btn {
-    @apply flex h-7 w-7 min-h-0 min-w-0 shrink-0 items-center justify-center justify-self-center rounded-full border-0 bg-white/10 p-0 text-[10px] font-bold text-slate-300 shadow-none transition hover:scale-115 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white;
+    @apply relative flex h-7 w-7 min-h-0 min-w-0 shrink-0 items-center justify-center justify-self-center rounded-full border-0 bg-white/10 p-0 text-[10px] font-bold text-slate-300 shadow-none transition hover:scale-115 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white;
   }
   .observe-heat-dot-btn.is-current {
     @apply ring-2 ring-white ring-offset-2 ring-offset-slate-950 scale-105;
@@ -1754,14 +1775,26 @@
   .observe-heat-dot-btn.is-red {
     @apply bg-red-500 text-white;
   }
-  .observe-heat-dot-btn.is-yellow {
+  .observe-heat-dot-btn.is-orange {
     @apply bg-orange-500 text-white;
+  }
+  .observe-heat-dot-btn.is-yellow {
+    @apply bg-yellow-400 text-yellow-950;
   }
   .observe-heat-dot-btn.is-green {
     @apply bg-green-500 text-white;
   }
+  .observe-heat-dot-btn.is-blue {
+    @apply bg-sky-500 text-white;
+  }
+  .observe-heat-dot-btn.is-indigo {
+    @apply bg-indigo-500 text-white;
+  }
   .observe-heat-dot-btn.is-purple {
     @apply bg-purple-500 text-white;
+  }
+  .observe-heat-probe-badge {
+    @apply absolute -right-1.5 -top-1.5 rounded-full bg-slate-950 px-1 text-[8px] font-black leading-3 text-white ring-1 ring-white/70;
   }
   .observe-heat-dot-btn.is-open {
     @apply bg-amber-400 text-amber-950 animate-pulse;
@@ -1817,12 +1850,12 @@
   }
 
   .observe-split-pane .observe-dock-num {
-    font-size: 1rem !important;
+    font-size: 0.625rem !important;
   }
 
   @media (min-width: 640px) {
     .observe-split-pane .observe-dock-num {
-      font-size: 1.125rem !important;
+      font-size: 0.75rem !important;
     }
   }
 
@@ -1963,6 +1996,36 @@
 
   .observe-learner-rfc svg {
     @apply h-3.5 w-3.5 text-amber-400;
+  }
+
+  .observe-learner-rfc.is-rfc {
+    @apply border-red-400/30 bg-red-500/15 text-red-200;
+  }
+
+  .observe-learner-rfc.is-percent-c {
+    @apply border-emerald-400/30 bg-emerald-500/15 text-emerald-200;
+  }
+
+  .observe-learner-rfc.is-cpd {
+    @apply border-cyan-400/30 bg-cyan-500/15 text-cyan-100;
+  }
+
+  .observe-has-tooltip {
+    @apply relative cursor-help outline-none;
+  }
+
+  .observe-metric-tooltip {
+    @apply pointer-events-none absolute left-1/2 top-[calc(100%+0.5rem)] z-50 hidden w-[min(18rem,82vw)] -translate-x-1/2 rounded-xl border border-white/10 bg-slate-950/95 px-3 py-2 text-left font-sans text-[11px] font-semibold leading-snug tracking-normal text-slate-100 shadow-2xl shadow-black/50 backdrop-blur;
+  }
+
+  .observe-metric-tooltip::before {
+    content: '';
+    @apply absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-l border-t border-white/10 bg-slate-950;
+  }
+
+  .observe-has-tooltip:hover .observe-metric-tooltip,
+  .observe-has-tooltip:focus-visible .observe-metric-tooltip {
+    @apply block;
   }
 
   .observe-depth-inline {
@@ -2328,7 +2391,7 @@
       inset 0 -9px 12px rgb(69 10 10 / 0.42),
       0 0 18px rgb(239 68 68 / 0.45);
   }
-  .observe-dock-color.is-yellow {
+  .observe-dock-color.is-orange {
     @apply border-slate-950 bg-gradient-to-b from-orange-300 via-orange-500 to-orange-700 text-white hover:brightness-110;
     box-shadow:
       inset 0 7px 10px rgb(255 255 255 / 0.36),
@@ -2371,8 +2434,11 @@
   .observe-dock.is-glowing.is-red .observe-dock-colors {
     --dock-glow: 239 68 68;
   }
-  .observe-dock.is-glowing.is-yellow .observe-dock-colors {
+  .observe-dock.is-glowing.is-orange .observe-dock-colors {
     --dock-glow: 249 115 22;
+  }
+  .observe-dock.is-glowing.is-yellow .observe-dock-colors {
+    --dock-glow: 250 204 21;
   }
   .observe-dock.is-glowing.is-green .observe-dock-colors {
     --dock-glow: 16 185 129;
@@ -2382,7 +2448,7 @@
   }
 
   .observe-dock.is-glowing.is-red .observe-dock-color.is-red,
-  .observe-dock.is-glowing.is-yellow .observe-dock-color.is-yellow,
+  .observe-dock.is-glowing.is-orange .observe-dock-color.is-orange,
   .observe-dock.is-glowing.is-green .observe-dock-color.is-green,
   .observe-dock.is-glowing.is-purple .observe-dock-color.is-purple {
     animation: observe-active-light 1.15s ease-out both;
@@ -2431,7 +2497,7 @@
   .observe-dock-color.is-red.is-selected {
     @apply bg-gradient-to-b from-[#ff3b30] to-[#e50914] text-white opacity-100 border-white/40 scale-105 shadow-[0_0_25px_8px_#ef4444,_inset_0_2px_6px_rgba(255,255,255,0.55)];
   }
-  .observe-dock-color.is-yellow.is-selected {
+  .observe-dock-color.is-orange.is-selected {
     @apply bg-gradient-to-b from-[#fb923c] to-[#ea580c] text-white opacity-100 border-white/40 scale-105 shadow-[0_0_25px_8px_#f97316,_inset_0_2px_6px_rgba(255,255,255,0.55)];
   }
   .observe-dock-color.is-green.is-selected {
@@ -2442,11 +2508,11 @@
   }
 
   .observe-dock-label {
-    @apply hidden!;
+    @apply block text-[10px] sm:text-xs font-black uppercase tracking-wide opacity-90;
   }
 
   .observe-dock-num {
-    @apply font-display text-2xl sm:text-4xl font-black leading-none tabular-nums tracking-tight opacity-95;
+    @apply font-display text-xs sm:text-sm font-black leading-none tracking-tight opacity-95;
   }
 
   .observe-dock-probe {
@@ -2663,7 +2729,7 @@
     }
 
     .observe-dock-num {
-      @apply text-2xl!;
+      @apply text-xs!;
     }
 
     .observe-dock-probe-btn kbd {
@@ -2691,7 +2757,7 @@
     }
 
     .observe-split-pane .observe-dock-num {
-      font-size: clamp(0.95rem, 2.8dvh, 1.25rem) !important;
+      font-size: clamp(0.625rem, 1.7dvh, 0.75rem) !important;
     }
 
     .observe-dock-tools {
@@ -4610,7 +4676,7 @@
     @apply h-16 w-16 border-2 p-1.5 sm:h-20 sm:w-20;
   }
   .live-test-dock-compact .observe-dock-num {
-    @apply text-base sm:text-lg;
+    @apply text-xs sm:text-sm;
   }
   .live-test-dock-compact .observe-dock-label {
     @apply text-[10px] sm:text-xs;
@@ -4710,7 +4776,7 @@
     padding: clamp(0.2rem, 0.7dvh, 0.5rem);
   }
   .live-test-dock-compact .observe-dock-num {
-    font-size: clamp(1.25rem, 4dvh, 2.55rem) !important;
+    font-size: clamp(0.75rem, 2dvh, 0.875rem) !important;
   }
   .live-test-dock-compact .observe-dock-label {
     @apply hidden!;
@@ -4926,7 +4992,7 @@
       height: clamp(3.1rem, 17vw, 4rem) !important;
     }
     .live-test-dock-compact .observe-dock-num {
-      font-size: clamp(1rem, 5vw, 1.35rem) !important;
+      font-size: clamp(0.75rem, 3vw, 0.875rem) !important;
     }
     .live-test-audio-panel {
       @apply mt-2 rounded-2xl p-2!;

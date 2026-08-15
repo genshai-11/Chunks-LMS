@@ -46,15 +46,12 @@ export type AppStateValue = {
   }) => Promise<boolean>
   reloadFromSupabase: () => Promise<void>
   supabaseEnabled: boolean
-  /** Which learner portal is active (email / invite link) */
+  /** Teacher-selected learner for focused session/analysis flows. */
   activeLearnerUserId: string | null
   setActiveLearnerUserId: (id: string | null) => void
   /** Teacher workspace active class */
   activeClassId: string | null
   setActiveClassId: (id: string | null) => void
-  /** Learner portal active class (multi-enrollment) */
-  activeLearnerClassId: string | null
-  setActiveLearnerClassId: (id: string | null) => void
 }
 
 export const AppStateContext = createContext<AppStateValue | null>(null)

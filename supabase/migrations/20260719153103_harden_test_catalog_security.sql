@@ -4,7 +4,6 @@
 
 create schema if not exists private;
 revoke all on schema private from public, anon, authenticated;
-
 drop policy if exists test_packages_staff_read on public.test_packages;
 create policy test_packages_staff_read on public.test_packages
   for select to authenticated
@@ -17,7 +16,6 @@ create policy test_packages_staff_read on public.test_packages
         and v.status in ('published', 'archived')
     )
   );
-
 -- Harden every overload of the named privileged functions without relying on
 -- remembered signatures. Explicit grants are restored below only where needed.
 do $$
@@ -41,13 +39,11 @@ begin
     execute format('alter function %s set search_path = pg_catalog, public, extensions', target);
   end loop;
 end $$;
-
 -- Raw CPD records are internal to the authorized summary RPC.
 revoke execute on function public.get_learner_cpd_records(uuid, uuid, uuid)
   from authenticated;
 grant execute on function public.get_learner_cpd_records(uuid, uuid, uuid)
   to service_role;
-
 -- Generation functions perform their own Admin checks and are invoked through
 -- the JWT-verified Edge Function.
 grant execute on function public.generate_test_item(uuid, uuid, text)
@@ -56,7 +52,6 @@ grant execute on function public.generate_narration(uuid, text, uuid, uuid, text
   to authenticated, service_role;
 grant execute on function public.approve_generated_asset(uuid, text)
   to authenticated, service_role;
-
 -- Replace only the summary RPC to add caller authorization. The raw record RPC
 -- remains service-role/internal and still supplies correction-aware records.
 create or replace function public.calculate_learner_cpd_report(
@@ -127,11 +122,9 @@ begin
   );
 end;
 $$;
-
 revoke execute on function public.calculate_learner_cpd_report(uuid, uuid, uuid)
   from public, anon;
 grant execute on function public.calculate_learner_cpd_report(uuid, uuid, uuid)
   to authenticated, service_role;
-
 comment on function public.calculate_learner_cpd_report(uuid, uuid, uuid) is
   'Authorized correction-aware live-test CPD summary; raw record RPC is service-role only.';

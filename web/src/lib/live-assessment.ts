@@ -13,12 +13,13 @@ import {
   type CaptureSessionState,
   type SessionQuestion,
 } from '../modules/assessment/session-capture'
+import { isPrimaryCaptureColor } from '../modules/assessment/session-capture'
 import type { CaptureMode } from '../modules/assessment/capture-mode'
 import {
   applyLifecycleCommand,
   createDraftSnapshot,
 } from '../modules/result-lifecycle/state-machine'
-import type { AssessmentSnapshot, ResultColor } from '../modules/result-lifecycle/types'
+import type { AssessmentSnapshot, ProvisionalColor, ResultColor } from '../modules/result-lifecycle/types'
 import type { RosterState } from '../modules/roster/types'
 import type { ResultRecord } from '../modules/reporting/progress'
 import type { LearningSession } from '../modules/scheduling/types'
@@ -28,7 +29,7 @@ import { getSupabase } from './supabase'
 type DbSnapshot = {
   attempt_id: string
   status: AssessmentSnapshot['status']
-  provisional_color: ResultColor | null
+  provisional_color: ProvisionalColor | null
   effective_color: ResultColor | null
   effective_score: number | null
   probe_count: number
@@ -491,6 +492,9 @@ export async function recordLiveColor(
         actorId: attempt.teacherUserId,
       },
     )
+  }
+  if (!isPrimaryCaptureColor(color)) {
+    return { ok: false, error: 'Primary capture only accepts Red, Orange, Green, or Purple' }
   }
   return mutateSnapshot(
     attempt,

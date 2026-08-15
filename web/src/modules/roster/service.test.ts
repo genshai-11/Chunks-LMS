@@ -19,9 +19,6 @@ import {
   updateUserProfile,
   deleteUserProfile,
   deleteEnrollment,
-  learnerInviteUrl,
-  learnerInviteMailto,
-  formatClassInviteClipboard,
   isLearnerEmailTaken,
   isEmailTaken,
   addTeacherProfile,
@@ -259,20 +256,9 @@ describe('admin roster workflows', () => {
     expect(gone.ok).toBe(true)
   })
 
-  it('builds share-link invites and enforces unique learner emails', () => {
+  it('enforces unique learner emails', () => {
     const seed = createSeedRoster()
     const learner = seed.users.find((u) => u.roles.includes('learner') && u.email)!
-    const url = learnerInviteUrl(learner, 'https://lms.example')
-    expect(url).toBe(`https://lms.example/access?email=${encodeURIComponent(learner.email!)}`)
-    const mailto = learnerInviteMailto(learner, 'https://lms.example')
-    expect(mailto).toContain('mailto:')
-    expect(mailto).toContain(encodeURIComponent(url!))
-
-    const classId = seed.classes[0]!.id
-    const clip = formatClassInviteClipboard(seed, classId, 'https://lms.example')
-    expect(clip.split('\n').length).toBeGreaterThanOrEqual(1)
-    expect(clip).toContain('/access?email=')
-
     expect(isLearnerEmailTaken(seed, learner.email)).toBe(true)
     expect(isLearnerEmailTaken(seed, learner.email, learner.id)).toBe(false)
 

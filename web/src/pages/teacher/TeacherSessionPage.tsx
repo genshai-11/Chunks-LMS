@@ -631,7 +631,7 @@ export function TeacherSessionPage() {
                       </td>
                       <td>
                         {color ? (
-                          <span className={`capture-dot ${color}`}>{color === 'yellow' ? 'orange' : color}</span>
+                          <span className={`capture-dot ${color}`}>{color}</span>
                         ) : (
                           <span className="capture-dot">·</span>
                         )}

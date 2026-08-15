@@ -76,22 +76,6 @@ export type Database = {
         }
         Update: Partial<Database['public']['Tables']['staff_roles']['Insert']>
       }
-      learner_access_tokens: {
-        Row: {
-          id: string
-          token_hash: string
-          learner_user_id: string
-          class_id: string | null
-          issued_by_user_id: string
-          issued_at: string
-          expires_at: string
-          revoked_at: string | null
-          last_used_at: string | null
-          created_at: string
-        }
-        Insert: Record<string, unknown>
-        Update: Record<string, unknown>
-      }
       organization_memberships: {
         Row: {
           id: string
@@ -594,30 +578,6 @@ export type Database = {
           p_avatar_url?: string | null
         }
         Returns: Json
-      }
-      issue_learner_access_token: {
-        Args: { p_learner_user_id: string; p_class_id: string; p_ttl_seconds?: number }
-        Returns: Array<{ token_id: string; url_token: string; expires_at: string }>
-      }
-      verify_learner_access: {
-        Args: { p_url_token: string }
-        Returns: Array<{
-          token_id: string
-          learner_user_id: string
-          class_id: string | null
-          expires_at: string
-          learner_display_name: string
-          learner_email: string | null
-          class_name: string | null
-        }>
-      }
-      learner_access_snapshot: {
-        Args: { p_url_token: string }
-        Returns: Json
-      }
-      revoke_learner_access_token: {
-        Args: { p_token_id: string }
-        Returns: undefined
       }
       live_test_v2_deterministic_uuid: {
         Args: { p_basis: string }

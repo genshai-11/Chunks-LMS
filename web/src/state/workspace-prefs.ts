@@ -1,5 +1,4 @@
 const CLASS_KEY = 'chunks-lms:active-class-id'
-const LEARNER_CLASS_KEY = 'chunks-lms:active-learner-class-id'
 
 function load(key: string): string | null {
   if (typeof window === 'undefined') return null
@@ -26,12 +25,4 @@ export function loadActiveClassId(): string | null {
 
 export function saveActiveClassId(id: string | null): void {
   save(CLASS_KEY, id)
-}
-
-export function loadActiveLearnerClassId(): string | null {
-  return load(LEARNER_CLASS_KEY)
-}
-
-export function saveActiveLearnerClassId(id: string | null): void {
-  save(LEARNER_CLASS_KEY, id)
 }

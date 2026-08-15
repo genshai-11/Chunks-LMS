@@ -7,7 +7,6 @@ set search_path = pg_catalog, extensions
 as $$
   select encode(extensions.digest(p_url_token, 'sha256'), 'hex');
 $$;
-
 create or replace function public.issue_learner_access_token(
   p_learner_user_id uuid,
   p_class_id uuid,
@@ -43,7 +42,6 @@ begin
   return query select v_token_id,v_url_token,v_expires_at;
 end;
 $$;
-
 create or replace function public.verify_learner_access(p_url_token text)
 returns table (
   token_id uuid,
@@ -83,7 +81,6 @@ begin
   from eligible e join touched t on t.id=e.id;
 end;
 $$;
-
 alter function public.learner_access_snapshot(text)
   set search_path = pg_catalog, public, extensions;
 alter function public.stage_live_test_v2_csv_rows(text,jsonb)

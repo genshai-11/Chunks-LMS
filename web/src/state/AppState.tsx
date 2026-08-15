@@ -21,12 +21,7 @@ import { rebuildLedgerFromCloud } from '../lib/reconciliation-fetch'
 import { AppStateContext, type BackendStatus } from './app-state-context'
 import { clearPersistedAppState, loadPersistedAppState, savePersistedAppState } from './persist'
 import { loadActiveLearnerId, saveActiveLearnerId } from './active-learner'
-import {
-  loadActiveClassId,
-  loadActiveLearnerClassId,
-  saveActiveClassId,
-  saveActiveLearnerClassId,
-} from './workspace-prefs'
+import { loadActiveClassId, saveActiveClassId } from './workspace-prefs'
 import { loadLiveLedger } from '../lib/live-assessment'
 import { useStaffSession } from '../auth/useStaffSession'
 import {
@@ -127,6 +122,11 @@ function ensureStableOrg(r: RosterState): RosterState {
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const staffSession = useStaffSession()
+  const staffRolesKey = staffSession.staffRoles.join('|')
+  const stableStaffRoles = useMemo(
+    () => (staffRolesKey ? staffRolesKey.split('|') : []) as typeof staffSession.staffRoles,
+    [staffRolesKey],
+  )
   const persistedRef = useRef(loadPersistedAppState())
   const [roster, setRoster] = useState<RosterState>(() =>
     staffSession.authEnabled
@@ -153,9 +153,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     loadActiveLearnerId(),
   )
   const [activeClassId, setActiveClassIdState] = useState<string | null>(() => loadActiveClassId())
-  const [activeLearnerClassId, setActiveLearnerClassIdState] = useState<string | null>(() =>
-    loadActiveLearnerClassId(),
-  )
 
   const setActiveLearnerUserId = useCallback((id: string | null) => {
     saveActiveLearnerId(id)
@@ -167,11 +164,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setActiveClassIdState(id)
   }, [])
 
-  const setActiveLearnerClassId = useCallback((id: string | null) => {
-    saveActiveLearnerClassId(id)
-    setActiveLearnerClassIdState(id)
-  }, [])
-
   const bootDone = useRef(false)
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const skipNextSync = useRef(false)
@@ -181,8 +173,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const liveRef = useRef({ roster, scheduling })
   liveRef.current = { roster, scheduling }
 
-  // Boot: staff (signed-in) cloud is authoritative for writes. Learner access
-  // remains isolated through the existing scoped learner-link flow.
+  // Boot: staff (signed-in) cloud is authoritative for writes.
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -193,7 +184,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         staffSession.authBypass || (staffSession.authEnabled && staffSession.signedIn)
       const canProvisionStaff =
         Boolean(staffSession.userId) &&
-        (staffSession.authBypass || staffSession.staffRoles.length > 0)
+        (staffSession.authBypass || stableStaffRoles.length > 0)
 
       if (!isSupabaseConfigured()) {
         // Offline: restore local cache so learner invite still works on this browser.
@@ -216,7 +207,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         staffSession.authEnabled &&
         staffSession.signedIn &&
         !staffSession.authBypass &&
-        staffSession.staffRoles.length === 0
+        stableStaffRoles.length === 0
       ) {
         setBackendStatus('offline')
         setBackendError(syncPhaseError('auth', 'Signed in but no active database staff role'))
@@ -230,7 +221,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           authUserId: staffSession.userId,
           email: staffSession.email,
           displayName: staffSession.displayName ?? staffSession.email ?? 'Chunks Staff',
-          roles: staffSession.staffRoles.length ? staffSession.staffRoles : ['admin', 'teacher'],
+          roles: stableStaffRoles.length ? stableStaffRoles : ['admin', 'teacher'],
         })
         if (!provisioned.ok) {
           setBackendStatus('error')
@@ -273,7 +264,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const source = chooseBootstrapSource(wRemote, wLive)
 
       if (!staffAuthed) {
-        // Read-only portal path: prefer cloud; fall back to this browser's cache.
+        // Signed-out path: prefer cloud; fall back to this browser's cache.
         // Never push local → cloud while signed out.
         if (source === 'cloud' || (source === 'empty' && wRemote === 0 && wLive === 0)) {
           setRoster(remote.roster)
@@ -321,7 +312,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [staffSession])
+  }, [
+    staffSession.authBypass,
+    staffSession.authEnabled,
+    staffSession.displayName,
+    staffSession.email,
+    staffSession.ready,
+    staffSession.signedIn,
+    staffSession.userId,
+    stableStaffRoles,
+  ])
 
   // Local cache always
   useEffect(() => {
@@ -450,10 +450,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     clearPersistedAppState()
     saveActiveLearnerId(null)
     saveActiveClassId(null)
-    saveActiveLearnerClassId(null)
     setActiveLearnerUserIdState(null)
     setActiveClassIdState(null)
-    setActiveLearnerClassIdState(null)
     skipNextSync.current = false
     allowEmptyWipeOnce.current = false
 
@@ -546,7 +544,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       authUserId: staffSession.userId,
       email: staffSession.email,
       displayName: staffSession.displayName ?? staffSession.email ?? 'Chunks Staff',
-      roles: staffSession.staffRoles,
+      roles: stableStaffRoles,
     })
     if (!provisioned.ok) {
       setBackendStatus('error')
@@ -575,7 +573,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setBackendStatus('online')
     setBackendError(null)
     setLastSyncedAt(new Date().toISOString())
-  }, [staffSession])
+  }, [
+    staffSession.displayName,
+    staffSession.email,
+    staffSession.userId,
+    stableStaffRoles,
+  ])
 
   const setMetricSettings = useCallback((next: MetricSettingsState) => {
     setMetricSettingsState(next)
@@ -649,8 +652,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setActiveLearnerUserId,
       activeClassId,
       setActiveClassId,
-      activeLearnerClassId,
-      setActiveLearnerClassId,
     }),
     [
       roster,
@@ -673,8 +674,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setActiveLearnerUserId,
       activeClassId,
       setActiveClassId,
-      activeLearnerClassId,
-      setActiveLearnerClassId,
     ],
   )
 

@@ -23,7 +23,6 @@ as $$
     'hex'
   )
 $$;
-
 create or replace function private.test_item_spoken_script(
   p_item_order integer,
   p_prompt text,
@@ -39,7 +38,6 @@ as $$
     else 'Number ' || p_item_order::text || '. '
   end || regexp_replace(trim(coalesce(p_prompt, '')), '\s+', ' ', 'g')
 $$;
-
 create or replace function public.prepare_standalone_test_run(
   p_assignment_id uuid,
   p_test_section_id uuid,
@@ -174,7 +172,6 @@ begin
   );
 end
 $$;
-
 create or replace function public.start_standalone_test_run(p_run_id uuid, p_readiness_token text)
 returns jsonb
 language plpgsql
@@ -246,6 +243,5 @@ begin
   return jsonb_build_object('runId', r.id, 'status', 'in_progress', 'itemCount', 10, 'insertedItems', v_inserted);
 end
 $$;
-
 revoke all on function private.narration_spoken_source_hash(text, text, text) from public;
 revoke all on function private.test_item_spoken_script(integer, text, text) from public;

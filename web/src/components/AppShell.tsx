@@ -1,7 +1,6 @@
 import {
   Cloud,
   CloudOff,
-  GraduationCap,
   Loader2,
   RefreshCw,
   Shield,
@@ -92,7 +91,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   const staffLinks = STAFF_NAV.filter((r) => session.canAccess(r.role))
-  // Show staff nav only when bypass or signed-in staff; otherwise only portal entry
   const showStaffNav = session.authBypass || (session.signedIn && session.isStaff)
 
   return (
@@ -126,15 +124,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                 )
               })
             : null}
-          <NavLink
-            to="/access"
-            className={({ isActive }) =>
-              `topbar-role${isActive || pathname.startsWith('/learner') ? ' is-active' : ''}`
-            }
-          >
-            <GraduationCap className="h-3.5 w-3.5" aria-hidden strokeWidth={1.75} />
-            Portal
-          </NavLink>
         </nav>
 
         <div className="topbar-actions">
@@ -161,15 +150,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               </NavLink>
             )
           })}
-          <NavLink
-            to="/access"
-            className={({ isActive }) =>
-              `mobile-bottom-tab${isActive || pathname.startsWith('/learner') ? ' is-active' : ''}`
-            }
-          >
-            <GraduationCap className="h-5 w-5" aria-hidden strokeWidth={2} />
-            <span className="mobile-bottom-label">Portal</span>
-          </NavLink>
         </nav>
       )}
     </div>

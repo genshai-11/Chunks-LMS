@@ -3,8 +3,6 @@ import {
   Check,
   GraduationCap,
   ImagePlus,
-  Link2,
-  Mail,
   Pencil,
   Power,
   Trash2,
@@ -37,7 +35,6 @@ import {
   setAccountStatus,
   updateUserProfile,
 } from '../../modules/roster/service'
-import type { DomainUser } from '../../modules/roster/types'
 import { useAppState } from '../../state/useAppState'
 
 type Tab = 'teachers' | 'learners'
@@ -58,28 +55,6 @@ const emptyDraft = (): Draft => ({
   avatarUrl: '',
   allowMultiClass: false,
 })
-
-function invitationUrl(user: DomainUser): string {
-  const origin = window.location.origin
-  if (user.roles.includes('learner') && user.email) {
-    return `${origin}/access?email=${encodeURIComponent(user.email)}`
-  }
-  return `${origin}/teacher`
-}
-
-function invitationMailto(user: DomainUser): string {
-  const link = invitationUrl(user)
-  const isLearner = user.roles.includes('learner')
-  const subject = encodeURIComponent(
-    isLearner ? 'Chunks LMS learner invite' : 'Chunks LMS teacher invite',
-  )
-  const body = encodeURIComponent(
-    isLearner
-      ? `Hi ${user.displayName},\n\nOpen your portal:\n${link}\n`
-      : `Hi ${user.displayName},\n\nSign in as Teacher:\n${link}\n`,
-  )
-  return `mailto:${encodeURIComponent(user.email ?? '')}?subject=${subject}&body=${body}`
-}
 
 export function AdminPeoplePage() {
   const { roster, setRoster, syncNow, reloadFromSupabase } = useAppState()
@@ -170,7 +145,7 @@ export function AdminPeoplePage() {
         icon={Users}
         kicker="Admin"
         title="Accounts"
-        subtitle="Teacher: email + username (Supabase Auth) · learner: email invite link"
+        subtitle="Teacher: email + username (Supabase Auth) · learner: profile account"
         actions={
           <button
             type="button"
@@ -246,7 +221,7 @@ export function AdminPeoplePage() {
           description={
             tab === 'teachers'
               ? 'Creates a real Supabase Auth staff account plus database teacher role.'
-              : 'Email is the portal invite identity. Unique across all accounts.'
+              : 'Creates a learner profile. Email remains unique across all accounts.'
           }
         >
           <form
@@ -548,32 +523,6 @@ export function AdminPeoplePage() {
                       </td>
                       <td>
                         <div className="row-actions accounts-actions">
-                          {u.email ? (
-                            <>
-                              <button
-                                type="button"
-                                className="ghost"
-                                title="Copy invite link"
-                                onClick={async () => {
-                                  try {
-                                    await navigator.clipboard.writeText(invitationUrl(u))
-                                    ok('Invite copied')
-                                  } catch {
-                                    ok(invitationUrl(u))
-                                  }
-                                }}
-                              >
-                                <Link2 className="h-3.5 w-3.5" aria-hidden />
-                              </button>
-                              <a
-                                className="btn ghost"
-                                href={invitationMailto(u)}
-                                title="Send invite email"
-                              >
-                                <Mail className="h-3.5 w-3.5" aria-hidden />
-                              </a>
-                            </>
-                          ) : null}
                           <button
                             type="button"
                             className="ghost"

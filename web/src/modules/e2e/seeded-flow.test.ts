@@ -9,9 +9,9 @@ describe('seeded end-to-end flow', () => {
     expect(result.scheduling.attendance).toHaveLength(3)
     expect(result.capture.sessionStatus).toBe('completed')
     expect(result.ledger).toHaveLength(3)
-    expect(result.reportSampleSize).toBe(3)
+    expect(result.reportSampleSize).toBe(4)
 
     const colors = result.ledger.map((r) => r.effectiveColor).sort()
-    expect(colors).toEqual(['green', 'purple', 'red'])
+    expect(colors).toEqual(['indigo', 'purple', 'red'])
   })
 })

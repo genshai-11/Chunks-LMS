@@ -52,12 +52,6 @@ export function StaffGate({ role, children }: Props) {
               </p>
             </Panel>
           )}
-          <p className="meta" style={{ marginTop: 16, textAlign: 'center' }}>
-            Learner access?{' '}
-            <Link to="/access" className="underline">
-              Open learner portal
-            </Link>
-          </p>
         </div>
       </div>
     )
@@ -84,10 +78,6 @@ export function StaffGate({ role, children }: Props) {
             Staff authorization is database-owned in <code>staff_roles</code>; user-editable Auth
             metadata and email allowlists are not used for authorization.
           </p>
-          <p className="meta" style={{ marginTop: 8 }}>
-            Learners do not use Supabase Auth accounts — open the signed invite link at{' '}
-            <code>/access?token=…</code>.
-          </p>
           <div className="btn-row" style={{ marginTop: 12 }}>
             {session.canAccess('admin') ? (
               <Link to="/admin" className="btn ghost">
@@ -101,9 +91,6 @@ export function StaffGate({ role, children }: Props) {
             ) : null}
             <Link to="/" className="btn ghost">
               Home
-            </Link>
-            <Link to="/access" className="btn ghost">
-              Learner portal
             </Link>
           </div>
         </div>

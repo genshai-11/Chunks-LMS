@@ -56,8 +56,6 @@ begin
   return new;
 end;
 $$;
-
 revoke all on function public.handle_auth_user_created() from public, anon, authenticated;
-
 comment on function public.handle_auth_user_created() is
   'Links native Auth to a stable domain User and activates only pre-provisioned database staff membership roles; unmatched signups remain no-role.';

@@ -97,7 +97,7 @@ export function AdminOverviewPage() {
             to="/admin/people"
             step="1"
             title="Accounts"
-            description="Add teacher/learner, active/inactive, copy or email invites."
+            description="Add teacher/learner accounts and manage active/inactive status."
             icon={Users}
           />
           <NavTile

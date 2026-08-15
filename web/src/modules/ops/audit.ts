@@ -87,7 +87,7 @@ export function correctFinalizedResult(
   const snapshot = {
     ...createDraftSnapshot(2),
     status: 'finalized' as const,
-    provisionalColor: current.effectiveColor,
+    provisionalColor: null,
     effectiveColor: current.effectiveColor,
     effectiveScore: null,
     finalizedAt: current.finalizedAt,

@@ -7,7 +7,9 @@ import {
   createCaptureSession,
   markSessionCompleted,
   recordColorForCurrent,
+  resolveProbeForCurrent,
   setCaptureMode,
+  sessionColorSummary,
 } from './session-capture'
 
 const learners = ['learner-1', 'learner-2', 'learner-3']
@@ -105,5 +107,55 @@ describe('one-result-per-sentence assignment', () => {
     expect(r.value.learnerUserId).toBe('learner-1')
     expect(r.value.snapshot.effectiveColor).toBe('red')
     expect(attemptsForQuestion(state, q.value.id)).toHaveLength(1)
+  })
+
+  it('records Orange as the primary 1 result instead of direct Yellow', () => {
+    let state = createCaptureSession({
+      learningSessionId: 'ls-1',
+      teacherUserId: 'teacher-1',
+      learnerIds: learners,
+      mode: 'question_first',
+    })
+    const q = addSessionQuestion(state)
+    if (!q.ok) throw new Error(q.error)
+
+    const r = recordColorForCurrent(q.state, 'orange')
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.value.snapshot.status).toBe('finalized')
+    expect(r.value.snapshot.effectiveColor).toBe('orange')
+  })
+
+  it('separates effective final color from recorded 7-color probe steps', () => {
+    let state = createCaptureSession({
+      learningSessionId: 'ls-1',
+      teacherUserId: 'teacher-1',
+      learnerIds: learners,
+      mode: 'question_first',
+    })
+    const q = addSessionQuestion(state)
+    if (!q.ok) throw new Error(q.error)
+    state = q.state
+
+    const green = recordColorForCurrent(state, 'green')
+    if (!green.ok) throw new Error(green.error)
+    state = green.state
+    const blue1 = resolveProbeForCurrent(state, 'continue')
+    if (!blue1.ok) throw new Error(blue1.error)
+    state = blue1.state
+    const blue2 = resolveProbeForCurrent(state, 'continue')
+    if (!blue2.ok) throw new Error(blue2.error)
+    state = blue2.state
+    const indigo = resolveProbeForCurrent(state, 'done')
+    if (!indigo.ok) throw new Error(indigo.error)
+    state = indigo.state
+
+    const summary = sessionColorSummary(state)
+    expect(summary.byColor.green).toBe(0)
+    expect(summary.byColor.indigo).toBe(1)
+    expect(summary.recordedByColor.green).toBe(1)
+    expect(summary.recordedByColor.blue).toBe(2)
+    expect(summary.recordedByColor.indigo).toBe(1)
+    expect(summary.totalRecords).toBe(4)
   })
 })

@@ -7,11 +7,11 @@ import { useFlash } from '../../hooks/useFlash'
 import { filterAuditEvents } from '../../modules/ops/audit'
 import { effectiveResults, resultKey } from '../../modules/ops/effective-results'
 import type { OpsAuditEventType } from '../../modules/ops/types'
-import type { ResultColor } from '../../modules/result-lifecycle/types'
+import { SPECTRUM_COLORS, type ResultColor } from '../../modules/result-lifecycle/types'
 import { useAppState } from '../../state/useAppState'
 import { useStaffSession } from '../../auth/useStaffSession'
 
-const COLORS: ResultColor[] = ['red', 'yellow', 'green', 'purple']
+const COLORS: ResultColor[] = [...SPECTRUM_COLORS]
 
 const TYPE_LABEL: Record<OpsAuditEventType, string> = {
   result_finalized: 'Finalized',
@@ -151,13 +151,13 @@ export function AdminAuditPage() {
                       {e.previousColor ? (
                         <span>
                           <span className={`color-pill is-${e.previousColor}`}>
-                            {e.previousColor === 'yellow' ? 'orange' : e.previousColor}
+                            {e.previousColor}
                           </span>
                           {' → '}
                         </span>
                       ) : null}
                       {e.color ? (
-                        <span className={`color-pill is-${e.color}`}>{e.color === 'yellow' ? 'orange' : e.color}</span>
+                        <span className={`color-pill is-${e.color}`}>{e.color}</span>
                       ) : (
                         '—'
                       )}

@@ -216,6 +216,20 @@ export function calculateSpectrumStepBreakdown(
   }
 }
 
+export function spectrumRecordsForAttempt(attempt: FinalizedAttempt): ResultColor[] {
+  if (!attempt.enteredProbeFlow) return [attempt.effectiveColor]
+
+  const probeCount = Math.max(0, attempt.probeEventCount)
+  const records: ResultColor[] = ['green']
+  if (attempt.effectiveColor === 'yellow' || attempt.effectiveColor === 'indigo') {
+    records.push(...Array.from({ length: Math.max(0, probeCount - 1) }, () => 'blue' as const))
+    records.push(attempt.effectiveColor)
+  } else {
+    records.push(...Array.from({ length: probeCount }, () => 'blue' as const))
+  }
+  return records
+}
+
 function observation(
   key: MetricKey,
   value: number | null,

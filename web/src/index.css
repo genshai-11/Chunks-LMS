@@ -5046,16 +5046,20 @@
   }
 
   .standalone-analysis-grid {
-    @apply mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6;
+    @apply mb-3 grid gap-2 sm:grid-cols-3 xl:grid-cols-7;
   }
   .standalone-metric-card {
-    @apply rounded-2xl border border-slate-800 bg-slate-950 p-4 text-slate-100 shadow-sm;
+    @apply rounded-xl border border-slate-800 bg-slate-950 p-3 text-slate-100 shadow-sm;
   }
   .standalone-metric-card span {
-    @apply mt-2 block text-xs font-bold uppercase tracking-wide text-slate-400;
+    @apply mt-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400;
+  }
+  .standalone-metric-card.metric-percent-c span {
+    @apply normal-case;
+    text-transform: none;
   }
   .standalone-metric-card strong {
-    @apply mt-1 block font-display text-2xl font-black text-white;
+    @apply mt-0.5 block font-display text-xl font-black text-white;
   }
   .standalone-chart-wrap {
     @apply h-[min(56dvh,28rem)] min-h-[18rem] rounded-2xl border border-slate-800 bg-slate-950 p-3;
@@ -5274,50 +5278,84 @@
     @apply max-w-[110rem];
   }
   .test-analysis-workbench {
-    @apply grid items-start gap-4;
+    @apply grid items-start gap-4 overflow-visible;
   }
   .test-analysis-filter-card {
-    @apply rounded-2xl border border-slate-200 bg-white p-2 text-slate-800 shadow-sm lg:grid lg:grid-cols-[minmax(10rem,0.8fr)_minmax(12rem,1fr)_minmax(18rem,1.4fr)_auto] lg:items-center lg:gap-3;
+    @apply relative z-50 flex flex-wrap items-center gap-2 overflow-visible rounded-[1.35rem] border border-slate-200/70 bg-white/85 p-2.5 text-slate-800 shadow-[0_10px_35px_-28px_rgba(15,23,42,0.7)] backdrop-blur;
   }
   .test-analysis-filter-head {
-    @apply mb-2 flex items-center gap-2 border-b border-slate-100 pb-2 text-slate-700 lg:mb-0 lg:border-b-0 lg:pb-0;
+    @apply flex min-h-9 items-center gap-2 rounded-full bg-slate-50/80 px-2.5 py-1.5 text-slate-700;
   }
   .test-analysis-filter-head strong {
-    @apply block text-sm font-black text-slate-950;
+    @apply block text-xs font-black text-slate-950;
   }
   .test-analysis-filter-head span {
-    @apply block text-[11px] font-semibold text-slate-500;
+    @apply block text-[10px] font-semibold text-slate-500;
   }
   .test-analysis-filter-section {
-    @apply mb-2 space-y-1.5 lg:mb-0;
+    @apply mb-2 space-y-1 rounded-2xl bg-slate-50/55 p-2 lg:mb-0;
+  }
+  .test-analysis-filter-menu {
+    @apply relative;
+  }
+  .test-analysis-filter-menu summary {
+    @apply flex min-h-9 cursor-pointer list-none items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-black text-slate-950 shadow-3xs transition hover:border-slate-300 hover:bg-slate-50;
+  }
+  .test-analysis-filter-menu summary::-webkit-details-marker {
+    display: none;
+  }
+  .test-analysis-filter-menu summary span {
+    @apply text-slate-500;
+  }
+  .test-analysis-filter-menu summary strong {
+    @apply max-w-24 truncate font-black text-slate-950;
+  }
+  .test-analysis-filter-menu[open] summary {
+    @apply border-slate-950 bg-slate-950 text-white;
+  }
+  .test-analysis-filter-menu[open] summary span,
+  .test-analysis-filter-menu[open] summary strong {
+    @apply text-white;
+  }
+  .test-analysis-filter-popover {
+    @apply absolute left-0 top-[calc(100%+0.35rem)] z-[100] min-w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl;
+  }
+  .test-analysis-filter-menu.is-wide .test-analysis-filter-popover {
+    @apply min-w-72;
+  }
+  .test-analysis-filter-title.is-popover-title {
+    @apply mb-1;
   }
   .test-analysis-filter-title {
-    @apply flex items-center justify-between gap-2 text-[11px] font-black uppercase tracking-wide text-slate-600;
+    @apply flex items-center justify-between gap-2 px-0.5 text-[10px] font-black uppercase tracking-wide text-slate-500;
   }
   .test-analysis-filter-title button {
-    @apply rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold normal-case tracking-normal text-slate-600 shadow-none transition hover:bg-slate-100;
+    @apply inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold normal-case tracking-normal text-slate-500 shadow-none transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700;
   }
   .test-analysis-chip-grid {
-    @apply flex flex-wrap gap-1.5;
+    @apply flex flex-wrap gap-1;
+  }
+  .test-analysis-chip-grid.is-tight {
+    @apply gap-1;
   }
   .test-analysis-chip {
-    @apply min-h-8 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-black text-slate-500 shadow-none transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700;
+    @apply min-h-6 rounded-full border border-transparent bg-white px-2 py-0.5 text-[10px] font-black text-slate-500 shadow-none transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700;
   }
   .test-analysis-chip.is-active {
-    @apply border-indigo-300 bg-indigo-50 text-indigo-700;
+    @apply border-indigo-200 bg-indigo-600 text-white hover:bg-indigo-600 hover:text-white;
   }
   .test-analysis-color-list {
-    @apply flex flex-wrap gap-1.5;
+    @apply flex flex-wrap gap-1;
   }
   .test-analysis-color-chip {
-    @apply flex min-h-8 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-500 shadow-none transition hover:bg-slate-100;
+    @apply flex min-h-6 items-center gap-1.5 rounded-full border border-transparent bg-white px-2 py-0.5 text-[10px] font-bold text-slate-500 shadow-none transition hover:border-slate-200 hover:bg-slate-100;
   }
   .test-analysis-color-chip.is-active {
     @apply text-slate-900;
   }
   .test-analysis-color-chip i,
   .test-analysis-legend-row i {
-    @apply inline-block h-2.5 w-2.5 shrink-0 rounded-full;
+    @apply inline-block h-2 w-2 shrink-0 rounded-full;
   }
   .test-analysis-label-toggle {
     @apply mt-1 flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-600 shadow-none transition hover:bg-slate-100 lg:mt-0 lg:w-auto lg:whitespace-nowrap;
@@ -5326,10 +5364,56 @@
     @apply border-indigo-200 bg-indigo-50 text-indigo-700;
   }
   .test-analysis-chart-stack {
-    @apply grid min-w-0 gap-4;
+    @apply grid min-w-0 gap-4 lg:grid-cols-2;
   }
   .test-analysis-chart-row {
-    @apply grid min-w-0 gap-4 lg:grid-cols-2;
+    display: contents;
+  }
+  .test-analysis-chart-slot {
+    @apply min-w-0;
+  }
+  .test-analysis-chart-slot:has(.test-analysis-panel.is-expanded) {
+    @apply lg:col-span-2;
+  }
+  .test-analysis-chart-actions {
+    @apply flex items-center gap-1;
+  }
+  .test-analysis-chart-actions button {
+    @apply inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500 shadow-none transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700;
+  }
+  .test-analysis-filter-section.is-chart-picker {
+    @apply lg:col-span-3;
+  }
+  .test-analysis-chart-order-list {
+    @apply max-h-36 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1;
+    scrollbar-width: thin;
+  }
+  .test-analysis-chart-order-row {
+    @apply flex cursor-grab items-center justify-start gap-0.5 rounded-lg border border-transparent bg-white px-1 py-0.5 text-left text-slate-950 transition hover:bg-slate-50 active:cursor-grabbing;
+  }
+  .test-analysis-chart-order-row.is-dragging {
+    @apply border-slate-950 bg-slate-50 opacity-60;
+  }
+  .test-analysis-chart-order-row.is-hidden {
+    @apply bg-white text-slate-400 opacity-70;
+  }
+  .test-analysis-chart-order-grip {
+    @apply inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-slate-950;
+  }
+  .test-analysis-chart-order-name {
+    @apply flex min-w-0 flex-1 items-center justify-start gap-1.5 rounded-md border-0 bg-transparent px-1.5 py-1 text-left shadow-none;
+  }
+  .test-analysis-chart-order-name span {
+    @apply inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-slate-950 text-[9px] font-black text-white;
+  }
+  .test-analysis-chart-order-name strong {
+    @apply min-w-0 truncate text-[10px] font-black leading-none text-slate-950;
+  }
+  .test-analysis-chart-order-row.is-hidden .test-analysis-chart-order-name span {
+    @apply bg-slate-300 text-white;
+  }
+  .test-analysis-chart-order-row.is-hidden .test-analysis-chart-order-name strong {
+    @apply text-slate-400 line-through decoration-slate-300;
   }
   .test-analysis-panel .standalone-chart-wrap {
     @apply bg-white;
@@ -5344,6 +5428,51 @@
     stroke: #ffffff;
     stroke-width: 3px;
     stroke-linejoin: round;
+  }
+  .test-analysis-tube-wrap {
+    @apply overflow-hidden;
+  }
+  .test-analysis-tube-scroll {
+    @apply flex h-full min-w-full items-end gap-2 overflow-x-auto overflow-y-hidden pb-2 pt-4;
+  }
+  .test-analysis-tube-col {
+    @apply flex min-w-10 flex-col items-center gap-1 text-center text-[10px] font-black text-slate-500;
+  }
+  .test-analysis-tube-col strong {
+    @apply text-[11px] text-slate-700;
+  }
+  .test-analysis-tube-col span:not(.test-analysis-tube-bead) {
+    @apply text-[10px] text-slate-400;
+  }
+  .test-analysis-tube-stack {
+    @apply flex min-h-32 flex-col-reverse justify-start gap-1 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-2 shadow-inner;
+  }
+  .test-analysis-tube-bead {
+    @apply block h-4 w-4 rounded-full border-2 border-white shadow-sm ring-1 ring-slate-900/10;
+  }
+  .test-analysis-empty-chart {
+    @apply flex h-full w-full items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-sm font-bold text-slate-500;
+  }
+  .test-analysis-record-cpd-wrap {
+    @apply overflow-hidden;
+  }
+  .test-analysis-record-cpd-scroll {
+    @apply flex h-full min-w-full items-end gap-3 overflow-x-auto overflow-y-hidden pb-2 pt-4;
+  }
+  .test-analysis-record-cpd-group {
+    @apply flex min-w-16 flex-col items-center gap-1 text-center text-[10px] font-black text-slate-500;
+  }
+  .test-analysis-record-cpd-group strong {
+    @apply text-[11px] text-slate-700;
+  }
+  .test-analysis-record-cpd-group span:not(.test-analysis-record-cpd-bar) {
+    @apply text-[10px] text-slate-400;
+  }
+  .test-analysis-record-cpd-bars {
+    @apply flex h-44 items-end justify-center gap-1 rounded-2xl border border-slate-200 bg-slate-50 px-2 py-2 shadow-inner;
+  }
+  .test-analysis-record-cpd-bar {
+    @apply block w-3 rounded-t-full border border-white shadow-sm ring-1 ring-slate-900/10;
   }
   .test-analysis-pie-layout {
     @apply grid gap-4 lg:grid-cols-[minmax(0,1fr)_16rem];

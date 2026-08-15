@@ -3,6 +3,7 @@ import {
   calculateMetrics,
   calculateSpectrumStepBreakdown,
   compareEqualDurationWindows,
+  spectrumRecordsForAttempt,
   type FinalizedAttempt,
 } from './calculate'
 
@@ -136,5 +137,11 @@ describe('metric calculations', () => {
     expect(breakdown.totalRecords).toBe(9)
     expect(breakdown.rfc).toBeCloseTo(3 / 9)
     expect(breakdown.rac).toBeCloseTo(6 / 9)
+  })
+
+  it('expands finalized attempts into chronological N_total records', () => {
+    expect(spectrumRecordsForAttempt({ effectiveColor: 'red', enteredProbeFlow: false, probeEventCount: 0 })).toEqual(['red'])
+    expect(spectrumRecordsForAttempt({ effectiveColor: 'yellow', enteredProbeFlow: true, probeEventCount: 1 })).toEqual(['green', 'yellow'])
+    expect(spectrumRecordsForAttempt({ effectiveColor: 'indigo', enteredProbeFlow: true, probeEventCount: 3 })).toEqual(['green', 'blue', 'blue', 'indigo'])
   })
 })

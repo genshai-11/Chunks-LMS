@@ -33,7 +33,7 @@ import { EmptyState, Panel } from '../../components/ui'
 import { PROBE_ACTIONS } from '../../modules/assessment/probe-actions'
 import { probeChunksNumber } from '../../modules/assessment/probe-metrics'
 import { listActiveLearners } from '../../modules/roster/service'
-import { getTestPackageVersion, listTestSections } from '../../lib/test-packages'
+import { getTestPackageVersion, listTestPackages, listTestSections } from '../../lib/test-packages'
 import {
   completeStandaloneRun,
   findLatestApprovedNarrationVariant,
@@ -53,6 +53,7 @@ import { getNarrationPlaybackUrl } from '../../modules/catalog/live-test-generat
 import { triggerConfetti } from '../../lib/confetti'
 import { useAppState } from '../../state/useAppState'
 import { calculateSpectrumStepBreakdown } from '../../modules/metrics/calculate'
+import { racMetricLabelForPackage, racMetricTitle, type PackageRacMetricLabel } from '../../modules/metrics/display-labels'
 import { SPECTRUM_COLORS, type ProvisionalColor, type ResultColor } from '../../modules/result-lifecycle/types'
 import { resultAudioUrl } from '../../lib/color-audio'
 
@@ -70,6 +71,7 @@ type RunPageCacheEntry = {
   runDetails: StandaloneTestRunRow | null
   allRuns: StandaloneTestRunRow[]
   items: TestItem[]
+  racMetricLabel: PackageRacMetricLabel
   introVariantId: string | null
   sessionIntroVariantIds: Record<number, string | null>
   packageStartVariantId: string | null
@@ -363,6 +365,7 @@ export function TeacherTestRunPage() {
   const [runDetails, setRunDetails] = useState<StandaloneTestRunRow | null>(null)
   const [allRuns, setAllRuns] = useState<StandaloneTestRunRow[]>([])
   const [items, setItems] = useState<TestItem[]>([])
+  const [racMetricLabel, setRacMetricLabel] = useState<PackageRacMetricLabel>('%c')
   const [introVariantId, setIntroVariantId] = useState<string | null>(null)
   const [sessionIntroVariantIds, setSessionIntroVariantIds] = useState<Record<number, string | null>>({})
   const [packageStartVariantId, setPackageStartVariantId] = useState<string | null>(null)
@@ -587,6 +590,7 @@ export function TeacherTestRunPage() {
       setRunDetails(cached.runDetails)
       setAllRuns(cached.allRuns)
       setItems(cached.items)
+      setRacMetricLabel(cached.racMetricLabel)
       setIntroVariantId(cached.introVariantId)
       setSessionIntroVariantIds(cached.sessionIntroVariantIds)
       setPackageStartVariantId(cached.packageStartVariantId)
@@ -617,6 +621,7 @@ export function TeacherTestRunPage() {
     const assignmentId = assignmentIdParam || currentRun.assignmentId
     let targetRuns: StandaloneTestRunRow[] = [currentRun]
     let packageVersionId: string | null = null
+    let nextRacMetricLabel: PackageRacMetricLabel = '%c'
     let nextPackageStartVariantId: string | null = null
     let nextPartIntroVariantIds: Record<PartIntroNumber, string | null> = { 1: null, 2: null, 3: null }
     let nextPackageEndVariantId: string | null = null
@@ -629,6 +634,13 @@ export function TeacherTestRunPage() {
           packageVersionId = assignment.packageVersionId
           const sectionsRes = await listTestSections(assignment.packageVersionId)
           const versionRes = await getTestPackageVersion(assignment.packageVersionId)
+          if (versionRes.ok && versionRes.data) {
+            const packagesRes = await listTestPackages()
+            const packageTitle = packagesRes.ok
+              ? packagesRes.data.find((pkg) => pkg.id === versionRes.data?.packageId)?.title
+              : null
+            nextRacMetricLabel = racMetricLabelForPackage(packageTitle ?? versionRes.data.versionLabel)
+          }
           const languagePolicy = versionRes.ok ? versionRes.data?.sourceMetadata?.languagePolicy : null
           const existingRunsRes = await listStandaloneRuns(assignmentId)
           const existingRuns = existingRunsRes.ok ? existingRunsRes.data : []
@@ -654,6 +666,7 @@ export function TeacherTestRunPage() {
       if (runsResult.ok && runsResult.data.length > 0) targetRuns = runsResult.data
     }
     setAllRuns(targetRuns)
+    setRacMetricLabel(nextRacMetricLabel)
 
     if (packageVersionId) {
       const partOneLanguage = targetRuns.find((run) => run.sessionNumber === 1)?.promptLanguage ?? targetRuns[0]?.promptLanguage ?? currentRun.promptLanguage ?? 'vi'
@@ -783,6 +796,7 @@ export function TeacherTestRunPage() {
         runDetails: currentRun,
         allRuns: targetRuns,
         items: combinedItems,
+        racMetricLabel: nextRacMetricLabel,
         introVariantId: nextIntroBySession[currentRun.sessionNumber] ?? null,
         sessionIntroVariantIds: nextIntroBySession,
         packageStartVariantId: nextPackageStartVariantId,
@@ -801,6 +815,7 @@ export function TeacherTestRunPage() {
       runDetails,
       allRuns,
       items,
+      racMetricLabel,
       introVariantId,
       sessionIntroVariantIds,
       packageStartVariantId,
@@ -812,6 +827,7 @@ export function TeacherTestRunPage() {
     assignmentIdParam,
     introVariantId,
     items,
+    racMetricLabel,
     packageEndVariantId,
     packageStartVariantId,
     partIntroVariantIds,
@@ -1575,14 +1591,14 @@ export function TeacherTestRunPage() {
       rfc,
       rac,
       rfcTitle: `RFC = warm records / N_total = ${spectrum.warmSteps} / ${nTotal}. Warm = Red + Orange + Yellow.`,
-      racTitle: `%c = cool records / N_total = ${spectrum.coolSteps} / ${nTotal}. Cool = Green + Blue + Indigo + Purple.`,
+      racTitle: racMetricTitle(racMetricLabel, spectrum.coolSteps, nTotal),
       totalTitle: `N_total = primary records + probe records = ${spectrum.primaryRecords} + ${spectrum.probeRecords} = ${nTotal}.`,
       cpdTitle: `Max CPD is the highest achieved CPD among finalized items. Achieved CPD = CVR x CCI x color factor.`,
       avgCpd,
       minCpd,
       maxCpd,
     }
-  }, [items, completedCount])
+  }, [items, completedCount, racMetricLabel])
 
   const chartData = useMemo(
     () =>
@@ -1710,8 +1726,8 @@ export function TeacherTestRunPage() {
                   <span className="observe-metric-tooltip" role="tooltip">{summaryMetrics.rfcTitle} Lower RFC means less observed struggle.</span>
                 </span>
                 <span className="observe-learner-rfc observe-has-tooltip is-percent-c" tabIndex={0} aria-label={summaryMetrics.racTitle}>
-                  %c {summaryMetrics.rac}%
-                  <span className="observe-metric-tooltip" role="tooltip">{summaryMetrics.racTitle} Higher %c means more cool measurement steps.</span>
+                  {racMetricLabel} {summaryMetrics.rac}%
+                  <span className="observe-metric-tooltip" role="tooltip">{summaryMetrics.racTitle} Higher {racMetricLabel} means more cool measurement steps.</span>
                 </span>
                 <span className="observe-learner-rfc observe-has-tooltip is-cpd" tabIndex={0} aria-label={summaryMetrics.cpdTitle}>
                   Max CPD {formatVolt(summaryMetrics.maxCpd)}
@@ -2087,7 +2103,7 @@ export function TeacherTestRunPage() {
 
               <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-900 p-4 text-xs font-mono text-white shadow-inner sm:grid-cols-5">
                 <div title={summaryMetrics.rfcTitle}><span className="text-slate-400">RFC </span><strong className="text-red-400">{summaryMetrics.rfc}%</strong></div>
-                <div title={summaryMetrics.racTitle}><span className="text-slate-400">%c </span><strong className="text-emerald-400">{summaryMetrics.rac}%</strong></div>
+                <div title={summaryMetrics.racTitle}><span className="text-slate-400">{racMetricLabel} </span><strong className="text-emerald-400">{summaryMetrics.rac}%</strong></div>
                 <div><span className="text-slate-400">CPD min </span><strong className="text-blue-300">{formatVolt(summaryMetrics.minCpd)}</strong></div>
                 <div><span className="text-slate-400">CPD max </span><strong className="text-blue-300">{formatVolt(summaryMetrics.maxCpd)}</strong></div>
                 <div><span className="text-slate-400">CPD avg </span><strong className="text-blue-300">{formatVolt(summaryMetrics.avgCpd)}</strong></div>

@@ -308,64 +308,6 @@ export function countDuplicateEmailGroups(state: RosterState): number {
   return n
 }
 
-/** Invite URL so a learner can open their portal by email. */
-export function learnerInviteUrl(
-  learner: DomainUser,
-  origin = typeof window !== 'undefined' ? window.location.origin : '',
-): string | null {
-  if (!learner.email?.trim()) return null
-  const base = origin || ''
-  return `${base}/access?email=${encodeURIComponent(learner.email.trim())}`
-}
-
-/** mailto: so staff can send the invite from their mail client. */
-export function learnerInviteMailto(
-  learner: DomainUser,
-  origin = typeof window !== 'undefined' ? window.location.origin : '',
-): string | null {
-  const url = learnerInviteUrl(learner, origin)
-  if (!url || !learner.email?.trim()) return null
-  const subject = encodeURIComponent('Your Chunks LMS progress link')
-  const body = encodeURIComponent(
-    `Hi ${learner.displayName},\n\nOpen your learning portal (attendance & progress):\n\n${url}\n\nUse the email your teacher registered for you.\n`,
-  )
-  return `mailto:${learner.email.trim()}?subject=${subject}&body=${body}`
-}
-
-export type ClassInviteLine = {
-  learner: DomainUser
-  url: string
-  mailto: string
-}
-
-/** Active seats that have an invite-ready email. */
-export function classInviteLines(
-  state: RosterState,
-  classId: string,
-  origin = typeof window !== 'undefined' ? window.location.origin : '',
-): ClassInviteLine[] {
-  const lines: ClassInviteLine[] = []
-  for (const e of activeEnrollmentsForClass(state, classId)) {
-    const learner = state.users.find((u) => u.id === e.learnerUserId)
-    if (!learner) continue
-    const url = learnerInviteUrl(learner, origin)
-    const mailto = learnerInviteMailto(learner, origin)
-    if (url && mailto) lines.push({ learner, url, mailto })
-  }
-  return lines
-}
-
-/** Plain text block of all invite URLs for clipboard. */
-export function formatClassInviteClipboard(
-  state: RosterState,
-  classId: string,
-  origin = typeof window !== 'undefined' ? window.location.origin : '',
-): string {
-  return classInviteLines(state, classId, origin)
-    .map((l) => `${l.learner.displayName} <${l.learner.email}>: ${l.url}`)
-    .join('\n')
-}
-
 export function archiveCourse(state: RosterState, courseId: string): RosterResult<Course> {
   return updateCourse(state, courseId, { status: 'archived' })
 }

@@ -21,10 +21,6 @@ function Root() {
             sign-in, or <code className="text-slate-200">VITE_AUTH_BYPASS=true</code> for local/CI
             demos only.
           </p>
-          <p className="text-sm text-slate-500 mt-3">
-            Learners use signed access links at <code className="text-slate-300">/access</code> and
-            do not need Supabase Auth accounts.
-          </p>
           <p className="text-xs text-slate-600 mt-4 font-mono">
             env={vercelEnv} · supabase={env.isConfigured ? 'set' : 'missing'} · bypass=
             {env.authBypass ? 'on' : 'off'}

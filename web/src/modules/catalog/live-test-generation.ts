@@ -19,7 +19,10 @@ async function readFunctionError(error: unknown, data: any): Promise<string | nu
     const text = await response.text().catch(() => '')
     if (!text) return null
     try {
-      const parsed = JSON.parse(text) as { error?: { message?: string; code?: string } | string; message?: string }
+      const parsed = JSON.parse(text) as {
+        error?: { message?: string; code?: string } | string
+        message?: string
+      }
       if (typeof parsed.error === 'string') return parsed.error
       return parsed.error?.message ?? parsed.error?.code ?? parsed.message ?? text
     } catch {
@@ -59,7 +62,8 @@ export function listTtsModels(language: 'vi' | 'en'): Promise<{
   return invoke({ action: 'listTtsModels', language })
 }
 
-export type NarrationGenerationTarget = 'package_start' | 'part_intro' | 'package_end' | 'section_intro' | 'test_item'
+export type NarrationGenerationTarget =
+  'package_start' | 'part_intro' | 'package_end' | 'section_intro' | 'test_item'
 
 export function generateNarration(input: {
   packageVersionId: string
@@ -109,7 +113,11 @@ export async function uploadNarrationAudio(input: {
   const storagePath = `narrations/${input.packageVersionId}/uploads/${input.target}-${input.language}-${Date.now()}.${ext}`
   const { error: uploadError } = await sb.storage
     .from('narration-audio')
-    .upload(storagePath, input.file, { contentType: input.file.type || 'audio/mpeg', upsert: false })
+    .upload(storagePath, input.file, {
+      contentType: input.file.type || 'audio/mpeg',
+      cacheControl: '31536000',
+      upsert: false,
+    })
   if (uploadError) throw new Error(uploadError.message)
   const { data: audio, error: audioError } = await sb
     .from('audio_assets')
@@ -157,7 +165,8 @@ export function getNarrationPlaybackUrl(narrationVariantId: string): Promise<{
   return cachedQuery(
     cacheKey(['audio', 'signed-playback', narrationVariantId]),
     () => invoke({ action: 'getNarrationPlaybackUrl', narrationVariantId }),
-    // Edge returns 10-minute signed URLs. Refresh before expiry but dedupe rapid duplicate lookups.
-    { ttlMs: 9 * 60_000, persist: true },
+    // Edge returns 10-minute bearer URLs. Reuse in-memory before expiry, but
+    // never persist them across browser sessions or authenticated identities.
+    { ttlMs: 9 * 60_000 },
   )
 }

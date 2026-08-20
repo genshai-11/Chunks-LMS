@@ -25,11 +25,14 @@ The deployed app has Clerk authentication, Supabase workspace sync, Teacher clas
 6. **Invitations are links.** Copy and `mailto:` are supported; no delivery service is introduced.
 7. **Probe labels are presentation aliases.** Fail → `fail`, Pass → `continue`, Done → `done`; immutable event names and RPC contracts remain unchanged.
 8. **CI/CD path.** PR/push runs OpenSpec validation, lint, typecheck, tests, build; migrations are manually pushed before Vercel production deploy.
+9. **Teacher writes are command-scoped.** Existing database memberships select the Teacher workspace without rewriting role grants. Creating a Learner uses one ownership-checked transaction that creates/reuses the profile, applies multi-class/capacity rules, adds membership, and enrolls. The Teacher browser never upserts an Admin-oriented full workspace for this action.
 
 ## Risks / Trade-offs
 
 - [Clerk third-party integration or JWT claim missing] → expose token/config phase and document dashboard setup without logging tokens.
 - [Teacher class management exceeds RLS scope] → authorize by assigned Teacher/organization in Postgres and test denied cross-scope writes.
+- [Assigned Class is hidden when its Course is filtered by RLS] → correlate the Course policy to the outer Course ID and test the exact policy expression.
+- [Bulk sync grants Teacher excessive writes or fails midway] → use a narrow SECURITY DEFINER command with explicit ownership checks and client grants limited to `authenticated`.
 - [Local bootstrap imports stale demo data] → permit it only for a newly provisioned empty organization and mark completion.
 - [Pass label is semantically ambiguous] → preserve accessible description “continue probe” and document mapping.
 - [Large mobile learner dashboard] → progressive disclosure and compact cards with 44px controls.

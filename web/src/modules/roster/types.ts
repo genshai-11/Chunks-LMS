@@ -13,6 +13,8 @@ export type DomainUser = {
   id: string
   displayName: string
   email: string | null
+  /** Optional normalized login identifier for staff; never grants authorization. */
+  username?: string | null
   /** Optional image URL or data URL for avatar */
   avatarUrl: string | null
   roles: Array<'admin' | 'teacher' | 'learner'>

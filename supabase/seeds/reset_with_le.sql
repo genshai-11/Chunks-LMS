@@ -17,7 +17,6 @@ delete from public.schedule_definitions;
 delete from public.enrollments;
 delete from public.classes;
 delete from public.courses;
-delete from public.learner_access_tokens;
 
 -- Clear standalone test tracking data
 delete from public.standalone_test_attempt_snapshots;
@@ -45,10 +44,10 @@ delete from public.users;
 delete from auth.users;
 
 -- Insert clean users into public.users with stable UUIDs
-insert into public.users (id, email, display_name, account_status, allow_multi_class) values
-  ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb0', 'le.ntmkh@gmail.com', 'Le Nguyen', 'active', true),
-  ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1', 'admin@example.com', 'Admin', 'active', true),
-  ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2', 'chunker@example.com', 'Chunker', 'active', true);
+insert into public.users (id, email, username, display_name, account_status, allow_multi_class) values
+  ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb0', 'le.ntmkh@gmail.com', 'le.ntmkh', 'Le Nguyen', 'active', true),
+  ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1', 'admin@example.com', 'admin', 'Admin', 'active', true),
+  ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2', 'chunker@example.com', 'chunker', 'Chunker', 'active', true);
 
 -- Insert into auth.users (setting email_confirmed_at to enable login)
 insert into auth.users (

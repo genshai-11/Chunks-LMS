@@ -41,7 +41,6 @@ as $$
     'learningSessionIds', coalesce((select jsonb_agg(id::text order by id) from old_sessions), '[]'::jsonb)
   )
 $$;
-
 create or replace function private.obsolete_test_catalog_counts(p_scope jsonb)
 returns jsonb
 language sql
@@ -75,12 +74,10 @@ as $$
     'mappings', (select count(*) from public.live_test_v2_item_mappings where target_package_version_id in (select id from version_ids) or legacy_live_test_resource_id in (select id from resource_ids))
   )
 $$;
-
 revoke execute on function private.obsolete_test_catalog_scope() from public, anon, authenticated;
 revoke execute on function private.obsolete_test_catalog_counts(jsonb) from public, anon, authenticated;
 grant execute on function private.obsolete_test_catalog_scope() to service_role;
 grant execute on function private.obsolete_test_catalog_counts(jsonb) to service_role;
-
 create or replace function public.preview_test_catalog_replacement(
   p_source_sha256 text,
   p_manifest jsonb
@@ -156,7 +153,6 @@ begin
   );
 end;
 $$;
-
 create or replace function private.catalog_reset_allows_version_delete(p_version_id uuid)
 returns boolean
 language sql
@@ -172,10 +168,8 @@ as $$
         and (run.deletion_scope->'packageVersionIds') @> jsonb_build_array(p_version_id::text)
     )
 $$;
-
 revoke execute on function private.catalog_reset_allows_version_delete(uuid) from public, anon, authenticated;
 grant execute on function private.catalog_reset_allows_version_delete(uuid) to service_role;
-
 create or replace function public.freeze_published_package_version()
 returns trigger
 language plpgsql
@@ -210,7 +204,6 @@ begin
   return new;
 end;
 $$;
-
 create or replace function public.apply_test_catalog_replacement(
   p_import_run_id uuid,
   p_confirmation_token text
@@ -328,9 +321,7 @@ begin
           public.live_test_v2_deterministic_uuid('canonical-standalone-item:' || run.source_sha256 || ':' || (v_session->>'sessionOrder') || ':' || (v_item->>'itemOrder')),
           v_version_id, v_section_id, (v_item->>'itemOrder')::int, v_item->>'sourceMaterial', v_item->>'sourceItemId',
           v_item->>'termVi', v_item->>'termEn', v_item->>'promptVi', v_item->>'promptEn',
-          coalesce((v_item->>'tc')::numeric, (v_session->>'targetCvrOhm')::numeric),
-          coalesce((v_item->>'lc')::numeric, 1),
-          coalesce((v_item->>'tl')::numeric, 1),
+          (v_session->>'targetCvrOhm')::numeric, 1, 1,
           jsonb_build_object('source','Chunks Resource.xlsx','sourceCciId',v_item->>'sourceCciId','sessionCciId',v_session->>'sourceCciId','sourceCvrId',(v_item->>'sourceCvrId')::numeric)
         );
       end loop;
@@ -350,12 +341,10 @@ begin
   end;
 end;
 $$;
-
 revoke execute on function public.preview_test_catalog_replacement(text, jsonb) from public, anon;
 revoke execute on function public.apply_test_catalog_replacement(uuid, text) from public, anon;
 grant execute on function public.preview_test_catalog_replacement(text, jsonb) to authenticated, service_role;
 grant execute on function public.apply_test_catalog_replacement(uuid, text) to authenticated, service_role;
-
 comment on function public.preview_test_catalog_replacement(text, jsonb) is
   'Read-only impact preview plus durable confirmation token for canonical test replacement.';
 comment on function public.apply_test_catalog_replacement(uuid, text) is

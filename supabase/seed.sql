@@ -7,12 +7,12 @@ values (
   'org_demo_chunks'
 );
 
-insert into public.users (id, clerk_user_id, display_name, email) values
-  ('22222222-2222-2222-2222-222222222201', 'user_admin_demo', 'Demo Admin', 'admin@example.com'),
-  ('22222222-2222-2222-2222-222222222202', 'user_teacher_demo', 'Demo Teacher', 'teacher@example.com'),
-  ('22222222-2222-2222-2222-222222222203', 'user_learner_1', 'Learner One', 'l1@example.com'),
-  ('22222222-2222-2222-2222-222222222204', 'user_learner_2', 'Learner Two', 'l2@example.com'),
-  ('22222222-2222-2222-2222-222222222205', 'user_learner_3', 'Learner Three', 'l3@example.com');
+insert into public.users (id, clerk_user_id, display_name, email, username) values
+  ('22222222-2222-2222-2222-222222222201', 'user_admin_demo', 'Demo Admin', 'admin@example.com', 'admin'),
+  ('22222222-2222-2222-2222-222222222202', 'user_teacher_demo', 'Demo Teacher', 'teacher@example.com', 'teacher'),
+  ('22222222-2222-2222-2222-222222222203', 'user_learner_1', 'Learner One', 'l1@example.com', null),
+  ('22222222-2222-2222-2222-222222222204', 'user_learner_2', 'Learner Two', 'l2@example.com', null),
+  ('22222222-2222-2222-2222-222222222205', 'user_learner_3', 'Learner Three', 'l3@example.com', null);
 
 insert into public.organization_memberships (organization_id, user_id, role) values
   ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222201', 'admin'),

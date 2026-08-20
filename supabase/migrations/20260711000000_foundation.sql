@@ -2,7 +2,6 @@
 -- Hybrid: transactional roster/scheduling + immutable assessment lifecycle events/snapshots
 
 create extension if not exists "pgcrypto";
-
 -- ---------------------------------------------------------------------------
 -- Enums
 -- ---------------------------------------------------------------------------
@@ -32,7 +31,6 @@ create type public.assessment_event_type as enum (
 );
 create type public.metric_status as enum ('operational', 'experimental');
 create type public.metric_direction as enum ('higher_better', 'lower_better', 'contextual');
-
 -- ---------------------------------------------------------------------------
 -- Identity / organization
 -- ---------------------------------------------------------------------------
@@ -42,7 +40,6 @@ create table public.organizations (
   clerk_org_id text unique,
   created_at timestamptz not null default now()
 );
-
 create table public.users (
   id uuid primary key default gen_random_uuid(),
   clerk_user_id text not null unique,
@@ -51,7 +48,6 @@ create table public.users (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create table public.organization_memberships (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations (id) on delete cascade,
@@ -60,7 +56,6 @@ create table public.organization_memberships (
   created_at timestamptz not null default now(),
   unique (organization_id, user_id, role)
 );
-
 -- ---------------------------------------------------------------------------
 -- Roster
 -- ---------------------------------------------------------------------------
@@ -75,7 +70,6 @@ create table public.courses (
   created_at timestamptz not null default now(),
   unique (organization_id, code)
 );
-
 create table public.classes (
   id uuid primary key default gen_random_uuid(),
   course_id uuid not null references public.courses (id) on delete cascade,
@@ -85,7 +79,6 @@ create table public.classes (
   status public.class_status not null default 'active',
   created_at timestamptz not null default now()
 );
-
 -- V1: exactly one active teacher is stored as teacher_user_id (single column).
 -- A partial unique index would only be needed if we modeled multi-teacher later.
 
@@ -98,7 +91,6 @@ create table public.enrollments (
   ended_at timestamptz,
   unique (class_id, learner_user_id)
 );
-
 -- Capacity enforcement for active enrollments
 create or replace function public.enforce_class_capacity()
 returns trigger
@@ -122,11 +114,9 @@ begin
   return new;
 end;
 $$;
-
 create trigger trg_enforce_class_capacity
 before insert or update on public.enrollments
 for each row execute function public.enforce_class_capacity();
-
 -- ---------------------------------------------------------------------------
 -- Scheduling & attendance
 -- ---------------------------------------------------------------------------
@@ -141,7 +131,6 @@ create table public.schedule_definitions (
   ends_on date,
   created_at timestamptz not null default now()
 );
-
 create table public.scheduled_sessions (
   id uuid primary key default gen_random_uuid(),
   class_id uuid not null references public.classes (id) on delete cascade,
@@ -152,7 +141,6 @@ create table public.scheduled_sessions (
   rescheduled_from_id uuid references public.scheduled_sessions (id),
   created_at timestamptz not null default now()
 );
-
 create table public.learning_sessions (
   id uuid primary key default gen_random_uuid(),
   class_id uuid not null references public.classes (id) on delete cascade,
@@ -164,7 +152,6 @@ create table public.learning_sessions (
   max_probe_count integer not null default 2 check (max_probe_count > 0),
   unique (scheduled_session_id)
 );
-
 create table public.attendance_records (
   id uuid primary key default gen_random_uuid(),
   learning_session_id uuid not null references public.learning_sessions (id) on delete cascade,
@@ -173,7 +160,6 @@ create table public.attendance_records (
   recorded_at timestamptz not null default now(),
   unique (learning_session_id, learner_user_id)
 );
-
 -- ---------------------------------------------------------------------------
 -- Assessment capture
 -- ---------------------------------------------------------------------------
@@ -185,7 +171,6 @@ create table public.session_questions (
   created_at timestamptz not null default now(),
   unique (learning_session_id, sequence_number)
 );
-
 create table public.assessment_attempts (
   id uuid primary key default gen_random_uuid(),
   learning_session_id uuid not null references public.learning_sessions (id) on delete cascade,
@@ -195,7 +180,6 @@ create table public.assessment_attempts (
   created_at timestamptz not null default now(),
   unique (session_question_id, learner_user_id)
 );
-
 -- Immutable event log
 create table public.assessment_events (
   id uuid primary key default gen_random_uuid(),
@@ -205,9 +189,7 @@ create table public.assessment_events (
   actor_user_id uuid references public.users (id),
   created_at timestamptz not null default now()
 );
-
 create index assessment_events_attempt_idx on public.assessment_events (attempt_id, created_at);
-
 -- Current-state snapshot (UX / realtime)
 create table public.assessment_attempt_snapshots (
   attempt_id uuid primary key references public.assessment_attempts (id) on delete cascade,
@@ -221,7 +203,6 @@ create table public.assessment_attempt_snapshots (
   finalized_at timestamptz,
   updated_at timestamptz not null default now()
 );
-
 -- Color score helper
 create or replace function public.color_score(c public.result_color)
 returns smallint
@@ -235,7 +216,6 @@ as $$
     when 'purple' then 3
   end::smallint;
 $$;
-
 -- Atomic provisional + optional finalization / probe open
 create or replace function public.record_provisional_result(
   p_attempt_id uuid,
@@ -313,7 +293,6 @@ begin
   return snap;
 end;
 $$;
-
 create or replace function public.resolve_probe(
   p_attempt_id uuid,
   p_outcome text,
@@ -413,7 +392,6 @@ begin
   return snap;
 end;
 $$;
-
 create or replace function public.correct_final_result(
   p_attempt_id uuid,
   p_color public.result_color,
@@ -465,7 +443,6 @@ begin
   return snap;
 end;
 $$;
-
 -- Auto-create draft snapshot when attempt is inserted
 create or replace function public.create_attempt_snapshot()
 returns trigger
@@ -490,11 +467,9 @@ begin
   return new;
 end;
 $$;
-
 create trigger trg_create_attempt_snapshot
 after insert on public.assessment_attempts
 for each row execute function public.create_attempt_snapshot();
-
 -- ---------------------------------------------------------------------------
 -- Metrics
 -- ---------------------------------------------------------------------------
@@ -504,7 +479,6 @@ create table public.metric_templates (
   name text not null,
   created_at timestamptz not null default now()
 );
-
 create table public.metric_versions (
   id uuid primary key default gen_random_uuid(),
   template_id uuid not null references public.metric_templates (id) on delete cascade,
@@ -521,7 +495,6 @@ create table public.metric_versions (
   created_at timestamptz not null default now(),
   unique (template_id, version)
 );
-
 insert into public.metric_templates (key, name) values
   ('rfc', 'Red/Fail Concentration'),
   ('rac', 'Ready/Awareness Concentration'),
@@ -531,7 +504,6 @@ insert into public.metric_templates (key, name) values
   ('clarification_depth', 'Clarification Depth'),
   ('awareness_recovery', 'Awareness Recovery'),
   ('focus_stability', 'Focus Stability');
-
 insert into public.metric_versions (
   template_id, version, definition, formula, min_sample, unit, direction, status
 )
@@ -549,7 +521,6 @@ join (
     ('focus_stability', 'inverse adjacent score movement', '1 - mean_delta/3', 2, 'score', 'contextual', 'experimental')
 ) as d(key, definition, formula, min_sample, unit, direction, status)
   on d.key = t.key;
-
 -- ---------------------------------------------------------------------------
 -- RLS helpers (deny by default)
 -- ---------------------------------------------------------------------------
@@ -560,7 +531,6 @@ stable
 as $$
   select coalesce(auth.jwt() ->> 'sub', '');
 $$;
-
 create or replace function public.current_user_id()
 returns uuid
 language sql
@@ -570,7 +540,6 @@ set search_path = public
 as $$
   select id from public.users where clerk_user_id = public.jwt_sub() limit 1;
 $$;
-
 create or replace function public.is_org_member(p_org_id uuid)
 returns boolean
 language sql
@@ -585,7 +554,6 @@ as $$
       and m.user_id = public.current_user_id()
   );
 $$;
-
 create or replace function public.has_org_role(p_org_id uuid, p_role public.app_role)
 returns boolean
 language sql
@@ -601,7 +569,6 @@ as $$
       and m.role = p_role
   );
 $$;
-
 alter table public.organizations enable row level security;
 alter table public.users enable row level security;
 alter table public.organization_memberships enable row level security;
@@ -618,21 +585,16 @@ alter table public.assessment_events enable row level security;
 alter table public.assessment_attempt_snapshots enable row level security;
 alter table public.metric_templates enable row level security;
 alter table public.metric_versions enable row level security;
-
 -- Self profile
 create policy users_self_select on public.users
   for select using (id = public.current_user_id() or clerk_user_id = public.jwt_sub());
-
 -- Org membership visibility
 create policy org_member_select on public.organizations
   for select using (public.is_org_member(id));
-
 create policy membership_select on public.organization_memberships
   for select using (public.is_org_member(organization_id));
-
 create policy courses_org_select on public.courses
   for select using (public.is_org_member(organization_id));
-
 create policy classes_select on public.classes
   for select using (
     exists (
@@ -640,7 +602,6 @@ create policy classes_select on public.classes
       where c.id = course_id and public.is_org_member(c.organization_id)
     )
   );
-
 create policy enrollments_select on public.enrollments
   for select using (
     learner_user_id = public.current_user_id()
@@ -655,7 +616,6 @@ create policy enrollments_select on public.enrollments
         )
     )
   );
-
 -- Attempts: teacher of class, admin, or the learner themselves (read)
 create policy attempts_select on public.assessment_attempts
   for select using (
@@ -670,7 +630,6 @@ create policy attempts_select on public.assessment_attempts
         and public.has_org_role(c.organization_id, 'admin')
     )
   );
-
 create policy snapshots_select on public.assessment_attempt_snapshots
   for select using (
     exists (
@@ -682,7 +641,6 @@ create policy snapshots_select on public.assessment_attempt_snapshots
         )
     )
   );
-
 create policy events_select on public.assessment_events
   for select using (
     exists (
@@ -694,12 +652,9 @@ create policy events_select on public.assessment_events
         )
     )
   );
-
 create policy metric_templates_read on public.metric_templates
   for select using (true);
-
 create policy metric_versions_read on public.metric_versions
   for select using (true);
-
 -- Realtime publication for current snapshots only
 alter publication supabase_realtime add table public.assessment_attempt_snapshots;

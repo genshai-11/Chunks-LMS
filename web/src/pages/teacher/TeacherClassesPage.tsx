@@ -25,6 +25,10 @@ import {
   updateUserProfile,
 } from '../../modules/roster/service'
 import {
+  createTeacherLearnerAndEnroll,
+  resolveTeacherClassScope,
+} from '../../modules/roster/teacher-workspace'
+import {
   summarizeLearnerSessions,
   learnerRfcStats,
   formatPercent,
@@ -33,25 +37,33 @@ import { useAppState } from '../../state/useAppState'
 import { useStaffSession } from '../../auth/useStaffSession'
 
 export function TeacherClassesPage() {
-  const { roster, setRoster, setActiveClassId, setActiveLearnerUserId, ledger, scheduling, syncNow } = useAppState()
+  const {
+    roster,
+    setRoster,
+    setActiveClassId,
+    setActiveLearnerUserId,
+    ledger,
+    scheduling,
+    syncNow,
+    reloadFromSupabase,
+    supabaseEnabled,
+  } = useAppState()
   const staffSession = useStaffSession()
 
-  const teacher =
-    roster.users.find(
-      (user) =>
-        user.roles.includes('teacher') &&
-        user.email?.toLowerCase() === staffSession.email?.toLowerCase(),
-    ) ??
-    (staffSession.canAccess('admin')
-      ? roster.users.find((user) => user.roles.includes('teacher'))
-      : undefined)
-
-  const classes = roster.classes.filter((row) => row.teacherUserId === teacher?.id)
+  const { teacher, classes } = resolveTeacherClassScope(
+    roster,
+    staffSession.email,
+    staffSession.canAccess('admin'),
+  )
 
   const { message, error, ok, err } = useFlash()
 
   // Class category filtering state linked to global context
-  const { activeClassId, setActiveClassId: setGlobalActiveClassId, selectedClassIds } = useTeacherClassContext()
+  const {
+    activeClassId,
+    setActiveClassId: setGlobalActiveClassId,
+    selectedClassIds,
+  } = useTeacherClassContext()
   const selectedClassId = activeClassId || 'all'
 
   // Add learner states
@@ -60,6 +72,7 @@ export function TeacherClassesPage() {
   const [newLearnerEmail, setNewLearnerEmail] = useState('')
   const [enrollClassId, setEnrollClassId] = useState('')
   const [newLearnerAvatarUrl, setNewLearnerAvatarUrl] = useState<string | null>(null)
+  const [isCreatingLearner, setIsCreatingLearner] = useState(false)
 
   // Edit learner states
   const [editingLearner, setEditingLearner] = useState<{
@@ -146,6 +159,28 @@ export function TeacherClassesPage() {
   const handleAddLearner = async () => {
     if (!enrollClassId) return err('Select a class first')
     if (!newLearnerName.trim()) return err('Learner name required')
+
+    if (supabaseEnabled && !staffSession.authBypass) {
+      setIsCreatingLearner(true)
+      try {
+        const result = await createTeacherLearnerAndEnroll({
+          classId: enrollClassId,
+          displayName: newLearnerName,
+          email: newLearnerEmail.trim() || null,
+          avatarUrl: newLearnerAvatarUrl,
+        })
+        if (!result.ok) return err(result.error)
+
+        setNewLearnerName('')
+        setNewLearnerEmail('')
+        setNewLearnerAvatarUrl(null)
+        setIsAddingLearner(false)
+        await reloadFromSupabase()
+        return ok(`Seated ${result.data.displayName} successfully`)
+      } finally {
+        setIsCreatingLearner(false)
+      }
+    }
 
     const result = createLearnerAndEnroll(roster, enrollClassId, {
       displayName: newLearnerName,
@@ -283,7 +318,7 @@ export function TeacherClassesPage() {
                 />
               </label>
               <label>
-                Email (portal invite)
+                Email
                 <input
                   type="email"
                   value={newLearnerEmail}
@@ -308,9 +343,14 @@ export function TeacherClassesPage() {
               type="button"
               className="primary"
               onClick={handleAddLearner}
-              disabled={!newLearnerName.trim() || !newLearnerEmail.trim() || !enrollClassId}
+              disabled={
+                isCreatingLearner ||
+                !newLearnerName.trim() ||
+                !newLearnerEmail.trim() ||
+                !enrollClassId
+              }
             >
-              Create + Enroll
+              {isCreatingLearner ? 'Creating…' : 'Create + Enroll'}
             </button>
             <button type="button" className="ghost" onClick={() => setIsAddingLearner(false)}>
               Cancel

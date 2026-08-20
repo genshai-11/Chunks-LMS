@@ -3,7 +3,8 @@ import {
   applyLifecycleCommand,
   createDraftSnapshot,
 } from '../result-lifecycle/state-machine'
-import type { AssessmentSnapshot, ResultColor } from '../result-lifecycle/types'
+import type { AssessmentSnapshot, ProvisionalColor, ResultColor } from '../result-lifecycle/types'
+import { PRIMARY_CAPTURE_COLORS, SPECTRUM_COLORS } from '../result-lifecycle/types'
 import {
   assignedLearnerIndex,
   goToQuestionIndex,
@@ -155,7 +156,7 @@ export function currentAttempt(state: CaptureSessionState): AssessmentAttempt | 
 
 export function recordColorForCurrent(
   state: CaptureSessionState,
-  color: ResultColor,
+  color: ProvisionalColor,
   at = new Date().toISOString(),
 ): CaptureResult<AssessmentAttempt> {
   if (state.sessionStatus === 'completed') {
@@ -202,6 +203,10 @@ export function recordColorForCurrent(
       attempts: state.attempts.map((a) => (a.id === attempt.id ? updated : a)),
     },
   }
+}
+
+export function isPrimaryCaptureColor(color: ResultColor): color is ProvisionalColor {
+  return PRIMARY_CAPTURE_COLORS.includes(color as ProvisionalColor)
 }
 
 /** Change a finalized result while still in an open session (audit-preserving correction). */
@@ -305,18 +310,25 @@ export function sessionColorSummary(state: CaptureSessionState): {
   done: number
   total: number
   byColor: Record<ResultColor | 'open' | 'draft', number>
+  recordedByColor: Record<ResultColor, number>
+  primaryRecords: number
+  probeRecords: number
+  totalRecords: number
   maxProbeDepth: number
 } {
-  const byColor: Record<ResultColor | 'open' | 'draft', number> = {
-    red: 0,
-    yellow: 0,
-    green: 0,
-    purple: 0,
+  const byColor = {
+    ...Object.fromEntries(SPECTRUM_COLORS.map((color) => [color, 0])),
     open: 0,
     draft: 0,
-  }
+  } as Record<ResultColor | 'open' | 'draft', number>
+  const recordedByColor = Object.fromEntries(SPECTRUM_COLORS.map((color) => [color, 0])) as Record<
+    ResultColor,
+    number
+  >
   let done = 0
   let maxProbeDepth = 0
+  let primaryRecords = 0
+  let probeRecords = 0
   for (const a of state.attempts) {
     maxProbeDepth = Math.max(maxProbeDepth, probeChunksNumber(a.snapshot) ?? 0)
     const s = a.snapshot.status
@@ -324,13 +336,42 @@ export function sessionColorSummary(state: CaptureSessionState): {
       done += 1
       const c = a.snapshot.effectiveColor
       if (c) byColor[c] += 1
+      primaryRecords += 1
+      if (a.snapshot.enteredProbeFlow) {
+        recordedByColor.green += 1
+        probeRecords += Math.max(0, a.snapshot.probeCount)
+        if (c === 'yellow') {
+          recordedByColor.yellow += 1
+          recordedByColor.blue += Math.max(0, a.snapshot.probeCount - 1)
+        } else if (c === 'indigo') {
+          recordedByColor.indigo += 1
+          recordedByColor.blue += Math.max(0, a.snapshot.probeCount - 1)
+        } else {
+          recordedByColor.blue += Math.max(0, a.snapshot.probeCount)
+        }
+      } else if (c) {
+        recordedByColor[c] += 1
+      }
     } else if (s === 'probe_open' || s === 'resolution_required') {
       byColor.open += 1
+      primaryRecords += 1
+      recordedByColor.green += 1
+      probeRecords += Math.max(0, a.snapshot.probeCount)
+      recordedByColor.blue += Math.max(0, a.snapshot.probeCount)
     } else {
       byColor.draft += 1
     }
   }
-  return { done, total: state.attempts.length, byColor, maxProbeDepth }
+  return {
+    done,
+    total: state.attempts.length,
+    byColor,
+    recordedByColor,
+    primaryRecords,
+    probeRecords,
+    totalRecords: primaryRecords + probeRecords,
+    maxProbeDepth,
+  }
 }
 
 export function attemptsForQuestion(

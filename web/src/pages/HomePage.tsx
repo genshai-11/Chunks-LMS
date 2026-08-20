@@ -1,4 +1,4 @@
-import { GraduationCap, LogIn, RotateCcw, Shield, Users } from 'lucide-react'
+import { RotateCcw, Shield, Users } from 'lucide-react'
 import { Link, Navigate } from 'react-router-dom'
 import { useStaffSession } from '../auth/useStaffSession'
 import { env } from '../env'
@@ -41,13 +41,6 @@ export function HomePage() {
       icon: Users,
     })
   }
-  chips.push({
-    to: '/access',
-    title: 'Learner portal',
-    description: 'Open invite link or enter registered email',
-    icon: GraduationCap,
-  })
-
   return (
     <div className="home-compact">
       <header className="home-compact-head">
@@ -62,10 +55,6 @@ export function HomePage() {
         <h1 className="sr-only">Chunks LMS</h1>
         <p>Focus &amp; Awareness observation for small classes.</p>
         <div className="home-tools">
-          <Link to="/access" className="btn ghost">
-            <LogIn className="h-4 w-4" aria-hidden />
-            Learner portal
-          </Link>
           {(session.authBypass || session.canAccess('admin')) && (
             <button
               type="button"
@@ -113,8 +102,7 @@ export function HomePage() {
 
       {!session.signedIn && !session.authBypass ? (
         <p className="meta" style={{ textAlign: 'center', marginTop: 16 }}>
-          Admin and Teacher use Supabase staff accounts. Learners use scoped invite links from the
-          class roster instead of staff sign-in.
+          Admin and Teacher use Supabase staff accounts.
         </p>
       ) : null}
     </div>

@@ -4,7 +4,6 @@
 
 drop policy if exists snapshots_staff_insert on public.assessment_attempt_snapshots;
 drop policy if exists snapshots_staff_update on public.assessment_attempt_snapshots;
-
 create policy snapshots_staff_insert on public.assessment_attempt_snapshots
   for insert to authenticated
   with check (
@@ -20,7 +19,6 @@ create policy snapshots_staff_insert on public.assessment_attempt_snapshots
         )
     )
   );
-
 create policy snapshots_staff_update on public.assessment_attempt_snapshots
   for update to authenticated
   using (

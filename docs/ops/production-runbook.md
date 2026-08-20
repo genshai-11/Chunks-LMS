@@ -7,7 +7,7 @@
 | Role | Access |
 |------|--------|
 | Admin / Teacher | Native Supabase Auth + active database `staff_roles` |
-| Learner | Scoped share link `/access?email=…` (profile email registered by staff) |
+| Learner | No app login; staff-managed profile only |
 
 **Live app (typical):** https://chunks-lms.vercel.app  
 **Repo:** https://github.com/genshai-11/Chunks-LMS
@@ -71,9 +71,8 @@ Details: [vercel-deploy.md](./vercel-deploy.md).
 1. Role-granted staff signs in with Supabase Auth → Admin.  
 2. **Courses** → create course (e.g. `ERE-Level-B`) + auto-schedule if desired.  
 3. **Classes** → create class, assign teacher, set capacity.  
-4. **Students** on the class → add learners with **email** (required for portal).  
-5. Copy / Email invite links.  
-6. Teacher opens **Home** → **Schedule** → materialize or start Day 1.
+4. **Students** on the class → add learner profiles.
+5. Teacher opens **Home** → **Schedule** → materialize or start Day 1.
 
 ### Optional: idempotent SQL starter
 
@@ -97,10 +96,9 @@ Then replace demo emails/names in Admin UI with real people, or edit the SQL bef
 ## 3. Day-1 staff workflow
 
 ```text
-Admin: Course → Class → seat learners (email) → share invite links
+Admin: Course → Class → seat learner profiles
 Teacher: Schedule → Start live session → Attendance → Observe (colors/probes) → Complete
 Teacher/Admin: Analysis — confirm RFC/RAC sample size > 0
-Learner: Open invite link → My classes / Attendance / Analysis (own rows only)
 ```
 
 ### Teacher soft lock
@@ -127,7 +125,7 @@ Use [hosted-e2e-checklist.md](./hosted-e2e-checklist.md). Minimum gate for “fi
 | 2 | Admin creates/uses one course + class + ≥1 learner with email | |
 | 3 | Teacher starts Learning Session, marks attendance, records ≥1 final color | |
 | 4 | Analysis shows finalized count / metrics with sample size | |
-| 5 | Learner opens `/access?email=…` and sees **only** own progress | |
+| 5 | Public `/access` and `/learner` routes do not expose learner data | |
 | 6 | Second staff browser does not wipe open session (reload still shows data) | |
 | 7 | Admin Integrity reconciliation runs without unexpected divergences | |
 
@@ -143,7 +141,7 @@ Automated domain path (local CI): `web` Vitest `seeded-flow` + ops tests still c
 | Bad migration | Do **not** auto-revert destructive SQL; restore from Supabase backup; open ADR if events were touched |
 | Empty UI after reload | Prefer **Reload workspace** / rebuild ledger — not Clear data |
 | Wrong staff role | Verify `public.users.auth_user_id`, account status, and active `public.staff_roles`; do not grant through Auth metadata |
-| Learner wrong data | Confirm invite email uniqueness; clear browser portal session → re-open invite |
+| Learner wrong data | Verify Teacher/Admin analysis filter and learner profile selection |
 
 ---
 

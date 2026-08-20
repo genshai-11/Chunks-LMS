@@ -33,9 +33,8 @@ import { EmptyState, Panel } from '../../components/ui'
 import { PROBE_ACTIONS } from '../../modules/assessment/probe-actions'
 import { probeChunksNumber } from '../../modules/assessment/probe-metrics'
 import { listActiveLearners } from '../../modules/roster/service'
-import { getTestPackageVersion, listTestSections } from '../../lib/test-packages'
+import { getTestPackageVersion, listTestPackages, listTestSections } from '../../lib/test-packages'
 import {
-  clearRequestCache,
   completeStandaloneRun,
   findLatestApprovedNarrationVariant,
   getStandaloneRun,
@@ -53,23 +52,97 @@ import {
 import { getNarrationPlaybackUrl } from '../../modules/catalog/live-test-generation'
 import { triggerConfetti } from '../../lib/confetti'
 import { useAppState } from '../../state/useAppState'
+import { calculateSpectrumStepBreakdown } from '../../modules/metrics/calculate'
+import { racMetricLabelForPackage, racMetricTitle, type PackageRacMetricLabel } from '../../modules/metrics/display-labels'
+import { SPECTRUM_COLORS, type ProvisionalColor, type ResultColor } from '../../modules/result-lifecycle/types'
+import { resultAudioUrl } from '../../lib/color-audio'
 
 type AudioState = 'idle' | 'loading' | 'ready' | 'playing' | 'played' | 'error'
 type AudioTarget = 'item' | 'result_reaction' | 'session_intro' | 'package_start' | 'part_intro_1' | 'part_intro_2' | 'part_intro_3' | 'package_end' | 'item_prefix'
 type PartIntroNumber = 1 | 2 | 3
-type ResultColor = 'red' | 'yellow' | 'green' | 'purple'
+type PrimaryResultColor = ProvisionalColor
 type ReactionKind = 'celebrate' | 'happy' | 'fight'
 type Reaction = { kind: ReactionKind; color: ResultColor; id: number } | null
 
 type TestItem = Record<string, any>
 type ItemPlaybackCacheEntry = { variantId: string; signedUrl: string; isSilent?: boolean }
+type RunPageCacheEntry = {
+  expiresAt: number
+  runDetails: StandaloneTestRunRow | null
+  allRuns: StandaloneTestRunRow[]
+  items: TestItem[]
+  racMetricLabel: PackageRacMetricLabel
+  introVariantId: string | null
+  sessionIntroVariantIds: Record<number, string | null>
+  packageStartVariantId: string | null
+  partIntroVariantIds: Record<PartIntroNumber, string | null>
+  packageEndVariantId: string | null
+}
 
-const COLORS: Array<{ key: ResultColor; label: string; num: string; hex: string }> = [
+const RUN_PAGE_CACHE_TTL_MS = 120_000
+const runPageCache = new Map<string, RunPageCacheEntry>()
+
+function runPageCacheKey(runId?: string | null, assignmentId?: string | null): string | null {
+  if (!runId) return null
+  return `${runId}:${assignmentId ?? ''}`
+}
+
+const COLORS: Array<{ key: PrimaryResultColor; label: string; num: string; hex: string }> = [
   { key: 'red', label: 'Red', num: '0', hex: '#ef4444' },
-  { key: 'yellow', label: 'Orange', num: '1', hex: '#f97316' },
+  { key: 'orange', label: 'Orange', num: '1', hex: '#f97316' },
   { key: 'green', label: 'Green', num: '2', hex: '#22c55e' },
   { key: 'purple', label: 'Purple', num: '3', hex: '#a855f7' },
 ]
+
+const COLOR_HEX: Record<ResultColor, string> = {
+  red: '#ef4444',
+  orange: '#f97316',
+  yellow: '#facc15',
+  green: '#22c55e',
+  blue: '#38bdf8',
+  indigo: '#6366f1',
+  purple: '#a855f7',
+}
+
+const COLOR_LABEL: Record<ResultColor, string> = {
+  red: '0 · Red',
+  orange: '1 · Orange',
+  yellow: 'F · Yellow',
+  green: '2 · Green',
+  blue: 'C · Blue',
+  indigo: 'D · Indigo',
+  purple: '3 · Purple',
+}
+
+const SUMMARY_TILE_CLASS: Record<ResultColor, string> = {
+  red: 'bg-red-500/10 border-red-500/30',
+  orange: 'bg-orange-500/10 border-orange-500/30',
+  yellow: 'bg-yellow-500/10 border-yellow-500/30',
+  green: 'bg-emerald-500/10 border-emerald-500/30',
+  blue: 'bg-sky-500/10 border-sky-500/30',
+  indigo: 'bg-indigo-500/10 border-indigo-500/30',
+  purple: 'bg-purple-500/10 border-purple-500/30',
+}
+
+const SUMMARY_TILE_COUNT_CLASS: Record<ResultColor, string> = {
+  red: 'text-red-500',
+  orange: 'text-orange-500',
+  yellow: 'text-yellow-500',
+  green: 'text-emerald-500',
+  blue: 'text-sky-500',
+  indigo: 'text-indigo-500',
+  purple: 'text-purple-500',
+}
+
+const SUMMARY_TILE_LABEL_CLASS: Record<ResultColor, string> = {
+  red: 'text-red-400',
+  orange: 'text-orange-400',
+  yellow: 'text-yellow-500',
+  green: 'text-emerald-400',
+  blue: 'text-sky-400',
+  indigo: 'text-indigo-400',
+  purple: 'text-purple-400',
+}
 
 const RAIL_W_KEY = 'chunks-lms:live-test-rail-w'
 const RAIL_MIN = 168
@@ -135,6 +208,38 @@ function isItemFinalized(item: TestItem | null | undefined): boolean {
   return ['finalized', 'corrected'].includes(getItemSnapshot(item)?.status)
 }
 
+function withStandaloneSnapshot(
+  item: TestItem,
+  snapshot: { attemptId: string; status: string; effectiveColor: string | null; probeCount: number },
+  enteredProbeFlow: boolean,
+): TestItem {
+  const existingAttempt = getItemAttempt(item) ?? {}
+  const existingSnapshot = getItemSnapshot(item) ?? {}
+  return {
+    ...item,
+    standalone_test_attempts: [
+      {
+        ...existingAttempt,
+        id: snapshot.attemptId,
+        standalone_test_attempt_snapshots: {
+          ...existingSnapshot,
+          status: snapshot.status,
+          effective_color: snapshot.effectiveColor,
+          effectiveColor: snapshot.effectiveColor,
+          probe_count: snapshot.probeCount,
+          probeCount: snapshot.probeCount,
+          entered_probe_flow: enteredProbeFlow,
+          enteredProbeFlow,
+          finalized_at:
+            snapshot.status === 'finalized' || snapshot.status === 'corrected'
+              ? (existingSnapshot.finalized_at ?? existingSnapshot.finalizedAt ?? new Date().toISOString())
+              : null,
+        },
+      },
+    ],
+  }
+}
+
 function cpdValue(item: TestItem | null | undefined): number | null {
   if (!item) return null
   const raw = item.cpd ?? (item.cvr !== undefined && item.cci !== undefined ? Number(item.cvr) * Number(item.cci) : null)
@@ -145,9 +250,12 @@ function cpdValue(item: TestItem | null | undefined): number | null {
 function resultColorScore(color: ResultColor | null): number | null {
   if (!color) return null
   if (color === 'red') return 0
-  if (color === 'yellow') return 1
-  if (color === 'green') return 2
-  return 3
+  if (color === 'orange') return 0.17
+  if (color === 'yellow') return 0.33
+  if (color === 'green') return 0.5
+  if (color === 'blue') return 0.67
+  if (color === 'indigo') return 0.83
+  return 1
 }
 
 function achievedCpdValue(item: TestItem | null | undefined): number | null {
@@ -178,14 +286,6 @@ function formatAmp(value: unknown): string {
 function formatVolt(value: unknown): string {
   const n = metricNumber(value)
   return n == null ? '—' : `${Math.round(n * 100) / 100}V`
-}
-
-function formatVoltRange(min: unknown, max: unknown): string {
-  const a = metricNumber(min)
-  const b = metricNumber(max)
-  if (a == null && b == null) return '—'
-  if (a != null && b != null) return `${formatVolt(a)}–${formatVolt(b)}`
-  return formatVolt(a ?? b)
 }
 
 function readSavedRailWidth(): number {
@@ -265,6 +365,7 @@ export function TeacherTestRunPage() {
   const [runDetails, setRunDetails] = useState<StandaloneTestRunRow | null>(null)
   const [allRuns, setAllRuns] = useState<StandaloneTestRunRow[]>([])
   const [items, setItems] = useState<TestItem[]>([])
+  const [racMetricLabel, setRacMetricLabel] = useState<PackageRacMetricLabel>('%c')
   const [introVariantId, setIntroVariantId] = useState<string | null>(null)
   const [sessionIntroVariantIds, setSessionIntroVariantIds] = useState<Record<number, string | null>>({})
   const [packageStartVariantId, setPackageStartVariantId] = useState<string | null>(null)
@@ -483,6 +584,30 @@ export function TeacherTestRunPage() {
 
   const load = useCallback(async () => {
     if (!runId) return
+    const cacheKey = runPageCacheKey(runId, assignmentIdParam)
+    const cached = cacheKey ? runPageCache.get(cacheKey) : null
+    if (cached && cached.expiresAt > Date.now()) {
+      setRunDetails(cached.runDetails)
+      setAllRuns(cached.allRuns)
+      setItems(cached.items)
+      setRacMetricLabel(cached.racMetricLabel)
+      setIntroVariantId(cached.introVariantId)
+      setSessionIntroVariantIds(cached.sessionIntroVariantIds)
+      setPackageStartVariantId(cached.packageStartVariantId)
+      setPartIntroVariantIds(cached.partIntroVariantIds)
+      setPackageEndVariantId(cached.packageEndVariantId)
+      const firstUnfinalized = cached.items.findIndex((item) => !isItemFinalized(item))
+      if (firstUnfinalized !== -1) {
+        setSelectedIndex(firstUnfinalized)
+        setIsSummaryShown(false)
+      } else if (cached.items.length > 0) {
+        setSelectedIndex(cached.items.length - 1)
+        setIsSummaryShown(true)
+      }
+      enteringProbeRef.current = null
+      setIsRestoringRun(false)
+      return
+    }
     setIsRestoringRun(true)
     const primaryRunResult = await getStandaloneRun(runId)
     if (!primaryRunResult.ok || !primaryRunResult.data) {
@@ -496,6 +621,10 @@ export function TeacherTestRunPage() {
     const assignmentId = assignmentIdParam || currentRun.assignmentId
     let targetRuns: StandaloneTestRunRow[] = [currentRun]
     let packageVersionId: string | null = null
+    let nextRacMetricLabel: PackageRacMetricLabel = '%c'
+    let nextPackageStartVariantId: string | null = null
+    let nextPartIntroVariantIds: Record<PartIntroNumber, string | null> = { 1: null, 2: null, 3: null }
+    let nextPackageEndVariantId: string | null = null
 
     if (assignmentId) {
       const assignmentRes = await listStandaloneAssignments()
@@ -505,6 +634,13 @@ export function TeacherTestRunPage() {
           packageVersionId = assignment.packageVersionId
           const sectionsRes = await listTestSections(assignment.packageVersionId)
           const versionRes = await getTestPackageVersion(assignment.packageVersionId)
+          if (versionRes.ok && versionRes.data) {
+            const packagesRes = await listTestPackages()
+            const packageTitle = packagesRes.ok
+              ? packagesRes.data.find((pkg) => pkg.id === versionRes.data?.packageId)?.title
+              : null
+            nextRacMetricLabel = racMetricLabelForPackage(packageTitle ?? versionRes.data.versionLabel)
+          }
           const languagePolicy = versionRes.ok ? versionRes.data?.sourceMetadata?.languagePolicy : null
           const existingRunsRes = await listStandaloneRuns(assignmentId)
           const existingRuns = existingRunsRes.ok ? existingRunsRes.data : []
@@ -530,6 +666,7 @@ export function TeacherTestRunPage() {
       if (runsResult.ok && runsResult.data.length > 0) targetRuns = runsResult.data
     }
     setAllRuns(targetRuns)
+    setRacMetricLabel(nextRacMetricLabel)
 
     if (packageVersionId) {
       const partOneLanguage = targetRuns.find((run) => run.sessionNumber === 1)?.promptLanguage ?? targetRuns[0]?.promptLanguage ?? currentRun.promptLanguage ?? 'vi'
@@ -567,13 +704,16 @@ export function TeacherTestRunPage() {
           language: partThreeLanguage,
         }),
       ])
-      setPackageStartVariantId(startAudio.ok && startAudio.data ? startAudio.data.id : null)
-      setPartIntroVariantIds({
+      nextPackageStartVariantId = startAudio.ok && startAudio.data ? startAudio.data.id : null
+      nextPartIntroVariantIds = {
         1: partOneAudio.ok && partOneAudio.data ? partOneAudio.data.id : null,
         2: partTwoAudio.ok && partTwoAudio.data ? partTwoAudio.data.id : null,
         3: partThreeAudio.ok && partThreeAudio.data ? partThreeAudio.data.id : null,
-      })
-      setPackageEndVariantId(endAudio.ok && endAudio.data ? endAudio.data.id : null)
+      }
+      nextPackageEndVariantId = endAudio.ok && endAudio.data ? endAudio.data.id : null
+      setPackageStartVariantId(nextPackageStartVariantId)
+      setPartIntroVariantIds(nextPartIntroVariantIds)
+      setPackageEndVariantId(nextPackageEndVariantId)
     } else {
       setPackageStartVariantId(null)
       setPartIntroVariantIds({ 1: null, 2: null, 3: null })
@@ -650,8 +790,51 @@ export function TeacherTestRunPage() {
       triggerConfetti()
     }
     enteringProbeRef.current = null
+    if (cacheKey) {
+      runPageCache.set(cacheKey, {
+        expiresAt: Date.now() + RUN_PAGE_CACHE_TTL_MS,
+        runDetails: currentRun,
+        allRuns: targetRuns,
+        items: combinedItems,
+        racMetricLabel: nextRacMetricLabel,
+        introVariantId: nextIntroBySession[currentRun.sessionNumber] ?? null,
+        sessionIntroVariantIds: nextIntroBySession,
+        packageStartVariantId: nextPackageStartVariantId,
+        partIntroVariantIds: nextPartIntroVariantIds,
+        packageEndVariantId: nextPackageEndVariantId,
+      })
+    }
     setIsRestoringRun(false)
   }, [markAudioReady, runId, assignmentIdParam])
+
+  useEffect(() => {
+    const cacheKey = runPageCacheKey(runId, assignmentIdParam)
+    if (!cacheKey || items.length === 0) return
+    runPageCache.set(cacheKey, {
+      expiresAt: Date.now() + RUN_PAGE_CACHE_TTL_MS,
+      runDetails,
+      allRuns,
+      items,
+      racMetricLabel,
+      introVariantId,
+      sessionIntroVariantIds,
+      packageStartVariantId,
+      partIntroVariantIds,
+      packageEndVariantId,
+    })
+  }, [
+    allRuns,
+    assignmentIdParam,
+    introVariantId,
+    items,
+    racMetricLabel,
+    packageEndVariantId,
+    packageStartVariantId,
+    partIntroVariantIds,
+    runDetails,
+    runId,
+    sessionIntroVariantIds,
+  ])
 
   useEffect(() => {
     partIntroPlayedRef.current = { 1: false, 2: false, 3: false }
@@ -1143,7 +1326,7 @@ export function TeacherTestRunPage() {
       }
     }
 
-    activateAudioUrl(`/audio/${color}.wav`, `${color} result`, true, 'result_reaction')
+    activateAudioUrl(resultAudioUrl(color), `${color} result`, true, 'result_reaction')
     return Boolean(pendingAfterReactionRef.current)
   }, [activateAudioUrl, autoPlayItems, currentItem, items, primeItemPlaybackUrl, selectedIndex])
 
@@ -1226,7 +1409,7 @@ export function TeacherTestRunPage() {
   }, [activateAudioUrl, autoPlayItems, autoPlayPartIntro, autoPlaySessionIntro, canPlayCurrentItemAudio, canPlayCurrentSessionIntro, currentItemNumber, items, loadAudioVariant, navigate, partIntroVariantIds, playCurrentItemAudio, playCurrentSessionIntro, playPartIntroAudio, probeOpen, selectedIndex])
 
   const handleRecord = useCallback(
-    async (color: ResultColor) => {
+    async (color: PrimaryResultColor) => {
       if (!currentItem || probeOpen) return
       resumeAudioAutoFlow()
       const isFinalOutstandingItem = !isItemFinalized(currentItem) && items.filter((item) => !isItemFinalized(item)).length === 1
@@ -1235,18 +1418,23 @@ export function TeacherTestRunPage() {
         playScoreFeedbackThenNext(color)
       } else {
         enteringProbeRef.current = String(currentItem.id)
-        activateAudioUrl('/audio/green.wav', 'green result', true, 'result_reaction')
+        activateAudioUrl(resultAudioUrl('green'), 'green result', true, 'result_reaction')
       }
       const result = await recordStandaloneResult(currentItem.id, color)
       if (!result.ok) {
         setMessage(result.error)
         return
       }
-      clearRequestCache()
-      await load()
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === currentItem.id
+            ? withStandaloneSnapshot(item, result.data, color === 'green')
+            : item,
+        ),
+      )
       if (isFinalOutstandingItem) await playEndAfterFinalScore()
     },
-    [activateAudioUrl, currentItem, items, load, playEndAfterFinalScore, playReaction, playScoreFeedbackThenNext, probeOpen, resumeAudioAutoFlow],
+    [activateAudioUrl, currentItem, items, playEndAfterFinalScore, playReaction, playScoreFeedbackThenNext, probeOpen, resumeAudioAutoFlow],
   )
 
   const handleProbe = useCallback(
@@ -1255,26 +1443,29 @@ export function TeacherTestRunPage() {
       resumeAudioAutoFlow()
       const isFinalOutstandingItem = outcome !== 'continue' && currentItem && !isItemFinalized(currentItem) && items.filter((item) => !isItemFinalized(item)).length === 1
       if (outcome !== 'continue') {
-        playScoreFeedbackThenNext(outcome === 'fail' ? 'red' : 'green')
+        playScoreFeedbackThenNext(outcome === 'fail' ? 'yellow' : 'indigo')
       } else {
-        activateAudioUrl('/audio/yellow.wav', 'continue result', true, 'result_reaction')
+        activateAudioUrl(resultAudioUrl('blue'), 'blue continue result', true, 'result_reaction')
       }
       const result = await resolveStandaloneProbe(String(currentAttempt.id), outcome)
       if (!result.ok) {
         setMessage(result.error)
         return
       }
-      clearRequestCache()
       if (outcome === 'continue') {
         setMessage(`Chunks Number=${probeChunksNumber({ enteredProbeFlow: true, probeCount: result.data.probeCount }) ?? 1}`)
       } else {
-        playReaction(outcome === 'fail' ? 'red' : 'green')
+        playReaction(outcome === 'fail' ? 'yellow' : 'indigo')
         setMessage('')
       }
-      await load()
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === currentItem.id ? withStandaloneSnapshot(item, result.data, true) : item,
+        ),
+      )
       if (isFinalOutstandingItem) await playEndAfterFinalScore()
     },
-    [activateAudioUrl, currentAttempt?.id, currentItem, items, load, playEndAfterFinalScore, playReaction, playScoreFeedbackThenNext, probeOpen, resumeAudioAutoFlow],
+    [activateAudioUrl, currentAttempt?.id, currentItem, items, playEndAfterFinalScore, playReaction, playScoreFeedbackThenNext, probeOpen, resumeAudioAutoFlow],
   )
 
   useEffect(() => {
@@ -1292,17 +1483,17 @@ export function TeacherTestRunPage() {
         return
       }
       if (probeOpen) {
-        if (e.key.toLowerCase() === 'f') {
+        if (e.key.toLowerCase() === 'f' || e.key === '1') {
           e.preventDefault()
           void handleProbe('fail')
           return
         }
-        if (e.key.toLowerCase() === 'c' || e.key.toLowerCase() === 'p') {
+        if (e.key.toLowerCase() === 'c' || e.key === '2') {
           e.preventDefault()
           void handleProbe('continue')
           return
         }
-        if (e.key.toLowerCase() === 'd' || e.key === 'Enter') {
+        if (e.key.toLowerCase() === 'd' || e.key === '3' || e.key === 'Enter') {
           e.preventDefault()
           void handleProbe('done')
           return
@@ -1370,21 +1561,44 @@ export function TeacherTestRunPage() {
   }, [items])
 
   const summaryMetrics = useMemo(() => {
-    const redCount = items.filter((i) => getItemColor(i) === 'red').length
-    const yellowCount = items.filter((i) => getItemColor(i) === 'yellow').length
-    const greenCount = items.filter((i) => getItemColor(i) === 'green').length
-    const purpleCount = items.filter((i) => getItemColor(i) === 'purple').length
     const cpdValues = items.map(achievedCpdValue).filter((v): v is number => v !== null)
     const finalized = completedCount
-    const rfc = finalized > 0 ? Math.round(((redCount + yellowCount) / finalized) * 100) : 0
-    const rac = finalized > 0 ? Math.round(((greenCount + purpleCount) / finalized) * 100) : 0
+    const spectrumAttempts = []
+    for (const item of items) {
+      if (!isItemFinalized(item)) continue
+      const effectiveColor = getItemColor(item)
+      if (!effectiveColor) continue
+      const snap = getItemSnapshot(item)
+      spectrumAttempts.push({
+        effectiveColor,
+        enteredProbeFlow: Boolean(snap?.entered_probe_flow ?? snap?.enteredProbeFlow),
+        probeEventCount: Number(snap?.probe_count ?? snap?.probeCount ?? 0),
+      })
+    }
+    const spectrum = calculateSpectrumStepBreakdown(spectrumAttempts)
+    const nTotal = spectrum.totalRecords
+    const rfc = spectrum.rfc == null ? 0 : Math.round(spectrum.rfc * 100)
+    const rac = spectrum.rac == null ? 0 : Math.round(spectrum.rac * 100)
     const avgCpd = cpdValues.length
       ? Math.round(cpdValues.reduce((acc, value) => acc + value, 0) / cpdValues.length)
       : 0
     const minCpd = cpdValues.length ? Math.min(...cpdValues) : null
     const maxCpd = cpdValues.length ? Math.max(...cpdValues) : null
-    return { redCount, yellowCount, greenCount, purpleCount, finalized, rfc, rac, avgCpd, minCpd, maxCpd }
-  }, [items, completedCount])
+    return {
+      ...spectrum.byColor,
+      finalized,
+      nTotal,
+      rfc,
+      rac,
+      rfcTitle: `RFC = warm records / N_total = ${spectrum.warmSteps} / ${nTotal}. Warm = Red + Orange + Yellow.`,
+      racTitle: racMetricTitle(racMetricLabel, spectrum.coolSteps, nTotal),
+      totalTitle: `N_total = primary records + probe records = ${spectrum.primaryRecords} + ${spectrum.probeRecords} = ${nTotal}.`,
+      cpdTitle: `Max CPD is the highest achieved CPD among finalized items. Achieved CPD = CVR x CCI x color factor.`,
+      avgCpd,
+      minCpd,
+      maxCpd,
+    }
+  }, [items, completedCount, racMetricLabel])
 
   const chartData = useMemo(
     () =>
@@ -1399,7 +1613,7 @@ export function TeacherTestRunPage() {
           cvr: item.cvr ?? 0,
           cci: item.cci ?? 0,
           colorKey: finalized ? colorKey : 'pending',
-          hex: finalized && colorKey ? (COLORS.find((r) => r.key === colorKey)?.hex ?? '#cbd5e1') : '#cbd5e1',
+          hex: finalized && colorKey ? (COLOR_HEX[colorKey] ?? '#cbd5e1') : '#cbd5e1',
           prompt: item.prompt_text,
         }
       }),
@@ -1507,9 +1721,18 @@ export function TeacherTestRunPage() {
             <>
               <p className="observe-rail-name">{learnerName}</p>
               <div className="observe-meta-row live-test-rail-meta">
-                <span className="observe-learner-rfc is-rfc">RFC {summaryMetrics.rfc}%</span>
-                <span className="observe-learner-rfc is-percent-c">%c {summaryMetrics.rac}%</span>
-                <span className="observe-learner-rfc is-cpd">Max CPD {formatVolt(summaryMetrics.maxCpd)}</span>
+                <span className="observe-learner-rfc observe-has-tooltip is-rfc" tabIndex={0} aria-label={summaryMetrics.rfcTitle}>
+                  RFC {summaryMetrics.rfc}%
+                  <span className="observe-metric-tooltip" role="tooltip">{summaryMetrics.rfcTitle} Lower RFC means less observed struggle.</span>
+                </span>
+                <span className="observe-learner-rfc observe-has-tooltip is-percent-c" tabIndex={0} aria-label={summaryMetrics.racTitle}>
+                  {racMetricLabel} {summaryMetrics.rac}%
+                  <span className="observe-metric-tooltip" role="tooltip">{summaryMetrics.racTitle} Higher {racMetricLabel} means more cool measurement steps.</span>
+                </span>
+                <span className="observe-learner-rfc observe-has-tooltip is-cpd" tabIndex={0} aria-label={summaryMetrics.cpdTitle}>
+                  Max CPD {formatVolt(summaryMetrics.maxCpd)}
+                  <span className="observe-metric-tooltip" role="tooltip">{summaryMetrics.cpdTitle}</span>
+                </span>
               </div>
               <p className="observe-rail-n">{completedCount}/{items.length} scored</p>
             </>
@@ -1522,12 +1745,12 @@ export function TeacherTestRunPage() {
               <div className="observe-heat-summary">
                 <span className="observe-heat-metric">Items <strong>{items.length}</strong></span>
                 <span className="observe-heat-metric muted">Done <strong>{completedCount}</strong></span>
-                <span className="observe-heat-metric tabular">CPD <strong>{formatVoltRange(summaryMetrics.minCpd, summaryMetrics.maxCpd)}</strong></span>
-                <span className="observe-heat-counts" aria-label="Color counts">
-                  {COLORS.map((c) => (
-                    <span key={c.key} className={`observe-heat-count is-${c.key}`} title={c.label}>
+                <span className="observe-heat-metric tabular" title={summaryMetrics.totalTitle}>N_total <strong>{summaryMetrics.nTotal}</strong></span>
+                <span className="observe-heat-counts" aria-label="Recorded 7-color counts">
+                  {SPECTRUM_COLORS.map((color) => (
+                    <span key={color} className={`observe-heat-count is-${color}`} title={`${COLOR_LABEL[color]}: ${summaryMetrics[color]} recorded steps`}>
                       <i aria-hidden />
-                      {summaryMetrics[`${c.key}Count` as keyof typeof summaryMetrics] as number}
+                      {summaryMetrics[color]}
                     </span>
                   ))}
                 </span>
@@ -1804,19 +2027,19 @@ export function TeacherTestRunPage() {
                       type="button"
                       className={`observe-dock-probe-btn ${action.className}`}
                       onClick={() => void handleProbe(action.outcome)}
-                      aria-label={`${action.label} probe`}
+                      aria-label={`${action.colorLabel} (${action.label}) probe`}
                     >
-                      <span>{action.label}</span>
-                      <kbd>{action.shortcut}</kbd>
+                      <span>{action.colorLabel} ({action.label})</span>
+                      <kbd>{action.shortcuts.join(' / ')}</kbd>
                     </button>
                   ))}
                 </div>
               ) : (
                 <div className="observe-dock-colors" role="group" aria-label="Result color">
                   {COLORS.map((c) => (
-                    <button key={c.key} type="button" className={`observe-dock-color is-${c.key}${currentColor === c.key ? ' is-selected' : ''}`} onClick={() => void handleRecord(c.key)} disabled={!currentItem} title={`${c.num} · ${c.label}`}>
-                      <span className="observe-dock-num">{c.num}</span>
-                      <span className="observe-dock-label">{c.label}</span>
+                    <button key={c.key} type="button" className={`observe-dock-color is-${c.key}${currentColor === c.key ? ' is-selected' : ''}`} onClick={() => void handleRecord(c.key)} disabled={!currentItem} title={`${c.label} · key ${c.num}`}>
+                      <span className="observe-dock-num">{c.label}</span>
+                      <span className="observe-dock-label">Key {c.num}</span>
                     </button>
                   ))}
                 </div>
@@ -1868,17 +2091,19 @@ export function TeacherTestRunPage() {
           </>
         ) : (
           <div className="min-h-0 w-full max-w-4xl overflow-y-auto p-4">
-            <Panel icon={BarChart3} title={`Màn hình Ghi nhận & Xem Kết quả · ${learnerName}`} description={`Tổng số câu trong Package: ${items.length} | Đã hoàn thành: ${summaryMetrics.finalized}/${items.length}`} collapsible={false}>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-3">
-                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-center"><div className="text-2xl font-bold text-red-500">{summaryMetrics.redCount}</div><div className="text-xs text-red-400 font-semibold">0 · Red</div></div>
-                <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/30 text-center"><div className="text-2xl font-bold text-orange-500">{summaryMetrics.yellowCount}</div><div className="text-xs text-orange-400 font-semibold">1 · Orange</div></div>
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center"><div className="text-2xl font-bold text-emerald-500">{summaryMetrics.greenCount}</div><div className="text-xs text-emerald-400 font-semibold">2 · Green</div></div>
-                <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/30 text-center"><div className="text-2xl font-bold text-purple-500">{summaryMetrics.purpleCount}</div><div className="text-xs text-purple-400 font-semibold">3 · Purple</div></div>
+            <Panel icon={BarChart3} title={`Màn hình Ghi nhận & Xem Kết quả · ${learnerName}`} description={`Tổng số câu trong Package: ${items.length} | Đã hoàn thành: ${summaryMetrics.finalized}/${items.length} | ${summaryMetrics.totalTitle}`} collapsible={false}>
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 my-3">
+                {SPECTRUM_COLORS.map((color) => (
+                  <div key={color} className={`p-3 rounded-xl border text-center ${SUMMARY_TILE_CLASS[color]}`} title={`${COLOR_LABEL[color]}: ${summaryMetrics[color]} recorded steps`}>
+                    <div className={`text-2xl font-bold ${SUMMARY_TILE_COUNT_CLASS[color]}`}>{summaryMetrics[color]}</div>
+                    <div className={`text-xs font-semibold ${SUMMARY_TILE_LABEL_CLASS[color]}`}>{COLOR_LABEL[color]}</div>
+                  </div>
+                ))}
               </div>
 
               <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-900 p-4 text-xs font-mono text-white shadow-inner sm:grid-cols-5">
-                <div><span className="text-slate-400">RFC </span><strong className="text-red-400">{summaryMetrics.rfc}%</strong></div>
-                <div><span className="text-slate-400">%c </span><strong className="text-emerald-400">{summaryMetrics.rac}%</strong></div>
+                <div title={summaryMetrics.rfcTitle}><span className="text-slate-400">RFC </span><strong className="text-red-400">{summaryMetrics.rfc}%</strong></div>
+                <div title={summaryMetrics.racTitle}><span className="text-slate-400">{racMetricLabel} </span><strong className="text-emerald-400">{summaryMetrics.rac}%</strong></div>
                 <div><span className="text-slate-400">CPD min </span><strong className="text-blue-300">{formatVolt(summaryMetrics.minCpd)}</strong></div>
                 <div><span className="text-slate-400">CPD max </span><strong className="text-blue-300">{formatVolt(summaryMetrics.maxCpd)}</strong></div>
                 <div><span className="text-slate-400">CPD avg </span><strong className="text-blue-300">{formatVolt(summaryMetrics.avgCpd)}</strong></div>

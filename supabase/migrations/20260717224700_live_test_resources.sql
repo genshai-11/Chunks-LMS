@@ -12,7 +12,6 @@ create table if not exists public.audio_assets (
   created_at timestamptz not null default now(),
   unique (storage_bucket, storage_path)
 );
-
 create table if not exists public.live_test_resources (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid references public.organizations (id) on delete cascade,
@@ -25,7 +24,6 @@ create table if not exists public.live_test_resources (
   updated_at timestamptz not null default now(),
   unique (organization_id, title, version)
 );
-
 create table if not exists public.live_test_blocks (
   id uuid primary key default gen_random_uuid(),
   resource_id uuid not null references public.live_test_resources (id) on delete cascade,
@@ -47,7 +45,6 @@ create table if not exists public.live_test_blocks (
   created_at timestamptz not null default now(),
   unique (resource_id, block_number)
 );
-
 create table if not exists public.live_test_items (
   id uuid primary key default gen_random_uuid(),
   block_id uuid not null references public.live_test_blocks (id) on delete cascade,
@@ -79,13 +76,10 @@ create table if not exists public.live_test_items (
   check (cci_value is null or cci_value >= 0),
   check (cvr_value is null or cvr_value >= 0)
 );
-
 create index if not exists live_test_blocks_resource_idx
   on public.live_test_blocks (resource_id, block_number);
-
 create index if not exists live_test_items_block_idx
   on public.live_test_items (block_id, item_number);
-
 alter table public.learning_sessions
   add column if not exists session_format text not null default 'lesson'
     check (session_format in ('lesson', 'test')),
@@ -93,7 +87,6 @@ alter table public.learning_sessions
     check (prompt_language in ('vi', 'en')),
   add column if not exists live_test_resource_id uuid null references public.live_test_resources (id),
   add column if not exists live_test_block_id uuid null references public.live_test_blocks (id);
-
 do $$
 begin
   if not exists (
@@ -119,34 +112,28 @@ begin
       );
   end if;
 end $$;
-
 alter table public.audio_assets enable row level security;
 alter table public.live_test_resources enable row level security;
 alter table public.live_test_blocks enable row level security;
 alter table public.live_test_items enable row level security;
-
 -- V1 demo posture: readable to app clients; import/upsert is allowed for authenticated/anon
 -- local workflows. Tighten to service-role/RPC before multi-tenant production hardening.
 create policy audio_assets_read on public.audio_assets
   for select to authenticated, anon using (true);
 create policy audio_assets_write on public.audio_assets
   for all to authenticated, anon using (true) with check (true);
-
 create policy live_test_resources_read on public.live_test_resources
   for select to authenticated, anon using (true);
 create policy live_test_resources_write on public.live_test_resources
   for all to authenticated, anon using (true) with check (true);
-
 create policy live_test_blocks_read on public.live_test_blocks
   for select to authenticated, anon using (true);
 create policy live_test_blocks_write on public.live_test_blocks
   for all to authenticated, anon using (true) with check (true);
-
 create policy live_test_items_read on public.live_test_items
   for select to authenticated, anon using (true);
 create policy live_test_items_write on public.live_test_items
   for all to authenticated, anon using (true) with check (true);
-
 comment on table public.live_test_resources is
   'Predefined live-test packages: 8 blocks x 10 items, prompt-language content, and CVR/CCI metadata.';
 comment on table public.live_test_items is

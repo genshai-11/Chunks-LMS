@@ -66,7 +66,6 @@ begin
   );
 end
 $$;
-
 -- Relax standalone assignment: allow assignments for draft package versions (essential for live-test simulation runs before publication)
 
 create or replace function public.create_standalone_test_assignment(p_learner_user_id uuid, p_package_version_id uuid)

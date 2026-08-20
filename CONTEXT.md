@@ -9,12 +9,16 @@ The administrative scope that owns users, metric templates, and reports.
 _Avoid_: Tenant, school account
 
 **User**:
-A stable domain person. Staff may link to one native Supabase Auth identity through `auth_user_id`; a Learner may remain profile-only and use a scoped invite link.
+A stable domain person. Staff may link to one native Supabase Auth identity through `auth_user_id`; a Learner remains profile-only and is managed through staff workspaces.
 _Avoid_: Auth account, transient session
 
 **Staff Auth Identity**:
 A native Supabase `auth.users` account linked to one domain User. It authenticates but does not authorize; active database `staff_roles` grant Admin/Teacher access.
 _Avoid_: Clerk subject, metadata role, frontend allowlist
+
+**Staff Username**:
+An optional, unique, normalized login identifier for an Admin or Teacher. A server-side resolver converts it to the linked Staff Auth Identity without exposing the account email; it never grants a role.
+_Avoid_: Authorization claim, learner username, public email alias
 
 **Account Status**:
 Active or inactive for a Teacher or Learner profile. Admin may deactivate without deleting history.
@@ -25,7 +29,7 @@ A User who owns classes/programs for their learners, starts sessions (selecting 
 _Avoid_: Instructor, assessor
 
 **Learner**:
-A User whose Focus and Awareness progress is observed across a Course (program label). Access uses a scoped learner invite rather than staff Supabase Auth in V1.
+A User whose Focus and Awareness progress is observed across a Course (program label). Learners do not have a public self-serve portal or share-link access in the current V1 runtime.
 _Avoid_: Student, participant
 
 ## Learning structure
@@ -91,12 +95,16 @@ _Avoid_: Response, answer
 The initial color assessment before any required follow-up is resolved.
 _Avoid_: Temporary score, draft grade
 
+**Spectrum Color**:
+The official 7-color measurement vocabulary: Red, Orange, Yellow, Green, Blue, Indigo, Purple. Primary capture uses Red/Orange/Green/Purple. Green opens probe flow; Fail resolves Yellow, Continue records Blue probe depth, and Done resolves Indigo.
+_Avoid_: Legacy four-color score only, Vietnamese probe color labels
+
 **Probe Event**:
 A Fail, Continue, or Done follow-up recorded after a Green Provisional Result.
 _Avoid_: Sub-screen, sub-question
 
 **Final Result**:
-The effective color result eligible for progress metrics.
+The effective Spectrum Color result eligible for progress metrics. Direct primary results finalize as Red, Orange, or Purple; Green probe Fail finalizes Yellow and Green probe Done finalizes Indigo.
 _Avoid_: Score, grade
 
 **Correction**:
@@ -122,11 +130,11 @@ An explicit period and population over which Metric Observations are calculated 
 _Avoid_: Filter, date range
 
 **RFC**:
-The share of finalized Assessment Attempts ending Red or Yellow in a Report Window.
+The share of warm Spectrum Color measurement steps (Red + Orange + Yellow) in a Report Window, using `N_total = planned primary questions + sum(probe steps)` where available.
 _Avoid_: Failure score
 
 **RAC**:
-The share of finalized Assessment Attempts ending Green or Purple in a Report Window.
+The share of cool Spectrum Color measurement steps (Green + Blue + Indigo + Purple) in a Report Window; also displayed as `%c` in Teacher analysis.
 _Avoid_: Success score
 
 **CVR**:
@@ -139,6 +147,7 @@ _Avoid_: CVR, manually derived score
 
 **CPD**:
 Derived live-test demand value calculated as CVR × CCI and reproducible from stored source measurements.
+Spectrum color factors normalize CPD contribution: Red `0.00`, Orange `0.17`, Yellow `0.33`, Green `0.50`, Blue `0.67`, Indigo `0.83`, Purple `1.00`.
 _Avoid_: Manually entered metric
 
 ---
@@ -151,6 +160,7 @@ _Avoid_: Manually entered metric
 | [`docs/ops/hosted-e2e-checklist.md`](docs/ops/hosted-e2e-checklist.md) | Production pass/fail checklist |
 | [`docs/ops/ci-cd.md`](docs/ops/ci-cd.md) | GitHub Actions CI/CD, Vercel secrets, migration promote |
 | [`docs/ops/vercel-deploy.md`](docs/ops/vercel-deploy.md) | Manual / first-time Vercel deploy |
+| [`docs/ops/supabase-egress-audit-2026-08-03.md`](docs/ops/supabase-egress-audit-2026-08-03.md) | Measured Storage/API egress baseline and prioritized remediation |
 | [`docs/adr/`](docs/adr/) | Architecture decisions |
 
 CI/CD workflows: `.github/workflows/ci.yml`, `.github/workflows/cd.yml`. Domain terms above are the source of truth for product language; ops docs do not redefine them.

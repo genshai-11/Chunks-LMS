@@ -3,16 +3,12 @@
 
 alter table public.courses
   add column if not exists schedule jsonb;
-
 alter table public.users
   add column if not exists avatar_url text;
-
 comment on column public.courses.schedule is
   'Auto-schedule: { weekdays, startTime, durationMinutes, sessionCount, timeZone }';
-
 comment on column public.users.avatar_url is
   'Optional avatar image URL or data URL';
-
 -- ---------------------------------------------------------------------------
 -- Foundation demo policies: allow full CRUD for local Vite app using anon key.
 -- Tighten when Clerk session JWT is required in production.

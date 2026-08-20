@@ -16,8 +16,8 @@ Do **not** enable `VITE_AUTH_BYPASS` for this checklist.
 | A1 | Home loads; no auth bypass badge | ☐ |
 | A2 | Supabase staff signup/confirmation/sign-in and refresh persistence work | ☐ |
 | A3 | Unsigned user cannot open `/admin` or `/teacher` | ☐ |
-| A4 | Top bar shows only staff roles held + Portal | ☐ |
-| A5 | Learner path remains scoped `/access` and separate from staff Auth | ☐ |
+| A4 | Top bar shows only staff roles held; no Portal entry | ☐ |
+| A5 | `/access` and `/learner` routes do not expose learner data | ☐ |
 
 ## B. Admin provisioning
 
@@ -25,8 +25,8 @@ Do **not** enable `VITE_AUTH_BYPASS` for this checklist.
 |---|--------|------|
 | B1 | Create or open a Course | ☐ |
 | B2 | Create Class with teacher + capacity ≥ 1 | ☐ |
-| B3 | Seat learner with unique email | ☐ |
-| B4 | Copy invite link; URL contains `/access?email=` | ☐ |
+| B3 | Seat learner profile | ☐ |
+| B4 | Accounts/Class UI has no learner invite/share-link actions | ☐ |
 | B5 | Metrics page loads; max probes configurable | ☐ |
 
 ## C. Teacher live path
@@ -41,14 +41,14 @@ Do **not** enable `VITE_AUTH_BYPASS` for this checklist.
 | C6 | Analysis: sample size ≥ 1 for at least one metric window | ☐ |
 | C7 | Archive: completed day appears with colors | ☐ |
 
-## D. Learner portal
+## D. Learner Data Scope
 
 | # | Check | Pass |
 |---|--------|------|
-| D1 | Open invite link in private/incognito window | ☐ |
-| D2 | Portal shows correct display name | ☐ |
-| D3 | Attendance reflects teacher marks | ☐ |
-| D4 | Analysis shows only that learner’s results | ☐ |
+| D1 | Visiting `/access` redirects/falls through without learner data | ☐ |
+| D2 | Visiting `/learner` redirects/falls through without learner data | ☐ |
+| D3 | Teacher learner profile shows only selected learner data | ☐ |
+| D4 | Tests 1-1 analysis opens only from staff routes | ☐ |
 | D5 | Cannot navigate to Admin/Teacher without a native session and active staff role | ☐ |
 
 ## E. Multi-user / integrity

@@ -33,5 +33,7 @@ site_url = "http://127.0.0.1:5173"
 additional_redirect_urls = ["http://127.0.0.1:5173"]
 enable_signup = true
 
-# Clerk third-party auth is configured per environment.
-# See docs/ops/ci-cd.md and ADR 0002.
+# Username login has no user JWT yet. It authenticates credentials inside the
+# function and returns a Supabase Auth session without exposing the resolved email.
+[functions.username-login]
+verify_jwt = false

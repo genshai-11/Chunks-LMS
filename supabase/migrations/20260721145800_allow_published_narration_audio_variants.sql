@@ -69,7 +69,6 @@ begin
   raise exception 'Published Package Versions are immutable';
 end;
 $$;
-
 drop trigger if exists trg_ensure_narration_parent_version_is_draft on public.narration_variants;
 create trigger trg_ensure_narration_parent_version_is_draft
 before insert or update or delete on public.narration_variants

@@ -72,10 +72,8 @@ begin
   );
 end;
 $$;
-
 grant execute on function public.create_session_question_attempt(uuid, uuid, uuid, text)
   to authenticated, anon;
-
 -- Align database behavior with the current unlimited-depth probe domain rule.
 create or replace function public.resolve_probe(
   p_attempt_id uuid,

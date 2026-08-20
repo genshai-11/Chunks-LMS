@@ -3,12 +3,10 @@
 alter table public.test_items
   add column if not exists spoken_script_vi text,
   add column if not exists spoken_script_en text;
-
 comment on column public.test_items.spoken_script_vi is
   'Optional exact Vietnamese spoken script override. Null uses Số {item_order} plus prompt_vi.';
 comment on column public.test_items.spoken_script_en is
   'Optional exact English spoken script override. Null uses Number {item_order} plus prompt_en.';
-
 create or replace function private.test_item_spoken_script(
   p_item_order integer,
   p_prompt text,
@@ -28,7 +26,6 @@ as $$
     end || regexp_replace(trim(coalesce(p_prompt, '')), '\s+', ' ', 'g')
   )
 $$;
-
 create or replace function public.prepare_standalone_test_run(
   p_assignment_id uuid,
   p_test_section_id uuid,
@@ -164,7 +161,6 @@ begin
   );
 end
 $$;
-
 create or replace function public.start_standalone_test_run(p_run_id uuid, p_readiness_token text)
 returns jsonb
 language plpgsql
@@ -237,8 +233,6 @@ begin
   return jsonb_build_object('runId', r.id, 'status', 'in_progress', 'itemCount', 10, 'insertedItems', v_inserted);
 end
 $$;
-
-
 create or replace function private.section_audio_bundle_ready(
   p_section_id uuid,
   p_language text,
@@ -295,7 +289,6 @@ as $$
         )
     )
 $$;
-
 create or replace function public.get_test_package_publication_readiness(
   p_package_version_id uuid,
   p_voice_vi text,
@@ -351,7 +344,6 @@ begin
   );
 end
 $$;
-
 create or replace function public.publish_test_package_version(
   p_package_version_id uuid,
   p_voice_vi text,
@@ -434,7 +426,6 @@ begin
   );
 end
 $$;
-
 revoke all on function private.test_item_spoken_script(integer, text, text, text) from public;
 revoke all on function private.section_audio_bundle_ready(uuid, text, text) from public;
 revoke all on function public.get_test_package_publication_readiness(uuid, text, text) from public;

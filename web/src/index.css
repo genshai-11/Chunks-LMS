@@ -1316,11 +1316,20 @@
   .capture-dot.red {
     @apply border-red-100 bg-red-50 text-red-700;
   }
-  .capture-dot.yellow {
+  .capture-dot.orange {
     @apply border-orange-100 bg-orange-50 text-orange-700;
+  }
+  .capture-dot.yellow {
+    @apply border-yellow-100 bg-yellow-50 text-yellow-700;
   }
   .capture-dot.green {
     @apply border-green-100 bg-green-50 text-green-700;
+  }
+  .capture-dot.blue {
+    @apply border-sky-100 bg-sky-50 text-sky-700;
+  }
+  .capture-dot.indigo {
+    @apply border-indigo-100 bg-indigo-50 text-indigo-700;
   }
   .capture-dot.purple {
     @apply border-purple-100 bg-purple-50 text-purple-700;
@@ -1726,14 +1735,26 @@
   .observe-heat-count.is-red i {
     @apply bg-red-500;
   }
-  .observe-heat-count.is-yellow i {
+  .observe-heat-count.is-orange i {
     @apply bg-orange-500;
+  }
+  .observe-heat-count.is-yellow i {
+    @apply bg-yellow-400;
   }
   .observe-heat-count.is-green i {
     @apply bg-green-500;
   }
+  .observe-heat-count.is-blue i {
+    @apply bg-sky-500;
+  }
+  .observe-heat-count.is-indigo i {
+    @apply bg-indigo-500;
+  }
   .observe-heat-count.is-purple i {
     @apply bg-purple-500;
+  }
+  .observe-heat-count.is-total {
+    @apply ml-1 rounded-full border border-white/10 bg-white/10 px-1.5 text-slate-100;
   }
 
   .observe-heat-grid {
@@ -1746,7 +1767,7 @@
   }
 
   .observe-heat-dot-btn {
-    @apply flex h-7 w-7 min-h-0 min-w-0 shrink-0 items-center justify-center justify-self-center rounded-full border-0 bg-white/10 p-0 text-[10px] font-bold text-slate-300 shadow-none transition hover:scale-115 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white;
+    @apply relative flex h-7 w-7 min-h-0 min-w-0 shrink-0 items-center justify-center justify-self-center rounded-full border-0 bg-white/10 p-0 text-[10px] font-bold text-slate-300 shadow-none transition hover:scale-115 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white;
   }
   .observe-heat-dot-btn.is-current {
     @apply ring-2 ring-white ring-offset-2 ring-offset-slate-950 scale-105;
@@ -1754,14 +1775,26 @@
   .observe-heat-dot-btn.is-red {
     @apply bg-red-500 text-white;
   }
-  .observe-heat-dot-btn.is-yellow {
+  .observe-heat-dot-btn.is-orange {
     @apply bg-orange-500 text-white;
+  }
+  .observe-heat-dot-btn.is-yellow {
+    @apply bg-yellow-400 text-yellow-950;
   }
   .observe-heat-dot-btn.is-green {
     @apply bg-green-500 text-white;
   }
+  .observe-heat-dot-btn.is-blue {
+    @apply bg-sky-500 text-white;
+  }
+  .observe-heat-dot-btn.is-indigo {
+    @apply bg-indigo-500 text-white;
+  }
   .observe-heat-dot-btn.is-purple {
     @apply bg-purple-500 text-white;
+  }
+  .observe-heat-probe-badge {
+    @apply absolute -right-1.5 -top-1.5 rounded-full bg-slate-950 px-1 text-[8px] font-black leading-3 text-white ring-1 ring-white/70;
   }
   .observe-heat-dot-btn.is-open {
     @apply bg-amber-400 text-amber-950 animate-pulse;
@@ -1817,12 +1850,12 @@
   }
 
   .observe-split-pane .observe-dock-num {
-    font-size: 1rem !important;
+    font-size: 0.625rem !important;
   }
 
   @media (min-width: 640px) {
     .observe-split-pane .observe-dock-num {
-      font-size: 1.125rem !important;
+      font-size: 0.75rem !important;
     }
   }
 
@@ -1963,6 +1996,36 @@
 
   .observe-learner-rfc svg {
     @apply h-3.5 w-3.5 text-amber-400;
+  }
+
+  .observe-learner-rfc.is-rfc {
+    @apply border-red-400/30 bg-red-500/15 text-red-200;
+  }
+
+  .observe-learner-rfc.is-percent-c {
+    @apply border-emerald-400/30 bg-emerald-500/15 text-emerald-200;
+  }
+
+  .observe-learner-rfc.is-cpd {
+    @apply border-cyan-400/30 bg-cyan-500/15 text-cyan-100;
+  }
+
+  .observe-has-tooltip {
+    @apply relative cursor-help outline-none;
+  }
+
+  .observe-metric-tooltip {
+    @apply pointer-events-none absolute left-1/2 top-[calc(100%+0.5rem)] z-50 hidden w-[min(18rem,82vw)] -translate-x-1/2 rounded-xl border border-white/10 bg-slate-950/95 px-3 py-2 text-left font-sans text-[11px] font-semibold leading-snug tracking-normal text-slate-100 shadow-2xl shadow-black/50 backdrop-blur;
+  }
+
+  .observe-metric-tooltip::before {
+    content: '';
+    @apply absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-l border-t border-white/10 bg-slate-950;
+  }
+
+  .observe-has-tooltip:hover .observe-metric-tooltip,
+  .observe-has-tooltip:focus-visible .observe-metric-tooltip {
+    @apply block;
   }
 
   .observe-depth-inline {
@@ -2328,7 +2391,7 @@
       inset 0 -9px 12px rgb(69 10 10 / 0.42),
       0 0 18px rgb(239 68 68 / 0.45);
   }
-  .observe-dock-color.is-yellow {
+  .observe-dock-color.is-orange {
     @apply border-slate-950 bg-gradient-to-b from-orange-300 via-orange-500 to-orange-700 text-white hover:brightness-110;
     box-shadow:
       inset 0 7px 10px rgb(255 255 255 / 0.36),
@@ -2371,8 +2434,11 @@
   .observe-dock.is-glowing.is-red .observe-dock-colors {
     --dock-glow: 239 68 68;
   }
-  .observe-dock.is-glowing.is-yellow .observe-dock-colors {
+  .observe-dock.is-glowing.is-orange .observe-dock-colors {
     --dock-glow: 249 115 22;
+  }
+  .observe-dock.is-glowing.is-yellow .observe-dock-colors {
+    --dock-glow: 250 204 21;
   }
   .observe-dock.is-glowing.is-green .observe-dock-colors {
     --dock-glow: 16 185 129;
@@ -2382,7 +2448,7 @@
   }
 
   .observe-dock.is-glowing.is-red .observe-dock-color.is-red,
-  .observe-dock.is-glowing.is-yellow .observe-dock-color.is-yellow,
+  .observe-dock.is-glowing.is-orange .observe-dock-color.is-orange,
   .observe-dock.is-glowing.is-green .observe-dock-color.is-green,
   .observe-dock.is-glowing.is-purple .observe-dock-color.is-purple {
     animation: observe-active-light 1.15s ease-out both;
@@ -2431,7 +2497,7 @@
   .observe-dock-color.is-red.is-selected {
     @apply bg-gradient-to-b from-[#ff3b30] to-[#e50914] text-white opacity-100 border-white/40 scale-105 shadow-[0_0_25px_8px_#ef4444,_inset_0_2px_6px_rgba(255,255,255,0.55)];
   }
-  .observe-dock-color.is-yellow.is-selected {
+  .observe-dock-color.is-orange.is-selected {
     @apply bg-gradient-to-b from-[#fb923c] to-[#ea580c] text-white opacity-100 border-white/40 scale-105 shadow-[0_0_25px_8px_#f97316,_inset_0_2px_6px_rgba(255,255,255,0.55)];
   }
   .observe-dock-color.is-green.is-selected {
@@ -2442,11 +2508,11 @@
   }
 
   .observe-dock-label {
-    @apply hidden!;
+    @apply block text-[10px] sm:text-xs font-black uppercase tracking-wide opacity-90;
   }
 
   .observe-dock-num {
-    @apply font-display text-2xl sm:text-4xl font-black leading-none tabular-nums tracking-tight opacity-95;
+    @apply font-display text-xs sm:text-sm font-black leading-none tracking-tight opacity-95;
   }
 
   .observe-dock-probe {
@@ -2663,7 +2729,7 @@
     }
 
     .observe-dock-num {
-      @apply text-2xl!;
+      @apply text-xs!;
     }
 
     .observe-dock-probe-btn kbd {
@@ -2691,7 +2757,7 @@
     }
 
     .observe-split-pane .observe-dock-num {
-      font-size: clamp(0.95rem, 2.8dvh, 1.25rem) !important;
+      font-size: clamp(0.625rem, 1.7dvh, 0.75rem) !important;
     }
 
     .observe-dock-tools {
@@ -4610,7 +4676,7 @@
     @apply h-16 w-16 border-2 p-1.5 sm:h-20 sm:w-20;
   }
   .live-test-dock-compact .observe-dock-num {
-    @apply text-base sm:text-lg;
+    @apply text-xs sm:text-sm;
   }
   .live-test-dock-compact .observe-dock-label {
     @apply text-[10px] sm:text-xs;
@@ -4710,7 +4776,7 @@
     padding: clamp(0.2rem, 0.7dvh, 0.5rem);
   }
   .live-test-dock-compact .observe-dock-num {
-    font-size: clamp(1.25rem, 4dvh, 2.55rem) !important;
+    font-size: clamp(0.75rem, 2dvh, 0.875rem) !important;
   }
   .live-test-dock-compact .observe-dock-label {
     @apply hidden!;
@@ -4926,7 +4992,7 @@
       height: clamp(3.1rem, 17vw, 4rem) !important;
     }
     .live-test-dock-compact .observe-dock-num {
-      font-size: clamp(1rem, 5vw, 1.35rem) !important;
+      font-size: clamp(0.75rem, 3vw, 0.875rem) !important;
     }
     .live-test-audio-panel {
       @apply mt-2 rounded-2xl p-2!;
@@ -4980,16 +5046,20 @@
   }
 
   .standalone-analysis-grid {
-    @apply mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6;
+    @apply mb-3 grid gap-2 sm:grid-cols-3 xl:grid-cols-7;
   }
   .standalone-metric-card {
-    @apply rounded-2xl border border-slate-800 bg-slate-950 p-4 text-slate-100 shadow-sm;
+    @apply rounded-xl border border-slate-800 bg-slate-950 p-3 text-slate-100 shadow-sm;
   }
   .standalone-metric-card span {
-    @apply mt-2 block text-xs font-bold uppercase tracking-wide text-slate-400;
+    @apply mt-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400;
+  }
+  .standalone-metric-card.metric-percent-c span {
+    @apply normal-case;
+    text-transform: none;
   }
   .standalone-metric-card strong {
-    @apply mt-1 block font-display text-2xl font-black text-white;
+    @apply mt-0.5 block font-display text-xl font-black text-white;
   }
   .standalone-chart-wrap {
     @apply h-[min(56dvh,28rem)] min-h-[18rem] rounded-2xl border border-slate-800 bg-slate-950 p-3;
@@ -5208,50 +5278,84 @@
     @apply max-w-[110rem];
   }
   .test-analysis-workbench {
-    @apply grid items-start gap-4;
+    @apply grid items-start gap-4 overflow-visible;
   }
   .test-analysis-filter-card {
-    @apply rounded-2xl border border-slate-200 bg-white p-2 text-slate-800 shadow-sm lg:grid lg:grid-cols-[minmax(10rem,0.8fr)_minmax(12rem,1fr)_minmax(18rem,1.4fr)_auto] lg:items-center lg:gap-3;
+    @apply relative z-50 flex flex-wrap items-center gap-2 overflow-visible rounded-[1.35rem] border border-slate-200/70 bg-white/85 p-2.5 text-slate-800 shadow-[0_10px_35px_-28px_rgba(15,23,42,0.7)] backdrop-blur;
   }
   .test-analysis-filter-head {
-    @apply mb-2 flex items-center gap-2 border-b border-slate-100 pb-2 text-slate-700 lg:mb-0 lg:border-b-0 lg:pb-0;
+    @apply flex min-h-9 items-center gap-2 rounded-full bg-slate-50/80 px-2.5 py-1.5 text-slate-700;
   }
   .test-analysis-filter-head strong {
-    @apply block text-sm font-black text-slate-950;
+    @apply block text-xs font-black text-slate-950;
   }
   .test-analysis-filter-head span {
-    @apply block text-[11px] font-semibold text-slate-500;
+    @apply block text-[10px] font-semibold text-slate-500;
   }
   .test-analysis-filter-section {
-    @apply mb-2 space-y-1.5 lg:mb-0;
+    @apply mb-2 space-y-1 rounded-2xl bg-slate-50/55 p-2 lg:mb-0;
+  }
+  .test-analysis-filter-menu {
+    @apply relative;
+  }
+  .test-analysis-filter-menu summary {
+    @apply flex min-h-9 cursor-pointer list-none items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-black text-slate-950 shadow-3xs transition hover:border-slate-300 hover:bg-slate-50;
+  }
+  .test-analysis-filter-menu summary::-webkit-details-marker {
+    display: none;
+  }
+  .test-analysis-filter-menu summary span {
+    @apply text-slate-500;
+  }
+  .test-analysis-filter-menu summary strong {
+    @apply max-w-24 truncate font-black text-slate-950;
+  }
+  .test-analysis-filter-menu[open] summary {
+    @apply border-slate-950 bg-slate-950 text-white;
+  }
+  .test-analysis-filter-menu[open] summary span,
+  .test-analysis-filter-menu[open] summary strong {
+    @apply text-white;
+  }
+  .test-analysis-filter-popover {
+    @apply absolute left-0 top-[calc(100%+0.35rem)] z-[100] min-w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl;
+  }
+  .test-analysis-filter-menu.is-wide .test-analysis-filter-popover {
+    @apply min-w-72;
+  }
+  .test-analysis-filter-title.is-popover-title {
+    @apply mb-1;
   }
   .test-analysis-filter-title {
-    @apply flex items-center justify-between gap-2 text-[11px] font-black uppercase tracking-wide text-slate-600;
+    @apply flex items-center justify-between gap-2 px-0.5 text-[10px] font-black uppercase tracking-wide text-slate-500;
   }
   .test-analysis-filter-title button {
-    @apply rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold normal-case tracking-normal text-slate-600 shadow-none transition hover:bg-slate-100;
+    @apply inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold normal-case tracking-normal text-slate-500 shadow-none transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700;
   }
   .test-analysis-chip-grid {
-    @apply flex flex-wrap gap-1.5;
+    @apply flex flex-wrap gap-1;
+  }
+  .test-analysis-chip-grid.is-tight {
+    @apply gap-1;
   }
   .test-analysis-chip {
-    @apply min-h-8 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-black text-slate-500 shadow-none transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700;
+    @apply min-h-6 rounded-full border border-transparent bg-white px-2 py-0.5 text-[10px] font-black text-slate-500 shadow-none transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700;
   }
   .test-analysis-chip.is-active {
-    @apply border-indigo-300 bg-indigo-50 text-indigo-700;
+    @apply border-indigo-200 bg-indigo-600 text-white hover:bg-indigo-600 hover:text-white;
   }
   .test-analysis-color-list {
-    @apply flex flex-wrap gap-1.5;
+    @apply flex flex-wrap gap-1;
   }
   .test-analysis-color-chip {
-    @apply flex min-h-8 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-500 shadow-none transition hover:bg-slate-100;
+    @apply flex min-h-6 items-center gap-1.5 rounded-full border border-transparent bg-white px-2 py-0.5 text-[10px] font-bold text-slate-500 shadow-none transition hover:border-slate-200 hover:bg-slate-100;
   }
   .test-analysis-color-chip.is-active {
     @apply text-slate-900;
   }
   .test-analysis-color-chip i,
   .test-analysis-legend-row i {
-    @apply inline-block h-2.5 w-2.5 shrink-0 rounded-full;
+    @apply inline-block h-2 w-2 shrink-0 rounded-full;
   }
   .test-analysis-label-toggle {
     @apply mt-1 flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-600 shadow-none transition hover:bg-slate-100 lg:mt-0 lg:w-auto lg:whitespace-nowrap;
@@ -5260,10 +5364,56 @@
     @apply border-indigo-200 bg-indigo-50 text-indigo-700;
   }
   .test-analysis-chart-stack {
-    @apply grid min-w-0 gap-4;
+    @apply grid min-w-0 gap-4 lg:grid-cols-2;
   }
   .test-analysis-chart-row {
-    @apply grid min-w-0 gap-4 lg:grid-cols-2;
+    display: contents;
+  }
+  .test-analysis-chart-slot {
+    @apply min-w-0;
+  }
+  .test-analysis-chart-slot:has(.test-analysis-panel.is-expanded) {
+    @apply lg:col-span-2;
+  }
+  .test-analysis-chart-actions {
+    @apply flex items-center gap-1;
+  }
+  .test-analysis-chart-actions button {
+    @apply inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500 shadow-none transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700;
+  }
+  .test-analysis-filter-section.is-chart-picker {
+    @apply lg:col-span-3;
+  }
+  .test-analysis-chart-order-list {
+    @apply max-h-36 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1;
+    scrollbar-width: thin;
+  }
+  .test-analysis-chart-order-row {
+    @apply flex cursor-grab items-center justify-start gap-0.5 rounded-lg border border-transparent bg-white px-1 py-0.5 text-left text-slate-950 transition hover:bg-slate-50 active:cursor-grabbing;
+  }
+  .test-analysis-chart-order-row.is-dragging {
+    @apply border-slate-950 bg-slate-50 opacity-60;
+  }
+  .test-analysis-chart-order-row.is-hidden {
+    @apply bg-white text-slate-400 opacity-70;
+  }
+  .test-analysis-chart-order-grip {
+    @apply inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-slate-950;
+  }
+  .test-analysis-chart-order-name {
+    @apply flex min-w-0 flex-1 items-center justify-start gap-1.5 rounded-md border-0 bg-transparent px-1.5 py-1 text-left shadow-none;
+  }
+  .test-analysis-chart-order-name span {
+    @apply inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-slate-950 text-[9px] font-black text-white;
+  }
+  .test-analysis-chart-order-name strong {
+    @apply min-w-0 truncate text-[10px] font-black leading-none text-slate-950;
+  }
+  .test-analysis-chart-order-row.is-hidden .test-analysis-chart-order-name span {
+    @apply bg-slate-300 text-white;
+  }
+  .test-analysis-chart-order-row.is-hidden .test-analysis-chart-order-name strong {
+    @apply text-slate-400 line-through decoration-slate-300;
   }
   .test-analysis-panel .standalone-chart-wrap {
     @apply bg-white;
@@ -5278,6 +5428,51 @@
     stroke: #ffffff;
     stroke-width: 3px;
     stroke-linejoin: round;
+  }
+  .test-analysis-tube-wrap {
+    @apply overflow-hidden;
+  }
+  .test-analysis-tube-scroll {
+    @apply flex h-full min-w-full items-end gap-2 overflow-x-auto overflow-y-hidden pb-2 pt-4;
+  }
+  .test-analysis-tube-col {
+    @apply flex min-w-10 flex-col items-center gap-1 text-center text-[10px] font-black text-slate-500;
+  }
+  .test-analysis-tube-col strong {
+    @apply text-[11px] text-slate-700;
+  }
+  .test-analysis-tube-col span:not(.test-analysis-tube-bead) {
+    @apply text-[10px] text-slate-400;
+  }
+  .test-analysis-tube-stack {
+    @apply flex min-h-32 flex-col-reverse justify-start gap-1 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-2 shadow-inner;
+  }
+  .test-analysis-tube-bead {
+    @apply block h-4 w-4 rounded-full border-2 border-white shadow-sm ring-1 ring-slate-900/10;
+  }
+  .test-analysis-empty-chart {
+    @apply flex h-full w-full items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-sm font-bold text-slate-500;
+  }
+  .test-analysis-record-cpd-wrap {
+    @apply overflow-hidden;
+  }
+  .test-analysis-record-cpd-scroll {
+    @apply flex h-full min-w-full items-end gap-3 overflow-x-auto overflow-y-hidden pb-2 pt-4;
+  }
+  .test-analysis-record-cpd-group {
+    @apply flex min-w-16 flex-col items-center gap-1 text-center text-[10px] font-black text-slate-500;
+  }
+  .test-analysis-record-cpd-group strong {
+    @apply text-[11px] text-slate-700;
+  }
+  .test-analysis-record-cpd-group span:not(.test-analysis-record-cpd-bar) {
+    @apply text-[10px] text-slate-400;
+  }
+  .test-analysis-record-cpd-bars {
+    @apply flex h-44 items-end justify-center gap-1 rounded-2xl border border-slate-200 bg-slate-50 px-2 py-2 shadow-inner;
+  }
+  .test-analysis-record-cpd-bar {
+    @apply block w-3 rounded-t-full border border-white shadow-sm ring-1 ring-slate-900/10;
   }
   .test-analysis-pie-layout {
     @apply grid gap-4 lg:grid-cols-[minmax(0,1fr)_16rem];

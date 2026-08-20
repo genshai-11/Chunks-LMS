@@ -26,7 +26,6 @@ create table public.test_catalog_import_runs (
   error_code text,
   error_message text
 );
-
 create table public.standalone_test_assignments (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
@@ -40,7 +39,6 @@ create table public.standalone_test_assignments (
   cancelled_at timestamptz,
   unique (learner_user_id, package_version_id, assignment_number)
 );
-
 create table public.standalone_test_runs (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
@@ -69,11 +67,9 @@ create table public.standalone_test_runs (
   cancellation_reason text,
   unique (assignment_id, test_section_id, attempt_number)
 );
-
 create unique index standalone_test_runs_one_open_section_idx
   on public.standalone_test_runs (assignment_id, test_section_id)
   where status in ('ready','in_progress');
-
 create table public.standalone_test_run_items (
   id uuid primary key default gen_random_uuid(),
   run_id uuid not null references public.standalone_test_runs(id) on delete cascade,
@@ -90,7 +86,6 @@ create table public.standalone_test_run_items (
   unique (run_id, item_order),
   unique (run_id, test_item_id)
 );
-
 create table public.standalone_test_attempts (
   id uuid primary key default gen_random_uuid(),
   run_id uuid not null references public.standalone_test_runs(id) on delete cascade,
@@ -100,7 +95,6 @@ create table public.standalone_test_attempts (
   created_at timestamptz not null default now(),
   unique (run_id, run_item_id)
 );
-
 create table public.standalone_test_events (
   id uuid primary key default gen_random_uuid(),
   attempt_id uuid not null references public.standalone_test_attempts(id) on delete cascade,
@@ -111,7 +105,6 @@ create table public.standalone_test_events (
   created_at timestamptz not null default now(),
   unique (attempt_id, event_sequence)
 );
-
 create table public.standalone_test_attempt_snapshots (
   attempt_id uuid primary key references public.standalone_test_attempts(id) on delete cascade,
   status public.attempt_status not null default 'draft',
@@ -126,7 +119,6 @@ create table public.standalone_test_attempt_snapshots (
   corrected_at timestamptz,
   updated_at timestamptz not null default now()
 );
-
 create index test_catalog_import_runs_org_status_idx
   on public.test_catalog_import_runs(organization_id, status, previewed_at desc);
 create index standalone_test_assignments_learner_idx
@@ -139,7 +131,6 @@ create index standalone_test_attempts_run_idx
   on public.standalone_test_attempts(run_id, run_item_id);
 create index standalone_test_events_attempt_idx
   on public.standalone_test_events(attempt_id, event_sequence);
-
 create or replace function private.staff_can_manage_standalone_test(
   p_organization_id uuid,
   p_learner_user_id uuid
@@ -166,12 +157,10 @@ as $$
         and learner.account_status = 'active'
     )
 $$;
-
 revoke execute on function private.staff_can_manage_standalone_test(uuid, uuid)
   from public, anon;
 grant execute on function private.staff_can_manage_standalone_test(uuid, uuid)
   to authenticated, service_role;
-
 alter table public.test_catalog_import_runs enable row level security;
 alter table public.standalone_test_assignments enable row level security;
 alter table public.standalone_test_runs enable row level security;
@@ -179,10 +168,8 @@ alter table public.standalone_test_run_items enable row level security;
 alter table public.standalone_test_attempts enable row level security;
 alter table public.standalone_test_events enable row level security;
 alter table public.standalone_test_attempt_snapshots enable row level security;
-
 create policy test_catalog_import_runs_admin_read on public.test_catalog_import_runs
   for select to authenticated using ((select public.current_staff_is_admin()));
-
 create policy standalone_test_assignments_staff_all on public.standalone_test_assignments
   for all to authenticated
   using ((select private.staff_can_manage_standalone_test(organization_id, learner_user_id)))
@@ -190,14 +177,12 @@ create policy standalone_test_assignments_staff_all on public.standalone_test_as
 create policy standalone_test_assignments_learner_read on public.standalone_test_assignments
   for select to authenticated
   using (public.current_user_id() = learner_user_id);
-
 create policy standalone_test_runs_staff_all on public.standalone_test_runs
   for all to authenticated
   using ((select private.staff_can_manage_standalone_test(organization_id, learner_user_id)))
   with check ((select private.staff_can_manage_standalone_test(organization_id, learner_user_id)));
 create policy standalone_test_runs_learner_read on public.standalone_test_runs
   for select to authenticated using (public.current_user_id() = learner_user_id);
-
 create policy standalone_test_run_items_read on public.standalone_test_run_items
   for select to authenticated using (
     exists (
@@ -209,7 +194,6 @@ create policy standalone_test_run_items_read on public.standalone_test_run_items
         )
     )
   );
-
 create policy standalone_test_attempts_read on public.standalone_test_attempts
   for select to authenticated using (
     exists (
@@ -221,7 +205,6 @@ create policy standalone_test_attempts_read on public.standalone_test_attempts
         )
     )
   );
-
 create policy standalone_test_events_read on public.standalone_test_events
   for select to authenticated using (
     exists (
@@ -235,7 +218,6 @@ create policy standalone_test_events_read on public.standalone_test_events
         )
     )
   );
-
 create policy standalone_test_snapshots_read on public.standalone_test_attempt_snapshots
   for select to authenticated using (
     exists (
@@ -249,7 +231,6 @@ create policy standalone_test_snapshots_read on public.standalone_test_attempt_s
         )
     )
   );
-
 -- New public tables are not automatically exposed in current hosted Supabase.
 grant select on public.test_catalog_import_runs to authenticated;
 grant select, insert, update on public.standalone_test_assignments to authenticated;
@@ -259,7 +240,6 @@ grant select on public.standalone_test_attempts to authenticated;
 grant select on public.standalone_test_events to authenticated;
 grant select on public.standalone_test_attempt_snapshots to authenticated;
 grant all on all tables in schema public to service_role;
-
 comment on table public.standalone_test_runs is
   'One Learner and one Test Section; deliberately independent of Classes and Learning Sessions.';
 comment on table public.test_catalog_import_runs is

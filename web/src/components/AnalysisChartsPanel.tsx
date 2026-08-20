@@ -27,7 +27,7 @@ import {
   toChartRows,
   type SessionMetricPoint,
 } from '../modules/reporting/session-series'
-import type { ResultColor } from '../modules/result-lifecycle/types'
+import { SPECTRUM_COLORS, type ResultColor } from '../modules/result-lifecycle/types'
 
 export type AnalysisChartKind = 'line' | 'bar' | 'area' | 'composed' | 'pie'
 
@@ -76,9 +76,19 @@ const FALLBACK_METRICS: MetricKey[] = [
 
 const COLOR_HEX: Record<ResultColor, string> = {
   red: '#f87171',
-  yellow: '#f97316',
+  orange: '#f97316',
+  yellow: '#facc15',
   green: '#4ade80',
+  blue: '#38bdf8',
+  indigo: '#818cf8',
   purple: '#c084fc',
+}
+
+function emptyColorCounts(): Record<ResultColor, number> {
+  return Object.fromEntries(SPECTRUM_COLORS.map((color) => [color, 0])) as Record<
+    ResultColor,
+    number
+  >
 }
 
 const CHART_KINDS: { id: AnalysisChartKind; label: string }[] = [
@@ -138,7 +148,7 @@ function colorByDay(
   totalDays?: number | null,
 ): Array<Record<string, string | number>> {
   return points.map((p) => {
-    const counts = { red: 0, yellow: 0, green: 0, purple: 0 }
+    const counts = emptyColorCounts()
     for (const r of ledger) {
       if (r.learningSessionId !== p.learningSessionId) continue
       counts[r.effectiveColor] += 1
@@ -146,7 +156,7 @@ function colorByDay(
     return {
       name: sessionLabel(p.sessionNumber, p.startedAt, totalDays),
       ...counts,
-      total: counts.red + counts.yellow + counts.green + counts.purple,
+      total: SPECTRUM_COLORS.reduce((sum, color) => sum + counts[color], 0),
     }
   })
 }
@@ -245,7 +255,7 @@ export function AnalysisChartsPanel({
   )
 
   const colorMixPie = useMemo(() => {
-    const counts = { red: 0, yellow: 0, green: 0, purple: 0 }
+    const counts = emptyColorCounts()
     // Scope to selected days when set; otherwise all days that have series points
     const ids = new Set(
       (selectedDays.length > 0 ? filtered : points).map((p) => p.learningSessionId),
@@ -258,7 +268,7 @@ export function AnalysisChartsPanel({
       if (ids.size > 0 && !ids.has(r.learningSessionId)) continue
       counts[r.effectiveColor] += 1
     }
-    return (Object.keys(counts) as ResultColor[]).map((c) => ({
+    return SPECTRUM_COLORS.map((c) => ({
       name: c,
       value: counts[c],
       fill: COLOR_HEX[c],

@@ -186,7 +186,6 @@ begin
   );
 end;
 $$;
-
 create or replace function public.start_standalone_test_run(p_run_id uuid,p_readiness_token text)
 returns jsonb
 language plpgsql
@@ -270,7 +269,6 @@ begin
   return jsonb_build_object('runId',r.id,'status','in_progress','itemCount',v_expected_items,'insertedItems',v_inserted);
 end;
 $$;
-
 do $$
 declare target regprocedure;
 begin

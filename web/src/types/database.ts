@@ -30,6 +30,7 @@ export type Database = {
           legacy_clerk_user_id: string | null
           display_name: string
           email: string | null
+          username: string | null
           avatar_url: string | null
           account_status: 'active' | 'inactive'
           allow_multi_class: boolean
@@ -43,6 +44,7 @@ export type Database = {
           legacy_clerk_user_id?: string | null
           display_name: string
           email?: string | null
+          username?: string | null
           avatar_url?: string | null
           account_status?: 'active' | 'inactive'
           allow_multi_class?: boolean
@@ -73,22 +75,6 @@ export type Database = {
           revoked_at?: string | null
         }
         Update: Partial<Database['public']['Tables']['staff_roles']['Insert']>
-      }
-      learner_access_tokens: {
-        Row: {
-          id: string
-          token_hash: string
-          learner_user_id: string
-          class_id: string | null
-          issued_by_user_id: string
-          issued_at: string
-          expires_at: string
-          revoked_at: string | null
-          last_used_at: string | null
-          created_at: string
-        }
-        Insert: Record<string, unknown>
-        Update: Record<string, unknown>
       }
       organization_memberships: {
         Row: {
@@ -584,29 +570,14 @@ export type Database = {
     }
     Views: Record<string, never>
     Functions: {
-      issue_learner_access_token: {
-        Args: { p_learner_user_id: string; p_class_id: string; p_ttl_seconds?: number }
-        Returns: Array<{ token_id: string; url_token: string; expires_at: string }>
-      }
-      verify_learner_access: {
-        Args: { p_url_token: string }
-        Returns: Array<{
-          token_id: string
-          learner_user_id: string
-          class_id: string | null
-          expires_at: string
-          learner_display_name: string
-          learner_email: string | null
-          class_name: string | null
-        }>
-      }
-      learner_access_snapshot: {
-        Args: { p_url_token: string }
+      create_teacher_learner_and_enroll: {
+        Args: {
+          p_class_id: string
+          p_display_name: string
+          p_email?: string | null
+          p_avatar_url?: string | null
+        }
         Returns: Json
-      }
-      revoke_learner_access_token: {
-        Args: { p_token_id: string }
-        Returns: undefined
       }
       live_test_v2_deterministic_uuid: {
         Args: { p_basis: string }

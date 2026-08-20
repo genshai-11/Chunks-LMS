@@ -72,9 +72,7 @@ begin
   );
 end;
 $$;
-
 revoke execute on function public.stop_standalone_test_run(uuid) from public, anon;
 grant execute on function public.stop_standalone_test_run(uuid) to authenticated, service_role;
-
 comment on function public.stop_standalone_test_run(uuid) is
   'Stops an in-progress standalone test run early; completed run remains analyzable from finalized/corrected items only.';

@@ -101,11 +101,11 @@ export function runSeededEndToEndFlow(now = '2026-07-11T10:00:00.000Z'): SeededF
   if (!r.ok) throw new Error(r.error)
   capture = r.state
 
-  // Q3 → learner 2: Yellow then correct to Purple
+  // Q3 → learner 2: Orange then correct to Purple
   q = addSessionQuestion(capture)
   if (!q.ok) throw new Error(q.error)
   capture = q.state
-  r = recordColorForCurrent(capture, 'yellow', now)
+  r = recordColorForCurrent(capture, 'orange', now)
   if (!r.ok) throw new Error(r.error)
   capture = r.state
 
@@ -159,8 +159,8 @@ export function runSeededEndToEndFlow(now = '2026-07-11T10:00:00.000Z'): SeededF
   const sample =
     report.overall.current.find((m) => m.key === 'rac')?.sampleSize ?? 0
 
-  if (sample !== 3) {
-    throw new Error(`Expected 3 finalized results in report, got ${sample}`)
+  if (sample !== 4) {
+    throw new Error(`Expected 4 measured steps in report, got ${sample}`)
   }
 
   return {

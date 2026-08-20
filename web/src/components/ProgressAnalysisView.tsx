@@ -27,8 +27,7 @@ import {
   type SessionMetricPoint,
 } from '../modules/reporting/session-series'
 import type { DomainUser } from '../modules/roster/types'
-import type { ResultColor } from '../modules/result-lifecycle/types'
-import { COLOR_SCORE } from '../modules/result-lifecycle/types'
+import { COLOR_SCORE, SPECTRUM_COLORS, type ResultColor } from '../modules/result-lifecycle/types'
 import type { MetricSettingsState } from '../modules/metrics/settings'
 import { getEnabledMetricKeys } from '../modules/metrics/settings'
 import type { MetricKey, MetricObservation } from '../modules/metrics/calculate'
@@ -84,13 +83,16 @@ const TIME_SCOPES: { kind: ReportWindowKind; label: string; hint: string }[] = [
 ]
 
 function colorCounts(records: ResultRecord[]): Record<ResultColor, number> {
-  const c: Record<ResultColor, number> = { red: 0, yellow: 0, green: 0, purple: 0 }
+  const c = Object.fromEntries(SPECTRUM_COLORS.map((color) => [color, 0])) as Record<
+    ResultColor,
+    number
+  >
   for (const r of records) c[r.effectiveColor] += 1
   return c
 }
 
 function resultColorLabel(color: ResultColor): string {
-  return color === 'yellow' ? 'orange' : color
+  return color
 }
 
 function pct(n: number, total: number): number {
@@ -867,7 +869,7 @@ export function ProgressAnalysisView({
                 <p className="meta" style={{ marginTop: 0 }}>
                   Finalized results in current filter · sample={total}
                   {total > 0
-                    ? ` · R${counts.red} Y${counts.yellow} G${counts.green} P${counts.purple}`
+                    ? ` · R${counts.red} O${counts.orange} Y${counts.yellow} G${counts.green} B${counts.blue} I${counts.indigo} P${counts.purple}`
                     : ''}
                 </p>
                 {total === 0 ? (
@@ -875,7 +877,7 @@ export function ProgressAnalysisView({
                 ) : (
                   <div className="flex flex-col sm:flex-row gap-6 items-center w-full">
                     <div className="dist-bars flex-1 w-full">
-                      {(['red', 'yellow', 'green', 'purple'] as ResultColor[]).map((color) => {
+                      {SPECTRUM_COLORS.map((color) => {
                         const n = counts[color]
                         const p = pct(n, total)
                         const width = `${Math.max(n ? 8 : 0, (n / Math.max(maxBar, 1)) * 100)}%`

@@ -3,8 +3,6 @@ import {
   Check,
   GraduationCap,
   ImagePlus,
-  Link2,
-  Mail,
   Pencil,
   Power,
   Trash2,
@@ -24,6 +22,7 @@ import { PageHeader } from '../../components/PageHeader'
 import { UserAvatar } from '../../components/UserAvatar'
 import { EmptyState, Panel } from '../../components/ui'
 import { useFlash } from '../../hooks/useFlash'
+import { normalizeStaffUsername, validateStaffUsername } from '../../auth/staff-username'
 import {
   addLearnerProfile,
   countDuplicateEmailGroups,
@@ -36,13 +35,13 @@ import {
   setAccountStatus,
   updateUserProfile,
 } from '../../modules/roster/service'
-import type { DomainUser } from '../../modules/roster/types'
 import { useAppState } from '../../state/useAppState'
 
 type Tab = 'teachers' | 'learners'
 type Draft = {
   displayName: string
   email: string
+  username: string
   password?: string
   avatarUrl?: string
   allowMultiClass?: boolean
@@ -51,32 +50,11 @@ type Draft = {
 const emptyDraft = (): Draft => ({
   displayName: '',
   email: '',
+  username: '',
   password: '',
   avatarUrl: '',
   allowMultiClass: false,
 })
-
-function invitationUrl(user: DomainUser): string {
-  const origin = window.location.origin
-  if (user.roles.includes('learner') && user.email) {
-    return `${origin}/access?email=${encodeURIComponent(user.email)}`
-  }
-  return `${origin}/teacher`
-}
-
-function invitationMailto(user: DomainUser): string {
-  const link = invitationUrl(user)
-  const isLearner = user.roles.includes('learner')
-  const subject = encodeURIComponent(
-    isLearner ? 'Chunks LMS learner invite' : 'Chunks LMS teacher invite',
-  )
-  const body = encodeURIComponent(
-    isLearner
-      ? `Hi ${user.displayName},\n\nOpen your portal:\n${link}\n`
-      : `Hi ${user.displayName},\n\nSign in as Teacher:\n${link}\n`,
-  )
-  return `mailto:${encodeURIComponent(user.email ?? '')}?subject=${subject}&body=${body}`
-}
 
 export function AdminPeoplePage() {
   const { roster, setRoster, syncNow, reloadFromSupabase } = useAppState()
@@ -100,10 +78,13 @@ export function AdminPeoplePage() {
   async function createAccount() {
     if (tab === 'teachers') {
       const password = draft.password ?? ''
+      const usernameError = validateStaffUsername(draft.username)
+      if (usernameError) return err(usernameError)
       if (password.length < 6) return err('Teacher password must be at least 6 characters')
       const r = await createTeacherAuthAccount({
         displayName: draft.displayName,
         email: draft.email,
+        username: normalizeStaffUsername(draft.username),
         password,
         avatarUrl: draft.avatarUrl || null,
       })
@@ -129,10 +110,13 @@ export function AdminPeoplePage() {
   async function saveEdit(id: string) {
     const user = roster.users.find((u) => u.id === id)
     if (user?.roles.includes('teacher')) {
+      const usernameError = validateStaffUsername(editDraft.username)
+      if (usernameError) return err(usernameError)
       const r = await updateTeacherAuthAccount({
         userId: id,
         displayName: editDraft.displayName,
         email: editDraft.email,
+        username: normalizeStaffUsername(editDraft.username),
         avatarUrl: editDraft.avatarUrl || null,
       })
       if (!r.ok) return err(r.error)
@@ -161,7 +145,7 @@ export function AdminPeoplePage() {
         icon={Users}
         kicker="Admin"
         title="Accounts"
-        subtitle="One row per email · teacher (Supabase Auth) · learner (invite link)"
+        subtitle="Teacher: email + username (Supabase Auth) · learner: profile account"
         actions={
           <button
             type="button"
@@ -237,7 +221,7 @@ export function AdminPeoplePage() {
           description={
             tab === 'teachers'
               ? 'Creates a real Supabase Auth staff account plus database teacher role.'
-              : 'Email is the portal invite identity. Unique across all accounts.'
+              : 'Creates a learner profile. Email remains unique across all accounts.'
           }
         >
           <form
@@ -266,6 +250,22 @@ export function AdminPeoplePage() {
                 placeholder={tab === 'learners' ? 'learner@school.edu' : 'teacher@school.edu'}
               />
             </label>
+            {tab === 'teachers' && (
+              <label>
+                Username
+                <input
+                  type="text"
+                  value={draft.username}
+                  onChange={(e) => setDraft((d) => ({ ...d, username: e.target.value }))}
+                  required
+                  minLength={3}
+                  maxLength={32}
+                  pattern="[A-Za-z0-9][A-Za-z0-9._-]{2,31}"
+                  placeholder="teacher.name"
+                  autoComplete="username"
+                />
+              </label>
+            )}
             {tab === 'teachers' && (
               <label>
                 Password
@@ -395,6 +395,21 @@ export function AdminPeoplePage() {
                             aria-label="Email"
                             placeholder="Email"
                           />
+                          {tab === 'teachers' && (
+                            <input
+                              className="row-input"
+                              value={editDraft.username}
+                              onChange={(e) =>
+                                setEditDraft((d) => ({ ...d, username: e.target.value }))
+                              }
+                              aria-label="Username"
+                              placeholder="Username"
+                              minLength={3}
+                              maxLength={32}
+                              pattern="[A-Za-z0-9][A-Za-z0-9._-]{2,31}"
+                              required
+                            />
+                          )}
                           {tab === 'learners' && (
                             <label className="flex items-center gap-1.5 text-xs text-slate-600 select-none cursor-pointer">
                               <input
@@ -491,6 +506,11 @@ export function AdminPeoplePage() {
                               )}
                             </strong>
                             <span className="accounts-email">{u.email ?? '—'}</span>
+                            {u.roles.includes('teacher') ? (
+                              <span className="accounts-email">
+                                {u.username ? `@${u.username}` : 'Username not set'}
+                              </span>
+                            ) : null}
                           </span>
                         </span>
                       </td>
@@ -503,32 +523,6 @@ export function AdminPeoplePage() {
                       </td>
                       <td>
                         <div className="row-actions accounts-actions">
-                          {u.email ? (
-                            <>
-                              <button
-                                type="button"
-                                className="ghost"
-                                title="Copy invite link"
-                                onClick={async () => {
-                                  try {
-                                    await navigator.clipboard.writeText(invitationUrl(u))
-                                    ok('Invite copied')
-                                  } catch {
-                                    ok(invitationUrl(u))
-                                  }
-                                }}
-                              >
-                                <Link2 className="h-3.5 w-3.5" aria-hidden />
-                              </button>
-                              <a
-                                className="btn ghost"
-                                href={invitationMailto(u)}
-                                title="Send invite email"
-                              >
-                                <Mail className="h-3.5 w-3.5" aria-hidden />
-                              </a>
-                            </>
-                          ) : null}
                           <button
                             type="button"
                             className="ghost"
@@ -568,6 +562,7 @@ export function AdminPeoplePage() {
                               setEditDraft({
                                 displayName: u.displayName,
                                 email: u.email ?? '',
+                                username: u.username ?? '',
                                 avatarUrl: u.avatarUrl ?? '',
                                 allowMultiClass: u.allowMultiClass ?? false,
                               })

@@ -4,10 +4,12 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
 import type { User } from '@supabase/supabase-js'
+import { clearRequestCache } from '../lib/request-cache'
 import { getSupabase } from '../lib/supabase'
 import {
   canAccessStaffRole,
@@ -15,6 +17,13 @@ import {
   resolveActiveStaffRoles,
   type StaffRole,
 } from './staff-roles'
+import {
+  INVALID_STAFF_LOGIN_MESSAGE,
+  STAFF_LOGIN_RATE_LIMIT_MESSAGE,
+  isEmailLoginIdentifier,
+  normalizeStaffUsername,
+  validateStaffUsername,
+} from './staff-username'
 
 export type StaffSession = {
   ready: boolean
@@ -29,7 +38,7 @@ export type StaffSession = {
   isStaff: boolean
   signInWithEmail: (email: string) => Promise<{ ok: true } | { ok: false; error: string }>
   signInWithPassword: (
-    email: string,
+    identifier: string,
     password: string,
   ) => Promise<{ ok: true } | { ok: false; error: string }>
   signUpWithPassword: (
@@ -60,14 +69,16 @@ function buildSession(
   }
 }
 
-const STAFF_LOGIN_ALIASES: Record<string, string> = {
-  admin: 'admin@example.com',
-  chunker: 'chunker@example.com',
+type UsernameLoginResponse = {
+  ok?: boolean
+  session?: {
+    accessToken?: string
+    refreshToken?: string
+  }
 }
 
-function normalizeStaffLoginIdentifier(raw: string): string {
-  const identifier = raw.trim().toLowerCase()
-  return STAFF_LOGIN_ALIASES[identifier] ?? identifier
+function normalizeStaffEmail(raw: string): string {
+  return raw.normalize('NFKC').trim().toLowerCase()
 }
 
 async function loadStaffRolesByAuthUserId(authUserId: string | null): Promise<StaffRole[]> {
@@ -149,13 +160,14 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
   const [user, setUser] = useState<User | null>(null)
   const [staffRoles, setStaffRoles] = useState<StaffRole[]>([])
   const [rolesLoading, setRolesLoading] = useState(false)
+  const activeAuthUserId = useRef<string | null>(null)
 
   const signInWithEmail = useCallback<StaffSession['signInWithEmail']>(
     async (email) => {
       if (!sb) return { ok: false, error: 'Supabase Auth is not configured' }
       const redirectTo = typeof window !== 'undefined' ? window.location.origin : undefined
       const { error } = await sb.auth.signInWithOtp({
-        email: normalizeStaffLoginIdentifier(email),
+        email: normalizeStaffEmail(email),
         options: redirectTo ? { emailRedirectTo: redirectTo } : undefined,
       })
       return error ? { ok: false, error: error.message } : { ok: true }
@@ -164,13 +176,41 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
   )
 
   const signInWithPassword = useCallback<StaffSession['signInWithPassword']>(
-    async (email, password) => {
+    async (identifier, password) => {
       if (!sb) return { ok: false, error: 'Supabase Auth is not configured' }
-      const { error } = await sb.auth.signInWithPassword({
-        email: normalizeStaffLoginIdentifier(email),
-        password,
+
+      if (isEmailLoginIdentifier(identifier)) {
+        const { error } = await sb.auth.signInWithPassword({
+          email: normalizeStaffEmail(identifier),
+          password,
+        })
+        return error ? { ok: false, error: INVALID_STAFF_LOGIN_MESSAGE } : { ok: true }
+      }
+
+      const usernameValidationError = validateStaffUsername(identifier)
+      if (usernameValidationError) {
+        return { ok: false, error: INVALID_STAFF_LOGIN_MESSAGE }
+      }
+
+      const { data, error } = await sb.functions.invoke('username-login', {
+        body: { username: normalizeStaffUsername(identifier), password },
       })
-      return error ? { ok: false, error: error.message } : { ok: true }
+      const payload = data as UsernameLoginResponse | null
+      const accessToken = payload?.session?.accessToken
+      const refreshToken = payload?.session?.refreshToken
+      const functionStatus = (error as { context?: { status?: number } } | null)?.context?.status
+      if (functionStatus === 429) {
+        return { ok: false, error: STAFF_LOGIN_RATE_LIMIT_MESSAGE }
+      }
+      if (error || payload?.ok !== true || !accessToken || !refreshToken) {
+        return { ok: false, error: INVALID_STAFF_LOGIN_MESSAGE }
+      }
+
+      const { error: sessionError } = await sb.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      })
+      return sessionError ? { ok: false, error: INVALID_STAFF_LOGIN_MESSAGE } : { ok: true }
     },
     [sb],
   )
@@ -179,7 +219,7 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
     async (email, password) => {
       if (!sb) return { ok: false, error: 'Supabase Auth is not configured' }
       const { data, error } = await sb.auth.signUp({
-        email: normalizeStaffLoginIdentifier(email),
+        email: normalizeStaffEmail(email),
         password,
       })
       if (error) return { ok: false, error: error.message }
@@ -193,7 +233,11 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
   )
 
   const signOut = useCallback(async () => {
-    if (sb) await sb.auth.signOut()
+    try {
+      if (sb) await sb.auth.signOut()
+    } finally {
+      clearRequestCache('audio:signed-playback')
+    }
   }, [sb])
 
   useEffect(() => {
@@ -205,6 +249,7 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
     void sb.auth.getUser().then(({ data }) => {
       if (!cancelled) {
         const nextUser = data.user ?? null
+        activeAuthUserId.current = nextUser?.id ?? null
         setRolesLoading(Boolean(nextUser))
         setUser(nextUser)
         setReady(true)
@@ -212,6 +257,11 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
     })
     const { data } = sb.auth.onAuthStateChange((_event, session) => {
       const nextUser = session?.user ?? null
+      const nextUserId = nextUser?.id ?? null
+      if (!nextUserId || (activeAuthUserId.current && activeAuthUserId.current !== nextUserId)) {
+        clearRequestCache('audio:signed-playback')
+      }
+      activeAuthUserId.current = nextUserId
       setRolesLoading(Boolean(nextUser))
       setUser(nextUser)
       setReady(true)

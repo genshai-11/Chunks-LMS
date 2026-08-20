@@ -1,7 +1,15 @@
-/** Color values: Red=0, Yellow=1, Green=2, Purple=3 */
-export type ResultColor = 'red' | 'yellow' | 'green' | 'purple'
+export type SpectrumColor =
+  | 'red'
+  | 'orange'
+  | 'yellow'
+  | 'green'
+  | 'blue'
+  | 'indigo'
+  | 'purple'
 
-export type ProvisionalColor = ResultColor
+export type ResultColor = SpectrumColor
+
+export type ProvisionalColor = 'red' | 'orange' | 'green' | 'purple'
 
 export type ProbeOutcome = 'fail' | 'continue' | 'done'
 
@@ -41,11 +49,40 @@ export type LifecycleResult =
   | { ok: true; snapshot: AssessmentSnapshot; events: AssessmentEventType[] }
   | { ok: false; error: string }
 
+export const SPECTRUM_COLORS: readonly SpectrumColor[] = [
+  'red',
+  'orange',
+  'yellow',
+  'green',
+  'blue',
+  'indigo',
+  'purple',
+] as const
+
+export const PRIMARY_CAPTURE_COLORS: readonly ProvisionalColor[] = [
+  'red',
+  'orange',
+  'green',
+  'purple',
+] as const
+
+export const WARM_COLORS: readonly SpectrumColor[] = ['red', 'orange', 'yellow']
+export const COOL_COLORS: readonly SpectrumColor[] = [
+  'green',
+  'blue',
+  'indigo',
+  'purple',
+]
+
+/** Normalized CPD color factors across the 7-color spectrum. */
 export const COLOR_SCORE: Record<ResultColor, number> = {
   red: 0,
-  yellow: 1,
-  green: 2,
-  purple: 3,
+  orange: 0.17,
+  yellow: 0.33,
+  green: 0.5,
+  blue: 0.67,
+  indigo: 0.83,
+  purple: 1,
 }
 
 /**

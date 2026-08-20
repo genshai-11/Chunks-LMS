@@ -4,6 +4,7 @@
 
 alter table public.narration_variants
   drop constraint if exists narration_variants_narration_target_check,
+  drop constraint if exists narration_variants_target_shape_check,
   drop constraint if exists narration_variants_check;
 
 alter table public.narration_variants

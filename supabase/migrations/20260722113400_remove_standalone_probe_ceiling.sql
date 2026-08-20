@@ -71,7 +71,6 @@ begin
   return jsonb_build_object('attemptId',p_attempt_id,'status',v_status,'effectiveColor',v_color,'probeCount',v_probe);
 end;
 $$;
-
 create or replace function public.complete_standalone_test_run(p_run_id uuid)
 returns jsonb
 language plpgsql
@@ -133,7 +132,6 @@ begin
   return jsonb_build_object('runId',r.id,'status','completed','finalizedItems',v_done,'expectedItems',v_expected);
 end;
 $$;
-
 do $$
 declare target regprocedure;
 begin

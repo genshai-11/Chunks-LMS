@@ -4,7 +4,6 @@ create or replace function private.result_color_score(p_color public.result_colo
 returns smallint language sql immutable set search_path=pg_catalog as $$
   select case p_color when 'red' then 0 when 'yellow' then 1 when 'green' then 2 when 'purple' then 3 end::smallint
 $$;
-
 create or replace function public.create_standalone_test_assignment(p_learner_user_id uuid, p_package_version_id uuid)
 returns uuid language plpgsql security definer set search_path=pg_catalog,public,private as $$
 declare v_actor uuid; v_org uuid; v_number int; v_id uuid;
@@ -19,7 +18,6 @@ begin
   values(v_org,p_learner_user_id,p_package_version_id,v_actor,v_number) returning id into v_id;
   return v_id;
 end $$;
-
 create or replace function public.prepare_standalone_test_run(p_assignment_id uuid,p_test_section_id uuid,p_language text,p_voice_id text)
 returns jsonb language plpgsql security definer set search_path=pg_catalog,public,private,extensions as $$
 declare a public.standalone_test_assignments%rowtype; s public.test_sections%rowtype; m public.section_measurement_snapshots%rowtype; c public.cci_categories%rowtype; v_run uuid; v_intro uuid; v_item_count int; v_audio_count int; v_hash text;
@@ -44,7 +42,6 @@ begin
   end if;
   return jsonb_build_object('runId',v_run,'canStart',v_intro is not null and v_item_count=10 and v_audio_count=10,'readinessToken',v_hash,'introApproved',v_intro is not null,'itemCount',v_item_count,'approvedItemAudioCount',v_audio_count,'sessionNumber',s.section_order,'targetCvrOhm',m.target_cvr_ohm,'cciName',m.cci_category_label,'cciValue',m.cci_value,'itemCpd',m.target_cvr_ohm*m.cci_value);
 end $$;
-
 create or replace function public.start_standalone_test_run(p_run_id uuid,p_readiness_token text)
 returns jsonb language plpgsql security definer set search_path=pg_catalog,public,private as $$
 declare r public.standalone_test_runs%rowtype; v_inserted int;
@@ -62,7 +59,6 @@ begin
   update public.standalone_test_runs set status='in_progress',started_at=coalesce(started_at,now()) where id=r.id;
   return jsonb_build_object('runId',r.id,'status','in_progress','itemCount',10,'insertedItems',v_inserted);
 end $$;
-
 create or replace function public.record_standalone_provisional_result(p_run_item_id uuid,p_color public.result_color)
 returns jsonb language plpgsql security definer set search_path=pg_catalog,public,private as $$
 declare ri public.standalone_test_run_items%rowtype; r public.standalone_test_runs%rowtype; a public.standalone_test_attempts%rowtype; v_seq int:=0; v_status public.attempt_status; v_effective public.result_color;
@@ -83,7 +79,6 @@ begin
   update public.standalone_test_attempt_snapshots set status=v_status,provisional_color=p_color,effective_color=v_effective,effective_score=case when v_effective is null then null else private.result_color_score(v_effective) end,entered_probe_flow=(p_color='green'),latest_event_sequence=v_seq,finalized_at=case when v_status='finalized' then now() else null end,updated_at=now() where attempt_id=a.id;
   return jsonb_build_object('attemptId',a.id,'status',v_status,'effectiveColor',v_effective,'probeCount',0);
 end $$;
-
 create or replace function public.resolve_standalone_probe(p_attempt_id uuid,p_outcome text)
 returns jsonb language plpgsql security definer set search_path=pg_catalog,public,private as $$
 declare s public.standalone_test_attempt_snapshots%rowtype; r public.standalone_test_runs%rowtype; v_seq int; v_color public.result_color; v_status public.attempt_status; v_probe int;
@@ -105,7 +100,6 @@ begin
   update public.standalone_test_attempt_snapshots set status=v_status,probe_count=v_probe,effective_color=v_color,effective_score=case when v_color is null then null else private.result_color_score(v_color) end,latest_event_sequence=v_seq,finalized_at=case when v_status='finalized' then now() else finalized_at end,updated_at=now() where attempt_id=p_attempt_id;
   return jsonb_build_object('attemptId',p_attempt_id,'status',v_status,'effectiveColor',v_color,'probeCount',v_probe);
 end $$;
-
 create or replace function public.correct_standalone_final_result(p_attempt_id uuid,p_color public.result_color,p_reason text)
 returns jsonb language plpgsql security definer set search_path=pg_catalog,public,private as $$
 declare s public.standalone_test_attempt_snapshots%rowtype; r public.standalone_test_runs%rowtype; v_seq int;
@@ -120,7 +114,6 @@ begin
   update public.standalone_test_attempt_snapshots set status='corrected',effective_color=p_color,effective_score=private.result_color_score(p_color),latest_event_sequence=v_seq,corrected_at=now(),updated_at=now() where attempt_id=p_attempt_id;
   return jsonb_build_object('attemptId',p_attempt_id,'status','corrected','effectiveColor',p_color);
 end $$;
-
 create or replace function public.complete_standalone_test_run(p_run_id uuid)
 returns jsonb language plpgsql security definer set search_path=pg_catalog,public,private as $$
 declare r public.standalone_test_runs%rowtype; v_done int;
@@ -133,7 +126,6 @@ begin
   if not exists(select 1 from public.test_sections section where section.package_version_id=(select package_version_id from public.standalone_test_assignments where id=r.assignment_id) and not exists(select 1 from public.standalone_test_runs done where done.assignment_id=r.assignment_id and done.test_section_id=section.id and done.status='completed')) then update public.standalone_test_assignments set status='completed',completed_at=now() where id=r.assignment_id; end if;
   return jsonb_build_object('runId',r.id,'status','completed','finalizedItems',v_done);
 end $$;
-
 do $$ declare target regprocedure; begin
   for target in select p.oid::regprocedure from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('create_standalone_test_assignment','prepare_standalone_test_run','start_standalone_test_run','record_standalone_provisional_result','resolve_standalone_probe','correct_standalone_final_result','complete_standalone_test_run') loop
     execute format('revoke execute on function %s from public, anon',target);

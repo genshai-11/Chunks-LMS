@@ -37,7 +37,7 @@ import {
 } from '../../modules/assessment/session-capture'
 import { ObserveHeatmap } from '../../components/ObserveHeatmap'
 import { UserAvatar } from '../../components/UserAvatar'
-import type { ResultColor } from '../../modules/result-lifecycle/types'
+import type { ProvisionalColor, ResultColor } from '../../modules/result-lifecycle/types'
 import { PROBE_ACTIONS } from '../../modules/assessment/probe-actions'
 import { probeChunksNumber } from '../../modules/assessment/probe-metrics'
 import type { LiveTestItem } from '../../modules/assessment/live-test'
@@ -68,13 +68,45 @@ import {
 } from '../../lib/live-assessment'
 import { getSupabase } from '../../lib/supabase'
 import { triggerConfetti } from '../../lib/confetti'
+import { playColorClick, resultAudioUrl } from '../../lib/color-audio'
+import { SPECTRUM_COLORS } from '../../modules/result-lifecycle/types'
 
-const COLORS: { key: ResultColor; label: string; shortcut: string }[] = [
+const COLORS: { key: ProvisionalColor; label: string; shortcut: string }[] = [
   { key: 'red', label: 'Red', shortcut: '0' },
-  { key: 'yellow', label: 'Orange', shortcut: '1' },
+  { key: 'orange', label: 'Orange', shortcut: '1' },
   { key: 'green', label: 'Green', shortcut: '2' },
   { key: 'purple', label: 'Purple', shortcut: '3' },
 ]
+
+const SPECTRUM_LABEL: Record<ResultColor, string> = {
+  red: 'Red',
+  orange: 'Orange',
+  yellow: 'Yellow',
+  green: 'Green',
+  blue: 'Blue',
+  indigo: 'Indigo',
+  purple: 'Purple',
+}
+
+const SPECTRUM_BG: Record<ResultColor, string> = {
+  red: 'bg-red-500',
+  orange: 'bg-orange-500',
+  yellow: 'bg-yellow-400',
+  green: 'bg-emerald-500',
+  blue: 'bg-sky-400',
+  indigo: 'bg-indigo-500',
+  purple: 'bg-fuchsia-500',
+}
+
+const SPECTRUM_PILL: Record<ResultColor, string> = {
+  red: 'bg-red-500/10 text-red-400 border-red-500/20',
+  orange: 'bg-orange-400/10 text-orange-400 border-orange-400/20',
+  yellow: 'bg-yellow-400/10 text-yellow-300 border-yellow-400/20',
+  green: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  blue: 'bg-sky-400/10 text-sky-300 border-sky-400/20',
+  indigo: 'bg-indigo-400/10 text-indigo-300 border-indigo-400/20',
+  purple: 'bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20',
+}
 
 type ReactionKind = 'celebrate' | 'happy' | 'fight'
 type Reaction = { kind: ReactionKind; color: ResultColor; id: number } | null
@@ -116,9 +148,13 @@ function formatFinishSummary(
     `Questions: ${capture.questions.length}`,
     `Finalized: ${summary.done}/${summary.total}`,
     `0 Red: ${summary.byColor.red}`,
-    `1 Orange: ${summary.byColor.yellow}`,
+    `1 Orange: ${summary.byColor.orange}`,
+    `F Yellow: ${summary.byColor.yellow}`,
     `2 Green: ${summary.byColor.green}`,
+    `C Blue: ${summary.byColor.blue}`,
+    `D Indigo: ${summary.byColor.indigo}`,
     `3 Purple: ${summary.byColor.purple}`,
+    `Total records: ${summary.totalRecords} (${summary.primaryRecords} main + ${summary.probeRecords} probe)`,
     `Max chunks number: ${summary.maxProbeDepth}`,
     unresolved > 0
       ? `Left unfinalized when session closed: ${unresolved}`
@@ -419,9 +455,14 @@ export function TeacherObservePage() {
       done: summary.done,
       total: summary.total,
       red: summary.byColor.red,
+      orange: summary.byColor.orange,
       yellow: summary.byColor.yellow,
       green: summary.byColor.green,
+      blue: summary.byColor.blue,
+      indigo: summary.byColor.indigo,
       purple: summary.byColor.purple,
+      recordedByColor: summary.recordedByColor,
+      totalRecords: summary.totalRecords,
       maxProbeDepth: summary.maxProbeDepth,
       unresolved,
     }
@@ -503,9 +544,27 @@ export function TeacherObservePage() {
   const probeOpen =
     attempt?.snapshot.status === 'probe_open' || attempt?.snapshot.status === 'resolution_required'
   const summary = capture ? sessionColorSummary(capture) : null
-  const ry = summary ? summary.byColor.red + summary.byColor.yellow : 0
+  const warmRecords = summary
+    ? summary.recordedByColor.red + summary.recordedByColor.orange + summary.recordedByColor.yellow
+    : 0
+  const coolRecords = summary
+    ? summary.recordedByColor.green + summary.recordedByColor.blue + summary.recordedByColor.indigo + summary.recordedByColor.purple
+    : 0
   const done = summary ? summary.done : 0
-  const rfcPct = done > 0 ? Math.round((ry / done) * 100) : 0
+  const rfcPct = summary?.totalRecords ? Math.round((warmRecords / summary.totalRecords) * 100) : 0
+  const racPct = summary?.totalRecords ? Math.round((coolRecords / summary.totalRecords) * 100) : 0
+  const rfcTitle = summary
+    ? `RFC = warm records / total records = ${warmRecords} / ${summary.totalRecords}. Warm = Red + Orange + Yellow.`
+    : 'RFC = warm records / total records'
+  const racTitle = summary
+    ? `%c = cool records / total records = ${coolRecords} / ${summary.totalRecords}. Cool = Green + Blue + Indigo + Purple.`
+    : '%c = cool records / total records'
+  const rfcTooltip = summary
+    ? `Warm records / N_total = ${warmRecords} / ${summary.totalRecords}. Warm = Red + Orange + Yellow. Lower RFC means less observed struggle.`
+    : 'RFC uses warm records once observations are finalized.'
+  const racTooltip = summary
+    ? `Cool records / N_total = ${coolRecords} / ${summary.totalRecords}. Cool = Green + Blue + Indigo + Purple. Higher %c means more cool measurement steps.`
+    : '%c uses cool records once observations are finalized.'
   const splitMode = capture?.learnerIds.length === 2
 
   const learnerName = useCallback(
@@ -542,7 +601,8 @@ export function TeacherObservePage() {
     }
 
     try {
-      const audio = new Audio(`/audio/${color}.wav`)
+      playColorClick(color)
+      const audio = new Audio(resultAudioUrl(color))
       void audio.play().catch((err) => {
         console.warn('[observe] audio play failed:', err)
       })
@@ -578,7 +638,7 @@ export function TeacherObservePage() {
   )
 
   const recordColor = useCallback(
-    async (color: ResultColor) => {
+    async (color: ProvisionalColor) => {
       if (!capture || !attempt || liveSaving) return
       const wasFinal = isFinalized
       setLiveSaving(true)
@@ -637,7 +697,7 @@ export function TeacherObservePage() {
           result.data.snapshot.status === 'finalized' ||
           result.data.snapshot.status === 'corrected'
         ) {
-          const color: ResultColor = outcome === 'fail' ? 'red' : 'green'
+          const color: ResultColor = outcome === 'fail' ? 'yellow' : 'indigo'
           playReaction(color)
           next = await advanceAfterFinal(next)
           setCapture(next)
@@ -645,7 +705,8 @@ export function TeacherObservePage() {
           flash(color)
         } else if (outcome === 'continue') {
           try {
-            const audio = new Audio('/audio/yellow.wav')
+            playColorClick('blue')
+            const audio = new Audio(resultAudioUrl('blue'))
             void audio.play().catch((err) => {
               console.warn('[observe] audio play failed:', err)
             })
@@ -693,7 +754,7 @@ export function TeacherObservePage() {
   )
 
   const recordColorForLearner = useCallback(
-    async (learnerUserId: string, color: ResultColor) => {
+    async (learnerUserId: string, color: ProvisionalColor) => {
       if (!capture || liveSaving) return
       const learnerAttempt = currentAttemptForLearner(capture, learnerUserId)
       if (!learnerAttempt) return
@@ -756,7 +817,7 @@ export function TeacherObservePage() {
           result.data.snapshot.status === 'finalized' ||
           result.data.snapshot.status === 'corrected'
         ) {
-          const color: ResultColor = outcome === 'fail' ? 'red' : 'green'
+          const color: ResultColor = outcome === 'fail' ? 'yellow' : 'indigo'
           playReaction(color)
           next = await advanceLearnerPane(next, learnerUserId)
           setCapture(next)
@@ -764,7 +825,8 @@ export function TeacherObservePage() {
           flash(color)
         } else if (outcome === 'continue') {
           try {
-            const audio = new Audio('/audio/yellow.wav')
+            playColorClick('blue')
+            const audio = new Audio(resultAudioUrl('blue'))
             void audio.play().catch((err) => {
               console.warn('[observe] audio play failed:', err)
             })
@@ -964,6 +1026,19 @@ export function TeacherObservePage() {
           setActiveSplitLearnerId(splitLearnerId === a ? (b ?? a ?? null) : (a ?? null))
           return
         }
+        if (splitProbeOpen) {
+          if (k === 'f' || k === '1') {
+            e.preventDefault()
+            resolveProbeForLearner(splitLearnerId, 'fail')
+          } else if (k === 'c' || k === '2') {
+            e.preventDefault()
+            resolveProbeForLearner(splitLearnerId, 'continue')
+          } else if (k === 'd' || k === '3' || k === 'enter') {
+            e.preventDefault()
+            resolveProbeForLearner(splitLearnerId, 'done')
+          }
+          return
+        }
         if (k === '0') {
           e.preventDefault()
           recordColorForLearner(splitLearnerId, 'red')
@@ -971,7 +1046,7 @@ export function TeacherObservePage() {
         }
         if (k === '1') {
           e.preventDefault()
-          recordColorForLearner(splitLearnerId, 'yellow')
+          recordColorForLearner(splitLearnerId, 'orange')
           return
         }
         if (k === '2') {
@@ -984,17 +1059,18 @@ export function TeacherObservePage() {
           recordColorForLearner(splitLearnerId, 'purple')
           return
         }
-        if (splitProbeOpen) {
-          if (k === 'f') {
-            e.preventDefault()
-            resolveProbeForLearner(splitLearnerId, 'fail')
-          } else if (k === 'p' || k === 'c') {
-            e.preventDefault()
-            resolveProbeForLearner(splitLearnerId, 'continue')
-          } else if (k === 'd' || k === 'enter') {
-            e.preventDefault()
-            resolveProbeForLearner(splitLearnerId, 'done')
-          }
+        return
+      }
+      if (probeOpen) {
+        if (k === 'f' || k === '1') {
+          e.preventDefault()
+          resolveProbe('fail')
+        } else if (k === 'c' || k === '2') {
+          e.preventDefault()
+          resolveProbe('continue')
+        } else if (k === 'd' || k === '3' || k === 'enter') {
+          e.preventDefault()
+          resolveProbe('done')
         }
         return
       }
@@ -1005,7 +1081,7 @@ export function TeacherObservePage() {
       }
       if (k === '1') {
         e.preventDefault()
-        recordColor('yellow')
+        recordColor('orange')
         return
       }
       if (k === '2') {
@@ -1017,18 +1093,6 @@ export function TeacherObservePage() {
         e.preventDefault()
         recordColor('purple')
         return
-      }
-      if (probeOpen) {
-        if (k === 'f') {
-          e.preventDefault()
-          resolveProbe('fail')
-        } else if (k === 'p' || k === 'c') {
-          e.preventDefault()
-          resolveProbe('continue')
-        } else if (k === 'd' || k === 'enter') {
-          e.preventDefault()
-          resolveProbe('done')
-        }
       }
     }
     window.addEventListener('keydown', onKey)
@@ -1113,10 +1177,13 @@ export function TeacherObservePage() {
     const learnerDone = learnerAttempts.filter(
       (a) => a.snapshot.status === 'finalized' || a.snapshot.status === 'corrected',
     ).length
-    const learnerRy = learnerAttempts.filter(
-      (a) => a.snapshot.effectiveColor === 'red' || a.snapshot.effectiveColor === 'yellow',
+    const learnerWarm = learnerAttempts.filter(
+      (a) =>
+        a.snapshot.effectiveColor === 'red' ||
+        a.snapshot.effectiveColor === 'orange' ||
+        a.snapshot.effectiveColor === 'yellow',
     ).length
-    const learnerRfc = learnerDone > 0 ? Math.round((learnerRy / learnerDone) * 100) : 0
+    const learnerRfc = learnerDone > 0 ? Math.round((learnerWarm / learnerDone) * 100) : 0
     const active = activeSplitLearnerId === learnerId
     const paneLearnerDayNumber = learnerCurrentSessionNumber({
       ledger,
@@ -1147,9 +1214,12 @@ export function TeacherObservePage() {
               </span>
             </h2>
             <div className="observe-meta-row">
-              <span className="observe-learner-rfc" title="Learner RFC in this session">
+              <span className="observe-learner-rfc observe-has-tooltip is-rfc" tabIndex={0}>
                 <Activity className="h-3.5 w-3.5" aria-hidden />
                 RFC {learnerDone ? `${learnerRfc}%` : '—'}
+                <span className="observe-metric-tooltip" role="tooltip">
+                  Learner RFC uses this learner's finalized effective colors only. Warm / finalized sample = {learnerWarm} / {learnerDone}.
+                </span>
               </span>
               <span className="observe-meta-muted">
                 {learnerDone}/{Math.max(learnerAttempts.length, 1)} done
@@ -1196,10 +1266,10 @@ export function TeacherObservePage() {
                       className={`observe-dock-probe-btn ${action.className}`}
                       onClick={() => resolveProbeForLearner(learnerId, action.outcome)}
                       disabled={liveSaving}
-                      aria-label={`${action.label} probe`}
+                      aria-label={`${action.colorLabel} (${action.label}) probe`}
                     >
-                      <span>{action.label}</span>
-                      <kbd>{action.shortcut}</kbd>
+                      <span>{action.colorLabel} ({action.label})</span>
+                      <kbd>{action.shortcuts.join(' / ')}</kbd>
                     </button>
                   ))}
                 </div>
@@ -1222,8 +1292,8 @@ export function TeacherObservePage() {
                       disabled={liveSaving}
                       aria-label={c.label}
                     >
-                      <span className="observe-dock-num">{c.shortcut}</span>
-                      <span className="observe-dock-label">{c.label}</span>
+                      <span className="observe-dock-num">{c.label}</span>
+                      <span className="observe-dock-label">Key {c.shortcut}</span>
                     </button>
                   ))}
                 </div>
@@ -1486,13 +1556,25 @@ export function TeacherObservePage() {
               </h1>
               <div className="observe-meta-row">
                 {done > 0 ? (
-                  <span
-                    className="observe-learner-rfc"
-                    title={`Focus Coefficient: ${rfcPct}% Red/Orange`}
-                  >
-                    <Activity className="h-3.5 w-3.5" aria-hidden />
-                    RFC {rfcPct}%
-                  </span>
+                  <>
+                    <span
+                      className="observe-learner-rfc observe-has-tooltip is-rfc"
+                      aria-label={rfcTitle}
+                      tabIndex={0}
+                    >
+                      <Activity className="h-3.5 w-3.5" aria-hidden />
+                      RFC {rfcPct}%
+                      <span className="observe-metric-tooltip" role="tooltip">
+                        {rfcTooltip}
+                      </span>
+                    </span>
+                    <span className="observe-learner-rfc observe-has-tooltip is-percent-c" aria-label={racTitle} tabIndex={0}>
+                      %c {racPct}%
+                      <span className="observe-metric-tooltip" role="tooltip">
+                        {racTooltip}
+                      </span>
+                    </span>
+                  </>
                 ) : (
                   <span className="observe-meta-muted observe-phone-only observe-hint-phone">
                     Tap a color
@@ -1501,18 +1583,26 @@ export function TeacherObservePage() {
                 {/* Counts live in map on phone — keep pills on tablet/desktop only */}
                 <div
                   className="observe-heat-counts observe-color-pills observe-hide-phone"
-                  aria-label="Color counts"
+                  aria-label="Recorded 7-color counts"
                 >
-                  {COLORS.map((c) => (
+                  {SPECTRUM_COLORS.map((color) => (
                     <span
-                      key={c.key}
-                      className={`observe-heat-count is-${c.key}`}
-                      title={`${c.label}: ${summary ? summary.byColor[c.key] : 0}`}
+                      key={color}
+                      className={`observe-heat-count is-${color}`}
+                      title={`${color}: ${summary ? summary.recordedByColor[color] : 0} recorded steps${
+                        color === 'green' ? ' (Green probe openers)' : color === 'blue' ? ' (Continue probe steps)' : ''
+                      }`}
                     >
                       <i aria-hidden />
-                      {summary ? summary.byColor[c.key] : 0}
+                      {summary ? summary.recordedByColor[color] : 0}
                     </span>
                   ))}
+                  <span
+                    className="observe-heat-count is-total"
+                    title={summary ? `Total records = main + probe = ${summary.primaryRecords} + ${summary.probeRecords}` : 'Total records'}
+                  >
+                    Σ {summary ? summary.totalRecords : 0}
+                  </span>
                 </div>
               </div>
               {probeOpen ? (
@@ -1563,10 +1653,10 @@ export function TeacherObservePage() {
                       className={`observe-dock-probe-btn ${action.className}`}
                       onClick={() => resolveProbe(action.outcome)}
                       disabled={liveSaving}
-                      aria-label={`${action.label} probe`}
+                      aria-label={`${action.colorLabel} (${action.label}) probe`}
                     >
-                      <span>{action.label}</span>
-                      <kbd>{action.shortcut}</kbd>
+                      <span>{action.colorLabel} ({action.label})</span>
+                      <kbd>{action.shortcuts.join(' / ')}</kbd>
                     </button>
                   ))}
                 </div>
@@ -1585,8 +1675,8 @@ export function TeacherObservePage() {
                       disabled={!attempt || liveSaving}
                       aria-label={c.label}
                     >
-                      <span className="observe-dock-num">{c.shortcut}</span>
-                      <span className="observe-dock-label">{c.label}</span>
+                      <span className="observe-dock-num">{c.label}</span>
+                      <span className="observe-dock-label">Key {c.shortcut}</span>
                     </button>
                   ))}
                 </div>
@@ -1835,30 +1925,32 @@ export function TeacherObservePage() {
 
                 {/* Color distribution bar */}
                 <div>
-                  <p className="text-[10px] text-slate-400 uppercase font-medium mb-1.5">Color Distribution</p>
+                  <p className="text-[10px] text-slate-400 uppercase font-medium mb-1.5">Recorded 7-color distribution</p>
                   <div className="h-3 w-full rounded-full bg-slate-950 overflow-hidden flex">
-                    {finishMetrics.red > 0 && <div className="h-full bg-red-500" style={{ width: `${(finishMetrics.red / Math.max(finishMetrics.done, 1)) * 100}%` }} />}
-                    {finishMetrics.yellow > 0 && <div className="h-full bg-orange-500" style={{ width: `${(finishMetrics.yellow / Math.max(finishMetrics.done, 1)) * 100}%` }} />}
-                    {finishMetrics.green > 0 && <div className="h-full bg-emerald-500" style={{ width: `${(finishMetrics.green / Math.max(finishMetrics.done, 1)) * 100}%` }} />}
-                    {finishMetrics.purple > 0 && <div className="h-full bg-fuchsia-500" style={{ width: `${(finishMetrics.purple / Math.max(finishMetrics.done, 1)) * 100}%` }} />}
+                    {SPECTRUM_COLORS.map((color) =>
+                      finishMetrics.recordedByColor[color] > 0 ? (
+                        <div
+                          key={color}
+                          className={`h-full ${SPECTRUM_BG[color]}`}
+                          style={{ width: `${(finishMetrics.recordedByColor[color] / Math.max(finishMetrics.totalRecords, 1)) * 100}%` }}
+                        />
+                      ) : null,
+                    )}
                   </div>
                   <div className="grid grid-cols-4 gap-1.5 mt-2.5 text-center text-[10px]">
-                    <div className="bg-red-500/10 text-red-400 border border-red-500/20 py-1 rounded font-bold">
-                      Red: {finishMetrics.red}
-                    </div>
-                    <div className="bg-orange-400/10 text-orange-400 border border-orange-400/20 py-1 rounded font-bold">
-                      Orange: {finishMetrics.yellow}
-                    </div>
-                    <div className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 py-1 rounded font-bold">
-                      Green: {finishMetrics.green}
-                    </div>
-                    <div className="bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20 py-1 rounded font-bold">
-                      Purple: {finishMetrics.purple}
-                    </div>
+                    {SPECTRUM_COLORS.map((color) => (
+                      <div key={color} className={`${SPECTRUM_PILL[color]} border py-1 rounded font-bold`}>
+                        {SPECTRUM_LABEL[color]}: {finishMetrics.recordedByColor[color]}
+                      </div>
+                    ))}
                   </div>
                 </div>
 
                 {/* Additional metrics */}
+                <div className="flex justify-between items-center text-xs pt-1 border-t border-white/5">
+                  <span className="text-slate-400">Total records:</span>
+                  <span className="font-mono font-bold text-white">{finishMetrics.totalRecords}</span>
+                </div>
                 <div className="flex justify-between items-center text-xs pt-1 border-t border-white/5">
                   <span className="text-slate-400">Max chunks number:</span>
                   <span className="font-mono font-bold text-white">{finishMetrics.maxProbeDepth}</span>

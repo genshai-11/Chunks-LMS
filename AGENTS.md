@@ -8,6 +8,18 @@ Before changing the project, read `CONTEXT.md`, relevant files under `docs/adr/`
 
 ## Agent skills
 
+### CodeGraph-first code reading
+
+**Before broad code search or reading implementation files, invoke `[skill:codegraph-advisor]`.**
+
+1. Run the CodeGraph preflight/status check and sync the graph when stale.
+2. Use `codegraph explore` for architecture, behavior, dependency, caller/callee, and impact questions.
+3. Use `codegraph query` for exact symbol lookup.
+4. Read only the relevant source files afterward to verify graph conclusions.
+5. If CodeGraph cannot index a language/file, report that limitation before falling back to normal search.
+
+The local `.codegraph/` index is machine-generated and must not be committed. Project MCP integration is declared in `.mcp.json`.
+
 Installed from [mattpocock/skills](https://github.com/mattpocock/skills) into:
 
 - `.agents/skills/` — canonical project skills
@@ -31,6 +43,7 @@ This is a single-context repository using root `CONTEXT.md` and `docs/adr/`. See
 
 | Skill | When |
 |---|---|
+| `[skill:codegraph-advisor]` | Required before broad code reading/search; trace architecture and blast radius with CodeGraph first |
 | `/grill-with-docs` | Align on a change; update glossary/ADRs while grilling |
 | `/triage` | Move GitHub issues through needs-triage → ready-for-agent |
 | `/to-spec` | Publish a discussed plan as a tracker issue |
@@ -59,21 +72,20 @@ Main specs live under `openspec/specs/` (7 capabilities). No active change by de
 
 | Role | Access | Scope |
 |------|--------|--------|
-| **Admin** | Supabase Auth | **Accounts** (teacher/learner active\|inactive, invites) + **Metrics** catalog (enable/label/min sample). Not courses/classes. |
+| **Admin** | Supabase Auth | **Accounts** (teacher/learner active\|inactive) + **Metrics** catalog (enable/label/min sample). Not courses/classes. |
 | **Teacher** | Supabase Auth | **Learner tree first** → programs/classes/seating → start session (1..N learners, pretest/posttest) → observe → analysis. |
-| **Learner** | **Scoped share link** | Profile **email** registered by Admin → invite URL `/access?email=…`. Read-only own progress. No staff Auth account. |
+| **Learner** | No app login | Staff-managed profile only. Results are reviewed through Teacher/Admin analysis. |
 
 - Staff maps native `auth.users.id` → stable domain `users.auth_user_id`; active database `staff_roles` authorize Admin/Teacher.
-- Learner portal is read-only, scoped to the matched email profile (`activeLearnerUserId`).
+- Learner portal/share-link access is removed from the current V1 runtime.
 - Membership, multi-org, and learner Auth accounts are **Phase F / later**.
 
 ### Flow (current product)
 
 ```text
-Home → Admin (Supabase Auth)  accounts (active/inactive · invites) · metrics catalog · analysis
+Home → Admin (Supabase Auth)  accounts (active/inactive) · metrics catalog · analysis
      → Teacher (Supabase Auth) learners tree → classes/programs → start session (select HV)
                               → observe (per-learner columns / learner-first) → analysis
-     → Learner (share link)   /access?email= → own attendance · analysis (enabled metrics only)
 ```
 
 ### Probe counters (product language)
@@ -99,14 +111,14 @@ Session **ceiling** (`maxProbeCount`) is not “n depth max”.
 | Domain + ADRs + unit tests | 90–95 | Measurement core + n_* metrics |
 | Role UI (CRUD / observe / analysis) | ~90 | Admin accounts/metrics; Teacher learner-first |
 | Staff Supabase Auth (Admin/Teacher gates) | ~85 | Native persistent session + database `staff_roles`; `VITE_AUTH_BYPASS` for CI |
-| Learner share-link portal | ~90 | Invites + multi-enrollment class picker |
+| Learner portal/share-link | Removed | No public learner access in current V1 runtime |
 | Multi-class / teacher-owned programs | ~85 | Teacher creates program/class/seat |
 | Hosted multi-user production | ~85 | Runbook + OpenSpec archive |
 | **Overall V1 production readiness** | **~88** | First class shippable; live sign-off via runbook |
 
 **Full plan (phases A–F):** [`docs/plans/lms-completion-by-role.md`](docs/plans/lms-completion-by-role.md) — still historical for A–E; product flow above is authoritative for Admin vs Teacher ownership.
 
-**V1 “100%” definition:** Admin provisions accounts + metrics; teachers own learners/sessions/capture; learners open **email invite links** and see only own progress from **finalized real data**; multi-class teacher works; hosted course without data loss.
+**V1 “100%” definition:** Admin provisions accounts + metrics; teachers own learners/sessions/capture/analysis; multi-class teacher works; hosted course without data loss.
 
 ## Release controls and deployment gates
 
@@ -125,7 +137,7 @@ Session **ceiling** (`maxProbeCount`) is not “n depth max”.
 - Only finalized results feed progress metrics.
 - Treat question sequence numbers as presentation, not stable identity.
 - Keep learner-first and question-first as UI modes over the same domain model.
-- Staff workspaces: gate with native Supabase Auth plus database `staff_roles`. Learner portal: scoped invite only — never expose other learners’ rows.
+- Staff workspaces: gate with native Supabase Auth plus database `staff_roles`. Do not reintroduce learner portal/share-link access unless product scope changes.
 - Prefer Supabase RLS for staff-backed data paths when configured; do not block V1 on full membership RLS.
 - Treat V1 metrics as operational indicators, not validated psychometric instruments.
 - Keep resource content and CCI/CVR integrations outside the V1 core domain.

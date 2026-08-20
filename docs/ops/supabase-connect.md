@@ -87,7 +87,7 @@ Sign-in required when `VITE_AUTH_BYPASS=false`. Sign-out no longer wipes local c
 | Symptom | Fix |
 |---------|-----|
 | Badge “Local only” | Missing `VITE_SUPABASE_*` or restart dev server |
-| “Sign in to load…” | Supabase email/password or magic-link sign-in; use bypass only locally |
+| “Sign in to load…” | Supabase email-or-username/password or email magic-link sign-in; use bypass only locally |
 | Save errors / empty cloud | `supabase db push`; check RLS demo policies on foundation tables |
 | service_role in frontend | Remove it; use anon key only |
 

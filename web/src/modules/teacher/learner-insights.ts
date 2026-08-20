@@ -1,5 +1,5 @@
 import type { ResultRecord } from '../reporting/progress'
-import { COLOR_SCORE, type ResultColor } from '../result-lifecycle/types'
+import { COLOR_SCORE, SPECTRUM_COLORS, WARM_COLORS } from '../result-lifecycle/types'
 import type { LearningSession, SchedulingState } from '../scheduling/types'
 import { effectiveResults } from '../ops/effective-results'
 
@@ -9,8 +9,11 @@ export type LearnerSessionSummary = {
   startedAt: string
   status: LearningSession['status']
   red: number
+  orange: number
   yellow: number
   green: number
+  blue: number
+  indigo: number
   purple: number
   total: number
   rfc: number | null
@@ -18,7 +21,7 @@ export type LearnerSessionSummary = {
   probeTotal: number
 }
 
-const COLORS: ResultColor[] = ['red', 'yellow', 'green', 'purple']
+const COLORS = SPECTRUM_COLORS
 
 export function summarizeLearnerSessions(input: {
   ledger: ResultRecord[]
@@ -59,7 +62,7 @@ export function summarizeLearnerSessions(input: {
 
   const chronological = Array.from(rows.values())
     .map((row) => {
-      const redYellow = row.red + row.yellow
+      const redYellow = WARM_COLORS.reduce((sum, color) => sum + row[color], 0)
       const score = COLORS.reduce((sum, color) => sum + row[color] * COLOR_SCORE[color], 0)
       return {
         ...row,
@@ -164,8 +167,11 @@ function emptyRow(session: LearningSession): LearnerSessionSummary {
     startedAt: session.startedAt,
     status: session.status,
     red: 0,
+    orange: 0,
     yellow: 0,
     green: 0,
+    blue: 0,
+    indigo: 0,
     purple: 0,
     total: 0,
     rfc: null,

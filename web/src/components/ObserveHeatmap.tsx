@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { CaptureSessionState } from '../modules/assessment/session-capture'
 import { sessionColorSummary } from '../modules/assessment/session-capture'
+import { calculateSpectrumStepBreakdown } from '../modules/metrics/calculate'
 import { probeChunksNumber } from '../modules/assessment/probe-metrics'
 
 type Props = {
@@ -23,12 +24,24 @@ export function ObserveHeatmap({
   layout = 'column',
 }: Props) {
   const summary = sessionColorSummary(capture)
-  // Sample size for RFC/%c — not chunks number.
-  const finalized = summary.done
-  const ry = summary.byColor.red + summary.byColor.yellow
-  const gp = summary.byColor.green + summary.byColor.purple
-  const rfcPct = finalized > 0 ? Math.round((ry / finalized) * 100) : 0
-  const racPct = finalized > 0 ? Math.round((gp / finalized) * 100) : 0
+  const finalizedAttempts = capture.attempts.filter(
+    (a) =>
+      (a.snapshot.status === 'finalized' || a.snapshot.status === 'corrected') &&
+      a.snapshot.effectiveColor,
+  )
+  const spectrum = calculateSpectrumStepBreakdown(
+    finalizedAttempts.map((a) => ({
+      effectiveColor: a.snapshot.effectiveColor!,
+      enteredProbeFlow: a.snapshot.enteredProbeFlow,
+      probeEventCount: a.snapshot.probeCount,
+    })),
+  )
+  const nTotal = spectrum.totalRecords
+  const rfcPct = spectrum.rfc == null ? 0 : Math.round(spectrum.rfc * 100)
+  const racPct = spectrum.rac == null ? 0 : Math.round(spectrum.rac * 100)
+  const rfcTitle = `RFC = warm steps / N_total = ${spectrum.warmSteps} / ${nTotal}. Warm = Red + Orange + Yellow.`
+  const racTitle = `%c = cool steps / N_total = ${spectrum.coolSteps} / ${nTotal}. Cool = Green + Blue + Indigo + Purple.`
+  const totalTitle = `Total records = primary records + probe records = ${spectrum.primaryRecords} + ${spectrum.probeRecords} = ${nTotal}. Finalized attempts=${summary.done}; max chunks number=${summary.maxProbeDepth}.`
 
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -43,17 +56,17 @@ export function ObserveHeatmap({
   return (
     <div className={`observe-heat layout-${layout}`}>
       <div className="observe-heat-summary" aria-label="Session summary">
-        <span className="observe-heat-metric" title="(Red+Orange) / finalized questions">
-          RFC <strong>{finalized ? `${rfcPct}%` : '—'}</strong>
+        <span className="observe-heat-metric" title={rfcTitle}>
+          RFC <strong>{nTotal ? `${rfcPct}%` : '—'}</strong>
         </span>
-        <span className="observe-heat-metric muted" title="(Green+Purple) / finalized questions">
-          %c <strong>{finalized ? `${racPct}%` : '—'}</strong>
+        <span className="observe-heat-metric muted" title={racTitle}>
+          %c <strong>{nTotal ? `${racPct}%` : '—'}</strong>
         </span>
         <span
           className="observe-heat-metric muted tabular"
-          title={`Finalized questions · max chunks number=${summary.maxProbeDepth}`}
+          title={totalTitle}
         >
-          {summary.done}/{Math.max(summary.total, 1)}
+          records {nTotal}/{Math.max(summary.total + spectrum.probeRecords, 1)}
           {summary.maxProbeDepth > 0 ? ` · max chunks=${summary.maxProbeDepth}` : ''}
         </span>
       </div>
@@ -73,8 +86,11 @@ export function ObserveHeatmap({
           const active = i === currentQuestionIndex
           const cls = open ? 'is-open' : draft ? 'is-draft' : color ? `is-${color}` : 'is-empty'
           const chunksNumber = snap ? probeChunksNumber(snap) : null
-          const probeBit =
-            chunksNumber != null ? ` · chunks number=${chunksNumber}` : open ? ' · probe open' : ''
+          const probeBit = chunksNumber != null
+            ? ` · probe records=${snap?.probeCount ?? 0}; chunks number=${chunksNumber}`
+            : open
+              ? ' · probe open'
+              : ''
           return (
             <button
               key={q.id}
@@ -93,6 +109,9 @@ export function ObserveHeatmap({
               onClick={() => onSelectQuestion(i)}
             >
               {q.sequenceNumber}
+              {chunksNumber != null ? (
+                <span className="observe-heat-probe-badge">n{chunksNumber}</span>
+              ) : null}
             </button>
           )
         })}

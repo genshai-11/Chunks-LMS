@@ -17,10 +17,7 @@ import {
   formatMetricValue,
   type ResultRecord,
 } from '../modules/reporting/progress'
-import {
-  resolveReportWindow,
-  type ReportWindowKind,
-} from '../modules/reporting/report-window'
+import { resolveReportWindow, type ReportWindowKind } from '../modules/reporting/report-window'
 import {
   buildSessionMetricSeries,
   sessionLabel,
@@ -168,9 +165,7 @@ export function ProgressAnalysisView({
 }: Props) {
   const [kind, setKind] = useState<ReportWindowKind>('course')
   const [customStart, setCustomStart] = useState(courseStart.slice(0, 10) || '2026-07-01')
-  const [customEnd, setCustomEnd] = useState(
-    (courseEnd ?? '2026-12-31').toString().slice(0, 10),
-  )
+  const [customEnd, setCustomEnd] = useState((courseEnd ?? '2026-12-31').toString().slice(0, 10))
   const [sessionId, setSessionId] = useState(learningSessions[0]?.id ?? '')
   const [selectedLearnerIds, setSelectedLearnerIds] = useState<string[]>(
     learnerUserId ? [learnerUserId] : [],
@@ -180,19 +175,16 @@ export function ProgressAnalysisView({
   const [deleteSessionIdConfirm, setDeleteSessionIdConfirm] = useState<string | null>(null)
   const [editSessionId, setEditSessionId] = useState<string | null>(null)
   const [editSessionNumberInput, setEditSessionNumberInput] = useState<string>('')
-  
+
   useEffect(() => {
     setSelectedLearnerIds(learnerUserId ? [learnerUserId] : [])
   }, [learnerUserId])
 
-  const [tab, setTab] = useState<
-    'overview' | 'charts' | 'sessions' | 'learners' | 'history'
-  >('overview')
-
-  const learners = useMemo(
-    () => users.filter((u) => u.roles.includes('learner')),
-    [users],
+  const [tab, setTab] = useState<'overview' | 'charts' | 'sessions' | 'learners' | 'history'>(
+    'overview',
   )
+
+  const learners = useMemo(() => users.filter((u) => u.roles.includes('learner')), [users])
 
   const orderedSessions = useMemo(() => {
     return [...learningSessions].sort((a, b) => {
@@ -244,14 +236,18 @@ export function ProgressAnalysisView({
     return ledger.filter((r) => r.courseId === courseId && r.classId === classId)
   }, [ledger, courseId, classId])
 
-  const focusLearnerId = mode === 'learner' ? learnerUserId : (selectedLearnerIds.length === 1 ? selectedLearnerIds[0] : undefined)
-  const focusLearner = focusLearnerId
-    ? users.find((u) => u.id === focusLearnerId)
-    : undefined
+  const focusLearnerId =
+    mode === 'learner'
+      ? learnerUserId
+      : selectedLearnerIds.length === 1
+        ? selectedLearnerIds[0]
+        : undefined
+  const focusLearner = focusLearnerId ? users.find((u) => u.id === focusLearnerId) : undefined
 
   const courseReport = useMemo(() => {
     if (!window || mode === 'learner' || focusLearnerId) return null
-    const learnerIds = selectedLearnerIds.length > 0 ? selectedLearnerIds : learners.map((u) => u.id)
+    const learnerIds =
+      selectedLearnerIds.length > 0 ? selectedLearnerIds : learners.map((u) => u.id)
     return buildCourseProgressReport(scopedLedger, courseId, window, { learnerIds })
   }, [window, mode, focusLearnerId, scopedLedger, courseId, learners, selectedLearnerIds])
 
@@ -316,7 +312,9 @@ export function ProgressAnalysisView({
         }
       })
       .filter(
-        (item): item is {
+        (
+          item,
+        ): item is {
           key: MetricKey
           label: string
           definition: string
@@ -329,7 +327,13 @@ export function ProgressAnalysisView({
   const probeStats = useMemo(() => {
     const probed = windowRecords.filter((r) => r.enteredProbeFlow)
     const count = probed.length
-    const chunksNumbers = probed.map((r) => probeChunksNumber({ enteredProbeFlow: r.enteredProbeFlow, probeCount: r.probeEventCount }) ?? 0)
+    const chunksNumbers = probed.map(
+      (r) =>
+        probeChunksNumber({
+          enteredProbeFlow: r.enteredProbeFlow,
+          probeCount: r.probeEventCount,
+        }) ?? 0,
+    )
     const totalChunksNumber = chunksNumbers.reduce((sum, value) => sum + value, 0)
     const avg = count > 0 ? totalChunksNumber / count : 0
     const max = count > 0 ? Math.max(...chunksNumbers) : 0
@@ -360,9 +364,10 @@ export function ProgressAnalysisView({
   /** Per-day series for class or focused learner — all enabled metrics from real ledger */
   const sessionSeries = useMemo(() => {
     return buildSessionMetricSeries({
-      ledger: selectedLearnerIds.length > 0
-        ? scopedLedger.filter((r) => selectedLearnerIds.includes(r.learnerUserId))
-        : scopedLedger,
+      ledger:
+        selectedLearnerIds.length > 0
+          ? scopedLedger.filter((r) => selectedLearnerIds.includes(r.learnerUserId))
+          : scopedLedger,
       learningSessions: orderedSessions.map((s) => ({
         id: s.id,
         classId: classId ?? '',
@@ -383,7 +388,15 @@ export function ProgressAnalysisView({
       learnerUserId: focusLearnerId,
       metricKeys: dayMetricOptions,
     })
-  }, [scopedLedger, orderedSessions, courseId, classId, focusLearnerId, dayMetricOptions, selectedLearnerIds])
+  }, [
+    scopedLedger,
+    orderedSessions,
+    courseId,
+    classId,
+    focusLearnerId,
+    dayMetricOptions,
+    selectedLearnerIds,
+  ])
 
   function metricLabel(key: MetricKey): string {
     if (key === 'rac') return '%c'
@@ -422,9 +435,7 @@ export function ProgressAnalysisView({
   const selectedSessionLabel = useMemo(() => {
     const s = orderedSessions.find((x) => x.id === sessionId) ?? orderedSessions[0]
     if (!s) return '—'
-    const num =
-      s.sessionNumber ??
-      orderedSessions.findIndex((x) => x.id === s.id) + 1
+    const num = s.sessionNumber ?? orderedSessions.findIndex((x) => x.id === s.id) + 1
     return sessionLabel(num, s.startedAt, totalDays)
   }, [orderedSessions, sessionId, totalDays])
 
@@ -494,10 +505,13 @@ export function ProgressAnalysisView({
                     {selectedLearnerIds.length === 0
                       ? 'Whole class'
                       : selectedLearnerIds.length === 1
-                        ? (learners.find((u) => u.id === selectedLearnerIds[0])?.displayName ?? '1 Learner')
+                        ? (learners.find((u) => u.id === selectedLearnerIds[0])?.displayName ??
+                          '1 Learner')
                         : `${selectedLearnerIds.length} learners`}
                   </span>
-                  <ChevronRight className={`h-3 w-3 transform transition-transform shrink-0 ${whoOpen ? 'rotate-90' : ''}`} />
+                  <ChevronRight
+                    className={`h-3 w-3 transform transition-transform shrink-0 ${whoOpen ? 'rotate-90' : ''}`}
+                  />
                 </button>
                 {whoOpen && (
                   <>
@@ -712,14 +726,17 @@ export function ProgressAnalysisView({
       {tab === 'overview' && (
         <div className="analysis-tab-body">
           <div className="stat-grid analysis-kpis">
-            <div className={`stat-card analysis-kpi-rfc${rfcTone === 'up' ? ' is-good' : rfcTone === 'down' ? ' is-warn' : ''}`}>
+            <div
+              className={`stat-card analysis-kpi-rfc${rfcTone === 'up' ? ' is-good' : rfcTone === 'down' ? ' is-warn' : ''}`}
+            >
               <p className="stat-label flex items-center gap-1">
                 <Activity className="h-3.5 w-3.5" aria-hidden />
                 <span>Struggle (RFC)</span>
                 <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
                   <Info className="h-3.5 w-3.5" />
                   <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
-                    <strong>Struggle (RFC)</strong> = (Red + Orange) ÷ finalized sample. Lower RFC is better. Source: assessment ledger only (no mock).
+                    <strong>Struggle (RFC)</strong> = (Red + Orange) ÷ finalized sample. Lower RFC
+                    is better. Source: assessment ledger only (no mock).
                   </span>
                 </span>
               </p>
@@ -734,7 +751,9 @@ export function ProgressAnalysisView({
                 <span className="analysis-delta-note"> vs prior window</span>
               </p>
             </div>
-            <div className={`stat-card analysis-kpi-rac${racTone === 'up' ? ' is-good' : racTone === 'down' ? ' is-warn' : ''}`}>
+            <div
+              className={`stat-card analysis-kpi-rac${racTone === 'up' ? ' is-good' : racTone === 'down' ? ' is-warn' : ''}`}
+            >
               <p className="stat-label flex items-center gap-1">
                 <span>Success (%c)</span>
                 <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
@@ -778,23 +797,23 @@ export function ProgressAnalysisView({
                   <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
                     <Info className="h-3.5 w-3.5" />
                     <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
-                      <strong>chunks count</strong> = number of times the teacher selected Green (2). Values use real observations only.
+                      <strong>chunks count</strong> = number of times the teacher selected Green
+                      (2). Values use real observations only.
                     </span>
                   </span>
                 </p>
                 <p className="stat-value">{probeStats.count}</p>
                 <p className="meta">Green (2) entries · sample={total}</p>
               </div>
-              <div
-                className="stat-card"
-                title="Mean chunks number among probed attempts"
-              >
+              <div className="stat-card" title="Mean chunks number among probed attempts">
                 <p className="stat-label flex items-center gap-1">
                   <span>avg chunks number</span>
                   <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
                     <Info className="h-3.5 w-3.5" />
                     <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
-                      <strong>avg chunks number</strong> = mean chunks number on probed questions. Green opens at 1; each Continue adds 1. Example: Green + Continue ×8 + Done → chunks number 9.
+                      <strong>avg chunks number</strong> = mean chunks number on probed questions.
+                      Green opens at 1; each Continue adds 1. Example: Green + Continue ×8 + Done →
+                      chunks number 9.
                     </span>
                   </span>
                 </p>
@@ -812,7 +831,8 @@ export function ProgressAnalysisView({
                   <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
                     <Info className="h-3.5 w-3.5" />
                     <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
-                      <strong>max chunks number</strong> = maximum observed chunks number on one question. Example: Green + Continue ×8 + Done → chunks number 9.
+                      <strong>max chunks number</strong> = maximum observed chunks number on one
+                      question. Example: Green + Continue ×8 + Done → chunks number 9.
                     </span>
                   </span>
                 </p>
@@ -823,7 +843,10 @@ export function ProgressAnalysisView({
           </div>
 
           {additionalMetrics.length > 0 && (
-            <div className="analysis-additional-section" style={{ marginTop: 24, marginBottom: 24 }}>
+            <div
+              className="analysis-additional-section"
+              style={{ marginTop: 24, marginBottom: 24 }}
+            >
               <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
                 Additional Indicators (Customized by Admin)
               </h3>
@@ -883,7 +906,9 @@ export function ProgressAnalysisView({
                         const width = `${Math.max(n ? 8 : 0, (n / Math.max(maxBar, 1)) * 100)}%`
                         return (
                           <div key={color} className="dist-row">
-                            <span className={`capture-dot ${color}`}>{resultColorLabel(color)}</span>
+                            <span className={`capture-dot ${color}`}>
+                              {resultColorLabel(color)}
+                            </span>
                             <div className="dist-track">
                               <div className={`dist-fill dist-${color}`} style={{ width }} />
                             </div>
@@ -947,13 +972,9 @@ export function ProgressAnalysisView({
                             </span>
                             <span className="analysis-session-mini-rfc">
                               RFC{' '}
-                              {p.metrics.rfc != null
-                                ? `${(p.metrics.rfc * 100).toFixed(0)}%`
-                                : '—'}
+                              {p.metrics.rfc != null ? `${(p.metrics.rfc * 100).toFixed(0)}%` : '—'}
                             </span>
-                            <span className={`analysis-delta is-${tone}`}>
-                              {formatPp(dRfc)}
-                            </span>
+                            <span className={`analysis-delta is-${tone}`}>{formatPp(dRfc)}</span>
                             <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
                           </button>
                         </li>
@@ -987,8 +1008,8 @@ export function ProgressAnalysisView({
       {tab === 'charts' && (
         <div className="analysis-tab-body">
           <p className="analysis-plain-hint">
-            Multi-chart board: line &amp; bar for RFC/%c by day, stacked colors, pie mix.
-            Respects <strong>Who</strong> filter (class or one learner) above.
+            Multi-chart board: line &amp; bar for RFC/%c by day, stacked colors, pie mix. Respects{' '}
+            <strong>Who</strong> filter (class or one learner) above.
           </p>
           <AnalysisChartsPanel
             ledger={scopedLedger}
@@ -1015,7 +1036,8 @@ export function ProgressAnalysisView({
                   <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
                     Each row is one live day from the <strong>finalized ledger</strong> (no mock).
                     <br />
-                    <strong>RFC</strong> = (Red+Orange) / sample. <strong>Δ RFC</strong> = change vs previous day (negative pp = improvement).
+                    <strong>RFC</strong> = (Red+Orange) / sample. <strong>Δ RFC</strong> = change vs
+                    previous day (negative pp = improvement).
                   </span>
                 </span>
               </span>
@@ -1025,7 +1047,9 @@ export function ProgressAnalysisView({
                 onClick={() => setColumnsPanelOpen(!columnsPanelOpen)}
               >
                 {columnsPanelOpen ? 'Hide columns config' : 'Show columns config'}
-                <ChevronRight className={`h-3 w-3 transform transition-transform ${columnsPanelOpen ? 'rotate-90' : ''}`} />
+                <ChevronRight
+                  className={`h-3 w-3 transform transition-transform ${columnsPanelOpen ? 'rotate-90' : ''}`}
+                />
               </button>
             </div>
             {columnsPanelOpen && (
@@ -1056,7 +1080,10 @@ export function ProgressAnalysisView({
                 <thead>
                   <tr>
                     <th scope="col">Day</th>
-                    <th scope="col" title="Finalized results that day (sample size, not chunks number)">
+                    <th
+                      scope="col"
+                      title="Finalized results that day (sample size, not chunks number)"
+                    >
                       sample
                     </th>
                     {visibleDayColumns.map((key) => (
@@ -1129,7 +1156,7 @@ export function ProgressAnalysisView({
                             >
                               Open
                             </button>
-                             {mode === 'teacher' && onEditSessionNumber && (
+                            {mode === 'teacher' && onEditSessionNumber && (
                               <button
                                 type="button"
                                 className="ghost text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 px-2 py-1 rounded"
@@ -1242,9 +1269,7 @@ export function ProgressAnalysisView({
                 <thead>
                   <tr>
                     <th scope="col">When</th>
-                    {mode === 'teacher' && !focusLearnerId ? (
-                      <th scope="col">Learner</th>
-                    ) : null}
+                    {mode === 'teacher' && !focusLearnerId ? <th scope="col">Learner</th> : null}
                     <th scope="col">Color</th>
                     <th scope="col">Score</th>
                   </tr>
@@ -1297,7 +1322,8 @@ export function ProgressAnalysisView({
           <div className="observe-modal-card text-left max-w-md p-6 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl relative z-50">
             <h3 className="text-lg font-bold text-white mb-2">Delete Live Session?</h3>
             <p className="text-sm text-slate-300 mb-6">
-              Are you sure you want to delete this live session? All question captures and attendance for this session will be permanently deleted from the database.
+              Are you sure you want to delete this live session? All question captures and
+              attendance for this session will be permanently deleted from the database.
             </p>
             <div className="flex justify-end gap-3">
               <button

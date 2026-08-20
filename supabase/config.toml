@@ -37,3 +37,8 @@ enable_signup = true
 # function and returns a Supabase Auth session without exposing the resolved email.
 [functions.username-login]
 verify_jwt = false
+
+# analysis-chat handles OPTIONS/CORS and then enforces the browser session token
+# inside the function, so preflight requests must not be rejected by the gateway.
+[functions.analysis-chat]
+verify_jwt = false

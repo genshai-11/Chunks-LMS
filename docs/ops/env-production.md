@@ -10,6 +10,16 @@
 
 Clerk variables, Clerk JWT bridging, and `VITE_STAFF_*_EMAILS` are no longer used. Staff roles are active rows in `public.staff_roles`.
 
+## Supabase Edge Function secrets
+
+Set these in Supabase Function Secrets, not in Vercel `VITE_*` browser variables.
+
+| Name | Example | Notes |
+|---|---|---|
+| `ANALYSIS_CHAT_BASE_URL` | `https://provider.example/v1` | OpenAI-compatible chat completions base URL |
+| `ANALYSIS_CHAT_API_KEY` | `sk-...` | Provider secret key; never commit or expose in frontend |
+| `ANALYSIS_CHAT_MODEL` | `gpt` | Model name for the analysis chatbot |
+
 ## GitHub Actions CD
 
 Same `VITE_*` values as above, plus:

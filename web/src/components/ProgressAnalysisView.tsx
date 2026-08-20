@@ -29,7 +29,6 @@ import type { MetricSettingsState } from '../modules/metrics/settings'
 import { getEnabledMetricKeys } from '../modules/metrics/settings'
 import type { MetricKey, MetricObservation } from '../modules/metrics/calculate'
 import { AnalysisChartsPanel } from './AnalysisChartsPanel'
-import { AnalysisInsightsChat } from './AnalysisInsightsChat'
 import { UserAvatar } from './UserAvatar'
 import { probeChunksNumber } from '../modules/assessment/probe-metrics'
 
@@ -440,70 +439,6 @@ export function ProgressAnalysisView({
     return sessionLabel(num, s.startedAt, totalDays)
   }, [orderedSessions, sessionId, totalDays])
 
-  const analysisChatContext = useMemo(
-    () => ({
-      courseCode,
-      className,
-      scope: focusLearner
-        ? `${focusLearner.displayName} learner detail`
-        : selectedLearnerIds.length > 1
-          ? `${selectedLearnerIds.length} selected learners`
-          : className
-            ? `${className} class view`
-            : 'course view',
-      totalResults: total,
-      colorCounts: counts,
-      primaryMetrics: [
-        {
-          label: 'Struggle (RFC)',
-          value: rfc ? formatMetricValue(rfc) : '—',
-          delta: formatDelta('rfc', rfcDelta),
-        },
-        {
-          label: 'Success (%c)',
-          value: rac ? formatMetricValue(rac) : '—',
-          delta: formatDelta('rac', racDelta),
-        },
-        { label: 'Results', value: String(total) },
-      ],
-      additionalMetrics: additionalMetrics.map((metric) => ({
-        label: metric.label,
-        value: formatMetricValue(metric.obs),
-        sampleSize: metric.obs.sampleSize,
-        definition: metric.definition,
-      })),
-      sessionSeries: sessionSeries.slice(-12).map((point) => ({
-        label: point.label,
-        metrics: point.metrics,
-      })),
-    }),
-    [
-      additionalMetrics,
-      className,
-      courseCode,
-      counts,
-      focusLearner,
-      rac,
-      racDelta,
-      rfc,
-      rfcDelta,
-      selectedLearnerIds.length,
-      sessionSeries,
-      total,
-    ],
-  )
-
-  const analysisChatStorageKey = useMemo(
-    () =>
-      [
-        'chunks.analysis-chat.cards.v1',
-        courseId,
-        classId ?? 'course',
-        focusLearnerId ?? (selectedLearnerIds.length > 0 ? selectedLearnerIds.join(',') : 'class'),
-      ].join(':'),
-    [classId, courseId, focusLearnerId, selectedLearnerIds],
-  )
-
   if (scopedLedger.length === 0) {
     return (
       <div className="empty-state analysis-empty">
@@ -773,8 +708,6 @@ export function ProgressAnalysisView({
           ) : null}
         </div>
       ) : null}
-
-      <AnalysisInsightsChat context={analysisChatContext} storageKey={analysisChatStorageKey} />
 
       <nav className="subnav" aria-label="Analysis sections">
         {subTabs.map((t) => (

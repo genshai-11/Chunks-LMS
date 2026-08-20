@@ -9,6 +9,8 @@ import {
 type Props = {
   context: AnalysisChatContext
   storageKey: string
+  title?: string
+  description?: string
 }
 
 type PinnedMetricCard = AnalysisChatResult['cards'][number] & {
@@ -17,7 +19,7 @@ type PinnedMetricCard = AnalysisChatResult['cards'][number] & {
 }
 
 const EXAMPLE_PROMPT =
-  'Tạo thêm metric cho biết learner đang cải thiện ổn định hay chỉ tăng đột biến, và gợi ý chart phù hợp.'
+  'Tạo metric cho biết học viên này đang cải thiện ổn định hay chỉ tăng đột biến theo từng session.'
 
 function readPinnedCards(storageKey: string): PinnedMetricCard[] {
   if (typeof window === 'undefined') return []
@@ -36,7 +38,12 @@ function makePinnedId(card: AnalysisChatResult['cards'][number]): string {
     .slice(0, 40)}`
 }
 
-export function AnalysisInsightsChat({ context, storageKey }: Props) {
+export function AnalysisInsightsChat({
+  context,
+  storageKey,
+  title = 'Custom metric chatbot',
+  description = 'Talk with the chatbot, review its draft metric cards, then confirm before adding them to this analysis view.',
+}: Props) {
   const [prompt, setPrompt] = useState('')
   const [result, setResult] = useState<AnalysisChatResult | null>(null)
   const [pinnedCards, setPinnedCards] = useState<PinnedMetricCard[]>(() =>
@@ -92,13 +99,10 @@ export function AnalysisInsightsChat({ context, storageKey }: Props) {
       <div className="panel-header items-start gap-4">
         <div>
           <p className="eyebrow flex items-center gap-2 text-indigo-200">
-            <Bot className="h-4 w-4" aria-hidden /> AI analysis builder
+            <Bot className="h-4 w-4" aria-hidden /> Tests 1-1 metric builder
           </p>
-          <h2>Custom metric chatbot</h2>
-          <p className="panel-desc">
-            Describe a metric or chart. The chatbot uses the current filtered analysis context and
-            returns live cards/suggestions without exposing provider keys in the browser.
-          </p>
+          <h2>{title}</h2>
+          <p className="panel-desc">{description}</p>
         </div>
         <Sparkles className="mt-1 h-5 w-5 text-indigo-200" aria-hidden />
       </div>
@@ -107,8 +111,8 @@ export function AnalysisInsightsChat({ context, storageKey }: Props) {
         {pinnedCards.length > 0 ? (
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="stat-label">Runtime metric cards</p>
-              <p className="meta">Saved in this browser for the current analysis scope</p>
+              <p className="stat-label">Confirmed custom metrics</p>
+              <p className="meta">Saved in this browser for this learner/test analysis scope</p>
             </div>
             <div className="stat-grid">
               {pinnedCards.map((card) => (
@@ -158,7 +162,7 @@ export function AnalysisInsightsChat({ context, storageKey }: Props) {
               ) : (
                 <Send className="h-4 w-4" />
               )}
-              Generate insight
+              Ask chatbot
             </button>
           </div>
         </form>
@@ -172,30 +176,36 @@ export function AnalysisInsightsChat({ context, storageKey }: Props) {
             </div>
 
             {result.cards.length > 0 ? (
-              <div className="stat-grid">
-                {result.cards.map((card, index) => (
-                  <div
-                    key={`${card.title}-${index}`}
-                    className={`stat-card is-${card.tone ?? 'neutral'}`}
-                  >
-                    <p className="stat-label">{card.title}</p>
-                    <p className="stat-value">
-                      {card.value}
-                      {card.unit ? (
-                        <span className="text-base text-slate-400"> {card.unit}</span>
-                      ) : null}
-                    </p>
-                    <p className="meta">{card.description}</p>
-                    <button
-                      type="button"
-                      className="ghost mt-3 inline-flex items-center gap-2 px-3 py-1.5 text-xs"
-                      onClick={() => pinCard(card)}
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="stat-label">Draft metric cards</p>
+                  <p className="meta">Review and confirm before adding to the screen</p>
+                </div>
+                <div className="stat-grid">
+                  {result.cards.map((card, index) => (
+                    <div
+                      key={`${card.title}-${index}`}
+                      className={`stat-card is-${card.tone ?? 'neutral'}`}
                     >
-                      <Pin className="h-3.5 w-3.5" aria-hidden />
-                      Pin to dashboard
-                    </button>
-                  </div>
-                ))}
+                      <p className="stat-label">{card.title}</p>
+                      <p className="stat-value">
+                        {card.value}
+                        {card.unit ? (
+                          <span className="text-base text-slate-400"> {card.unit}</span>
+                        ) : null}
+                      </p>
+                      <p className="meta">{card.description}</p>
+                      <button
+                        type="button"
+                        className="ghost mt-3 inline-flex items-center gap-2 px-3 py-1.5 text-xs"
+                        onClick={() => pinCard(card)}
+                      >
+                        <Pin className="h-3.5 w-3.5" aria-hidden />
+                        Confirm and add metric
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : null}
 

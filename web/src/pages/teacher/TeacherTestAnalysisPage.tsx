@@ -1,5 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, BarChart3, Brain, CircleDot, Eye, EyeOff, Gauge, GripVertical, LineChart as LineChartIcon, Maximize2, Minimize2, PieChart as PieChartIcon, RotateCcw, Target, X, Zap } from 'lucide-react'
+import {
+  Activity,
+  BarChart3,
+  Brain,
+  CircleDot,
+  Eye,
+  EyeOff,
+  Gauge,
+  GripVertical,
+  LineChart as LineChartIcon,
+  Maximize2,
+  Minimize2,
+  PieChart as PieChartIcon,
+  RotateCcw,
+  Target,
+  X,
+  Zap,
+} from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import {
   Bar,
@@ -18,19 +35,51 @@ import {
   YAxis,
 } from 'recharts'
 import { PageHeader } from '../../components/PageHeader'
+import { AnalysisInsightsChat } from '../../components/AnalysisInsightsChat'
 import { EmptyState, Panel } from '../../components/ui'
 import { listActiveLearners } from '../../modules/roster/service'
-import { getStandaloneAssignmentAnalysis, type StandaloneTestRunRow } from '../../lib/standalone-tests'
+import {
+  getStandaloneAssignmentAnalysis,
+  type StandaloneTestRunRow,
+} from '../../lib/standalone-tests'
 import { getTestPackageVersion, listTestPackages } from '../../lib/test-packages'
 import { useAppState } from '../../state/useAppState'
 import { probeChunksNumber } from '../../modules/assessment/probe-metrics'
-import { calculateSpectrumStepBreakdown, spectrumRecordsForAttempt } from '../../modules/metrics/calculate'
-import { racMetricLabelForPackage, racMetricTitle, type PackageRacMetricLabel } from '../../modules/metrics/display-labels'
-import { COLOR_SCORE, COOL_COLORS, SPECTRUM_COLORS, WARM_COLORS, type ResultColor } from '../../modules/result-lifecycle/types'
+import {
+  calculateSpectrumStepBreakdown,
+  spectrumRecordsForAttempt,
+} from '../../modules/metrics/calculate'
+import {
+  racMetricLabelForPackage,
+  racMetricTitle,
+  type PackageRacMetricLabel,
+} from '../../modules/metrics/display-labels'
+import {
+  COLOR_SCORE,
+  COOL_COLORS,
+  SPECTRUM_COLORS,
+  WARM_COLORS,
+  type ResultColor,
+} from '../../modules/result-lifecycle/types'
+import type { AnalysisChatContext } from '../../modules/analysis/analysis-chat'
 
 type AnalysisItem = Record<string, any>
-type QuestionRecord = { color: ResultColor; index: number; label: string; score: number; cpd: number }
-type ChartKey = 'tube' | 'mix' | 'recordCpdQuestion' | 'recordCpdTimeline' | 'questionCpd' | 'percentSession' | 'percentCpd' | 'distribution'
+type QuestionRecord = {
+  color: ResultColor
+  index: number
+  label: string
+  score: number
+  cpd: number
+}
+type ChartKey =
+  | 'tube'
+  | 'mix'
+  | 'recordCpdQuestion'
+  | 'recordCpdTimeline'
+  | 'questionCpd'
+  | 'percentSession'
+  | 'percentCpd'
+  | 'distribution'
 type MetricKey = 'rfc' | 'rac' | 'avgCvr' | 'avgCci' | 'avgCpd' | 'acn' | 'nTotal'
 type ChartUiState = Record<ChartKey, { showLabels: boolean; expanded: boolean; hidden: boolean }>
 type MetricUiState = Record<MetricKey, boolean>
@@ -46,7 +95,16 @@ const DEFAULT_CHART_UI: ChartUiState = {
   distribution: { showLabels: true, expanded: false, hidden: false },
 }
 
-const DEFAULT_CHART_ORDER: ChartKey[] = ['tube', 'mix', 'recordCpdQuestion', 'recordCpdTimeline', 'questionCpd', 'percentSession', 'percentCpd', 'distribution']
+const DEFAULT_CHART_ORDER: ChartKey[] = [
+  'tube',
+  'mix',
+  'recordCpdQuestion',
+  'recordCpdTimeline',
+  'questionCpd',
+  'percentSession',
+  'percentCpd',
+  'distribution',
+]
 
 const DEFAULT_METRIC_UI: MetricUiState = {
   rfc: true,
@@ -171,7 +229,8 @@ function ResultDot(props: any) {
 }
 
 function recordLabel(color: ResultColor, index: number, total: number): string {
-  if (index === 1 && color === 'green') return `Record ${index}/${total}: Green primary opens probe flow`
+  if (index === 1 && color === 'green')
+    return `Record ${index}/${total}: Green primary opens probe flow`
   if (color === 'blue') return `Record ${index}/${total}: Blue probe Continue`
   if (color === 'yellow') return `Record ${index}/${total}: Yellow probe Fail`
   if (color === 'indigo') return `Record ${index}/${total}: Indigo probe Done`
@@ -193,7 +252,10 @@ export function TeacherTestAnalysisPage() {
   const [draggingChart, setDraggingChart] = useState<ChartKey | null>(null)
   const [metricUi, setMetricUi] = useState<MetricUiState>(DEFAULT_METRIC_UI)
   const [racMetricLabel, setRacMetricLabel] = useState<PackageRacMetricLabel>('%c')
-  const [sessionBrushRange, setSessionBrushRange] = useState<{ startIndex?: number; endIndex?: number }>({})
+  const [sessionBrushRange, setSessionBrushRange] = useState<{
+    startIndex?: number
+    endIndex?: number
+  }>({})
   const filterCardRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
@@ -210,7 +272,9 @@ export function TeacherTestAnalysisPage() {
       }
       setRuns(result.data.runs)
       setItems(result.data.items)
-      setLearnerId(result.data.assignment?.learnerUserId ?? result.data.runs[0]?.learnerUserId ?? '')
+      setLearnerId(
+        result.data.assignment?.learnerUserId ?? result.data.runs[0]?.learnerUserId ?? '',
+      )
       const packageVersionId = result.data.assignment?.packageVersionId
       if (packageVersionId) {
         const versionResult = await getTestPackageVersion(packageVersionId)
@@ -219,7 +283,9 @@ export function TeacherTestAnalysisPage() {
           const packageTitle = packagesResult.ok
             ? packagesResult.data.find((pkg) => pkg.id === versionResult.data?.packageId)?.title
             : null
-          setRacMetricLabel(racMetricLabelForPackage(packageTitle ?? versionResult.data.versionLabel))
+          setRacMetricLabel(
+            racMetricLabelForPackage(packageTitle ?? versionResult.data.versionLabel),
+          )
         }
       } else {
         setRacMetricLabel('%c')
@@ -238,7 +304,9 @@ export function TeacherTestAnalysisPage() {
     function closeFilters(event: PointerEvent) {
       const target = event.target as Node | null
       if (target && filterCardRef.current?.contains(target)) return
-      filterCardRef.current?.querySelectorAll('details[open]').forEach((detail) => detail.removeAttribute('open'))
+      filterCardRef.current
+        ?.querySelectorAll('details[open]')
+        .forEach((detail) => detail.removeAttribute('open'))
     }
     window.addEventListener('pointerdown', closeFilters)
     return () => window.removeEventListener('pointerdown', closeFilters)
@@ -271,10 +339,11 @@ export function TeacherTestAnalysisPage() {
           cpd: finalCpd,
           enteredProbeFlow: Boolean(snap?.entered_probe_flow ?? snap?.enteredProbeFlow),
           probeEventCount: num(snap?.probe_count ?? snap?.probeCount, 0),
-          probeDepth: probeChunksNumber({
-            enteredProbeFlow: Boolean(snap?.entered_probe_flow ?? snap?.enteredProbeFlow),
-            probeCount: num(snap?.probe_count ?? snap?.probeCount, 0),
-          }) ?? 0,
+          probeDepth:
+            probeChunksNumber({
+              enteredProbeFlow: Boolean(snap?.entered_probe_flow ?? snap?.enteredProbeFlow),
+              probeCount: num(snap?.probe_count ?? snap?.probeCount, 0),
+            }) ?? 0,
           color,
           colorHex: COLOR_HEX[color],
           finalized: isFinal(item),
@@ -374,7 +443,10 @@ export function TeacherTestAnalysisPage() {
   }, [chartRows])
 
   const maxSessionBrushIndex = Math.max(percentCTimelineRows.length - 1, 0)
-  const sessionBrushStart = Math.min(maxSessionBrushIndex, Math.max(0, sessionBrushRange.startIndex ?? 0))
+  const sessionBrushStart = Math.min(
+    maxSessionBrushIndex,
+    Math.max(0, sessionBrushRange.startIndex ?? 0),
+  )
   const sessionBrushEnd = Math.max(
     sessionBrushStart,
     Math.min(maxSessionBrushIndex, sessionBrushRange.endIndex ?? maxSessionBrushIndex),
@@ -392,30 +464,44 @@ export function TeacherTestAnalysisPage() {
 
   const cpdBrushIndexes = useMemo(() => {
     const indexes = chartRows
-      .map((row, index) => (brushedSessionSet.size === 0 || brushedSessionSet.has(row.session) ? index : -1))
+      .map((row, index) =>
+        brushedSessionSet.size === 0 || brushedSessionSet.has(row.session) ? index : -1,
+      )
       .filter((index) => index >= 0)
     if (!indexes.length) return { startIndex: 0, endIndex: Math.max(chartRows.length - 1, 0) }
     return { startIndex: Math.min(...indexes), endIndex: Math.max(...indexes) }
   }, [brushedSessionSet, chartRows])
 
-  const handleSessionBrushChange = useCallback((range: { startIndex?: number; endIndex?: number } | null) => {
-    if (!range) return
-    setSessionBrushRange(range)
-  }, [])
+  const handleSessionBrushChange = useCallback(
+    (range: { startIndex?: number; endIndex?: number } | null) => {
+      if (!range) return
+      setSessionBrushRange(range)
+    },
+    [],
+  )
 
-  const handleQuestionBrushChange = useCallback((range: { startIndex?: number; endIndex?: number } | null) => {
-    if (!range) return
-    const start = Math.max(0, range.startIndex ?? 0)
-    const end = Math.min(Math.max(chartRows.length - 1, 0), range.endIndex ?? Math.max(chartRows.length - 1, 0))
-    const visible = chartRows.slice(start, end + 1)
-    if (!visible.length) return
-    const visibleSessions = new Set(visible.map((row) => row.session))
-    const sessionIndexes = percentCTimelineRows
-      .map((row, index) => (visibleSessions.has(row.session) ? index : -1))
-      .filter((index) => index >= 0)
-    if (!sessionIndexes.length) return
-    setSessionBrushRange({ startIndex: Math.min(...sessionIndexes), endIndex: Math.max(...sessionIndexes) })
-  }, [chartRows, percentCTimelineRows])
+  const handleQuestionBrushChange = useCallback(
+    (range: { startIndex?: number; endIndex?: number } | null) => {
+      if (!range) return
+      const start = Math.max(0, range.startIndex ?? 0)
+      const end = Math.min(
+        Math.max(chartRows.length - 1, 0),
+        range.endIndex ?? Math.max(chartRows.length - 1, 0),
+      )
+      const visible = chartRows.slice(start, end + 1)
+      if (!visible.length) return
+      const visibleSessions = new Set(visible.map((row) => row.session))
+      const sessionIndexes = percentCTimelineRows
+        .map((row, index) => (visibleSessions.has(row.session) ? index : -1))
+        .filter((index) => index >= 0)
+      if (!sessionIndexes.length) return
+      setSessionBrushRange({
+        startIndex: Math.min(...sessionIndexes),
+        endIndex: Math.max(...sessionIndexes),
+      })
+    },
+    [chartRows, percentCTimelineRows],
+  )
 
   const toggleSession = useCallback((session: number) => {
     setSelectedSessions((current) => {
@@ -485,7 +571,11 @@ export function TeacherTestAnalysisPage() {
             onClick={() => updateChartUi(key, { showLabels: !chartUi[key].showLabels })}
             title={chartUi[key].showLabels ? 'Hide labels' : 'Show labels'}
           >
-            {chartUi[key].showLabels ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+            {chartUi[key].showLabels ? (
+              <Eye className="h-3.5 w-3.5" />
+            ) : (
+              <EyeOff className="h-3.5 w-3.5" />
+            )}
           </button>
         ) : null}
         <button
@@ -493,9 +583,17 @@ export function TeacherTestAnalysisPage() {
           onClick={() => updateChartUi(key, { expanded: !chartUi[key].expanded })}
           title={chartUi[key].expanded ? 'Shrink chart' : 'Expand chart'}
         >
-          {chartUi[key].expanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+          {chartUi[key].expanded ? (
+            <Minimize2 className="h-3.5 w-3.5" />
+          ) : (
+            <Maximize2 className="h-3.5 w-3.5" />
+          )}
         </button>
-        <button type="button" onClick={() => updateChartUi(key, { hidden: true })} title="Hide chart">
+        <button
+          type="button"
+          onClick={() => updateChartUi(key, { hidden: true })}
+          title="Hide chart"
+        >
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
@@ -505,8 +603,12 @@ export function TeacherTestAnalysisPage() {
 
   const selectedColorGroup = useMemo(() => {
     const selected = new Set(selectedColors)
-    const isWarm = COLOR_GROUPS.warm.length === selectedColors.length && COLOR_GROUPS.warm.every((color) => selected.has(color))
-    const isCool = COLOR_GROUPS.cool.length === selectedColors.length && COLOR_GROUPS.cool.every((color) => selected.has(color))
+    const isWarm =
+      COLOR_GROUPS.warm.length === selectedColors.length &&
+      COLOR_GROUPS.warm.every((color) => selected.has(color))
+    const isCool =
+      COLOR_GROUPS.cool.length === selectedColors.length &&
+      COLOR_GROUPS.cool.every((color) => selected.has(color))
     if (isWarm) return 'warm'
     if (isCool) return 'cool'
     return 'custom'
@@ -526,6 +628,82 @@ export function TeacherTestAnalysisPage() {
       }
     })
   }, [chartRows])
+
+  const analysisChatContext = useMemo((): AnalysisChatContext => {
+    const selectedSessionLabel = selectedSessions.length
+      ? `sessions ${selectedSessions.join(', ')}`
+      : 'all sessions'
+    const selectedColorLabel =
+      selectedColors.length === SPECTRUM_COLORS.length
+        ? 'all colors'
+        : selectedColors.map((color) => COLOR_LABELS[color]).join(', ')
+
+    return {
+      courseCode: 'Tests 1-1',
+      className: learner?.displayName,
+      scope: `${learner?.displayName ?? 'Selected learner'} · assignment ${assignmentId ?? 'unknown'} · ${selectedSessionLabel} · ${selectedColorLabel}`,
+      totalResults: metrics.finalized,
+      colorCounts: Object.fromEntries(colorDistribution.map((row) => [row.color, row.count])),
+      primaryMetrics: [
+        { label: 'RFC', value: pct(metrics.rfc) },
+        { label: racMetricLabel, value: pct(metrics.percentC) },
+        { label: 'Avg Final CPD', value: volt(metrics.avgCpd) },
+        { label: 'N_total', value: String(metrics.nTotal) },
+      ],
+      additionalMetrics: [
+        {
+          label: 'Avg CVR',
+          value: ohm(metrics.avgCvr),
+          sampleSize: metrics.finalized,
+          definition: 'Average CVR across finalized questions in the current Tests 1-1 filter.',
+        },
+        {
+          label: 'Avg CCI',
+          value: amp(metrics.avgCci),
+          sampleSize: metrics.finalized,
+          definition: 'Average CCI across finalized questions in the current Tests 1-1 filter.',
+        },
+        {
+          label: 'ACN',
+          value: metrics.acn ? metrics.acn.toFixed(1) : '—',
+          sampleSize: metrics.finalized,
+          definition: metrics.acnTitle,
+        },
+      ],
+      sessionSeries: percentCTimelineRows.slice(-12).map((row) => ({
+        label: row.label,
+        metrics: {
+          percentC: row.percentC,
+          avgCpd: row.avgCpd,
+          finalized: row.finalized,
+          nTotal: row.nTotal,
+          warmSteps: row.warmSteps,
+          coolSteps: row.coolSteps,
+        },
+      })),
+    }
+  }, [
+    assignmentId,
+    colorDistribution,
+    learner?.displayName,
+    metrics,
+    percentCTimelineRows,
+    racMetricLabel,
+    selectedColors,
+    selectedSessions,
+  ])
+
+  const analysisChatStorageKey = useMemo(
+    () =>
+      [
+        'chunks.test-analysis-chat.cards.v1',
+        assignmentId ?? 'assignment',
+        learnerId || 'learner',
+        selectedSessions.length ? selectedSessions.join(',') : 'all-sessions',
+        selectedColors.length === SPECTRUM_COLORS.length ? 'all-colors' : selectedColors.join(','),
+      ].join(':'),
+    [assignmentId, learnerId, selectedColors, selectedSessions],
+  )
 
   const recordTubeRows = useMemo(() => {
     return chartRows
@@ -548,25 +726,30 @@ export function TeacherTestAnalysisPage() {
 
   const recordCpdRows = useMemo(() => {
     let globalRecord = 1
-    return recordTubeRows.flatMap((row) => row.records.map((record) => ({
-      key: `${row.shortLabel}-R${record.index}`,
-      label: `${row.shortLabel}-R${record.index}`,
-      globalRecord: globalRecord++,
-      question: row.shortLabel,
-      session: row.session,
-      recordIndex: record.index,
-      color: record.color,
-      colorHex: COLOR_HEX[record.color],
-      colorLabel: COLOR_LABELS[record.color],
-      recordLabel: record.label,
-      baseCpd: row.baseCpd,
-      score: record.score,
-      cpd: record.cpd,
-    })))
+    return recordTubeRows.flatMap((row) =>
+      row.records.map((record) => ({
+        key: `${row.shortLabel}-R${record.index}`,
+        label: `${row.shortLabel}-R${record.index}`,
+        globalRecord: globalRecord++,
+        question: row.shortLabel,
+        session: row.session,
+        recordIndex: record.index,
+        color: record.color,
+        colorHex: COLOR_HEX[record.color],
+        colorLabel: COLOR_LABELS[record.color],
+        recordLabel: record.label,
+        baseCpd: row.baseCpd,
+        score: record.score,
+        cpd: record.cpd,
+      })),
+    )
   }, [recordTubeRows])
 
   const sessionRecordMixRows = useMemo(() => {
-    const map = new Map<number, Record<ResultColor, number> & { session: number; shortLabel: string; nTotal: number }>()
+    const map = new Map<
+      number,
+      Record<ResultColor, number> & { session: number; shortLabel: string; nTotal: number }
+    >()
     for (const row of recordTubeRows) {
       if (!map.has(row.session)) {
         map.set(row.session, {
@@ -592,14 +775,19 @@ export function TeacherTestAnalysisPage() {
   }, [recordTubeRows])
 
   if (loading) return <EmptyState icon={BarChart3} title="Loading standalone analysis…" />
-  if (error) return <EmptyState icon={BarChart3} title="Could not load analysis" description={error} />
+  if (error)
+    return <EmptyState icon={BarChart3} title="Could not load analysis" description={error} />
 
   return (
     <div className="test-analysis-page">
       <PageHeader
         icon={BarChart3}
         kicker="Teacher · Standalone Test Analysis"
-        title={learner?.displayName ? `${learner.displayName} · Test Analysis` : 'Standalone Test Analysis'}
+        title={
+          learner?.displayName
+            ? `${learner.displayName} · Test Analysis`
+            : 'Standalone Test Analysis'
+        }
         subtitle="Dedicated analysis for Tests 1-1, separate from class/session analysis."
         actions={
           <Link className="btn ghost" to="/teacher/tests">
@@ -609,42 +797,72 @@ export function TeacherTestAnalysisPage() {
       />
 
       <div className="standalone-analysis-grid">
-        {metricUi.rfc ? <div className="standalone-metric-card metric-rfc" title={metrics.rfcTitle}>
-          <Activity className="h-5 w-5" />
-          <span>RFC</span>
-          <strong>{pct(metrics.rfc)}</strong>
-        </div> : null}
-        {metricUi.rac ? <div className="standalone-metric-card metric-percent-c" title={metrics.percentCTitle}>
-          <Target className="h-5 w-5" />
-          <span>{racMetricLabel}</span>
-          <strong>{pct(metrics.percentC)}</strong>
-        </div> : null}
-        {metricUi.avgCvr ? <div className="standalone-metric-card metric-cvr" title={`Average CVR across ${metrics.finalized} finalized questions in the current filter.`}>
-          <Gauge className="h-5 w-5" />
-          <span>Avg CVR</span>
-          <strong>{ohm(metrics.avgCvr)}</strong>
-        </div> : null}
-        {metricUi.avgCci ? <div className="standalone-metric-card metric-cci" title={`Average CCI across ${metrics.finalized} finalized questions in the current filter.`}>
-          <Brain className="h-5 w-5" />
-          <span>Avg CCI</span>
-          <strong>{amp(metrics.avgCci)}</strong>
-        </div> : null}
-        {metricUi.avgCpd ? <div className="standalone-metric-card metric-cpd" title={`Average Final CPD = mean(CVR x CCI x color factor) across ${metrics.finalized} finalized questions.`}>
-          <Zap className="h-5 w-5" />
-          <span>Avg Final CPD</span>
-          <strong>{volt(metrics.avgCpd)}</strong>
-        </div> : null}
-        {metricUi.acn ? <div className="standalone-metric-card" title={metrics.acnTitle}>
-          <LineChartIcon className="h-5 w-5 text-rose-300" />
-          <span>ACN</span>
-          <strong>{metrics.acn ? metrics.acn.toFixed(1) : '—'}</strong>
-        </div> : null}
-        {metricUi.nTotal ? <div className="standalone-metric-card" title={metrics.nTotalTitle}>
-          <BarChart3 className="h-5 w-5 text-slate-400" />
-          <span>N_total</span>
-          <strong>{metrics.nTotal}</strong>
-        </div> : null}
+        {metricUi.rfc ? (
+          <div className="standalone-metric-card metric-rfc" title={metrics.rfcTitle}>
+            <Activity className="h-5 w-5" />
+            <span>RFC</span>
+            <strong>{pct(metrics.rfc)}</strong>
+          </div>
+        ) : null}
+        {metricUi.rac ? (
+          <div className="standalone-metric-card metric-percent-c" title={metrics.percentCTitle}>
+            <Target className="h-5 w-5" />
+            <span>{racMetricLabel}</span>
+            <strong>{pct(metrics.percentC)}</strong>
+          </div>
+        ) : null}
+        {metricUi.avgCvr ? (
+          <div
+            className="standalone-metric-card metric-cvr"
+            title={`Average CVR across ${metrics.finalized} finalized questions in the current filter.`}
+          >
+            <Gauge className="h-5 w-5" />
+            <span>Avg CVR</span>
+            <strong>{ohm(metrics.avgCvr)}</strong>
+          </div>
+        ) : null}
+        {metricUi.avgCci ? (
+          <div
+            className="standalone-metric-card metric-cci"
+            title={`Average CCI across ${metrics.finalized} finalized questions in the current filter.`}
+          >
+            <Brain className="h-5 w-5" />
+            <span>Avg CCI</span>
+            <strong>{amp(metrics.avgCci)}</strong>
+          </div>
+        ) : null}
+        {metricUi.avgCpd ? (
+          <div
+            className="standalone-metric-card metric-cpd"
+            title={`Average Final CPD = mean(CVR x CCI x color factor) across ${metrics.finalized} finalized questions.`}
+          >
+            <Zap className="h-5 w-5" />
+            <span>Avg Final CPD</span>
+            <strong>{volt(metrics.avgCpd)}</strong>
+          </div>
+        ) : null}
+        {metricUi.acn ? (
+          <div className="standalone-metric-card" title={metrics.acnTitle}>
+            <LineChartIcon className="h-5 w-5 text-rose-300" />
+            <span>ACN</span>
+            <strong>{metrics.acn ? metrics.acn.toFixed(1) : '—'}</strong>
+          </div>
+        ) : null}
+        {metricUi.nTotal ? (
+          <div className="standalone-metric-card" title={metrics.nTotalTitle}>
+            <BarChart3 className="h-5 w-5 text-slate-400" />
+            <span>N_total</span>
+            <strong>{metrics.nTotal}</strong>
+          </div>
+        ) : null}
       </div>
+
+      <AnalysisInsightsChat
+        context={analysisChatContext}
+        storageKey={analysisChatStorageKey}
+        title="Setup custom metrics for this learner"
+        description="Talk with the chatbot about this Tests 1-1 learner detail. It drafts metric cards from the current filters; you confirm before adding them to this screen."
+      />
 
       <div className="test-analysis-workbench">
         <aside ref={filterCardRef} className="test-analysis-filter-card" aria-label="Chart filters">
@@ -652,37 +870,41 @@ export function TeacherTestAnalysisPage() {
             <Gauge className="h-4 w-4" />
             <div>
               <strong>Filters</strong>
-              <span>{chartRows.length}/{rows.length} questions</span>
+              <span>
+                {chartRows.length}/{rows.length} questions
+              </span>
             </div>
           </div>
 
           <details className="test-analysis-filter-menu">
             <summary>
               <span>Sessions</span>
-              <strong>{selectedSessions.length ? `${selectedSessions.length} selected` : 'All'}</strong>
+              <strong>
+                {selectedSessions.length ? `${selectedSessions.length} selected` : 'All'}
+              </strong>
             </summary>
             <div className="test-analysis-filter-popover">
               <div className="test-analysis-chip-grid">
-              <button
-                type="button"
-                className={`test-analysis-chip${selectedSessions.length === 0 ? ' is-active' : ''}`}
-                onClick={() => setSelectedSessions([])}
-              >
-                All
-              </button>
-              {availableSessions.map((session) => {
-                const active = selectedSessions.includes(session)
-                return (
-                  <button
-                    key={session}
-                    type="button"
-                    className={`test-analysis-chip${active ? ' is-active' : ''}`}
-                    onClick={() => toggleSession(session)}
-                  >
-                    S{session}
-                  </button>
-                )
-              })}
+                <button
+                  type="button"
+                  className={`test-analysis-chip${selectedSessions.length === 0 ? ' is-active' : ''}`}
+                  onClick={() => setSelectedSessions([])}
+                >
+                  All
+                </button>
+                {availableSessions.map((session) => {
+                  const active = selectedSessions.includes(session)
+                  return (
+                    <button
+                      key={session}
+                      type="button"
+                      className={`test-analysis-chip${active ? ' is-active' : ''}`}
+                      onClick={() => toggleSession(session)}
+                    >
+                      S{session}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           </details>
@@ -690,48 +912,57 @@ export function TeacherTestAnalysisPage() {
           <details className="test-analysis-filter-menu">
             <summary>
               <span>Colors</span>
-              <strong>{selectedColors.length === SPECTRUM_COLORS.length ? 'All' : `${selectedColors.length} selected`}</strong>
+              <strong>
+                {selectedColors.length === SPECTRUM_COLORS.length
+                  ? 'All'
+                  : `${selectedColors.length} selected`}
+              </strong>
             </summary>
             <div className="test-analysis-filter-popover">
               <div className="test-analysis-color-list">
-              <button
-                type="button"
-                className={`test-analysis-color-chip${selectedColors.length === SPECTRUM_COLORS.length ? ' is-active' : ''}`}
-                onClick={() => setSelectedColors([...SPECTRUM_COLORS])}
-              >
-                All
-              </button>
-              <button
-                type="button"
-                className={`test-analysis-color-chip${selectedColorGroup === 'warm' ? ' is-active' : ''}`}
-                onClick={() => selectColorGroup('warm')}
-                title="Warm = Red + Orange + Yellow"
-              >
-                Warm
-              </button>
-              <button
-                type="button"
-                className={`test-analysis-color-chip${selectedColorGroup === 'cool' ? ' is-active' : ''}`}
-                onClick={() => selectColorGroup('cool')}
-                title="Cool = Green + Blue + Indigo + Purple"
-              >
-                Cool
-              </button>
-              {SPECTRUM_COLORS.map((color) => {
-                const active = selectedColors.length < SPECTRUM_COLORS.length && selectedColors.includes(color)
-                return (
-                  <button
-                    key={color}
-                    type="button"
-                    className={`test-analysis-color-chip${active ? ' is-active' : ''}`}
-                    style={active ? { borderColor: COLOR_HEX[color], background: `${COLOR_HEX[color]}1f` } : undefined}
-                    onClick={() => toggleColor(color)}
-                  >
-                    <i style={{ background: COLOR_HEX[color] }} />
-                    {COLOR_LABELS[color]}
-                  </button>
-                )
-              })}
+                <button
+                  type="button"
+                  className={`test-analysis-color-chip${selectedColors.length === SPECTRUM_COLORS.length ? ' is-active' : ''}`}
+                  onClick={() => setSelectedColors([...SPECTRUM_COLORS])}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  className={`test-analysis-color-chip${selectedColorGroup === 'warm' ? ' is-active' : ''}`}
+                  onClick={() => selectColorGroup('warm')}
+                  title="Warm = Red + Orange + Yellow"
+                >
+                  Warm
+                </button>
+                <button
+                  type="button"
+                  className={`test-analysis-color-chip${selectedColorGroup === 'cool' ? ' is-active' : ''}`}
+                  onClick={() => selectColorGroup('cool')}
+                  title="Cool = Green + Blue + Indigo + Purple"
+                >
+                  Cool
+                </button>
+                {SPECTRUM_COLORS.map((color) => {
+                  const active =
+                    selectedColors.length < SPECTRUM_COLORS.length && selectedColors.includes(color)
+                  return (
+                    <button
+                      key={color}
+                      type="button"
+                      className={`test-analysis-color-chip${active ? ' is-active' : ''}`}
+                      style={
+                        active
+                          ? { borderColor: COLOR_HEX[color], background: `${COLOR_HEX[color]}1f` }
+                          : undefined
+                      }
+                      onClick={() => toggleColor(color)}
+                    >
+                      <i style={{ background: COLOR_HEX[color] }} />
+                      {COLOR_LABELS[color]}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           </details>
@@ -739,21 +970,23 @@ export function TeacherTestAnalysisPage() {
           <details className="test-analysis-filter-menu">
             <summary>
               <span>Metrics</span>
-              <strong>{Object.values(metricUi).filter(Boolean).length}/{Object.keys(METRIC_NAMES).length}</strong>
+              <strong>
+                {Object.values(metricUi).filter(Boolean).length}/{Object.keys(METRIC_NAMES).length}
+              </strong>
             </summary>
             <div className="test-analysis-filter-popover">
               <div className="test-analysis-chip-grid is-tight">
-              {(Object.keys(METRIC_NAMES) as MetricKey[]).map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  className={`test-analysis-chip${metricUi[key] ? ' is-active' : ''}`}
-                  onClick={() => toggleMetric(key)}
-                  title={metricUi[key] ? 'Hide metric' : 'Show metric'}
-                >
-                  {key === 'rac' ? racMetricLabel : METRIC_NAMES[key]}
-                </button>
-              ))}
+                {(Object.keys(METRIC_NAMES) as MetricKey[]).map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`test-analysis-chip${metricUi[key] ? ' is-active' : ''}`}
+                    onClick={() => toggleMetric(key)}
+                    title={metricUi[key] ? 'Hide metric' : 'Show metric'}
+                  >
+                    {key === 'rac' ? racMetricLabel : METRIC_NAMES[key]}
+                  </button>
+                ))}
               </div>
             </div>
           </details>
@@ -761,7 +994,9 @@ export function TeacherTestAnalysisPage() {
           <details className="test-analysis-filter-menu is-wide">
             <summary>
               <span>Charts</span>
-              <strong>{chartOrder.filter((key) => !chartUi[key].hidden).length}/{chartOrder.length}</strong>
+              <strong>
+                {chartOrder.filter((key) => !chartUi[key].hidden).length}/{chartOrder.length}
+              </strong>
             </summary>
             <div className="test-analysis-filter-popover">
               <div className="test-analysis-filter-title is-popover-title">
@@ -771,34 +1006,34 @@ export function TeacherTestAnalysisPage() {
                 </button>
               </div>
               <div className="test-analysis-chart-order-list">
-              {chartOrder.map((key, index) => (
-                <div
-                  key={key}
-                  className={`test-analysis-chart-order-row${chartUi[key].hidden ? ' is-hidden' : ''}${draggingChart === key ? ' is-dragging' : ''}`}
-                  draggable
-                  onDragStart={() => setDraggingChart(key)}
-                  onDragEnd={() => setDraggingChart(null)}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={(event) => {
-                    event.preventDefault()
-                    if (draggingChart) moveChartTo(draggingChart, key)
-                    setDraggingChart(null)
-                  }}
-                >
-                  <span className="test-analysis-chart-order-grip" aria-hidden>
-                    <GripVertical className="h-3 w-3" />
-                  </span>
-                  <button
-                    type="button"
-                    className="test-analysis-chart-order-name"
-                    onClick={() => updateChartUi(key, { hidden: !chartUi[key].hidden })}
-                    title={chartUi[key].hidden ? 'Show chart' : 'Hide chart'}
+                {chartOrder.map((key, index) => (
+                  <div
+                    key={key}
+                    className={`test-analysis-chart-order-row${chartUi[key].hidden ? ' is-hidden' : ''}${draggingChart === key ? ' is-dragging' : ''}`}
+                    draggable
+                    onDragStart={() => setDraggingChart(key)}
+                    onDragEnd={() => setDraggingChart(null)}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => {
+                      event.preventDefault()
+                      if (draggingChart) moveChartTo(draggingChart, key)
+                      setDraggingChart(null)
+                    }}
                   >
-                    <span>{index + 1}</span>
-                    <strong>{CHART_NAMES[key]}</strong>
-                  </button>
-                </div>
-              ))}
+                    <span className="test-analysis-chart-order-grip" aria-hidden>
+                      <GripVertical className="h-3 w-3" />
+                    </span>
+                    <button
+                      type="button"
+                      className="test-analysis-chart-order-name"
+                      onClick={() => updateChartUi(key, { hidden: !chartUi[key].hidden })}
+                      title={chartUi[key].hidden ? 'Show chart' : 'Hide chart'}
+                    >
+                      <span>{index + 1}</span>
+                      <strong>{CHART_NAMES[key]}</strong>
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           </details>
@@ -807,484 +1042,789 @@ export function TeacherTestAnalysisPage() {
         <div className="test-analysis-chart-stack">
           <div className="test-analysis-chart-row">
             {!chartUi.tube.hidden ? (
-            <div className="test-analysis-chart-slot" style={{ order: chartOrder.indexOf('tube') }}>
-            <Panel
-              className={chartPanelClass('tube')}
-              icon={CircleDot}
-              title="Question Record Tube Chart"
-              description="Each question is one tube. Records are stacked bottom-up: first primary record at the bottom, final probe record at the top. Finalized/corrected questions only."
-              actions={chartActions('tube')}
-              collapsible={false}
-            >
-              <div className="standalone-chart-wrap test-analysis-tube-wrap">
-                <div className="test-analysis-tube-scroll" role="img" aria-label="Question record tube chart showing N_total color records by question">
-                  {recordTubeRows.length ? recordTubeRows.map((row) => (
-                    <div key={row.index} className="test-analysis-tube-col">
-                      <div className="test-analysis-tube-stack" title={`${row.label} · N_total ${row.records.length}`}>
-                        {row.records.map((record) => (
-                          <span
-                            key={`${row.index}-${record.index}`}
-                            className="test-analysis-tube-bead"
-                            style={{ background: COLOR_HEX[record.color] }}
-                            title={`${row.label} · ${record.label}`}
-                            aria-label={`${row.label} ${record.label}`}
-                          />
-                        ))}
-                      </div>
-                      {chartUi.tube.showLabels ? (
-                        <>
-                          <strong>{row.shortLabel}</strong>
-                          <span>{row.records.length}</span>
-                        </>
-                      ) : null}
+              <div
+                className="test-analysis-chart-slot"
+                style={{ order: chartOrder.indexOf('tube') }}
+              >
+                <Panel
+                  className={chartPanelClass('tube')}
+                  icon={CircleDot}
+                  title="Question Record Tube Chart"
+                  description="Each question is one tube. Records are stacked bottom-up: first primary record at the bottom, final probe record at the top. Finalized/corrected questions only."
+                  actions={chartActions('tube')}
+                  collapsible={false}
+                >
+                  <div className="standalone-chart-wrap test-analysis-tube-wrap">
+                    <div
+                      className="test-analysis-tube-scroll"
+                      role="img"
+                      aria-label="Question record tube chart showing N_total color records by question"
+                    >
+                      {recordTubeRows.length ? (
+                        recordTubeRows.map((row) => (
+                          <div key={row.index} className="test-analysis-tube-col">
+                            <div
+                              className="test-analysis-tube-stack"
+                              title={`${row.label} · N_total ${row.records.length}`}
+                            >
+                              {row.records.map((record) => (
+                                <span
+                                  key={`${row.index}-${record.index}`}
+                                  className="test-analysis-tube-bead"
+                                  style={{ background: COLOR_HEX[record.color] }}
+                                  title={`${row.label} · ${record.label}`}
+                                  aria-label={`${row.label} ${record.label}`}
+                                />
+                              ))}
+                            </div>
+                            {chartUi.tube.showLabels ? (
+                              <>
+                                <strong>{row.shortLabel}</strong>
+                                <span>{row.records.length}</span>
+                              </>
+                            ) : null}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="test-analysis-empty-chart">
+                          No finalized records in the current filter.
+                        </div>
+                      )}
                     </div>
-                  )) : (
-                    <div className="test-analysis-empty-chart">No finalized records in the current filter.</div>
-                  )}
-                </div>
+                  </div>
+                </Panel>
               </div>
-            </Panel>
-            </div>
             ) : null}
 
             {!chartUi.mix.hidden ? (
-            <div className="test-analysis-chart-slot" style={{ order: chartOrder.indexOf('mix') }}>
-            <Panel
-              className={chartPanelClass('mix')}
-              icon={BarChart3}
-              title="7-Color Record Mix by Session"
-              description="Stacked count of N_total records by session across Red, Orange, Yellow, Green, Blue, Indigo, and Purple."
-              actions={chartActions('mix')}
-              collapsible={false}
-            >
-              <div className="standalone-chart-wrap is-short">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={sessionRecordMixRows} margin={{ top: 36, right: 20, bottom: 8, left: -12 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" />
-                    <XAxis dataKey="shortLabel" stroke="#334155" fontSize={12} tickLine={false} interval={0} />
-                    <YAxis stroke="#334155" fontSize={11} tickLine={false} allowDecimals={false} label={{ value: 'Records', angle: -90, position: 'insideLeft', fill: '#334155' }} />
-                    <Tooltip
-                      cursor={{ fill: '#f1f5f9' }}
-                      content={({ active, payload }) => {
-                        if (!active || !payload?.length) return null
-                        const row = payload[0]?.payload
-                        return (
-                          <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
-                            <div className="mb-1 font-black text-slate-950">Session {row.session} · N_total {row.nTotal}</div>
-                            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-                              {SPECTRUM_COLORS.map((color) => (
-                                <span key={color} style={{ color: COLOR_HEX[color] }}>{COLOR_LABELS[color]}: <strong>{row[color]}</strong></span>
-                              ))}
-                            </div>
-                          </div>
-                        )
-                      }}
-                    />
-                    {SPECTRUM_COLORS.map((color, index) => (
-                      <Bar key={color} dataKey={color} stackId="records" name={COLOR_LABELS[color]} fill={COLOR_HEX[color]} isAnimationActive={false}>
-                        {chartUi.mix.showLabels && index === SPECTRUM_COLORS.length - 1 ? <LabelList dataKey="nTotal" position="top" className="test-analysis-chart-label" /> : null}
-                      </Bar>
-                    ))}
-                  </BarChart>
-                </ResponsiveContainer>
+              <div
+                className="test-analysis-chart-slot"
+                style={{ order: chartOrder.indexOf('mix') }}
+              >
+                <Panel
+                  className={chartPanelClass('mix')}
+                  icon={BarChart3}
+                  title="7-Color Record Mix by Session"
+                  description="Stacked count of N_total records by session across Red, Orange, Yellow, Green, Blue, Indigo, and Purple."
+                  actions={chartActions('mix')}
+                  collapsible={false}
+                >
+                  <div className="standalone-chart-wrap is-short">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={sessionRecordMixRows}
+                        margin={{ top: 36, right: 20, bottom: 8, left: -12 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" />
+                        <XAxis
+                          dataKey="shortLabel"
+                          stroke="#334155"
+                          fontSize={12}
+                          tickLine={false}
+                          interval={0}
+                        />
+                        <YAxis
+                          stroke="#334155"
+                          fontSize={11}
+                          tickLine={false}
+                          allowDecimals={false}
+                          label={{
+                            value: 'Records',
+                            angle: -90,
+                            position: 'insideLeft',
+                            fill: '#334155',
+                          }}
+                        />
+                        <Tooltip
+                          cursor={{ fill: '#f1f5f9' }}
+                          content={({ active, payload }) => {
+                            if (!active || !payload?.length) return null
+                            const row = payload[0]?.payload
+                            return (
+                              <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
+                                <div className="mb-1 font-black text-slate-950">
+                                  Session {row.session} · N_total {row.nTotal}
+                                </div>
+                                <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                                  {SPECTRUM_COLORS.map((color) => (
+                                    <span key={color} style={{ color: COLOR_HEX[color] }}>
+                                      {COLOR_LABELS[color]}: <strong>{row[color]}</strong>
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )
+                          }}
+                        />
+                        {SPECTRUM_COLORS.map((color, index) => (
+                          <Bar
+                            key={color}
+                            dataKey={color}
+                            stackId="records"
+                            name={COLOR_LABELS[color]}
+                            fill={COLOR_HEX[color]}
+                            isAnimationActive={false}
+                          >
+                            {chartUi.mix.showLabels && index === SPECTRUM_COLORS.length - 1 ? (
+                              <LabelList
+                                dataKey="nTotal"
+                                position="top"
+                                className="test-analysis-chart-label"
+                              />
+                            ) : null}
+                          </Bar>
+                        ))}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </Panel>
               </div>
-            </Panel>
-            </div>
             ) : null}
           </div>
 
           <div className="test-analysis-chart-row">
             {!chartUi.recordCpdQuestion.hidden ? (
-              <div className="test-analysis-chart-slot" style={{ order: chartOrder.indexOf('recordCpdQuestion') }}>
-              <Panel
-                className={chartPanelClass('recordCpdQuestion')}
-                icon={Zap}
-                title="Record CPD by Question"
-                description="Each question groups its N_total records. Record CPD = base CPD × the 7-color factor for that record."
-                actions={chartActions('recordCpdQuestion')}
-                collapsible={false}
+              <div
+                className="test-analysis-chart-slot"
+                style={{ order: chartOrder.indexOf('recordCpdQuestion') }}
               >
-                <div className="standalone-chart-wrap test-analysis-record-cpd-wrap">
-                  <div className="test-analysis-record-cpd-scroll" role="img" aria-label="CPD for each N_total record grouped by question">
-                    {recordTubeRows.length ? recordTubeRows.map((row) => {
-                      const maxCpd = Math.max(...row.records.map((record) => record.cpd), 1)
-                      return (
-                        <div key={row.index} className="test-analysis-record-cpd-group">
-                          <div className="test-analysis-record-cpd-bars" title={`${row.label} · ${row.records.length} records`}>
-                            {row.records.map((record) => (
-                              <span
-                                key={`${row.index}-${record.index}`}
-                                className="test-analysis-record-cpd-bar"
-                                style={{ height: `${Math.max(8, (record.cpd / maxCpd) * 100)}%`, background: COLOR_HEX[record.color] }}
-                                title={`${row.shortLabel}-R${record.index} · ${COLOR_LABELS[record.color]} · CPD ${volt(record.cpd)}`}
-                              />
-                            ))}
-                          </div>
-                          {chartUi.recordCpdQuestion.showLabels ? (
-                            <>
-                              <strong>{row.shortLabel}</strong>
-                              <span>{row.records.length} records</span>
-                            </>
-                          ) : null}
+                <Panel
+                  className={chartPanelClass('recordCpdQuestion')}
+                  icon={Zap}
+                  title="Record CPD by Question"
+                  description="Each question groups its N_total records. Record CPD = base CPD × the 7-color factor for that record."
+                  actions={chartActions('recordCpdQuestion')}
+                  collapsible={false}
+                >
+                  <div className="standalone-chart-wrap test-analysis-record-cpd-wrap">
+                    <div
+                      className="test-analysis-record-cpd-scroll"
+                      role="img"
+                      aria-label="CPD for each N_total record grouped by question"
+                    >
+                      {recordTubeRows.length ? (
+                        recordTubeRows.map((row) => {
+                          const maxCpd = Math.max(...row.records.map((record) => record.cpd), 1)
+                          return (
+                            <div key={row.index} className="test-analysis-record-cpd-group">
+                              <div
+                                className="test-analysis-record-cpd-bars"
+                                title={`${row.label} · ${row.records.length} records`}
+                              >
+                                {row.records.map((record) => (
+                                  <span
+                                    key={`${row.index}-${record.index}`}
+                                    className="test-analysis-record-cpd-bar"
+                                    style={{
+                                      height: `${Math.max(8, (record.cpd / maxCpd) * 100)}%`,
+                                      background: COLOR_HEX[record.color],
+                                    }}
+                                    title={`${row.shortLabel}-R${record.index} · ${COLOR_LABELS[record.color]} · CPD ${volt(record.cpd)}`}
+                                  />
+                                ))}
+                              </div>
+                              {chartUi.recordCpdQuestion.showLabels ? (
+                                <>
+                                  <strong>{row.shortLabel}</strong>
+                                  <span>{row.records.length} records</span>
+                                </>
+                              ) : null}
+                            </div>
+                          )
+                        })
+                      ) : (
+                        <div className="test-analysis-empty-chart">
+                          No finalized record CPD in the current filter.
                         </div>
-                      )
-                    }) : (
-                      <div className="test-analysis-empty-chart">No finalized record CPD in the current filter.</div>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
-              </Panel>
+                </Panel>
               </div>
             ) : null}
 
             {!chartUi.recordCpdTimeline.hidden ? (
-              <div className="test-analysis-chart-slot" style={{ order: chartOrder.indexOf('recordCpdTimeline') }}>
-              <Panel
-                className={chartPanelClass('recordCpdTimeline')}
-                icon={LineChartIcon}
-                title="Record CPD Timeline"
-                description="One point per N_total record in package order: Q1-R1, Q2-R1, Q2-R2, and so on."
-                actions={chartActions('recordCpdTimeline')}
-                collapsible={false}
+              <div
+                className="test-analysis-chart-slot"
+                style={{ order: chartOrder.indexOf('recordCpdTimeline') }}
               >
-                <div className="standalone-chart-wrap">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RechartsLineChart data={recordCpdRows} margin={{ top: 36, right: 20, bottom: 8, left: -12 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" />
-                      <XAxis dataKey="label" stroke="#334155" fontSize={11} interval={0} tickLine={false} />
-                      <YAxis stroke={METRIC_HEX.cpd} fontSize={11} tickLine={false} tickFormatter={(value) => `${Number(value).toFixed(0)}V`} label={{ value: 'Record CPD (V)', angle: -90, position: 'insideLeft', fill: METRIC_HEX.cpd }} />
-                      <Tooltip
-                        cursor={{ stroke: '#94a3b8', strokeDasharray: '3 3' }}
-                        content={({ active, payload }) => {
-                          if (!active || !payload?.length) return null
-                          const row = payload[0]?.payload
-                          return (
-                            <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
-                              <div className="mb-1 font-black text-slate-950">{row.label}</div>
-                              <div>Record CPD: <strong style={{ color: METRIC_HEX.cpd }}>{volt(row.cpd)}</strong></div>
-                              <div>Formula: {volt(row.baseCpd)} × {row.score}</div>
-                              <div>Result record: <strong style={{ color: row.colorHex }}>{row.colorLabel}</strong></div>
-                              <div>Session: <strong>{row.session}</strong></div>
-                            </div>
-                          )
-                        }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="cpd"
-                        name="Record CPD"
-                        stroke={METRIC_HEX.cpd}
-                        strokeWidth={3}
-                        dot={(props: any) => {
-                          const { cx, cy, payload } = props
-                          if (typeof cx !== 'number' || typeof cy !== 'number') return null
-                          return <circle cx={cx} cy={cy} r={5} fill={payload.colorHex} stroke="#0f172a" strokeWidth={2} />
-                        }}
-                        activeDot={(props: any) => {
-                          const { cx, cy, payload } = props
-                          if (typeof cx !== 'number' || typeof cy !== 'number') return null
-                          return <circle cx={cx} cy={cy} r={7} fill={payload.colorHex} stroke="#0f172a" strokeWidth={2} />
-                        }}
-                        isAnimationActive={false}
+                <Panel
+                  className={chartPanelClass('recordCpdTimeline')}
+                  icon={LineChartIcon}
+                  title="Record CPD Timeline"
+                  description="One point per N_total record in package order: Q1-R1, Q2-R1, Q2-R2, and so on."
+                  actions={chartActions('recordCpdTimeline')}
+                  collapsible={false}
+                >
+                  <div className="standalone-chart-wrap">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsLineChart
+                        data={recordCpdRows}
+                        margin={{ top: 36, right: 20, bottom: 8, left: -12 }}
                       >
-                        {chartUi.recordCpdTimeline.showLabels ? <LabelList dataKey="cpd" position="top" offset={10} formatter={(value: unknown) => `${Number(value).toFixed(0)}V`} className="test-analysis-chart-label" /> : null}
-                      </Line>
-                    </RechartsLineChart>
-                  </ResponsiveContainer>
-                </div>
-              </Panel>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" />
+                        <XAxis
+                          dataKey="label"
+                          stroke="#334155"
+                          fontSize={11}
+                          interval={0}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          stroke={METRIC_HEX.cpd}
+                          fontSize={11}
+                          tickLine={false}
+                          tickFormatter={(value) => `${Number(value).toFixed(0)}V`}
+                          label={{
+                            value: 'Record CPD (V)',
+                            angle: -90,
+                            position: 'insideLeft',
+                            fill: METRIC_HEX.cpd,
+                          }}
+                        />
+                        <Tooltip
+                          cursor={{ stroke: '#94a3b8', strokeDasharray: '3 3' }}
+                          content={({ active, payload }) => {
+                            if (!active || !payload?.length) return null
+                            const row = payload[0]?.payload
+                            return (
+                              <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
+                                <div className="mb-1 font-black text-slate-950">{row.label}</div>
+                                <div>
+                                  Record CPD:{' '}
+                                  <strong style={{ color: METRIC_HEX.cpd }}>{volt(row.cpd)}</strong>
+                                </div>
+                                <div>
+                                  Formula: {volt(row.baseCpd)} × {row.score}
+                                </div>
+                                <div>
+                                  Result record:{' '}
+                                  <strong style={{ color: row.colorHex }}>{row.colorLabel}</strong>
+                                </div>
+                                <div>
+                                  Session: <strong>{row.session}</strong>
+                                </div>
+                              </div>
+                            )
+                          }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="cpd"
+                          name="Record CPD"
+                          stroke={METRIC_HEX.cpd}
+                          strokeWidth={3}
+                          dot={(props: any) => {
+                            const { cx, cy, payload } = props
+                            if (typeof cx !== 'number' || typeof cy !== 'number') return null
+                            return (
+                              <circle
+                                cx={cx}
+                                cy={cy}
+                                r={5}
+                                fill={payload.colorHex}
+                                stroke="#0f172a"
+                                strokeWidth={2}
+                              />
+                            )
+                          }}
+                          activeDot={(props: any) => {
+                            const { cx, cy, payload } = props
+                            if (typeof cx !== 'number' || typeof cy !== 'number') return null
+                            return (
+                              <circle
+                                cx={cx}
+                                cy={cy}
+                                r={7}
+                                fill={payload.colorHex}
+                                stroke="#0f172a"
+                                strokeWidth={2}
+                              />
+                            )
+                          }}
+                          isAnimationActive={false}
+                        >
+                          {chartUi.recordCpdTimeline.showLabels ? (
+                            <LabelList
+                              dataKey="cpd"
+                              position="top"
+                              offset={10}
+                              formatter={(value: unknown) => `${Number(value).toFixed(0)}V`}
+                              className="test-analysis-chart-label"
+                            />
+                          ) : null}
+                        </Line>
+                      </RechartsLineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </Panel>
               </div>
             ) : null}
           </div>
 
           <div className="test-analysis-chart-row">
             {!chartUi.questionCpd.hidden ? (
-            <div className="test-analysis-chart-slot" style={{ order: chartOrder.indexOf('questionCpd') }}>
-          <Panel
-            className={chartPanelClass('questionCpd')}
-            icon={LineChartIcon}
-            title="CPD by Question"
-              description={`${metrics.finalized}/${metrics.total} finalized questions · Final CPD = CVR × CCI × color score.`}
-              actions={chartActions('questionCpd')}
-              collapsible={false}
-            >
-              <div className="standalone-chart-wrap">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsLineChart data={chartRows} margin={{ top: 36, right: 20, bottom: 8, left: -12 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" />
-                    <XAxis dataKey="label" stroke="#334155" fontSize={11} interval="preserveStartEnd" tickLine={false} />
-                    <YAxis
-                      stroke="#334155"
-                      fontSize={11}
-                      tickLine={false}
-                      tickFormatter={(value) => `${value}V`}
-                      label={{ value: 'Final CPD (V)', angle: -90, position: 'insideLeft', fill: METRIC_HEX.cpd }}
-                    />
-                    <Tooltip
-                      cursor={{ stroke: '#94a3b8', strokeDasharray: '3 3' }}
-                      content={({ active, payload }) => {
-                        if (!active || !payload?.length) return null
-                        const row = payload[0]?.payload
-                        return (
-                          <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
-                            <div className="mb-1 font-black text-slate-950">{row.label}</div>
-                            <div>Final CPD: <strong style={{ color: METRIC_HEX.cpd }}>{volt(row.cpd)}</strong></div>
-                            <div>Formula: {volt(row.baseCpd)} × {row.resultScore}</div>
-                            <div>CVR: <strong style={{ color: METRIC_HEX.cvr }}>{ohm(row.cvr)}</strong> · CCI: <strong style={{ color: METRIC_HEX.cci }}>{amp(row.cci)}</strong></div>
-                            <div>Result: <strong className="capitalize" style={{ color: row.colorHex }}>{row.color}</strong></div>
-                            <div>Session: <strong>{row.session}</strong> · {row.language}</div>
-                            {row.prompt ? <div className="mt-1 max-w-xs text-slate-600">“{row.prompt}”</div> : null}
-                          </div>
-                        )
-                      }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="cpd"
-                      name="Final CPD"
-                      stroke={METRIC_HEX.cpd}
-                      strokeWidth={3}
-                      dot={<ResultDot />}
-                      activeDot={<ResultDot />}
-                      isAnimationActive={false}
-                    >
-                      {chartUi.questionCpd.showLabels ? <LabelList dataKey="cpd" position="top" offset={10} formatter={(value: unknown) => `${Number(value).toFixed(0)}V`} className="test-analysis-chart-label" /> : null}
-                    </Line>
-                    <Brush
-                      dataKey="label"
-                      height={24}
-                      stroke={METRIC_HEX.cpd}
-                      travellerWidth={10}
-                      startIndex={cpdBrushIndexes.startIndex}
-                      endIndex={cpdBrushIndexes.endIndex}
-                      onChange={handleQuestionBrushChange}
-                    />
-                  </RechartsLineChart>
-                </ResponsiveContainer>
+              <div
+                className="test-analysis-chart-slot"
+                style={{ order: chartOrder.indexOf('questionCpd') }}
+              >
+                <Panel
+                  className={chartPanelClass('questionCpd')}
+                  icon={LineChartIcon}
+                  title="CPD by Question"
+                  description={`${metrics.finalized}/${metrics.total} finalized questions · Final CPD = CVR × CCI × color score.`}
+                  actions={chartActions('questionCpd')}
+                  collapsible={false}
+                >
+                  <div className="standalone-chart-wrap">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsLineChart
+                        data={chartRows}
+                        margin={{ top: 36, right: 20, bottom: 8, left: -12 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" />
+                        <XAxis
+                          dataKey="label"
+                          stroke="#334155"
+                          fontSize={11}
+                          interval="preserveStartEnd"
+                          tickLine={false}
+                        />
+                        <YAxis
+                          stroke="#334155"
+                          fontSize={11}
+                          tickLine={false}
+                          tickFormatter={(value) => `${value}V`}
+                          label={{
+                            value: 'Final CPD (V)',
+                            angle: -90,
+                            position: 'insideLeft',
+                            fill: METRIC_HEX.cpd,
+                          }}
+                        />
+                        <Tooltip
+                          cursor={{ stroke: '#94a3b8', strokeDasharray: '3 3' }}
+                          content={({ active, payload }) => {
+                            if (!active || !payload?.length) return null
+                            const row = payload[0]?.payload
+                            return (
+                              <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
+                                <div className="mb-1 font-black text-slate-950">{row.label}</div>
+                                <div>
+                                  Final CPD:{' '}
+                                  <strong style={{ color: METRIC_HEX.cpd }}>{volt(row.cpd)}</strong>
+                                </div>
+                                <div>
+                                  Formula: {volt(row.baseCpd)} × {row.resultScore}
+                                </div>
+                                <div>
+                                  CVR:{' '}
+                                  <strong style={{ color: METRIC_HEX.cvr }}>{ohm(row.cvr)}</strong>{' '}
+                                  · CCI:{' '}
+                                  <strong style={{ color: METRIC_HEX.cci }}>{amp(row.cci)}</strong>
+                                </div>
+                                <div>
+                                  Result:{' '}
+                                  <strong className="capitalize" style={{ color: row.colorHex }}>
+                                    {row.color}
+                                  </strong>
+                                </div>
+                                <div>
+                                  Session: <strong>{row.session}</strong> · {row.language}
+                                </div>
+                                {row.prompt ? (
+                                  <div className="mt-1 max-w-xs text-slate-600">“{row.prompt}”</div>
+                                ) : null}
+                              </div>
+                            )
+                          }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="cpd"
+                          name="Final CPD"
+                          stroke={METRIC_HEX.cpd}
+                          strokeWidth={3}
+                          dot={<ResultDot />}
+                          activeDot={<ResultDot />}
+                          isAnimationActive={false}
+                        >
+                          {chartUi.questionCpd.showLabels ? (
+                            <LabelList
+                              dataKey="cpd"
+                              position="top"
+                              offset={10}
+                              formatter={(value: unknown) => `${Number(value).toFixed(0)}V`}
+                              className="test-analysis-chart-label"
+                            />
+                          ) : null}
+                        </Line>
+                        <Brush
+                          dataKey="label"
+                          height={24}
+                          stroke={METRIC_HEX.cpd}
+                          travellerWidth={10}
+                          startIndex={cpdBrushIndexes.startIndex}
+                          endIndex={cpdBrushIndexes.endIndex}
+                          onChange={handleQuestionBrushChange}
+                        />
+                      </RechartsLineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </Panel>
               </div>
-          </Panel>
-            </div>
             ) : null}
 
             {!chartUi.percentSession.hidden ? (
-            <div className="test-analysis-chart-slot" style={{ order: chartOrder.indexOf('percentSession') }}>
-            <Panel
-              className={chartPanelClass('percentSession')}
-              icon={LineChartIcon}
-              title={`${racMetricLabel} by Session`}
-              description={`${racMetricLabel} = cool records / N_total for each session. Cool = Green + Blue + Indigo + Purple.`}
-              actions={chartActions('percentSession')}
-              collapsible={false}
-            >
-              <div className="standalone-chart-wrap">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsLineChart data={percentCTimelineRows} margin={{ top: 42, right: 20, bottom: 8, left: -12 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" />
-                    <XAxis dataKey="shortLabel" stroke="#334155" fontSize={12} tickLine={false} interval={0} />
-                    <YAxis
-                      domain={[0, 100]}
-                      tickFormatter={(value) => `${value}%`}
-                      stroke="#334155"
-                      fontSize={11}
-                      tickLine={false}
-                      label={{ value: racMetricLabel, angle: -90, position: 'insideLeft', fill: METRIC_HEX.percentC }}
-                    />
-                    <Tooltip
-                      cursor={{ stroke: METRIC_HEX.percentC, strokeDasharray: '3 3' }}
-                      content={({ active, payload }) => {
-                        if (!active || !payload?.length) return null
-                        const row = payload[0]?.payload
-                        return (
-                          <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
-                            <div className="mb-1 font-black text-slate-950">{row.label}</div>
-                            <div>{racMetricLabel}: <strong style={{ color: METRIC_HEX.percentC }}>{row.percentC}%</strong></div>
-                            <div>Formula: <strong>{row.coolSteps} / {row.nTotal}</strong> cool records / N_total</div>
-                            <div>Finalized: <strong>{row.finalized}</strong> questions</div>
-                            <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1">
-                              {SPECTRUM_COLORS.map((color) => (
-                                <span key={color} style={{ color: COLOR_HEX[color] }}>{COLOR_LABELS[color]}: {row.byColor[color]}</span>
-                              ))}
-                            </div>
-                          </div>
-                        )
-                      }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="percentC"
-                      name={racMetricLabel}
-                      stroke={METRIC_HEX.percentC}
-                      strokeWidth={3}
-                      dot={{ r: 5, fill: METRIC_HEX.percentC, stroke: '#ffffff', strokeWidth: 2 }}
-                      activeDot={{ r: 7, fill: METRIC_HEX.percentC, stroke: '#0f172a', strokeWidth: 2 }}
-                      isAnimationActive={false}
-                    >
-                      {chartUi.percentSession.showLabels ? (
-                        <LabelList dataKey="percentCLabel" position="top" offset={10} fill={METRIC_HEX.percentC} className="test-analysis-chart-label" />
-                      ) : null}
-                    </Line>
-                    <Brush
-                      dataKey="shortLabel"
-                      height={24}
-                      stroke={METRIC_HEX.percentC}
-                      travellerWidth={10}
-                      startIndex={sessionBrushStart}
-                      endIndex={sessionBrushEnd}
-                      onChange={handleSessionBrushChange}
-                    />
-                  </RechartsLineChart>
-                </ResponsiveContainer>
+              <div
+                className="test-analysis-chart-slot"
+                style={{ order: chartOrder.indexOf('percentSession') }}
+              >
+                <Panel
+                  className={chartPanelClass('percentSession')}
+                  icon={LineChartIcon}
+                  title={`${racMetricLabel} by Session`}
+                  description={`${racMetricLabel} = cool records / N_total for each session. Cool = Green + Blue + Indigo + Purple.`}
+                  actions={chartActions('percentSession')}
+                  collapsible={false}
+                >
+                  <div className="standalone-chart-wrap">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsLineChart
+                        data={percentCTimelineRows}
+                        margin={{ top: 42, right: 20, bottom: 8, left: -12 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" />
+                        <XAxis
+                          dataKey="shortLabel"
+                          stroke="#334155"
+                          fontSize={12}
+                          tickLine={false}
+                          interval={0}
+                        />
+                        <YAxis
+                          domain={[0, 100]}
+                          tickFormatter={(value) => `${value}%`}
+                          stroke="#334155"
+                          fontSize={11}
+                          tickLine={false}
+                          label={{
+                            value: racMetricLabel,
+                            angle: -90,
+                            position: 'insideLeft',
+                            fill: METRIC_HEX.percentC,
+                          }}
+                        />
+                        <Tooltip
+                          cursor={{ stroke: METRIC_HEX.percentC, strokeDasharray: '3 3' }}
+                          content={({ active, payload }) => {
+                            if (!active || !payload?.length) return null
+                            const row = payload[0]?.payload
+                            return (
+                              <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
+                                <div className="mb-1 font-black text-slate-950">{row.label}</div>
+                                <div>
+                                  {racMetricLabel}:{' '}
+                                  <strong style={{ color: METRIC_HEX.percentC }}>
+                                    {row.percentC}%
+                                  </strong>
+                                </div>
+                                <div>
+                                  Formula:{' '}
+                                  <strong>
+                                    {row.coolSteps} / {row.nTotal}
+                                  </strong>{' '}
+                                  cool records / N_total
+                                </div>
+                                <div>
+                                  Finalized: <strong>{row.finalized}</strong> questions
+                                </div>
+                                <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1">
+                                  {SPECTRUM_COLORS.map((color) => (
+                                    <span key={color} style={{ color: COLOR_HEX[color] }}>
+                                      {COLOR_LABELS[color]}: {row.byColor[color]}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )
+                          }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="percentC"
+                          name={racMetricLabel}
+                          stroke={METRIC_HEX.percentC}
+                          strokeWidth={3}
+                          dot={{
+                            r: 5,
+                            fill: METRIC_HEX.percentC,
+                            stroke: '#ffffff',
+                            strokeWidth: 2,
+                          }}
+                          activeDot={{
+                            r: 7,
+                            fill: METRIC_HEX.percentC,
+                            stroke: '#0f172a',
+                            strokeWidth: 2,
+                          }}
+                          isAnimationActive={false}
+                        >
+                          {chartUi.percentSession.showLabels ? (
+                            <LabelList
+                              dataKey="percentCLabel"
+                              position="top"
+                              offset={10}
+                              fill={METRIC_HEX.percentC}
+                              className="test-analysis-chart-label"
+                            />
+                          ) : null}
+                        </Line>
+                        <Brush
+                          dataKey="shortLabel"
+                          height={24}
+                          stroke={METRIC_HEX.percentC}
+                          travellerWidth={10}
+                          startIndex={sessionBrushStart}
+                          endIndex={sessionBrushEnd}
+                          onChange={handleSessionBrushChange}
+                        />
+                      </RechartsLineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </Panel>
               </div>
-            </Panel>
-            </div>
             ) : null}
           </div>
 
           <div className="test-analysis-chart-row">
             {!chartUi.percentCpd.hidden ? (
-            <div className="test-analysis-chart-slot" style={{ order: chartOrder.indexOf('percentCpd') }}>
-            <Panel
-              className={chartPanelClass('percentCpd')}
-              icon={LineChartIcon}
-              title={`${racMetricLabel} & Avg CPD by Session`}
-              description={`Dual-axis line chart: Session on X, ${racMetricLabel} as the green line, Avg CPD as the blue line.`}
-              actions={chartActions('percentCpd')}
-              collapsible={false}
-            >
-              <div className="standalone-chart-wrap">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsLineChart data={percentCTimelineRows} margin={{ top: 42, right: 18, bottom: 8, left: -12 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" />
-                    <XAxis dataKey="shortLabel" stroke="#334155" fontSize={12} tickLine={false} interval={0} />
-                    <YAxis
-                      yAxisId="percent"
-                      domain={[0, 100]}
-                      tickFormatter={(value) => `${value}%`}
-                      stroke={METRIC_HEX.percentC}
-                      fontSize={11}
-                      tickLine={false}
-                      label={{ value: racMetricLabel, angle: -90, position: 'insideLeft', fill: METRIC_HEX.percentC }}
-                    />
-                    <YAxis
-                      yAxisId="cpd"
-                      orientation="right"
-                      tickFormatter={(value) => `${Number(value).toFixed(0)}V`}
-                      stroke={METRIC_HEX.cpd}
-                      fontSize={11}
-                      tickLine={false}
-                      label={{ value: 'Avg CPD (V)', angle: 90, position: 'insideRight', fill: METRIC_HEX.cpd }}
-                    />
-                    <Tooltip
-                      cursor={{ stroke: '#94a3b8', strokeDasharray: '3 3' }}
-                      content={({ active, payload }) => {
-                        if (!active || !payload?.length) return null
-                        const row = payload[0]?.payload
-                        return (
-                          <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
-                            <div className="mb-1 font-black text-slate-950">{row.label}</div>
-                            <div>{racMetricLabel}: <strong style={{ color: METRIC_HEX.percentC }}>{row.percentC}%</strong></div>
-                            <div>Formula: <strong>{row.coolSteps} / {row.nTotal}</strong> cool records / N_total</div>
-                            <div>Avg CPD: <strong style={{ color: METRIC_HEX.cpd }}>{volt(row.avgCpd)}</strong></div>
-                            <div>Finalized: <strong>{row.finalized}</strong> questions</div>
-                          </div>
-                        )
-                      }}
-                    />
-                    <Line
-                      yAxisId="percent"
-                      type="monotone"
-                      dataKey="percentC"
-                      name={racMetricLabel}
-                      stroke={METRIC_HEX.percentC}
-                      strokeWidth={3}
-                      dot={{ r: 5, fill: METRIC_HEX.percentC, stroke: '#ffffff', strokeWidth: 2 }}
-                      activeDot={{ r: 7, fill: METRIC_HEX.percentC, stroke: '#0f172a', strokeWidth: 2 }}
-                      isAnimationActive={false}
-                    >
-                      {chartUi.percentCpd.showLabels ? (
-                        <LabelList dataKey="percentCLabel" position="top" offset={10} fill={METRIC_HEX.percentC} className="test-analysis-chart-label" />
-                      ) : null}
-                    </Line>
-                    <Line
-                      yAxisId="cpd"
-                      type="monotone"
-                      dataKey="avgCpd"
-                      name="Avg CPD"
-                      stroke={METRIC_HEX.cpd}
-                      strokeWidth={3}
-                      dot={{ r: 5, fill: METRIC_HEX.cpd, stroke: '#ffffff', strokeWidth: 2 }}
-                      activeDot={{ r: 7, fill: METRIC_HEX.cpd, stroke: '#0f172a', strokeWidth: 2 }}
-                      isAnimationActive={false}
-                    >
-                      {chartUi.percentCpd.showLabels ? <LabelList dataKey="avgCpd" position="bottom" offset={10} formatter={(value: unknown) => `${Number(value).toFixed(0)}V`} className="test-analysis-chart-label" /> : null}
-                    </Line>
-                    <Brush
-                      dataKey="shortLabel"
-                      height={24}
-                      stroke={METRIC_HEX.cpd}
-                      travellerWidth={10}
-                      startIndex={sessionBrushStart}
-                      endIndex={sessionBrushEnd}
-                      onChange={handleSessionBrushChange}
-                    />
-                  </RechartsLineChart>
-                </ResponsiveContainer>
+              <div
+                className="test-analysis-chart-slot"
+                style={{ order: chartOrder.indexOf('percentCpd') }}
+              >
+                <Panel
+                  className={chartPanelClass('percentCpd')}
+                  icon={LineChartIcon}
+                  title={`${racMetricLabel} & Avg CPD by Session`}
+                  description={`Dual-axis line chart: Session on X, ${racMetricLabel} as the green line, Avg CPD as the blue line.`}
+                  actions={chartActions('percentCpd')}
+                  collapsible={false}
+                >
+                  <div className="standalone-chart-wrap">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsLineChart
+                        data={percentCTimelineRows}
+                        margin={{ top: 42, right: 18, bottom: 8, left: -12 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" />
+                        <XAxis
+                          dataKey="shortLabel"
+                          stroke="#334155"
+                          fontSize={12}
+                          tickLine={false}
+                          interval={0}
+                        />
+                        <YAxis
+                          yAxisId="percent"
+                          domain={[0, 100]}
+                          tickFormatter={(value) => `${value}%`}
+                          stroke={METRIC_HEX.percentC}
+                          fontSize={11}
+                          tickLine={false}
+                          label={{
+                            value: racMetricLabel,
+                            angle: -90,
+                            position: 'insideLeft',
+                            fill: METRIC_HEX.percentC,
+                          }}
+                        />
+                        <YAxis
+                          yAxisId="cpd"
+                          orientation="right"
+                          tickFormatter={(value) => `${Number(value).toFixed(0)}V`}
+                          stroke={METRIC_HEX.cpd}
+                          fontSize={11}
+                          tickLine={false}
+                          label={{
+                            value: 'Avg CPD (V)',
+                            angle: 90,
+                            position: 'insideRight',
+                            fill: METRIC_HEX.cpd,
+                          }}
+                        />
+                        <Tooltip
+                          cursor={{ stroke: '#94a3b8', strokeDasharray: '3 3' }}
+                          content={({ active, payload }) => {
+                            if (!active || !payload?.length) return null
+                            const row = payload[0]?.payload
+                            return (
+                              <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
+                                <div className="mb-1 font-black text-slate-950">{row.label}</div>
+                                <div>
+                                  {racMetricLabel}:{' '}
+                                  <strong style={{ color: METRIC_HEX.percentC }}>
+                                    {row.percentC}%
+                                  </strong>
+                                </div>
+                                <div>
+                                  Formula:{' '}
+                                  <strong>
+                                    {row.coolSteps} / {row.nTotal}
+                                  </strong>{' '}
+                                  cool records / N_total
+                                </div>
+                                <div>
+                                  Avg CPD:{' '}
+                                  <strong style={{ color: METRIC_HEX.cpd }}>
+                                    {volt(row.avgCpd)}
+                                  </strong>
+                                </div>
+                                <div>
+                                  Finalized: <strong>{row.finalized}</strong> questions
+                                </div>
+                              </div>
+                            )
+                          }}
+                        />
+                        <Line
+                          yAxisId="percent"
+                          type="monotone"
+                          dataKey="percentC"
+                          name={racMetricLabel}
+                          stroke={METRIC_HEX.percentC}
+                          strokeWidth={3}
+                          dot={{
+                            r: 5,
+                            fill: METRIC_HEX.percentC,
+                            stroke: '#ffffff',
+                            strokeWidth: 2,
+                          }}
+                          activeDot={{
+                            r: 7,
+                            fill: METRIC_HEX.percentC,
+                            stroke: '#0f172a',
+                            strokeWidth: 2,
+                          }}
+                          isAnimationActive={false}
+                        >
+                          {chartUi.percentCpd.showLabels ? (
+                            <LabelList
+                              dataKey="percentCLabel"
+                              position="top"
+                              offset={10}
+                              fill={METRIC_HEX.percentC}
+                              className="test-analysis-chart-label"
+                            />
+                          ) : null}
+                        </Line>
+                        <Line
+                          yAxisId="cpd"
+                          type="monotone"
+                          dataKey="avgCpd"
+                          name="Avg CPD"
+                          stroke={METRIC_HEX.cpd}
+                          strokeWidth={3}
+                          dot={{ r: 5, fill: METRIC_HEX.cpd, stroke: '#ffffff', strokeWidth: 2 }}
+                          activeDot={{
+                            r: 7,
+                            fill: METRIC_HEX.cpd,
+                            stroke: '#0f172a',
+                            strokeWidth: 2,
+                          }}
+                          isAnimationActive={false}
+                        >
+                          {chartUi.percentCpd.showLabels ? (
+                            <LabelList
+                              dataKey="avgCpd"
+                              position="bottom"
+                              offset={10}
+                              formatter={(value: unknown) => `${Number(value).toFixed(0)}V`}
+                              className="test-analysis-chart-label"
+                            />
+                          ) : null}
+                        </Line>
+                        <Brush
+                          dataKey="shortLabel"
+                          height={24}
+                          stroke={METRIC_HEX.cpd}
+                          travellerWidth={10}
+                          startIndex={sessionBrushStart}
+                          endIndex={sessionBrushEnd}
+                          onChange={handleSessionBrushChange}
+                        />
+                      </RechartsLineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </Panel>
               </div>
-            </Panel>
-            </div>
             ) : null}
 
             {!chartUi.distribution.hidden ? (
-            <div className="test-analysis-chart-slot" style={{ order: chartOrder.indexOf('distribution') }}>
-            <Panel
-              className={chartPanelClass('distribution')}
-              icon={PieChartIcon}
-              title="Result Color Distribution"
-              description="Distribution of finalized effective results across the 7-color spectrum."
-              actions={chartActions('distribution')}
-              collapsible={false}
-            >
-            <div className="standalone-chart-wrap">
-              <ResponsiveContainer width="100%" height="100%">
-                <RechartsPieChart>
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (!active || !payload?.length) return null
-                      const row = payload[0]?.payload
-                      return (
-                        <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
-                          <div className="font-black" style={{ color: row.fill }}>{row.name}</div>
-                          <div>Questions: <strong>{row.count}</strong></div>
-                          <div>Share: <strong>{row.percent}%</strong></div>
-                        </div>
-                      )
-                    }}
-                  />
-                  <Pie
-                    data={colorDistribution}
-                    dataKey="count"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius="45%"
-                    outerRadius="78%"
-                    paddingAngle={2}
-                    label={chartUi.distribution.showLabels ? ({ payload }: any) => (payload?.percent ? `${payload.percent}%` : '') : false}
-                    isAnimationActive={false}
-                  >
-                    {colorDistribution.map((entry) => (
-                      <Cell key={entry.color} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                </RechartsPieChart>
-              </ResponsiveContainer>
-            </div>
-          </Panel>
-            </div>
+              <div
+                className="test-analysis-chart-slot"
+                style={{ order: chartOrder.indexOf('distribution') }}
+              >
+                <Panel
+                  className={chartPanelClass('distribution')}
+                  icon={PieChartIcon}
+                  title="Result Color Distribution"
+                  description="Distribution of finalized effective results across the 7-color spectrum."
+                  actions={chartActions('distribution')}
+                  collapsible={false}
+                >
+                  <div className="standalone-chart-wrap">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsPieChart>
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (!active || !payload?.length) return null
+                            const row = payload[0]?.payload
+                            return (
+                              <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
+                                <div className="font-black" style={{ color: row.fill }}>
+                                  {row.name}
+                                </div>
+                                <div>
+                                  Questions: <strong>{row.count}</strong>
+                                </div>
+                                <div>
+                                  Share: <strong>{row.percent}%</strong>
+                                </div>
+                              </div>
+                            )
+                          }}
+                        />
+                        <Pie
+                          data={colorDistribution}
+                          dataKey="count"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius="45%"
+                          outerRadius="78%"
+                          paddingAngle={2}
+                          label={
+                            chartUi.distribution.showLabels
+                              ? ({ payload }: any) =>
+                                  payload?.percent ? `${payload.percent}%` : ''
+                              : false
+                          }
+                          isAnimationActive={false}
+                        >
+                          {colorDistribution.map((entry) => (
+                            <Cell key={entry.color} fill={entry.fill} />
+                          ))}
+                        </Pie>
+                      </RechartsPieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </Panel>
+              </div>
             ) : null}
+          </div>
         </div>
       </div>
     </div>
-  </div>
   )
 }

@@ -1297,33 +1297,30 @@ export function TeacherTestRunPage() {
     if (!currentItem) return false
     const nextIndex = items.findIndex((item, index) => index > selectedIndex && !isItemFinalized(item))
     const nextItem = nextIndex >= 0 ? items[nextIndex] : null
-    const canAdvanceWithinSession = Boolean(
-      liveAudioStartedRef.current &&
-      autoPlayItems &&
-      nextItem &&
-      nextItem.session_number === currentItem.session_number,
-    )
 
     pendingAfterReactionRef.current = null
-    if (canAdvanceWithinSession && nextItem) {
-      const cached = itemPlaybackCacheRef.current[String(nextItem.id)]
-      if (cached) {
-        const nextNumber = nextItem.global_item_order ?? nextIndex + 1
-        pendingAfterReactionRef.current = {
-          signedUrl: cached.signedUrl,
-          label: `Q${nextNumber} item`,
-          itemId: String(nextItem.id),
-          variantId: cached.variantId,
-          isSilent: cached.isSilent
+    if (nextItem) {
+      const isSameSession = nextItem.session_number === currentItem.session_number
+      if (liveAudioStartedRef.current && autoPlayItems && isSameSession) {
+        const cached = itemPlaybackCacheRef.current[String(nextItem.id)]
+        if (cached) {
+          const nextNumber = nextItem.global_item_order ?? nextIndex + 1
+          pendingAfterReactionRef.current = {
+            signedUrl: cached.signedUrl,
+            label: `Q${nextNumber} item`,
+            itemId: String(nextItem.id),
+            variantId: cached.variantId,
+            isSilent: cached.isSilent
+          }
+          suppressNextItemEffectForIdRef.current = String(nextItem.id)
+        } else {
+          void primeItemPlaybackUrl(nextItem).catch(() => {
+            /* best-effort late prefetch */
+          })
         }
-        suppressNextItemEffectForIdRef.current = String(nextItem.id)
-        pendingFirstItemAudioIndexRef.current = null
-        setSelectedIndex(nextIndex)
-      } else {
-        void primeItemPlaybackUrl(nextItem).catch(() => {
-          /* best-effort late prefetch */
-        })
       }
+      pendingFirstItemAudioIndexRef.current = null
+      setSelectedIndex(nextIndex)
     }
 
     activateAudioUrl(resultAudioUrl(color), `${color} result`, true, 'result_reaction')

@@ -24,6 +24,7 @@ import { getStandaloneAssignmentAnalysis, type StandaloneTestRunRow } from '../.
 import { getTestPackageVersion, listTestPackages } from '../../lib/test-packages'
 import { useAppState } from '../../state/useAppState'
 import { probeChunksNumber } from '../../modules/assessment/probe-metrics'
+import { calculateDynamicAcn, useDynamicAcnConfig } from '../../modules/assessment/dynamic-acn'
 import { calculateSpectrumStepBreakdown, spectrumRecordsForAttempt } from '../../modules/metrics/calculate'
 import { racMetricLabelForPackage, racMetricTitle, type PackageRacMetricLabel } from '../../modules/metrics/display-labels'
 import { COLOR_SCORE, COOL_COLORS, SPECTRUM_COLORS, WARM_COLORS, type ResultColor } from '../../modules/result-lifecycle/types'
@@ -195,6 +196,7 @@ export function TeacherTestAnalysisPage() {
   const [racMetricLabel, setRacMetricLabel] = useState<PackageRacMetricLabel>('%c')
   const [sessionBrushRange, setSessionBrushRange] = useState<{ startIndex?: number; endIndex?: number }>({})
   const filterCardRef = useRef<HTMLElement | null>(null)
+  const acnConfig = useDynamicAcnConfig()
 
   useEffect(() => {
     if (!assignmentId) return
@@ -302,9 +304,6 @@ export function TeacherTestAnalysisPage() {
     const finalized = chartRows.filter((row) => row.finalized)
     const count = Math.max(finalized.length, 1)
     const probed = finalized.filter((row) => row.enteredProbeFlow)
-    const acn = probed.length
-      ? probed.reduce((sum, row) => sum + row.probeDepth, 0) / probed.length
-      : 0
     const spectrum = calculateSpectrumStepBreakdown(
       finalized
         .filter((row) => row.color !== 'pending')
@@ -314,6 +313,13 @@ export function TeacherTestAnalysisPage() {
           probeEventCount: row.probeEventCount,
         })),
     )
+    const acnResult = calculateDynamicAcn({
+      spectrum,
+      finalizedCount: finalized.length,
+      probedCount: probed.length,
+      legacyProbeDepthSum: probed.reduce((sum, row) => sum + row.probeDepth, 0),
+      totalItemsCount: 49
+    }, acnConfig.config)
     return {
       finalized: finalized.length,
       total: chartRows.length,
@@ -328,10 +334,11 @@ export function TeacherTestAnalysisPage() {
       avgCvr: finalized.reduce((sum, row) => sum + row.cvr, 0) / count,
       avgCci: finalized.reduce((sum, row) => sum + row.cci, 0) / count,
       avgCpd: finalized.reduce((sum, row) => sum + row.cpd, 0) / count,
-      acn,
-      acnTitle: `ACN = Average Chunks Number among ${probed.length} probed finalized question${probed.length === 1 ? '' : 's'} in the current filter. Green opens at 1; each Continue adds 1.`,
+      acn: acnResult.acn,
+      acnTitle: acnResult.acnTitle,
+      acnFormulaDescription: acnResult.formulaDescription,
     }
-  }, [chartRows, racMetricLabel])
+  }, [chartRows, racMetricLabel, acnConfig.config])
 
   const percentCTimelineRows = useMemo(() => {
     const map = new Map<number, typeof chartRows>()
@@ -634,10 +641,10 @@ export function TeacherTestAnalysisPage() {
           <span>Avg Final CPD</span>
           <strong>{volt(metrics.avgCpd)}</strong>
         </div> : null}
-        {metricUi.acn ? <div className="standalone-metric-card" title={metrics.acnTitle}>
-          <LineChartIcon className="h-5 w-5 text-rose-300" />
+        {metricUi.acn ? <div className="standalone-metric-card metric-acn" title={metrics.acnTitle}>
+          <LineChartIcon className="h-5 w-5" />
           <span>ACN</span>
-          <strong>{metrics.acn ? metrics.acn.toFixed(1) : '—'}</strong>
+          <strong>{Number.isFinite(metrics.acn) ? metrics.acn.toFixed(2) : '—'}</strong>
         </div> : null}
         {metricUi.nTotal ? <div className="standalone-metric-card" title={metrics.nTotalTitle}>
           <BarChart3 className="h-5 w-5 text-slate-400" />
@@ -732,6 +739,61 @@ export function TeacherTestAnalysisPage() {
                   </button>
                 )
               })}
+              </div>
+            </div>
+          </details>
+
+          <details className="test-analysis-filter-menu">
+            <summary>
+              <span>ACN Formula</span>
+              <strong>{acnConfig.config.preset === 'v2_completed' ? 'v2 Default' : acnConfig.config.preset === 'v2_fixed49' ? 'v2 Fixed 49' : acnConfig.config.preset === 'v1_legacy_probe_avg' ? 'v1 Legacy' : 'Custom'}</strong>
+            </summary>
+            <div className="test-analysis-filter-popover" style={{ minWidth: '220px' }}>
+              <div className="test-analysis-filter-title is-popover-title">
+                <span>Select Formula</span>
+                <button type="button" onClick={acnConfig.reset} title="Reset to v2 Default">
+                  <RotateCcw className="h-3 w-3" /> Reset
+                </button>
+              </div>
+              <div className="flex flex-col gap-1 mt-2">
+                <button
+                  type="button"
+                  className={`test-analysis-chip justify-start text-left${acnConfig.config.preset === 'v2_completed' ? ' is-active' : ''}`}
+                  onClick={() => acnConfig.setPreset('v2_completed')}
+                >
+                  v2: (N_total - Tổng n) / Đã hoàn thành
+                </button>
+                <button
+                  type="button"
+                  className={`test-analysis-chip justify-start text-left${acnConfig.config.preset === 'v2_fixed49' ? ' is-active' : ''}`}
+                  onClick={() => acnConfig.setPreset('v2_fixed49')}
+                >
+                  v2: (N_total - Tổng n) / 49 câu
+                </button>
+                <button
+                  type="button"
+                  className={`test-analysis-chip justify-start text-left${acnConfig.config.preset === 'v1_legacy_probe_avg' ? ' is-active' : ''}`}
+                  onClick={() => acnConfig.setPreset('v1_legacy_probe_avg')}
+                >
+                  v1: Probed Depth Avg (Cũ)
+                </button>
+                <button
+                  type="button"
+                  className={`test-analysis-chip justify-start text-left${acnConfig.config.preset === 'custom' ? ' is-active' : ''}`}
+                  onClick={() => acnConfig.setPreset('custom')}
+                >
+                  Custom Formula
+                </button>
+                {acnConfig.config.preset === 'custom' && (
+                  <input
+                    type="text"
+                    className="mt-1 px-2 py-1 text-xs border rounded border-slate-300 dark:border-slate-700 bg-transparent"
+                    value={acnConfig.config.customFormula || ''}
+                    onChange={(e) => acnConfig.setCustomFormula(e.target.value)}
+                    placeholder="(N_total - totalN) / finalized_count"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                )}
               </div>
             </div>
           </details>

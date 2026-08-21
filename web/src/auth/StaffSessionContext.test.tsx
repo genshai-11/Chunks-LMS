@@ -247,4 +247,38 @@ describe('Supabase staff session', () => {
 
     expect(result).toEqual({ ok: false, error: 'Invalid email/username or password' })
   })
+
+  it('does not reset ready state or wipe staff roles on token refresh / tab switch for same user', async () => {
+    let authListener: ((event: string, session: { user: any } | null) => void) | undefined
+    const baseClient = fakeClient()
+    const client = {
+      ...baseClient,
+      auth: {
+        ...baseClient.auth,
+        onAuthStateChange: vi.fn((cb) => {
+          authListener = cb
+          return { data: { subscription: { unsubscribe: vi.fn() } } }
+        }),
+      },
+    }
+    mocks.getSupabase.mockReturnValue(client)
+    render(
+      <SupabaseStaffSessionProvider>
+        <CaptureSession />
+      </SupabaseStaffSessionProvider>,
+    )
+    await waitFor(() => expect(latest?.ready).toBe(true))
+    expect(latest?.staffRoles).toEqual(['admin', 'teacher'])
+
+    // Simulate tab switch / token refresh firing onAuthStateChange with same user ID
+    await act(async () => {
+      authListener?.('TOKEN_REFRESHED', {
+        user: { id: 'auth-1', email: 'admin@example.com', user_metadata: { full_name: 'Admin User' } },
+      })
+    })
+
+    // Ready should remain true immediately without unmounting or reloading
+    expect(latest?.ready).toBe(true)
+    expect(latest?.staffRoles).toEqual(['admin', 'teacher'])
+  })
 })

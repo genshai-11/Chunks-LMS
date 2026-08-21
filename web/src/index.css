@@ -5255,6 +5255,10 @@
   .standalone-metric-card.metric-cpd strong {
     @apply text-cyan-600;
   }
+  .standalone-metric-card.metric-acn svg,
+  .standalone-metric-card.metric-acn strong {
+    @apply text-rose-500;
+  }
   .standalone-chart-wrap {
     @apply border-slate-200 bg-white;
   }

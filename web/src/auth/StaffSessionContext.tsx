@@ -249,8 +249,12 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
     void sb.auth.getUser().then(({ data }) => {
       if (!cancelled) {
         const nextUser = data.user ?? null
-        activeAuthUserId.current = nextUser?.id ?? null
-        setRolesLoading(Boolean(nextUser))
+        const nextUserId = nextUser?.id ?? null
+        const userIdChanged = activeAuthUserId.current !== nextUserId
+        activeAuthUserId.current = nextUserId
+        if (userIdChanged) {
+          setRolesLoading(Boolean(nextUser))
+        }
         setUser(nextUser)
         setReady(true)
       }
@@ -261,8 +265,11 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
       if (!nextUserId || (activeAuthUserId.current && activeAuthUserId.current !== nextUserId)) {
         clearRequestCache('audio:signed-playback')
       }
+      const userIdChanged = activeAuthUserId.current !== nextUserId
       activeAuthUserId.current = nextUserId
-      setRolesLoading(Boolean(nextUser))
+      if (userIdChanged) {
+        setRolesLoading(Boolean(nextUser))
+      }
       setUser(nextUser)
       setReady(true)
     })
@@ -274,13 +281,14 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
 
   useEffect(() => {
     let cancelled = false
-    if (!user) {
+    const userId = user?.id ?? null
+    if (!userId) {
       setStaffRoles([])
       setRolesLoading(false)
       return
     }
     setRolesLoading(true)
-    void loadStaffRolesByAuthUserId(user.id)
+    void loadStaffRolesByAuthUserId(userId)
       .then((roles) => {
         if (!cancelled) setStaffRoles(roles)
       })
@@ -290,7 +298,7 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
     return () => {
       cancelled = true
     }
-  }, [user])
+  }, [user?.id])
 
   const value = useMemo(
     () =>

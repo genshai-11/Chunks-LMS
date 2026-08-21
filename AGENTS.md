@@ -44,6 +44,7 @@ This is a single-context repository using root `CONTEXT.md` and `docs/adr/`. See
 | Skill | When |
 |---|---|
 | `[skill:codegraph-advisor]` | Required before broad code reading/search; trace architecture and blast radius with CodeGraph first |
+| `/cowork` | Standard 4-step pair programming: clarify & confirm plan -> prompt subagent to implement & test -> verify local CI -> deploy Vercel Preview |
 | `/grill-with-docs` | Align on a change; update glossary/ADRs while grilling |
 | `/triage` | Move GitHub issues through needs-triage → ready-for-agent |
 | `/to-spec` | Publish a discussed plan as a tracker issue |

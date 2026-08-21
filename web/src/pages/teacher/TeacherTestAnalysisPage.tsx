@@ -641,15 +641,10 @@ export function TeacherTestAnalysisPage() {
           <span>Avg Final CPD</span>
           <strong>{volt(metrics.avgCpd)}</strong>
         </div> : null}
-        {metricUi.acn ? <div className="standalone-metric-card flex-col items-start gap-1 p-3" title={metrics.acnTitle}>
-          <div className="flex items-center gap-2 w-full">
-            <LineChartIcon className="h-5 w-5 text-rose-300 shrink-0" />
-            <div className="flex flex-col flex-1 min-w-0">
-              <span className="leading-tight">ACN</span>
-              <span className="text-[10px] opacity-60 leading-tight truncate" title={metrics.acnFormulaDescription}>{metrics.acnFormulaDescription}</span>
-            </div>
-            <strong className="text-lg">{Number.isFinite(metrics.acn) ? metrics.acn.toFixed(2) : '—'}</strong>
-          </div>
+        {metricUi.acn ? <div className="standalone-metric-card metric-acn" title={metrics.acnTitle}>
+          <LineChartIcon className="h-5 w-5" />
+          <span>ACN</span>
+          <strong>{Number.isFinite(metrics.acn) ? metrics.acn.toFixed(2) : '—'}</strong>
         </div> : null}
         {metricUi.nTotal ? <div className="standalone-metric-card" title={metrics.nTotalTitle}>
           <BarChart3 className="h-5 w-5 text-slate-400" />

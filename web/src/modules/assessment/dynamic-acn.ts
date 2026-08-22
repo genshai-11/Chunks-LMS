@@ -33,7 +33,7 @@ export type DynamicAcnResult = {
 
 const DEFAULT_CONFIG: DynamicAcnConfig = {
   preset: 'v2_completed',
-  customFormula: '(N_total - totalN) / finalized_count'
+  customFormula: 'totalN / finalized_count'
 }
 
 export function calculateDynamicAcn(
@@ -56,19 +56,19 @@ export function calculateDynamicAcn(
 
   if (preset === 'v2_completed') {
     denominator = Math.max(finalizedCount, 1)
-    acn = finalizedCount > 0 ? (nTotal - totalN) / denominator : 0
-    formulaDescription = 'v2: (N_total - Tổng n) / Đã hoàn thành'
-    acnTitle = `ACN = (N_total - Tổng n) / Số câu hoàn thành = (${nTotal} - ${totalN}) / ${finalizedCount} = ${(nTotal - totalN)} / ${finalizedCount} = ${acn.toFixed(2)}\n• N_total = ${nTotal} (tổng spectrum steps)\n• Tổng n = ${totalN} (Green: ${nGreen}, Blue: ${nBlue}, Indigo: ${nIndigo})\n• Đã hoàn thành: ${finalizedCount}/${totalItemsCount} câu`
+    acn = finalizedCount > 0 ? totalN / denominator : 0
+    formulaDescription = 'v2: Tổng n / Đã hoàn thành'
+    acnTitle = `ACN = Tổng n / Số câu hoàn thành = ${totalN} / ${finalizedCount} = ${acn.toFixed(2)}\n• Tổng n = ${totalN} (Green: ${nGreen}, Blue: ${nBlue}, Indigo: ${nIndigo})\n• Bell number (N_total) = ${nTotal}\n• Đã hoàn thành: ${finalizedCount}/${totalItemsCount} câu`
   } else if (preset === 'v2_fixed49') {
     denominator = Math.max(totalItemsCount, 1)
-    acn = (nTotal - totalN) / denominator
-    formulaDescription = `v2: (N_total - Tổng n) / ${totalItemsCount} câu`
-    acnTitle = `ACN = (N_total - Tổng n) / 49 = (${nTotal} - ${totalN}) / ${totalItemsCount} = ${(nTotal - totalN)} / ${totalItemsCount} = ${acn.toFixed(2)}\n• N_total = ${nTotal} (tổng spectrum steps)\n• Tổng n = ${totalN} (Green: ${nGreen}, Blue: ${nBlue}, Indigo: ${nIndigo})\n• Cố định: ${totalItemsCount} câu`
+    acn = totalN / denominator
+    formulaDescription = `v2: Tổng n / ${totalItemsCount} câu`
+    acnTitle = `ACN = Tổng n / 49 = ${totalN} / ${totalItemsCount} = ${acn.toFixed(2)}\n• Tổng n = ${totalN} (Green: ${nGreen}, Blue: ${nBlue}, Indigo: ${nIndigo})\n• Bell number (N_total) = ${nTotal}\n• Cố định: ${totalItemsCount} câu`
   } else if (preset === 'v1_legacy_probe_avg') {
     denominator = Math.max(probedCount, 1)
     acn = probedCount > 0 ? legacyProbeDepthSum / probedCount : 0
     formulaDescription = 'v1: Probed Depth Avg (Cũ)'
-    acnTitle = `ACN (v1 cũ) = Chunks number trung bình của ${probedCount} câu đã probe = ${legacyProbeDepthSum} / ${probedCount} = ${acn.toFixed(2)}\n• N_total = ${nTotal}\n• Tổng n = ${totalN}\n• Đã probe: ${probedCount} câu`
+    acnTitle = `ACN (v1 cũ) = Chunks number trung bình của ${probedCount} câu đã probe = ${legacyProbeDepthSum} / ${probedCount} = ${acn.toFixed(2)}\n• Bell number (N_total) = ${nTotal}\n• Tổng n = ${totalN}\n• Đã probe: ${probedCount} câu`
   } else if (preset === 'custom' && customFormula) {
     try {
       const formula = customFormula
@@ -87,18 +87,18 @@ export function calculateDynamicAcn(
       const result = new Function(`"use strict"; return (${formula});`)()
       acn = typeof result === 'number' && Number.isFinite(result) ? result : 0
       formulaDescription = 'Custom Formula'
-      acnTitle = `ACN (Custom) = ${customFormula} = ${acn.toFixed(2)}\n• N_total = ${nTotal}\n• Tổng n = ${totalN} (Green: ${nGreen}, Blue: ${nBlue}, Indigo: ${nIndigo})\n• Đã hoàn thành: ${finalizedCount} câu`
+      acnTitle = `ACN (Custom) = ${customFormula} = ${acn.toFixed(2)}\n• Bell number (N_total) = ${nTotal}\n• Tổng n = ${totalN} (Green: ${nGreen}, Blue: ${nBlue}, Indigo: ${nIndigo})\n• Đã hoàn thành: ${finalizedCount} câu`
     } catch {
       acn = 0
       formulaDescription = 'Custom Formula (Error)'
-      acnTitle = `Error evaluating custom formula: ${customFormula}\n• N_total = ${nTotal}\n• Tổng n = ${totalN}`
+      acnTitle = `Error evaluating custom formula: ${customFormula}\n• Bell number (N_total) = ${nTotal}\n• Tổng n = ${totalN}`
     }
   } else {
     // Default fallback
     denominator = Math.max(finalizedCount, 1)
-    acn = finalizedCount > 0 ? (nTotal - totalN) / denominator : 0
-    formulaDescription = 'v2: (N_total - Tổng n) / Đã hoàn thành'
-    acnTitle = `ACN = (N_total - Tổng n) / Số câu hoàn thành = (${nTotal} - ${totalN}) / ${finalizedCount} = ${(nTotal - totalN)} / ${finalizedCount} = ${acn.toFixed(2)}\n• N_total = ${nTotal} (tổng spectrum steps)\n• Tổng n = ${totalN} (Green: ${nGreen}, Blue: ${nBlue}, Indigo: ${nIndigo})\n• Đã hoàn thành: ${finalizedCount}/${totalItemsCount} câu`
+    acn = finalizedCount > 0 ? totalN / denominator : 0
+    formulaDescription = 'v2: Tổng n / Đã hoàn thành'
+    acnTitle = `ACN = Tổng n / Số câu hoàn thành = ${totalN} / ${finalizedCount} = ${acn.toFixed(2)}\n• Tổng n = ${totalN} (Green: ${nGreen}, Blue: ${nBlue}, Indigo: ${nIndigo})\n• Bell number (N_total) = ${nTotal}\n• Đã hoàn thành: ${finalizedCount}/${totalItemsCount} câu`
   }
 
   return {

@@ -77,7 +77,7 @@ const METRIC_NAMES: Record<MetricKey, string> = {
   avgCci: 'Avg CCI',
   avgCpd: 'Avg CPD',
   acn: 'ACN',
-  nTotal: 'N_total',
+  nTotal: 'Bell number',
 }
 
 const COLOR_HEX: Record<string, string> = {
@@ -330,7 +330,7 @@ export function TeacherTestAnalysisPage() {
       percentC: spectrum.rac == null ? 0 : spectrum.rac * 100,
       rfcTitle: `RFC = warm records / N_total = ${spectrum.warmSteps} / ${spectrum.totalRecords}. Warm = Red + Orange + Yellow.`,
       percentCTitle: racMetricTitle(racMetricLabel, spectrum.coolSteps, spectrum.totalRecords),
-      nTotalTitle: `N_total = primary records + probe records = ${spectrum.primaryRecords} + ${spectrum.probeRecords} = ${spectrum.totalRecords}.`,
+      nTotalTitle: `Bell number (N_total) = primary records + probe records = ${spectrum.primaryRecords} + ${spectrum.probeRecords} = ${spectrum.totalRecords}.`,
       avgCvr: finalized.reduce((sum, row) => sum + row.cvr, 0) / count,
       avgCci: finalized.reduce((sum, row) => sum + row.cci, 0) / count,
       avgCpd: finalized.reduce((sum, row) => sum + row.cpd, 0) / count,
@@ -648,7 +648,7 @@ export function TeacherTestAnalysisPage() {
         </div> : null}
         {metricUi.nTotal ? <div className="standalone-metric-card" title={metrics.nTotalTitle}>
           <BarChart3 className="h-5 w-5 text-slate-400" />
-          <span>N_total</span>
+          <span>Bell number</span>
           <strong>{metrics.nTotal}</strong>
         </div> : null}
       </div>
@@ -761,14 +761,14 @@ export function TeacherTestAnalysisPage() {
                   className={`test-analysis-chip justify-start text-left${acnConfig.config.preset === 'v2_completed' ? ' is-active' : ''}`}
                   onClick={() => acnConfig.setPreset('v2_completed')}
                 >
-                  v2: (N_total - Tổng n) / Đã hoàn thành
+                  v2: Tổng n / Đã hoàn thành
                 </button>
                 <button
                   type="button"
                   className={`test-analysis-chip justify-start text-left${acnConfig.config.preset === 'v2_fixed49' ? ' is-active' : ''}`}
                   onClick={() => acnConfig.setPreset('v2_fixed49')}
                 >
-                  v2: (N_total - Tổng n) / 49 câu
+                  v2: Tổng n / 49 câu
                 </button>
                 <button
                   type="button"
@@ -790,7 +790,7 @@ export function TeacherTestAnalysisPage() {
                     className="mt-1 px-2 py-1 text-xs border rounded border-slate-300 dark:border-slate-700 bg-transparent"
                     value={acnConfig.config.customFormula || ''}
                     onChange={(e) => acnConfig.setCustomFormula(e.target.value)}
-                    placeholder="(N_total - totalN) / finalized_count"
+                    placeholder="totalN / finalized_count"
                     onClick={(e) => e.stopPropagation()}
                   />
                 )}

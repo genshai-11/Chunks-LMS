@@ -4,6 +4,9 @@ import {
   calculateSpectrumStepBreakdown,
   compareEqualDurationWindows,
   spectrumRecordsForAttempt,
+  COLOR_PERCENT_X,
+  COLOR_PERCENT_X_VALUES,
+  colorForAvgPercentX,
   type FinalizedAttempt,
 } from './calculate'
 
@@ -137,6 +140,132 @@ describe('metric calculations', () => {
     expect(breakdown.totalRecords).toBe(9)
     expect(breakdown.rfc).toBeCloseTo(3 / 9)
     expect(breakdown.rac).toBeCloseTo(6 / 9)
+    expect(breakdown.sumPercentX).toBe(469)
+    expect(breakdown.avgPercentX).toBeCloseTo(469 / 9)
+  })
+
+  it('calculates sumPercentX and avgPercentX correctly across various sequences', () => {
+    // 1. Empty attempts: totalRecords = 0, sumPercentX = 0, avgPercentX = null
+    const emptyBreakdown = calculateSpectrumStepBreakdown([])
+    expect(emptyBreakdown.totalRecords).toBe(0)
+    expect(emptyBreakdown.sumPercentX).toBe(0)
+    expect(emptyBreakdown.avgPercentX).toBeNull()
+
+    // 2. Single direct attempts:
+    // Purple (100%)
+    const purpleBreakdown = calculateSpectrumStepBreakdown([
+      { effectiveColor: 'purple', enteredProbeFlow: false, probeEventCount: 0 },
+    ])
+    expect(purpleBreakdown.totalRecords).toBe(1)
+    expect(purpleBreakdown.sumPercentX).toBe(100)
+    expect(purpleBreakdown.avgPercentX).toBe(100)
+
+    // Red (0%)
+    const redBreakdown = calculateSpectrumStepBreakdown([
+      { effectiveColor: 'red', enteredProbeFlow: false, probeEventCount: 0 },
+    ])
+    expect(redBreakdown.totalRecords).toBe(1)
+    expect(redBreakdown.sumPercentX).toBe(0)
+    expect(redBreakdown.avgPercentX).toBe(0)
+
+    // Green without probe (50%)
+    const greenBreakdown = calculateSpectrumStepBreakdown([
+      { effectiveColor: 'green', enteredProbeFlow: false, probeEventCount: 0 },
+    ])
+    expect(greenBreakdown.totalRecords).toBe(1)
+    expect(greenBreakdown.sumPercentX).toBe(50)
+    expect(greenBreakdown.avgPercentX).toBe(50)
+
+    // 3. Probed attempt: Yellow fail (green 50% + yellow 34% = sum 84%, avg 42%)
+    const yellowFailBreakdown = calculateSpectrumStepBreakdown([
+      { effectiveColor: 'yellow', enteredProbeFlow: true, probeEventCount: 1 },
+    ])
+    expect(yellowFailBreakdown.totalRecords).toBe(2)
+    expect(yellowFailBreakdown.sumPercentX).toBe(84)
+    expect(yellowFailBreakdown.avgPercentX).toBe(42)
+
+    // 4. Probed attempt with continue: green (50%) + blue (67%) + indigo (84%) = sum 201%, avg 67%
+    const continueBreakdown = calculateSpectrumStepBreakdown([
+      { effectiveColor: 'indigo', enteredProbeFlow: true, probeEventCount: 2 },
+    ])
+    expect(continueBreakdown.totalRecords).toBe(3)
+    expect(continueBreakdown.sumPercentX).toBe(201)
+    expect(continueBreakdown.avgPercentX).toBe(67)
+
+    // 5. Mixed sequence with 9 steps:
+    // red (0) + orange (17) + yellow (34) + 2 green (100) + 2 blue (134) + indigo (84) + purple (100)
+    // sum = 469%, avg = 469/9 = 52.11%
+    const mixedBreakdown = calculateSpectrumStepBreakdown([
+      { effectiveColor: 'red', enteredProbeFlow: false, probeEventCount: 0 },
+      { effectiveColor: 'orange', enteredProbeFlow: false, probeEventCount: 0 },
+      { effectiveColor: 'yellow', enteredProbeFlow: true, probeEventCount: 1 },
+      { effectiveColor: 'indigo', enteredProbeFlow: true, probeEventCount: 3 },
+      { effectiveColor: 'purple', enteredProbeFlow: false, probeEventCount: 0 },
+    ])
+    expect(mixedBreakdown.totalRecords).toBe(9)
+    expect(mixedBreakdown.sumPercentX).toBe(469)
+    expect(mixedBreakdown.avgPercentX).toBeCloseTo(469 / 9)
+    expect((mixedBreakdown.avgPercentX ?? 0).toFixed(2)).toBe('52.11')
+  })
+
+  it('exports valid COLOR_PERCENT_X and COLOR_PERCENT_X_VALUES constants', () => {
+    expect(COLOR_PERCENT_X).toEqual({
+      red: 0,
+      orange: 0.17,
+      yellow: 0.34,
+      green: 0.5,
+      blue: 0.67,
+      indigo: 0.84,
+      purple: 1,
+    })
+    expect(COLOR_PERCENT_X_VALUES).toEqual({
+      red: 0,
+      orange: 17,
+      yellow: 34,
+      green: 50,
+      blue: 67,
+      indigo: 84,
+      purple: 100,
+    })
+  })
+
+  it('maps avg %x correctly to nearest spectrum color bands', () => {
+    // Red [0, 8.5)
+    expect(colorForAvgPercentX(null)).toBe('red')
+    expect(colorForAvgPercentX(0)).toBe('red')
+    expect(colorForAvgPercentX(5)).toBe('red')
+    expect(colorForAvgPercentX(8.4)).toBe('red')
+
+    // Orange [8.5, 25.5) - user example: 14% -> orange
+    expect(colorForAvgPercentX(8.5)).toBe('orange')
+    expect(colorForAvgPercentX(14)).toBe('orange')
+    expect(colorForAvgPercentX(17)).toBe('orange')
+    expect(colorForAvgPercentX(25.4)).toBe('orange')
+
+    // Yellow [25.5, 42.0)
+    expect(colorForAvgPercentX(25.5)).toBe('yellow')
+    expect(colorForAvgPercentX(34)).toBe('yellow')
+    expect(colorForAvgPercentX(41.9)).toBe('yellow')
+
+    // Green [42.0, 58.5)
+    expect(colorForAvgPercentX(42.0)).toBe('green')
+    expect(colorForAvgPercentX(50)).toBe('green')
+    expect(colorForAvgPercentX(58.4)).toBe('green')
+
+    // Blue [58.5, 75.5)
+    expect(colorForAvgPercentX(58.5)).toBe('blue')
+    expect(colorForAvgPercentX(67)).toBe('blue')
+    expect(colorForAvgPercentX(75.4)).toBe('blue')
+
+    // Indigo [75.5, 92.0)
+    expect(colorForAvgPercentX(75.5)).toBe('indigo')
+    expect(colorForAvgPercentX(84)).toBe('indigo')
+    expect(colorForAvgPercentX(91.9)).toBe('indigo')
+
+    // Purple [92.0, 100]
+    expect(colorForAvgPercentX(92.0)).toBe('purple')
+    expect(colorForAvgPercentX(95)).toBe('purple')
+    expect(colorForAvgPercentX(100)).toBe('purple')
   })
 
   it('expands finalized attempts into chronological N_total records', () => {

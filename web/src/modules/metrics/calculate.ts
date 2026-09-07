@@ -24,6 +24,49 @@ export type FinalizedAttempt = {
   sequenceIndex?: number
 }
 
+export const COLOR_PERCENT_X: Record<ResultColor, number> = {
+  red: 0,
+  orange: 0.17,
+  yellow: 0.34,
+  green: 0.5,
+  blue: 0.67,
+  indigo: 0.84,
+  purple: 1,
+}
+
+export const COLOR_PERCENT_X_VALUES: Record<ResultColor, number> = {
+  red: 0,
+  orange: 17,
+  yellow: 34,
+  green: 50,
+  blue: 67,
+  indigo: 84,
+  purple: 100,
+}
+
+/**
+ * Maps an Avg %x value [0, 100] to its nearest representative Spectrum Color band.
+ * Thresholds represent the midpoints between adjacent color benchmarks:
+ * - Red (0%): [0, 8.5)
+ * - Orange (17%): [8.5, 25.5)
+ * - Yellow (34%): [25.5, 42.0)
+ * - Green (50%): [42.0, 58.5)
+ * - Blue (67%): [58.5, 75.5)
+ * - Indigo (84%): [75.5, 92.0)
+ * - Purple (100%): [92.0, 100]
+ */
+export function colorForAvgPercentX(avgPercentX: number | null | undefined): ResultColor {
+  if (avgPercentX == null || Number.isNaN(avgPercentX)) return 'red'
+  if (avgPercentX < 8.5) return 'red'
+  if (avgPercentX < 25.5) return 'orange'
+  if (avgPercentX < 42.0) return 'yellow'
+  if (avgPercentX < 58.5) return 'green'
+  if (avgPercentX < 75.5) return 'blue'
+  if (avgPercentX < 92.0) return 'indigo'
+  return 'purple'
+}
+
+
 export type SpectrumStepBreakdown = {
   byColor: Record<ResultColor, number>
   primaryRecords: number
@@ -33,6 +76,8 @@ export type SpectrumStepBreakdown = {
   coolSteps: number
   rfc: number | null
   rac: number | null
+  sumPercentX: number
+  avgPercentX: number | null
 }
 
 export type MetricObservation = {
@@ -204,6 +249,11 @@ export function calculateSpectrumStepBreakdown(
   const totalRecords = primaryRecords + probeRecords
   const warmSteps = WARM_COLORS.reduce((sum, color) => sum + byColor[color], 0)
   const coolSteps = COOL_COLORS.reduce((sum, color) => sum + byColor[color], 0)
+  const sumPercentX = (Object.keys(byColor) as ResultColor[]).reduce(
+    (sum, color) => sum + byColor[color] * COLOR_PERCENT_X_VALUES[color],
+    0,
+  )
+  const avgPercentX = totalRecords > 0 ? sumPercentX / totalRecords : null
   return {
     byColor,
     primaryRecords,
@@ -213,6 +263,8 @@ export function calculateSpectrumStepBreakdown(
     coolSteps,
     rfc: ratio(warmSteps, totalRecords),
     rac: ratio(coolSteps, totalRecords),
+    sumPercentX,
+    avgPercentX,
   }
 }
 

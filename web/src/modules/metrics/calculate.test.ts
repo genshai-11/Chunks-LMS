@@ -6,6 +6,7 @@ import {
   spectrumRecordsForAttempt,
   COLOR_PERCENT_X,
   COLOR_PERCENT_X_VALUES,
+  colorForAvgPercentX,
   type FinalizedAttempt,
 } from './calculate'
 
@@ -226,6 +227,45 @@ describe('metric calculations', () => {
       indigo: 84,
       purple: 100,
     })
+  })
+
+  it('maps avg %x correctly to nearest spectrum color bands', () => {
+    // Red [0, 8.5)
+    expect(colorForAvgPercentX(null)).toBe('red')
+    expect(colorForAvgPercentX(0)).toBe('red')
+    expect(colorForAvgPercentX(5)).toBe('red')
+    expect(colorForAvgPercentX(8.4)).toBe('red')
+
+    // Orange [8.5, 25.5) - user example: 14% -> orange
+    expect(colorForAvgPercentX(8.5)).toBe('orange')
+    expect(colorForAvgPercentX(14)).toBe('orange')
+    expect(colorForAvgPercentX(17)).toBe('orange')
+    expect(colorForAvgPercentX(25.4)).toBe('orange')
+
+    // Yellow [25.5, 42.0)
+    expect(colorForAvgPercentX(25.5)).toBe('yellow')
+    expect(colorForAvgPercentX(34)).toBe('yellow')
+    expect(colorForAvgPercentX(41.9)).toBe('yellow')
+
+    // Green [42.0, 58.5)
+    expect(colorForAvgPercentX(42.0)).toBe('green')
+    expect(colorForAvgPercentX(50)).toBe('green')
+    expect(colorForAvgPercentX(58.4)).toBe('green')
+
+    // Blue [58.5, 75.5)
+    expect(colorForAvgPercentX(58.5)).toBe('blue')
+    expect(colorForAvgPercentX(67)).toBe('blue')
+    expect(colorForAvgPercentX(75.4)).toBe('blue')
+
+    // Indigo [75.5, 92.0)
+    expect(colorForAvgPercentX(75.5)).toBe('indigo')
+    expect(colorForAvgPercentX(84)).toBe('indigo')
+    expect(colorForAvgPercentX(91.9)).toBe('indigo')
+
+    // Purple [92.0, 100]
+    expect(colorForAvgPercentX(92.0)).toBe('purple')
+    expect(colorForAvgPercentX(95)).toBe('purple')
+    expect(colorForAvgPercentX(100)).toBe('purple')
   })
 
   it('expands finalized attempts into chronological N_total records', () => {

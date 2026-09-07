@@ -25,7 +25,7 @@ import { getTestPackageVersion, listTestPackages } from '../../lib/test-packages
 import { useAppState } from '../../state/useAppState'
 import { probeChunksNumber } from '../../modules/assessment/probe-metrics'
 import { calculateDynamicAcn, useDynamicAcnConfig } from '../../modules/assessment/dynamic-acn'
-import { calculateSpectrumStepBreakdown, spectrumRecordsForAttempt, COLOR_PERCENT_X_VALUES } from '../../modules/metrics/calculate'
+import { calculateSpectrumStepBreakdown, spectrumRecordsForAttempt, COLOR_PERCENT_X_VALUES, colorForAvgPercentX } from '../../modules/metrics/calculate'
 import { racMetricLabelForPackage, racMetricTitle, type PackageRacMetricLabel } from '../../modules/metrics/display-labels'
 import { COLOR_SCORE, COOL_COLORS, SPECTRUM_COLORS, WARM_COLORS, type ResultColor } from '../../modules/result-lifecycle/types'
 
@@ -93,7 +93,7 @@ const COLOR_HEX: Record<string, string> = {
   pending: '#64748b',
 }
 
-const COLOR_LABELS: Record<ResultColor, string> = {
+const COLOR_LABELS: Record<string, string> = {
   red: 'Red',
   orange: 'Orange',
   yellow: 'Yellow',
@@ -322,6 +322,7 @@ export function TeacherTestAnalysisPage() {
       legacyProbeDepthSum: probed.reduce((sum, row) => sum + row.probeDepth, 0),
       totalItemsCount: 49
     }, acnConfig.config)
+    const avgXColor = colorForAvgPercentX(spectrum.avgPercentX)
     return {
       finalized: finalized.length,
       total: chartRows.length,
@@ -332,7 +333,8 @@ export function TeacherTestAnalysisPage() {
       percentC: spectrum.rac == null ? 0 : spectrum.rac * 100,
       avgPercentX: spectrum.avgPercentX ?? 0,
       sumPercentX: spectrum.sumPercentX,
-      avgPercentXTitle: `Avg %x = sum(%x) / n_bell = ${spectrum.sumPercentX.toFixed(1)}% / ${spectrum.totalRecords} = ${(spectrum.avgPercentX ?? 0).toFixed(1)}%.\n• Colors: Red (0%), Orange (17%), Yellow (34%), Green (50%), Blue (67%), Indigo (84%), Violet (100%).`,
+      avgXColor,
+      avgPercentXTitle: `Avg %x = sum(%x) / n_bell = ${spectrum.sumPercentX.toFixed(1)}% / ${spectrum.totalRecords} = ${(spectrum.avgPercentX ?? 0).toFixed(1)}% (Band: ${COLOR_LABELS[avgXColor]}).\n• Colors: Red (0%), Orange (17%), Yellow (34%), Green (50%), Blue (67%), Indigo (84%), Violet (100%).`,
       rfcTitle: `RFC = warm records / N_total = ${spectrum.warmSteps} / ${spectrum.totalRecords}. Warm = Red + Orange + Yellow.`,
       percentCTitle: racMetricTitle(racMetricLabel, spectrum.coolSteps, spectrum.totalRecords),
       nTotalTitle: `N_total = primary records + probe records = ${spectrum.primaryRecords} + ${spectrum.probeRecords} = ${spectrum.totalRecords}.`,
@@ -368,12 +370,15 @@ export function TeacherTestAnalysisPage() {
         const avgCpd = finalized.length
           ? finalized.reduce((sum, row) => sum + row.cpd, 0) / denom
           : 0
+        const avgPercentX = spectrum.avgPercentX ?? 0
+        const avgXColor = colorForAvgPercentX(spectrum.avgPercentX)
         return {
           session,
           label: `Session ${session}`,
           shortLabel: `S${session}`,
           percentC: spectrum.rac == null ? 0 : Math.round(spectrum.rac * 100),
-          avgPercentX: spectrum.avgPercentX ?? 0,
+          avgPercentX,
+          avgXColor,
           sumPercentX: spectrum.sumPercentX,
           avgCpd: Number(avgCpd.toFixed(2)),
           percentCLabel: spectrum.rac == null ? '—' : `${Math.round(spectrum.rac * 100)}%`,
@@ -607,7 +612,8 @@ export function TeacherTestAnalysisPage() {
       .map((entry) => {
         const sumPercentX = SPECTRUM_COLORS.reduce((s, color) => s + entry[color] * COLOR_PERCENT_X_VALUES[color], 0)
         const avgPercentX = entry.nTotal > 0 ? sumPercentX / entry.nTotal : 0
-        return { ...entry, sumPercentX, avgPercentX }
+        const avgXColor = colorForAvgPercentX(avgPercentX)
+        return { ...entry, sumPercentX, avgPercentX, avgXColor }
       })
   }, [recordTubeRows])
 
@@ -641,12 +647,18 @@ export function TeacherTestAnalysisPage() {
         </div> : null}
         {metricUi.avgPercentX ? (
           <div
-            className="standalone-metric-card metric-avg-x"
+            className={`standalone-metric-card metric-avg-x is-${metrics.avgXColor}`}
+            style={{
+              borderColor: `${COLOR_HEX[metrics.avgXColor]}55`,
+              boxShadow: `0 0 16px -4px ${COLOR_HEX[metrics.avgXColor]}33`,
+            }}
             title={metrics.avgPercentXTitle}
           >
-            <Activity className="h-5 w-5" />
+            <Activity className="h-5 w-5" style={{ color: COLOR_HEX[metrics.avgXColor] }} />
             <span>Avg %x</span>
-            <strong>{Number.isFinite(metrics.avgPercentX) ? `${metrics.avgPercentX.toFixed(1)}%` : '—'}</strong>
+            <strong style={{ color: COLOR_HEX[metrics.avgXColor] }}>
+              {Number.isFinite(metrics.avgPercentX) ? `${metrics.avgPercentX.toFixed(1)}%` : '—'}
+            </strong>
           </div>
         ) : null}
         {metricUi.avgCvr ? <div className="standalone-metric-card metric-cvr" title={`Average CVR across ${metrics.finalized} finalized questions in the current filter.`}>
@@ -956,7 +968,7 @@ export function TeacherTestAnalysisPage() {
                         return (
                           <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
                             <div className="mb-1 font-black text-slate-950">
-                              Session {row.session} · N_total {row.nTotal} · Avg %x: <span className="text-cyan-600 font-bold">{Number(row.avgPercentX ?? 0).toFixed(1)}%</span>
+                              Session {row.session} · N_total {row.nTotal} · Avg %x: <span className="font-bold" style={{ color: COLOR_HEX[row.avgXColor] }}>{Number(row.avgPercentX ?? 0).toFixed(1)}%</span>
                             </div>
                             <div className="grid grid-cols-2 gap-x-3 gap-y-1">
                               {SPECTRUM_COLORS.map((color) => (
@@ -1185,7 +1197,7 @@ export function TeacherTestAnalysisPage() {
                           <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
                             <div className="mb-1 font-black text-slate-950">{row.label}</div>
                             <div>{racMetricLabel}: <strong style={{ color: METRIC_HEX.percentC }}>{row.percentC}%</strong></div>
-                            <div>Avg %x: <strong style={{ color: '#0891b2' }}>{Number(row.avgPercentX ?? 0).toFixed(1)}%</strong></div>
+                            <div>Avg %x: <strong style={{ color: COLOR_HEX[row.avgXColor] }}>{Number(row.avgPercentX ?? 0).toFixed(1)}%</strong> <span style={{ color: COLOR_HEX[row.avgXColor] }}>({COLOR_LABELS[row.avgXColor]})</span></div>
                             <div>Formula: <strong>{row.coolSteps} / {row.nTotal}</strong> cool records / N_total</div>
                             <div>Finalized: <strong>{row.finalized}</strong> questions</div>
                             <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1">
@@ -1271,7 +1283,7 @@ export function TeacherTestAnalysisPage() {
                           <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
                             <div className="mb-1 font-black text-slate-950">{row.label}</div>
                             <div>{racMetricLabel}: <strong style={{ color: METRIC_HEX.percentC }}>{row.percentC}%</strong></div>
-                            <div>Avg %x: <strong style={{ color: '#0891b2' }}>{Number(row.avgPercentX ?? 0).toFixed(1)}%</strong></div>
+                            <div>Avg %x: <strong style={{ color: COLOR_HEX[row.avgXColor] }}>{Number(row.avgPercentX ?? 0).toFixed(1)}%</strong> <span style={{ color: COLOR_HEX[row.avgXColor] }}>({COLOR_LABELS[row.avgXColor]})</span></div>
                             <div>Formula: <strong>{row.coolSteps} / {row.nTotal}</strong> cool records / N_total</div>
                             <div>Avg CPD: <strong style={{ color: METRIC_HEX.cpd }}>{volt(row.avgCpd)}</strong></div>
                             <div>Finalized: <strong>{row.finalized}</strong> questions</div>

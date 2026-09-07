@@ -2009,6 +2009,27 @@
   .observe-learner-rfc.is-avg-x {
     @apply border-cyan-400/30 bg-cyan-500/15 text-cyan-200;
   }
+  .observe-learner-rfc.is-avg-x.is-red {
+    @apply border-red-400/30 bg-red-500/15 text-red-300;
+  }
+  .observe-learner-rfc.is-avg-x.is-orange {
+    @apply border-orange-400/30 bg-orange-500/15 text-orange-300;
+  }
+  .observe-learner-rfc.is-avg-x.is-yellow {
+    @apply border-yellow-400/30 bg-yellow-500/15 text-yellow-300;
+  }
+  .observe-learner-rfc.is-avg-x.is-green {
+    @apply border-emerald-400/30 bg-emerald-500/15 text-emerald-300;
+  }
+  .observe-learner-rfc.is-avg-x.is-blue {
+    @apply border-sky-400/30 bg-sky-500/15 text-sky-300;
+  }
+  .observe-learner-rfc.is-avg-x.is-indigo {
+    @apply border-indigo-400/30 bg-indigo-500/15 text-indigo-300;
+  }
+  .observe-learner-rfc.is-avg-x.is-purple {
+    @apply border-purple-400/30 bg-purple-500/15 text-purple-300;
+  }
 
   .observe-learner-rfc.is-cpd {
     @apply border-cyan-400/30 bg-cyan-500/15 text-cyan-100;
@@ -5259,8 +5280,34 @@
   .standalone-metric-card.metric-cvr strong {
     @apply text-rose-600;
   }
-  .standalone-metric-card.metric-avg-x svg,
-  .standalone-metric-card.metric-avg-x strong,
+  .standalone-metric-card.metric-avg-x.is-red svg,
+  .standalone-metric-card.metric-avg-x.is-red strong {
+    color: #ef4444;
+  }
+  .standalone-metric-card.metric-avg-x.is-orange svg,
+  .standalone-metric-card.metric-avg-x.is-orange strong {
+    color: #f97316;
+  }
+  .standalone-metric-card.metric-avg-x.is-yellow svg,
+  .standalone-metric-card.metric-avg-x.is-yellow strong {
+    color: #eab308;
+  }
+  .standalone-metric-card.metric-avg-x.is-green svg,
+  .standalone-metric-card.metric-avg-x.is-green strong {
+    color: #22c55e;
+  }
+  .standalone-metric-card.metric-avg-x.is-blue svg,
+  .standalone-metric-card.metric-avg-x.is-blue strong {
+    color: #38bdf8;
+  }
+  .standalone-metric-card.metric-avg-x.is-indigo svg,
+  .standalone-metric-card.metric-avg-x.is-indigo strong {
+    color: #6366f1;
+  }
+  .standalone-metric-card.metric-avg-x.is-purple svg,
+  .standalone-metric-card.metric-avg-x.is-purple strong {
+    color: #a855f7;
+  }
   .standalone-metric-card.metric-cpd svg,
   .standalone-metric-card.metric-cpd strong {
     @apply text-cyan-600;

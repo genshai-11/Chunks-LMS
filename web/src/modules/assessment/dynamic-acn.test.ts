@@ -20,6 +20,8 @@ function createMockSpectrum(overrides: Partial<SpectrumStepBreakdown> = {}): Spe
     coolSteps: 8,
     rfc: 0,
     rac: 8 / 13,
+    sumPercentX: 468,
+    avgPercentX: 468 / 13,
     ...overrides
   }
 }

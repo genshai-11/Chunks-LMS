@@ -24,6 +24,26 @@ export type FinalizedAttempt = {
   sequenceIndex?: number
 }
 
+export const COLOR_PERCENT_X: Record<ResultColor, number> = {
+  red: 0,
+  orange: 0.17,
+  yellow: 0.34,
+  green: 0.5,
+  blue: 0.67,
+  indigo: 0.84,
+  purple: 1,
+}
+
+export const COLOR_PERCENT_X_VALUES: Record<ResultColor, number> = {
+  red: 0,
+  orange: 17,
+  yellow: 34,
+  green: 50,
+  blue: 67,
+  indigo: 84,
+  purple: 100,
+}
+
 export type SpectrumStepBreakdown = {
   byColor: Record<ResultColor, number>
   primaryRecords: number
@@ -33,6 +53,8 @@ export type SpectrumStepBreakdown = {
   coolSteps: number
   rfc: number | null
   rac: number | null
+  sumPercentX: number
+  avgPercentX: number | null
 }
 
 export type MetricObservation = {
@@ -204,6 +226,11 @@ export function calculateSpectrumStepBreakdown(
   const totalRecords = primaryRecords + probeRecords
   const warmSteps = WARM_COLORS.reduce((sum, color) => sum + byColor[color], 0)
   const coolSteps = COOL_COLORS.reduce((sum, color) => sum + byColor[color], 0)
+  const sumPercentX = (Object.keys(byColor) as ResultColor[]).reduce(
+    (sum, color) => sum + byColor[color] * COLOR_PERCENT_X_VALUES[color],
+    0,
+  )
+  const avgPercentX = totalRecords > 0 ? sumPercentX / totalRecords : null
   return {
     byColor,
     primaryRecords,
@@ -213,6 +240,8 @@ export function calculateSpectrumStepBreakdown(
     coolSteps,
     rfc: ratio(warmSteps, totalRecords),
     rac: ratio(coolSteps, totalRecords),
+    sumPercentX,
+    avgPercentX,
   }
 }
 

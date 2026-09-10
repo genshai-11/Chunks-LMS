@@ -1,4 +1,9 @@
 import { METRIC_CATALOG, type MetricKey, type MetricStatus } from './calculate'
+import {
+  DEFAULT_STANDALONE_TEST_METRICS,
+  mergeStandaloneTestMetrics,
+  type StandaloneTestMetricSetting,
+} from './standalone-settings'
 
 export type MetricSetting = {
   key: MetricKey
@@ -16,6 +21,8 @@ export type MetricSettingsState = {
   /** Default probe max for new sessions (org setting) */
   defaultMaxProbeCount: number
   metrics: MetricSetting[]
+  /** Standalone Tests 1-1 analysis metric cards and runtime formulas. */
+  standaloneTestMetrics: StandaloneTestMetricSetting[]
 }
 
 const LABELS: Record<MetricKey, string> = {
@@ -43,6 +50,37 @@ export function createDefaultMetricSettings(): MetricSettingsState {
       label: LABELS[m.key],
       definition: m.definition,
     })),
+    standaloneTestMetrics: DEFAULT_STANDALONE_TEST_METRICS.map((m) => ({ ...m })),
+  }
+}
+
+/** Ensure newly catalogued metrics appear after app upgrades. */
+export function mergeMetricSettings(saved?: Partial<MetricSettingsState> | null): MetricSettingsState {
+  const defaults = createDefaultMetricSettings()
+  if (!saved?.metrics?.length) {
+    return {
+      ...defaults,
+      defaultMaxProbeCount: saved?.defaultMaxProbeCount ?? defaults.defaultMaxProbeCount,
+      standaloneTestMetrics: mergeStandaloneTestMetrics(saved?.standaloneTestMetrics),
+    }
+  }
+
+  const byKey = new Map(saved.metrics.map((m) => [m.key, m]))
+  return {
+    defaultMaxProbeCount: saved.defaultMaxProbeCount ?? defaults.defaultMaxProbeCount,
+    metrics: defaults.metrics.map((d) => {
+      const prev = byKey.get(d.key)
+      if (!prev) return d
+      return {
+        ...d,
+        enabled: typeof prev.enabled === 'boolean' ? prev.enabled : d.enabled,
+        status: prev.status ?? d.status,
+        minSample: typeof prev.minSample === 'number' ? prev.minSample : d.minSample,
+        label: prev.label || d.label,
+        definition: prev.definition || d.definition,
+      }
+    }),
+    standaloneTestMetrics: mergeStandaloneTestMetrics(saved.standaloneTestMetrics),
   }
 }
 

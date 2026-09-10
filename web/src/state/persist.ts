@@ -1,6 +1,7 @@
 import type { CaptureSessionState } from '../modules/assessment/session-capture'
 import {
   createDefaultMetricSettings,
+  mergeMetricSettings,
   type MetricSettingsState,
 } from '../modules/metrics/settings'
 import type { OpsAuditEvent } from '../modules/ops/types'
@@ -45,28 +46,6 @@ function normalizeScheduling(s: SchedulingState): SchedulingState {
       liveTestBlockId: ls.sessionFormat === 'test' ? (ls.liveTestBlockId ?? null) : null,
       participantLearnerIds: ls.participantLearnerIds ?? null,
     })),
-  }
-}
-
-/** Ensure newly catalogued metrics appear after app upgrades. */
-function mergeMetricSettings(saved?: MetricSettingsState | null): MetricSettingsState {
-  const defaults = createDefaultMetricSettings()
-  if (!saved?.metrics?.length) return defaults
-  const byKey = new Map(saved.metrics.map((m) => [m.key, m]))
-  return {
-    defaultMaxProbeCount: saved.defaultMaxProbeCount ?? defaults.defaultMaxProbeCount,
-    metrics: defaults.metrics.map((d) => {
-      const prev = byKey.get(d.key)
-      if (!prev) return d
-      return {
-        ...d,
-        enabled: prev.enabled,
-        status: prev.status,
-        minSample: prev.minSample,
-        label: prev.label || d.label,
-        definition: prev.definition || d.definition,
-      }
-    }),
   }
 }
 

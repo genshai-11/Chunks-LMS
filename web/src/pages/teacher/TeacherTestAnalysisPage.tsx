@@ -26,15 +26,20 @@ import { useAppState } from '../../state/useAppState'
 import { probeChunksNumber } from '../../modules/assessment/probe-metrics'
 import { calculateDynamicAcn, useDynamicAcnConfig } from '../../modules/assessment/dynamic-acn'
 import { calculateSpectrumStepBreakdown, spectrumRecordsForAttempt, COLOR_PERCENT_X_VALUES, colorForAvgPercentX } from '../../modules/metrics/calculate'
-import { racMetricLabelForPackage, racMetricTitle, type PackageRacMetricLabel } from '../../modules/metrics/display-labels'
+import { racMetricLabelForPackage, type PackageRacMetricLabel } from '../../modules/metrics/display-labels'
+import {
+  evaluateStandaloneFormula,
+  standaloneMetricLabel,
+  type StandaloneFormulaContext,
+  type StandaloneTestMetricSetting,
+} from '../../modules/metrics/standalone-settings'
 import { COLOR_SCORE, COOL_COLORS, SPECTRUM_COLORS, WARM_COLORS, type ResultColor } from '../../modules/result-lifecycle/types'
 
 type AnalysisItem = Record<string, any>
 type QuestionRecord = { color: ResultColor; index: number; label: string; score: number; cpd: number }
 type ChartKey = 'tube' | 'mix' | 'recordCpdQuestion' | 'recordCpdTimeline' | 'questionCpd' | 'percentSession' | 'percentCpd' | 'distribution'
-type MetricKey = 'rfc' | 'rac' | 'avgPercentX' | 'avgCvr' | 'avgCci' | 'avgCpd' | 'acn' | 'nTotal'
 type ChartUiState = Record<ChartKey, { showLabels: boolean; expanded: boolean; hidden: boolean }>
-type MetricUiState = Record<MetricKey, boolean>
+type MetricUiState = Record<string, boolean>
 
 const DEFAULT_CHART_UI: ChartUiState = {
   tube: { showLabels: true, expanded: false, hidden: false },
@@ -49,17 +54,6 @@ const DEFAULT_CHART_UI: ChartUiState = {
 
 const DEFAULT_CHART_ORDER: ChartKey[] = ['tube', 'mix', 'recordCpdQuestion', 'recordCpdTimeline', 'questionCpd', 'percentSession', 'percentCpd', 'distribution']
 
-const DEFAULT_METRIC_UI: MetricUiState = {
-  rfc: true,
-  rac: true,
-  avgPercentX: true,
-  avgCvr: true,
-  avgCci: true,
-  avgCpd: true,
-  acn: true,
-  nTotal: true,
-}
-
 const CHART_NAMES: Record<ChartKey, string> = {
   tube: 'Tube',
   mix: '7-color records',
@@ -69,17 +63,6 @@ const CHART_NAMES: Record<ChartKey, string> = {
   percentSession: '% by session',
   percentCpd: '% + CPD',
   distribution: 'Color distribution',
-}
-
-const METRIC_NAMES: Record<MetricKey, string> = {
-  rfc: 'RFC',
-  rac: '%c/%r',
-  avgPercentX: 'Avg %x',
-  avgCvr: 'Avg CVR',
-  avgCci: 'Avg CCI',
-  avgCpd: 'Avg CPD',
-  acn: 'ACN',
-  nTotal: 'N_total',
 }
 
 const COLOR_HEX: Record<string, string> = {
@@ -138,7 +121,7 @@ function pct(value: number): string {
 }
 
 function ohm(value: number): string {
-  return `${value.toFixed(1)} Ω`
+  return `${value.toFixed(1)} \u03A9`
 }
 
 function amp(value: number): string {
@@ -168,7 +151,7 @@ function ResultDot(props: any) {
       fill={fill}
       stroke="#0f172a"
       strokeWidth={2}
-      aria-label={`${payload?.label ?? 'Question'} CPD ${payload?.cpd ?? '—'}`}
+      aria-label={`${payload?.label ?? 'Question'} CPD ${payload?.cpd ?? '-'}`}
     />
   )
 }
@@ -181,9 +164,59 @@ function recordLabel(color: ResultColor, index: number, total: number): string {
   return `Record ${index}/${total}: ${COLOR_LABELS[color]} primary`
 }
 
+function formatStandaloneMetricValue(
+  metric: StandaloneTestMetricSetting,
+  value: number | null,
+): string {
+  if (value == null || !Number.isFinite(value)) return '-'
+  if (metric.unit === 'percent') return pct(value)
+  if (metric.unit === 'ohm') return ohm(value)
+  if (metric.unit === 'amp') return amp(value)
+  if (metric.unit === 'volt') return volt(value)
+  if (metric.unit === 'count') return String(Math.round(value))
+  return Math.abs(value) >= 10 ? value.toFixed(1) : value.toFixed(2)
+}
+
+function standaloneMetricCardClass(metric: StandaloneTestMetricSetting): string {
+  if (metric.key === 'rfc') return 'standalone-metric-card metric-rfc'
+  if (metric.key === 'package_percent') return 'standalone-metric-card metric-avg-x'
+  if (metric.key === 'legacy_rac') return 'standalone-metric-card metric-percent-c'
+  if (metric.key === 'avg_cvr') return 'standalone-metric-card metric-cvr'
+  if (metric.key === 'avg_cci') return 'standalone-metric-card metric-cci'
+  if (metric.key === 'avg_cpd') return 'standalone-metric-card metric-cpd'
+  if (metric.key === 'acn') return 'standalone-metric-card metric-acn'
+  return 'standalone-metric-card'
+}
+
+function standaloneMetricTitle(
+  metric: StandaloneTestMetricSetting,
+  metrics: {
+    rfcTitle: string
+    percentCTitle: string
+    legacyRacTitle: string
+    acnTitle: string
+  },
+): string {
+  if (metric.key === 'rfc') return `${metrics.rfcTitle}\nFormula setting: ${metric.formula}`
+  if (metric.key === 'package_percent') return `${metrics.percentCTitle}\nFormula setting: ${metric.formula}`
+  if (metric.key === 'legacy_rac') return `${metrics.legacyRacTitle}\nFormula setting: ${metric.formula}`
+  if (metric.key === 'acn') return `${metrics.acnTitle}\nFormula setting: ${metric.formula}`
+  return `${metric.definition}\nFormula setting: ${metric.formula}`
+}
+
+function StandaloneMetricIcon({ metric }: { metric: StandaloneTestMetricSetting }) {
+  if (metric.key === 'package_percent' || metric.key === 'legacy_rac') return <Target className="h-5 w-5" />
+  if (metric.key === 'avg_cvr') return <Gauge className="h-5 w-5" />
+  if (metric.key === 'avg_cci') return <Brain className="h-5 w-5" />
+  if (metric.key === 'avg_cpd') return <Zap className="h-5 w-5" />
+  if (metric.key === 'acn') return <LineChartIcon className="h-5 w-5" />
+  if (metric.key === 'n_total') return <BarChart3 className="h-5 w-5 text-slate-400" />
+  return <Activity className="h-5 w-5" />
+}
+
 export function TeacherTestAnalysisPage() {
   const { assignmentId } = useParams()
-  const { roster } = useAppState()
+  const { roster, metricSettings } = useAppState()
   const [runs, setRuns] = useState<StandaloneTestRunRow[]>([])
   const [items, setItems] = useState<AnalysisItem[]>([])
   const [learnerId, setLearnerId] = useState('')
@@ -194,7 +227,7 @@ export function TeacherTestAnalysisPage() {
   const [chartUi, setChartUi] = useState<ChartUiState>(DEFAULT_CHART_UI)
   const [chartOrder, setChartOrder] = useState<ChartKey[]>(DEFAULT_CHART_ORDER)
   const [draggingChart, setDraggingChart] = useState<ChartKey | null>(null)
-  const [metricUi, setMetricUi] = useState<MetricUiState>(DEFAULT_METRIC_UI)
+  const [metricUi, setMetricUi] = useState<MetricUiState>({})
   const [racMetricLabel, setRacMetricLabel] = useState<PackageRacMetricLabel>('%c')
   const [sessionBrushRange, setSessionBrushRange] = useState<{ startIndex?: number; endIndex?: number }>({})
   const filterCardRef = useRef<HTMLElement | null>(null)
@@ -330,13 +363,15 @@ export function TeacherTestAnalysisPage() {
       warmSteps: spectrum.warmSteps,
       coolSteps: spectrum.coolSteps,
       rfc: spectrum.rfc == null ? 0 : spectrum.rfc * 100,
-      percentC: spectrum.rac == null ? 0 : spectrum.rac * 100,
+      percentC: spectrum.avgPercentX ?? 0,
+      legacyRac: spectrum.rac == null ? 0 : spectrum.rac * 100,
       avgPercentX: spectrum.avgPercentX ?? 0,
       sumPercentX: spectrum.sumPercentX,
       avgXColor,
-      avgPercentXTitle: `Avg %x = sum(%x) / n_bell = ${spectrum.sumPercentX.toFixed(1)}% / ${spectrum.totalRecords} = ${(spectrum.avgPercentX ?? 0).toFixed(1)}% (Band: ${COLOR_LABELS[avgXColor]}).\n• Colors: Red (0%), Orange (17%), Yellow (34%), Green (50%), Blue (67%), Indigo (84%), Violet (100%).`,
+      avgPercentXTitle: `Avg %x = sum(%x) / n_bell = ${spectrum.sumPercentX.toFixed(1)}% / ${spectrum.totalRecords} = ${(spectrum.avgPercentX ?? 0).toFixed(1)}% (Band: ${COLOR_LABELS[avgXColor]}).\n* Colors: Red (0%), Orange (17%), Yellow (34%), Green (50%), Blue (67%), Indigo (84%), Purple (100%).`,
       rfcTitle: `RFC = warm records / N_total = ${spectrum.warmSteps} / ${spectrum.totalRecords}. Warm = Red + Orange + Yellow.`,
-      percentCTitle: racMetricTitle(racMetricLabel, spectrum.coolSteps, spectrum.totalRecords),
+      percentCTitle: `${racMetricLabel} = Avg %x = sum(%x) / N_total = ${spectrum.sumPercentX.toFixed(1)}% / ${spectrum.totalRecords} = ${(spectrum.avgPercentX ?? 0).toFixed(1)}%.`,
+      legacyRacTitle: `RAC legacy = cool records / N_total = ${spectrum.coolSteps} / ${spectrum.totalRecords}. Cool = Green + Blue + Indigo + Purple. When N_total > 0, RAC legacy = 100 - RFC.`,
       nTotalTitle: `N_total = primary records + probe records = ${spectrum.primaryRecords} + ${spectrum.probeRecords} = ${spectrum.totalRecords}.`,
       avgCvr: finalized.reduce((sum, row) => sum + row.cvr, 0) / count,
       avgCci: finalized.reduce((sum, row) => sum + row.cci, 0) / count,
@@ -344,6 +379,32 @@ export function TeacherTestAnalysisPage() {
       acn: acnResult.acn,
       acnTitle: acnResult.acnTitle,
       acnFormulaDescription: acnResult.formulaDescription,
+      formulaContext: {
+        rfc: spectrum.rfc == null ? null : spectrum.rfc * 100,
+        rac: spectrum.rac == null ? null : spectrum.rac * 100,
+        avgPercentX: spectrum.avgPercentX,
+        legacyRac: spectrum.rac == null ? null : spectrum.rac * 100,
+        avgCvr: finalized.length ? finalized.reduce((sum, row) => sum + row.cvr, 0) / count : null,
+        avgCci: finalized.length ? finalized.reduce((sum, row) => sum + row.cci, 0) / count : null,
+        avgCpd: finalized.length ? finalized.reduce((sum, row) => sum + row.cpd, 0) / count : null,
+        acn: acnResult.acn,
+        nTotal: spectrum.totalRecords,
+        warmSteps: spectrum.warmSteps,
+        coolSteps: spectrum.coolSteps,
+        finalized: finalized.length,
+        total: chartRows.length,
+        sumPercentX: spectrum.sumPercentX,
+        primaryRecords: spectrum.primaryRecords,
+        probeRecords: spectrum.probeRecords,
+        enteredProbeCount: probed.length,
+        redSteps: spectrum.byColor.red,
+        orangeSteps: spectrum.byColor.orange,
+        yellowSteps: spectrum.byColor.yellow,
+        greenSteps: spectrum.byColor.green,
+        blueSteps: spectrum.byColor.blue,
+        indigoSteps: spectrum.byColor.indigo,
+        purpleSteps: spectrum.byColor.purple,
+      } satisfies StandaloneFormulaContext,
     }
   }, [chartRows, racMetricLabel, acnConfig.config])
 
@@ -376,13 +437,14 @@ export function TeacherTestAnalysisPage() {
           session,
           label: `Session ${session}`,
           shortLabel: `S${session}`,
-          percentC: spectrum.rac == null ? 0 : Math.round(spectrum.rac * 100),
+          percentC: spectrum.avgPercentX == null ? 0 : Number(spectrum.avgPercentX.toFixed(1)),
+          legacyRac: spectrum.rac == null ? 0 : Math.round(spectrum.rac * 100),
           avgPercentX,
           avgXColor,
           sumPercentX: spectrum.sumPercentX,
           avgCpd: Number(avgCpd.toFixed(2)),
-          percentCLabel: spectrum.rac == null ? '—' : `${Math.round(spectrum.rac * 100)}%`,
-          avgCpdLabel: finalized.length ? `CPD ${avgCpd.toFixed(0)}V` : 'CPD —',
+          percentCLabel: spectrum.avgPercentX == null ? '-' : `${spectrum.avgPercentX.toFixed(1)}%`,
+          avgCpdLabel: finalized.length ? `CPD ${avgCpd.toFixed(0)}V` : 'CPD -',
           finalized: finalized.length,
           nTotal: spectrum.totalRecords,
           warmSteps: spectrum.warmSteps,
@@ -486,8 +548,8 @@ export function TeacherTestAnalysisPage() {
     })
   }, [])
 
-  const toggleMetric = useCallback((key: MetricKey) => {
-    setMetricUi((current) => ({ ...current, [key]: !current[key] }))
+  const toggleMetric = useCallback((key: string) => {
+    setMetricUi((current) => ({ ...current, [key]: current[key] === false }))
   }, [])
 
   const chartPanelClass = useCallback(
@@ -617,15 +679,30 @@ export function TeacherTestAnalysisPage() {
       })
   }, [recordTubeRows])
 
-  if (loading) return <EmptyState icon={BarChart3} title="Loading standalone analysis…" />
+  const standaloneMetricCards = useMemo(
+    () =>
+      metricSettings.standaloneTestMetrics
+        .filter((metric) => metric.enabled && metricUi[metric.key] !== false)
+        .map((metric) => ({
+          metric,
+          label: standaloneMetricLabel(metric, racMetricLabel),
+          value: evaluateStandaloneFormula(metric.formula, metrics.formulaContext),
+          title: standaloneMetricTitle(metric, metrics),
+        })),
+    [metricSettings.standaloneTestMetrics, metricUi, metrics, racMetricLabel],
+  )
+
+  const enabledStandaloneMetricCount = metricSettings.standaloneTestMetrics.filter((metric) => metric.enabled).length
+
+  if (loading) return <EmptyState icon={BarChart3} title="Loading standalone analysis..." />
   if (error) return <EmptyState icon={BarChart3} title="Could not load analysis" description={error} />
 
   return (
     <div className="test-analysis-page">
       <PageHeader
         icon={BarChart3}
-        kicker="Teacher · Standalone Test Analysis"
-        title={learner?.displayName ? `${learner.displayName} · Test Analysis` : 'Standalone Test Analysis'}
+        kicker="Teacher - Standalone Test Analysis"
+        title={learner?.displayName ? `${learner.displayName} - Test Analysis` : 'Standalone Test Analysis'}
         subtitle="Dedicated analysis for Tests 1-1, separate from class/session analysis."
         actions={
           <Link className="btn ghost" to="/teacher/tests">
@@ -635,57 +712,30 @@ export function TeacherTestAnalysisPage() {
       />
 
       <div className="standalone-analysis-grid">
-        {metricUi.rfc ? <div className="standalone-metric-card metric-rfc" title={metrics.rfcTitle}>
-          <Activity className="h-5 w-5" />
-          <span>RFC</span>
-          <strong>{pct(metrics.rfc)}</strong>
-        </div> : null}
-        {metricUi.rac ? <div className="standalone-metric-card metric-percent-c" title={metrics.percentCTitle}>
-          <Target className="h-5 w-5" />
-          <span>{racMetricLabel}</span>
-          <strong>{pct(metrics.percentC)}</strong>
-        </div> : null}
-        {metricUi.avgPercentX ? (
-          <div
-            className={`standalone-metric-card metric-avg-x is-${metrics.avgXColor}`}
-            style={{
-              borderColor: `${COLOR_HEX[metrics.avgXColor]}55`,
-              boxShadow: `0 0 16px -4px ${COLOR_HEX[metrics.avgXColor]}33`,
-            }}
-            title={metrics.avgPercentXTitle}
-          >
-            <Activity className="h-5 w-5" style={{ color: COLOR_HEX[metrics.avgXColor] }} />
-            <span>Avg %x</span>
-            <strong style={{ color: COLOR_HEX[metrics.avgXColor] }}>
-              {Number.isFinite(metrics.avgPercentX) ? `${metrics.avgPercentX.toFixed(1)}%` : '—'}
-            </strong>
-          </div>
-        ) : null}
-        {metricUi.avgCvr ? <div className="standalone-metric-card metric-cvr" title={`Average CVR across ${metrics.finalized} finalized questions in the current filter.`}>
-          <Gauge className="h-5 w-5" />
-          <span>Avg CVR</span>
-          <strong>{ohm(metrics.avgCvr)}</strong>
-        </div> : null}
-        {metricUi.avgCci ? <div className="standalone-metric-card metric-cci" title={`Average CCI across ${metrics.finalized} finalized questions in the current filter.`}>
-          <Brain className="h-5 w-5" />
-          <span>Avg CCI</span>
-          <strong>{amp(metrics.avgCci)}</strong>
-        </div> : null}
-        {metricUi.avgCpd ? <div className="standalone-metric-card metric-cpd" title={`Average Final CPD = mean(CVR x CCI x color factor) across ${metrics.finalized} finalized questions.`}>
-          <Zap className="h-5 w-5" />
-          <span>Avg Final CPD</span>
-          <strong>{volt(metrics.avgCpd)}</strong>
-        </div> : null}
-        {metricUi.acn ? <div className="standalone-metric-card metric-acn" title={metrics.acnTitle}>
-          <LineChartIcon className="h-5 w-5" />
-          <span>ACN</span>
-          <strong>{Number.isFinite(metrics.acn) ? metrics.acn.toFixed(2) : '—'}</strong>
-        </div> : null}
-        {metricUi.nTotal ? <div className="standalone-metric-card" title={metrics.nTotalTitle}>
-          <BarChart3 className="h-5 w-5 text-slate-400" />
-          <span>N_total</span>
-          <strong>{metrics.nTotal}</strong>
-        </div> : null}
+        {standaloneMetricCards.map(({ metric, label, value, title }) => {
+          const isPackagePercent = metric.key === 'package_percent'
+          return (
+            <div
+              key={metric.key}
+              className={`${standaloneMetricCardClass(metric)}${isPackagePercent ? ` is-${metrics.avgXColor}` : ''}`}
+              style={
+                isPackagePercent
+                  ? {
+                      borderColor: `${COLOR_HEX[metrics.avgXColor]}55`,
+                      boxShadow: `0 0 16px -4px ${COLOR_HEX[metrics.avgXColor]}33`,
+                    }
+                  : undefined
+              }
+              title={title}
+            >
+              <StandaloneMetricIcon metric={metric} />
+              <span>{label}</span>
+              <strong style={isPackagePercent ? { color: COLOR_HEX[metrics.avgXColor] } : undefined}>
+                {formatStandaloneMetricValue(metric, value)}
+              </strong>
+            </div>
+          )
+        })}
       </div>
 
       <div className="test-analysis-workbench">
@@ -796,21 +846,21 @@ export function TeacherTestAnalysisPage() {
                   className={`test-analysis-chip justify-start text-left${acnConfig.config.preset === 'v2_completed' ? ' is-active' : ''}`}
                   onClick={() => acnConfig.setPreset('v2_completed')}
                 >
-                  v2: (N_total - Tổng n) / Đã hoàn thành
+                  v2: (N_total - n count) / completed items
                 </button>
                 <button
                   type="button"
                   className={`test-analysis-chip justify-start text-left${acnConfig.config.preset === 'v2_fixed49' ? ' is-active' : ''}`}
                   onClick={() => acnConfig.setPreset('v2_fixed49')}
                 >
-                  v2: (N_total - Tổng n) / 49 câu
+                  v2: (N_total - n count) / 49 items
                 </button>
                 <button
                   type="button"
                   className={`test-analysis-chip justify-start text-left${acnConfig.config.preset === 'v1_legacy_probe_avg' ? ' is-active' : ''}`}
                   onClick={() => acnConfig.setPreset('v1_legacy_probe_avg')}
                 >
-                  v1: Probed Depth Avg (Cũ)
+                  v1: Probed Depth Avg (legacy)
                 </button>
                 <button
                   type="button"
@@ -836,19 +886,19 @@ export function TeacherTestAnalysisPage() {
           <details className="test-analysis-filter-menu">
             <summary>
               <span>Metrics</span>
-              <strong>{Object.values(metricUi).filter(Boolean).length}/{Object.keys(METRIC_NAMES).length}</strong>
+              <strong>{standaloneMetricCards.length}/{enabledStandaloneMetricCount}</strong>
             </summary>
             <div className="test-analysis-filter-popover">
               <div className="test-analysis-chip-grid is-tight">
-              {(Object.keys(METRIC_NAMES) as MetricKey[]).map((key) => (
+              {metricSettings.standaloneTestMetrics.filter((metric) => metric.enabled).map((metric) => (
                 <button
-                  key={key}
+                  key={metric.key}
                   type="button"
-                  className={`test-analysis-chip${metricUi[key] ? ' is-active' : ''}`}
-                  onClick={() => toggleMetric(key)}
-                  title={metricUi[key] ? 'Hide metric' : 'Show metric'}
+                  className={`test-analysis-chip${metricUi[metric.key] !== false ? ' is-active' : ''}`}
+                  onClick={() => toggleMetric(metric.key)}
+                  title={metricUi[metric.key] !== false ? 'Hide metric' : 'Show metric'}
                 >
-                  {key === 'rac' ? racMetricLabel : METRIC_NAMES[key]}
+                  {standaloneMetricLabel(metric, racMetricLabel)}
                 </button>
               ))}
               </div>
@@ -917,13 +967,13 @@ export function TeacherTestAnalysisPage() {
                 <div className="test-analysis-tube-scroll" role="img" aria-label="Question record tube chart showing N_total color records by question">
                   {recordTubeRows.length ? recordTubeRows.map((row) => (
                     <div key={row.index} className="test-analysis-tube-col">
-                      <div className="test-analysis-tube-stack" title={`${row.label} · N_total ${row.records.length}`}>
+                      <div className="test-analysis-tube-stack" title={`${row.label} - N_total ${row.records.length}`}>
                         {row.records.map((record) => (
                           <span
                             key={`${row.index}-${record.index}`}
                             className="test-analysis-tube-bead"
                             style={{ background: COLOR_HEX[record.color] }}
-                            title={`${row.label} · ${record.label}`}
+                            title={`${row.label} - ${record.label}`}
                             aria-label={`${row.label} ${record.label}`}
                           />
                         ))}
@@ -968,7 +1018,7 @@ export function TeacherTestAnalysisPage() {
                         return (
                           <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
                             <div className="mb-1 font-black text-slate-950">
-                              Session {row.session} · N_total {row.nTotal} · Avg %x: <span className="font-bold" style={{ color: COLOR_HEX[row.avgXColor] }}>{Number(row.avgPercentX ?? 0).toFixed(1)}%</span>
+                              Session {row.session} - N_total {row.nTotal} - Avg %x: <span className="font-bold" style={{ color: COLOR_HEX[row.avgXColor] }}>{Number(row.avgPercentX ?? 0).toFixed(1)}%</span>
                             </div>
                             <div className="grid grid-cols-2 gap-x-3 gap-y-1">
                               {SPECTRUM_COLORS.map((color) => (
@@ -999,7 +1049,7 @@ export function TeacherTestAnalysisPage() {
                 className={chartPanelClass('recordCpdQuestion')}
                 icon={Zap}
                 title="Record CPD by Question"
-                description="Each question groups its N_total records. Record CPD = base CPD × the 7-color factor for that record."
+                description="Each question groups its N_total records. Record CPD = base CPD x the 7-color factor for that record."
                 actions={chartActions('recordCpdQuestion')}
                 collapsible={false}
               >
@@ -1009,13 +1059,13 @@ export function TeacherTestAnalysisPage() {
                       const maxCpd = Math.max(...row.records.map((record) => record.cpd), 1)
                       return (
                         <div key={row.index} className="test-analysis-record-cpd-group">
-                          <div className="test-analysis-record-cpd-bars" title={`${row.label} · ${row.records.length} records`}>
+                          <div className="test-analysis-record-cpd-bars" title={`${row.label} - ${row.records.length} records`}>
                             {row.records.map((record) => (
                               <span
                                 key={`${row.index}-${record.index}`}
                                 className="test-analysis-record-cpd-bar"
                                 style={{ height: `${Math.max(8, (record.cpd / maxCpd) * 100)}%`, background: COLOR_HEX[record.color] }}
-                                title={`${row.shortLabel}-R${record.index} · ${COLOR_LABELS[record.color]} · CPD ${volt(record.cpd)}`}
+                                title={`${row.shortLabel}-R${record.index} - ${COLOR_LABELS[record.color]} - CPD ${volt(record.cpd)}`}
                               />
                             ))}
                           </div>
@@ -1061,7 +1111,7 @@ export function TeacherTestAnalysisPage() {
                             <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
                               <div className="mb-1 font-black text-slate-950">{row.label}</div>
                               <div>Record CPD: <strong style={{ color: METRIC_HEX.cpd }}>{volt(row.cpd)}</strong></div>
-                              <div>Formula: {volt(row.baseCpd)} × {row.score}</div>
+                              <div>Formula: {volt(row.baseCpd)} x {row.score}</div>
                               <div>Result record: <strong style={{ color: row.colorHex }}>{row.colorLabel}</strong></div>
                               <div>Session: <strong>{row.session}</strong></div>
                             </div>
@@ -1103,7 +1153,7 @@ export function TeacherTestAnalysisPage() {
             className={chartPanelClass('questionCpd')}
             icon={LineChartIcon}
             title="CPD by Question"
-              description={`${metrics.finalized}/${metrics.total} finalized questions · Final CPD = CVR × CCI × color score.`}
+              description={`${metrics.finalized}/${metrics.total} finalized questions - Final CPD = CVR x CCI x color score.`}
               actions={chartActions('questionCpd')}
               collapsible={false}
             >
@@ -1128,11 +1178,11 @@ export function TeacherTestAnalysisPage() {
                           <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
                             <div className="mb-1 font-black text-slate-950">{row.label}</div>
                             <div>Final CPD: <strong style={{ color: METRIC_HEX.cpd }}>{volt(row.cpd)}</strong></div>
-                            <div>Formula: {volt(row.baseCpd)} × {row.resultScore}</div>
-                            <div>CVR: <strong style={{ color: METRIC_HEX.cvr }}>{ohm(row.cvr)}</strong> · CCI: <strong style={{ color: METRIC_HEX.cci }}>{amp(row.cci)}</strong></div>
+                            <div>Formula: {volt(row.baseCpd)} x {row.resultScore}</div>
+                            <div>CVR: <strong style={{ color: METRIC_HEX.cvr }}>{ohm(row.cvr)}</strong> - CCI: <strong style={{ color: METRIC_HEX.cci }}>{amp(row.cci)}</strong></div>
                             <div>Result: <strong className="capitalize" style={{ color: row.colorHex }}>{row.color}</strong></div>
-                            <div>Session: <strong>{row.session}</strong> · {row.language}</div>
-                            {row.prompt ? <div className="mt-1 max-w-xs text-slate-600">“{row.prompt}”</div> : null}
+                            <div>Session: <strong>{row.session}</strong> - {row.language}</div>
+                            {row.prompt ? <div className="mt-1 max-w-xs text-slate-600">"{row.prompt}"</div> : null}
                           </div>
                         )
                       }}
@@ -1171,7 +1221,7 @@ export function TeacherTestAnalysisPage() {
               className={chartPanelClass('percentSession')}
               icon={LineChartIcon}
               title={`${racMetricLabel} by Session`}
-              description={`${racMetricLabel} = cool records / N_total for each session. Cool = Green + Blue + Indigo + Purple.`}
+              description={`${racMetricLabel} = Avg %x for each session. Legacy RAC remains available as an optional Admin metric.`}
               actions={chartActions('percentSession')}
               collapsible={false}
             >
@@ -1196,9 +1246,9 @@ export function TeacherTestAnalysisPage() {
                         return (
                           <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
                             <div className="mb-1 font-black text-slate-950">{row.label}</div>
-                            <div>{racMetricLabel}: <strong style={{ color: METRIC_HEX.percentC }}>{row.percentC}%</strong></div>
-                            <div>Avg %x: <strong style={{ color: COLOR_HEX[row.avgXColor] }}>{Number(row.avgPercentX ?? 0).toFixed(1)}%</strong> <span style={{ color: COLOR_HEX[row.avgXColor] }}>({COLOR_LABELS[row.avgXColor]})</span></div>
-                            <div>Formula: <strong>{row.coolSteps} / {row.nTotal}</strong> cool records / N_total</div>
+                            <div>{racMetricLabel}: <strong style={{ color: METRIC_HEX.percentC }}>{Number(row.percentC ?? 0).toFixed(1)}%</strong> <span style={{ color: COLOR_HEX[row.avgXColor] }}>({COLOR_LABELS[row.avgXColor]})</span></div>
+                            <div>Legacy RAC: <strong>{row.legacyRac}%</strong></div>
+                            <div>Formula: <strong>{row.sumPercentX.toFixed(1)} / {row.nTotal}</strong> average normalized spectrum factor.</div>
                             <div>Finalized: <strong>{row.finalized}</strong> questions</div>
                             <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1">
                               {SPECTRUM_COLORS.map((color) => (
@@ -1247,7 +1297,7 @@ export function TeacherTestAnalysisPage() {
               className={chartPanelClass('percentCpd')}
               icon={LineChartIcon}
               title={`${racMetricLabel} & Avg CPD by Session`}
-              description={`Dual-axis line chart: Session on X, ${racMetricLabel} as the green line, Avg CPD as the blue line.`}
+              description={`Dual-axis line chart: Session on X, ${racMetricLabel} as Avg %x, Avg CPD as the blue line.`}
               actions={chartActions('percentCpd')}
               collapsible={false}
             >
@@ -1282,9 +1332,9 @@ export function TeacherTestAnalysisPage() {
                         return (
                           <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
                             <div className="mb-1 font-black text-slate-950">{row.label}</div>
-                            <div>{racMetricLabel}: <strong style={{ color: METRIC_HEX.percentC }}>{row.percentC}%</strong></div>
-                            <div>Avg %x: <strong style={{ color: COLOR_HEX[row.avgXColor] }}>{Number(row.avgPercentX ?? 0).toFixed(1)}%</strong> <span style={{ color: COLOR_HEX[row.avgXColor] }}>({COLOR_LABELS[row.avgXColor]})</span></div>
-                            <div>Formula: <strong>{row.coolSteps} / {row.nTotal}</strong> cool records / N_total</div>
+                            <div>{racMetricLabel}: <strong style={{ color: METRIC_HEX.percentC }}>{Number(row.percentC ?? 0).toFixed(1)}%</strong> <span style={{ color: COLOR_HEX[row.avgXColor] }}>({COLOR_LABELS[row.avgXColor]})</span></div>
+                            <div>Legacy RAC: <strong>{row.legacyRac}%</strong></div>
+                            <div>Formula: <strong>{row.sumPercentX.toFixed(1)} / {row.nTotal}</strong> average normalized spectrum factor.</div>
                             <div>Avg CPD: <strong style={{ color: METRIC_HEX.cpd }}>{volt(row.avgCpd)}</strong></div>
                             <div>Finalized: <strong>{row.finalized}</strong> questions</div>
                           </div>

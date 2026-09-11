@@ -4,6 +4,7 @@
  */
 import {
   createDefaultMetricSettings,
+  mergeMetricSettings,
   type MetricSetting,
   type MetricSettingsState,
 } from '../modules/metrics/settings'
@@ -17,6 +18,12 @@ function client() {
 function parseSettings(raw: unknown, defaultMaxProbeCount: number): MetricSettingsState {
   const base = createDefaultMetricSettings()
   base.defaultMaxProbeCount = defaultMaxProbeCount >= 1 ? defaultMaxProbeCount : 2
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    return mergeMetricSettings({
+      ...(raw as Partial<MetricSettingsState>),
+      defaultMaxProbeCount: base.defaultMaxProbeCount,
+    })
+  }
   if (!Array.isArray(raw)) return base
   const byKey = new Map(
     raw
@@ -33,9 +40,9 @@ function parseSettings(raw: unknown, defaultMaxProbeCount: number): MetricSettin
       minSample: typeof row.minSample === 'number' ? row.minSample : m.minSample,
       label: typeof row.label === 'string' ? row.label : m.label,
       definition: typeof row.definition === 'string' ? row.definition : m.definition,
-    } satisfies MetricSetting
+      } satisfies MetricSetting
   })
-  return base
+  return mergeMetricSettings(base)
 }
 
 export async function loadOrgMetricSettings(
@@ -74,14 +81,17 @@ export async function saveOrgMetricSettings(
     const payload = {
       organization_id: organizationId,
       default_max_probe_count: settings.defaultMaxProbeCount,
-      metric_settings: settings.metrics.map((m) => ({
-        key: m.key as MetricKey,
-        enabled: m.enabled,
-        status: m.status,
-        minSample: m.minSample,
-        label: m.label,
-        definition: m.definition,
-      })),
+      metric_settings: {
+        metrics: settings.metrics.map((m) => ({
+          key: m.key as MetricKey,
+          enabled: m.enabled,
+          status: m.status,
+          minSample: m.minSample,
+          label: m.label,
+          definition: m.definition,
+        })),
+        standaloneTestMetrics: settings.standaloneTestMetrics,
+      },
       updated_at: new Date().toISOString(),
     }
     const { error } = await sb.from('org_settings').upsert(payload, {

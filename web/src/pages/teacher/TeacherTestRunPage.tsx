@@ -53,7 +53,7 @@ import { getNarrationPlaybackUrl } from '../../modules/catalog/live-test-generat
 import { triggerConfetti } from '../../lib/confetti'
 import { useAppState } from '../../state/useAppState'
 import { calculateSpectrumStepBreakdown, colorForAvgPercentX } from '../../modules/metrics/calculate'
-import { racMetricLabelForPackage, racMetricTitle, type PackageRacMetricLabel } from '../../modules/metrics/display-labels'
+import { racMetricLabelForPackage, type PackageRacMetricLabel } from '../../modules/metrics/display-labels'
 import { SPECTRUM_COLORS, type ProvisionalColor, type ResultColor } from '../../modules/result-lifecycle/types'
 import { resultAudioUrl } from '../../lib/color-audio'
 
@@ -1575,8 +1575,9 @@ export function TeacherTestRunPage() {
     const spectrum = calculateSpectrumStepBreakdown(spectrumAttempts)
     const nTotal = spectrum.totalRecords
     const rfc = spectrum.rfc == null ? 0 : Math.round(spectrum.rfc * 100)
-    const rac = spectrum.rac == null ? 0 : Math.round(spectrum.rac * 100)
     const avgPercentX = spectrum.avgPercentX ?? 0
+    const rac = Number(avgPercentX.toFixed(1))
+    const legacyRac = spectrum.rac == null ? 0 : Math.round(spectrum.rac * 100)
     const sumPercentX = spectrum.sumPercentX
     const avgXColor = colorForAvgPercentX(spectrum.avgPercentX)
     const avgCpd = cpdValues.length
@@ -1590,12 +1591,14 @@ export function TeacherTestRunPage() {
       nTotal,
       rfc,
       rac,
+      legacyRac,
       avgPercentX,
       sumPercentX,
       avgXColor,
       avgPercentXTitle: `Avg %x = sum(%x) / n_bell = ${sumPercentX.toFixed(1)}% / ${nTotal} = ${avgPercentX.toFixed(1)}% (Band: ${COLOR_LABEL[avgXColor]}).\n• Colors: Red (0%), Orange (17%), Yellow (34%), Green (50%), Blue (67%), Indigo (84%), Violet (100%).`,
       rfcTitle: `RFC = warm records / N_total = ${spectrum.warmSteps} / ${nTotal}. Warm = Red + Orange + Yellow.`,
-      racTitle: racMetricTitle(racMetricLabel, spectrum.coolSteps, nTotal),
+      racTitle: `${racMetricLabel} = Avg %x = sum(%x) / N_total = ${sumPercentX.toFixed(1)}% / ${nTotal} = ${avgPercentX.toFixed(1)}%.`,
+      legacyRacTitle: `Legacy RAC = cool records / N_total = ${spectrum.coolSteps} / ${nTotal}. Cool = Green + Blue + Indigo + Purple. When N_total > 0, legacy RAC = 100 - RFC.`,
       totalTitle: `N_total = primary records + probe records = ${spectrum.primaryRecords} + ${spectrum.probeRecords} = ${nTotal}.`,
       cpdTitle: `Max CPD is the highest achieved CPD among finalized items. Achieved CPD = CVR x CCI x color factor.`,
       avgCpd,
@@ -1731,7 +1734,7 @@ export function TeacherTestRunPage() {
                 </span>
                 <span className="observe-learner-rfc observe-has-tooltip is-percent-c" tabIndex={0} aria-label={summaryMetrics.racTitle}>
                   {racMetricLabel} {summaryMetrics.rac}%
-                  <span className="observe-metric-tooltip" role="tooltip">{summaryMetrics.racTitle} Higher {racMetricLabel} means more cool measurement steps.</span>
+                  <span className="observe-metric-tooltip" role="tooltip">{summaryMetrics.racTitle}</span>
                 </span>
                 <span
                   className={`observe-learner-rfc observe-has-tooltip is-avg-x is-${summaryMetrics.avgXColor}`}
@@ -1741,10 +1744,10 @@ export function TeacherTestRunPage() {
                     color: COLOR_HEX[summaryMetrics.avgXColor],
                   }}
                   tabIndex={0}
-                  aria-label={summaryMetrics.avgPercentXTitle}
+                  aria-label={summaryMetrics.legacyRacTitle}
                 >
-                  Avg %x {summaryMetrics.avgPercentX.toFixed(1)}%
-                  <span className="observe-metric-tooltip" role="tooltip">{summaryMetrics.avgPercentXTitle}</span>
+                  Legacy RAC {summaryMetrics.legacyRac}%
+                  <span className="observe-metric-tooltip" role="tooltip">{summaryMetrics.legacyRacTitle}</span>
                 </span>
                 <span className="observe-learner-rfc observe-has-tooltip is-cpd" tabIndex={0} aria-label={summaryMetrics.cpdTitle}>
                   Max CPD {formatVolt(summaryMetrics.maxCpd)}
@@ -2121,9 +2124,9 @@ export function TeacherTestRunPage() {
               <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-900 p-4 text-xs font-mono text-white shadow-inner sm:grid-cols-3 lg:grid-cols-6">
                 <div title={summaryMetrics.rfcTitle}><span className="text-slate-400">RFC </span><strong className="text-red-400">{summaryMetrics.rfc}%</strong></div>
                 <div title={summaryMetrics.racTitle}><span className="text-slate-400">{racMetricLabel} </span><strong className="text-emerald-400">{summaryMetrics.rac}%</strong></div>
-                <div title={summaryMetrics.avgPercentXTitle}>
-                  <span className="text-slate-400">Avg %x </span>
-                  <strong style={{ color: COLOR_HEX[summaryMetrics.avgXColor] }}>{summaryMetrics.avgPercentX.toFixed(1)}%</strong>
+                <div title={summaryMetrics.legacyRacTitle}>
+                  <span className="text-slate-400">Legacy RAC </span>
+                  <strong style={{ color: COLOR_HEX[summaryMetrics.avgXColor] }}>{summaryMetrics.legacyRac}%</strong>
                 </div>
                 <div><span className="text-slate-400">CPD min </span><strong className="text-blue-300">{formatVolt(summaryMetrics.minCpd)}</strong></div>
                 <div><span className="text-slate-400">CPD max </span><strong className="text-blue-300">{formatVolt(summaryMetrics.maxCpd)}</strong></div>

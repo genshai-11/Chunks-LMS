@@ -38,6 +38,17 @@ export type StandaloneFormulaContext = {
   coolSteps: number
   finalized: number
   total: number
+  sumPercentX: number | null
+  primaryRecords: number
+  probeRecords: number
+  enteredProbeCount: number
+  redSteps: number
+  orangeSteps: number
+  yellowSteps: number
+  greenSteps: number
+  blueSteps: number
+  indigoSteps: number
+  purpleSteps: number
 }
 
 export const STANDALONE_FORMULA_VARIABLES: Array<keyof StandaloneFormulaContext> = [
@@ -54,6 +65,17 @@ export const STANDALONE_FORMULA_VARIABLES: Array<keyof StandaloneFormulaContext>
   'coolSteps',
   'finalized',
   'total',
+  'sumPercentX',
+  'primaryRecords',
+  'probeRecords',
+  'enteredProbeCount',
+  'redSteps',
+  'orangeSteps',
+  'yellowSteps',
+  'greenSteps',
+  'blueSteps',
+  'indigoSteps',
+  'purpleSteps',
 ]
 
 export const DEFAULT_STANDALONE_TEST_METRICS: StandaloneTestMetricSetting[] = [
@@ -338,3 +360,17 @@ export function coerceStandaloneMetric(
 function isStandaloneMetricUnit(value: unknown): value is StandaloneTestMetricUnit {
   return value === 'percent' || value === 'number' || value === 'ohm' || value === 'amp' || value === 'volt' || value === 'count'
 }
+
+export function formatStandaloneMetricValue(
+  unit: StandaloneTestMetricUnit,
+  value: number | null,
+): string {
+  if (value == null || !Number.isFinite(value)) return '-'
+  if (unit === 'percent') return `${Math.round(value)}%`
+  if (unit === 'ohm') return `${value.toFixed(1)} \u03A9`
+  if (unit === 'amp') return `${value.toFixed(1)}A`
+  if (unit === 'volt') return `${value.toFixed(1)}V`
+  if (unit === 'count') return String(Math.round(value))
+  return Math.abs(value) >= 10 ? value.toFixed(1) : value.toFixed(2)
+}
+

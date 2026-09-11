@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Activity, BarChart3, Brain, CircleDot, Eye, EyeOff, Gauge, GripVertical, LineChart as LineChartIcon, Maximize2, Minimize2, PieChart as PieChartIcon, RotateCcw, Target, X, Zap } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import {
@@ -121,7 +121,7 @@ function pct(value: number): string {
 }
 
 function ohm(value: number): string {
-  return `${value.toFixed(1)} Î©`
+  return `${value.toFixed(1)} \u03A9`
 }
 
 function amp(value: number): string {
@@ -393,6 +393,17 @@ export function TeacherTestAnalysisPage() {
         coolSteps: spectrum.coolSteps,
         finalized: finalized.length,
         total: chartRows.length,
+        sumPercentX: spectrum.sumPercentX,
+        primaryRecords: spectrum.primaryRecords,
+        probeRecords: spectrum.probeRecords,
+        enteredProbeCount: probed.length,
+        redSteps: spectrum.byColor.red,
+        orangeSteps: spectrum.byColor.orange,
+        yellowSteps: spectrum.byColor.yellow,
+        greenSteps: spectrum.byColor.green,
+        blueSteps: spectrum.byColor.blue,
+        indigoSteps: spectrum.byColor.indigo,
+        purpleSteps: spectrum.byColor.purple,
       } satisfies StandaloneFormulaContext,
     }
   }, [chartRows, racMetricLabel, acnConfig.config])

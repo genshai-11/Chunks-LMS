@@ -19,7 +19,6 @@ import { useFlash } from '../../hooks/useFlash'
 import type { MetricKey, MetricStatus } from '../../modules/metrics/calculate'
 import { updateMetricSetting } from '../../modules/metrics/settings'
 import {
-  STANDALONE_FORMULA_VARIABLES,
   evaluateStandaloneFormula,
   type StandaloneFormulaContext,
   type StandaloneTestMetricSetting,
@@ -28,12 +27,12 @@ import {
 import { useAppState } from '../../state/useAppState'
 
 const UNIT_OPTIONS: Array<{ value: StandaloneTestMetricUnit; label: string }> = [
-  { value: 'percent', label: 'Percent' },
+  { value: 'percent', label: 'Percent (%)' },
   { value: 'number', label: 'Number' },
-  { value: 'ohm', label: 'CVR' },
-  { value: 'amp', label: 'CCI' },
-  { value: 'volt', label: 'CPD' },
-  { value: 'count', label: 'Count' },
+  { value: 'ohm', label: 'CVR (\u03A9)' },
+  { value: 'amp', label: 'CCI (A)' },
+  { value: 'volt', label: 'CPD (V)' },
+  { value: 'count', label: 'Count (records)' },
 ]
 
 const FORMULA_REVIEW_CONTEXT: StandaloneFormulaContext = {
@@ -50,6 +49,17 @@ const FORMULA_REVIEW_CONTEXT: StandaloneFormulaContext = {
   coolSteps: 32,
   finalized: 44,
   total: 49,
+  sumPercentX: 3268.3,
+  primaryRecords: 44,
+  probeRecords: 5,
+  enteredProbeCount: 4,
+  redSteps: 3,
+  orangeSteps: 5,
+  yellowSteps: 9,
+  greenSteps: 12,
+  blueSteps: 10,
+  indigoSteps: 6,
+  purpleSteps: 4,
 }
 
 type StandaloneMetricDraft = Pick<StandaloneTestMetricSetting, 'label' | 'formula' | 'unit' | 'status' | 'definition'>
@@ -89,6 +99,38 @@ function statusLabel(status: MetricStatus): string {
   return status === 'operational' ? 'Operational' : 'Experimental'
 }
 
+const FORMULA_VARIABLE_GROUPS: Array<{
+  category: string
+  variables: Array<keyof StandaloneFormulaContext>
+}> = [
+  {
+    category: 'Ratios & Percent',
+    variables: ['rfc', 'rac', 'avgPercentX', 'legacyRac', 'sumPercentX'],
+  },
+  {
+    category: 'Electrical & CPD',
+    variables: ['avgCvr', 'avgCci', 'avgCpd', 'acn'],
+  },
+  {
+    category: 'Counts & Probes',
+    variables: ['nTotal', 'primaryRecords', 'probeRecords', 'enteredProbeCount', 'finalized', 'total'],
+  },
+  {
+    category: 'Color Steps (7 bands)',
+    variables: [
+      'warmSteps',
+      'coolSteps',
+      'redSteps',
+      'orangeSteps',
+      'yellowSteps',
+      'greenSteps',
+      'blueSteps',
+      'indigoSteps',
+      'purpleSteps',
+    ],
+  },
+]
+
 export function AdminMetricsPage() {
   const { metricSettings, setMetricSettings } = useAppState()
   const { message, error, ok, err } = useFlash()
@@ -102,9 +144,23 @@ export function AdminMetricsPage() {
     selectedMetric ? toDraft(selectedMetric) : emptyDraft(),
   )
   const [draftForKey, setDraftForKey] = useState(selectedMetric?.key ?? '')
+  const [activeFormulaTarget, setActiveFormulaTarget] = useState<'draft' | 'custom'>('draft')
   const [customLabel, setCustomLabel] = useState('')
   const [customFormula, setCustomFormula] = useState('')
   const [customUnit, setCustomUnit] = useState<StandaloneTestMetricUnit>('number')
+
+  function insertVariable(varName: string) {
+    if (activeFormulaTarget === 'custom') {
+      setCustomFormula((prev) => (prev.trim() ? `${prev.trim()} + ${varName}` : varName))
+      ok(`Inserted ${varName} into custom formula`)
+    } else {
+      setDraft((d) => ({
+        ...d,
+        formula: d.formula.trim() ? `${d.formula.trim()} + ${varName}` : varName,
+      }))
+      ok(`Inserted ${varName} into formula`)
+    }
+  }
 
   useEffect(() => {
     if (!selectedMetric || draftForKey === selectedMetric.key) return
@@ -294,13 +350,33 @@ export function AdminMetricsPage() {
 
       <section className="admin-metrics-note">
         <Sigma className="h-4 w-4" />
-        <div>
-          <strong>Formula variables</strong>
-          <p>
-            {STANDALONE_FORMULA_VARIABLES.map((name) => (
-              <code key={name}>{name}</code>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <strong>Formula variables</strong>
+            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+              Click any variable to insert into {activeFormulaTarget === 'custom' ? 'custom formula' : (selectedMetric ? `${selectedMetric.label} formula` : 'formula')}
+            </span>
+          </div>
+          <div className="admin-var-groups">
+            {FORMULA_VARIABLE_GROUPS.map((group) => (
+              <div key={group.category} className="admin-var-group">
+                <span className="admin-var-group-label">{group.category}</span>
+                <div className="admin-var-chips">
+                  {group.variables.map((name) => (
+                    <button
+                      type="button"
+                      key={name}
+                      className="admin-var-btn"
+                      onClick={() => insertVariable(name)}
+                      title={`Click to insert ${name} into ${activeFormulaTarget === 'custom' ? 'custom formula' : (selectedMetric?.label ?? 'formula')}`}
+                    >
+                      <code>{name}</code>
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
-          </p>
+          </div>
         </div>
       </section>
 
@@ -455,6 +531,7 @@ export function AdminMetricsPage() {
                   <input
                     type="text"
                     value={draft.formula}
+                    onFocus={() => setActiveFormulaTarget('draft')}
                     onChange={(e) => setDraft({ ...draft, formula: e.target.value })}
                     aria-label={`Formula for ${selectedMetric.label}`}
                   />
@@ -544,6 +621,7 @@ export function AdminMetricsPage() {
             <input
               type="text"
               value={customFormula}
+              onFocus={() => setActiveFormulaTarget('custom')}
               onChange={(e) => setCustomFormula(e.target.value)}
               placeholder="(avgPercentX + legacyRac) / 2"
               aria-label="Custom metric formula"

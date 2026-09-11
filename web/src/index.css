@@ -5848,6 +5848,24 @@
   .admin-metrics-note p {
     @apply m-0 mt-2 flex flex-wrap gap-1.5;
   }
+  .admin-var-groups {
+    @apply mt-3 space-y-2;
+  }
+  .admin-var-group {
+    @apply flex flex-wrap items-center gap-2;
+  }
+  .admin-var-group-label {
+    @apply font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400 min-w-[120px];
+  }
+  .admin-var-chips {
+    @apply flex flex-wrap gap-1.5;
+  }
+  .admin-var-btn {
+    @apply cursor-pointer rounded border-0 bg-transparent p-0 transition-transform active:scale-95;
+  }
+  .admin-var-btn:hover code {
+    @apply border-red-300 bg-red-50 text-red-700 shadow-2xs;
+  }
   .admin-metrics-note code,
   .admin-standalone-list-item code,
   .admin-standalone-editor code,

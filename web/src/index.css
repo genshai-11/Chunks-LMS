@@ -5803,4 +5803,207 @@
   .live-test-probe-dock .observe-dock-probe-btn.done {
     @apply border-indigo-300/60 bg-indigo-950/80 text-indigo-100 hover:bg-indigo-900;
   }
+
+  .admin-metrics-page {
+    @apply space-y-4;
+  }
+  .admin-metrics-overview {
+    @apply grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(10rem,1fr))];
+  }
+  .admin-metrics-overview-card {
+    @apply rounded-xl border border-slate-200 bg-white p-4 shadow-3xs;
+  }
+  .admin-metrics-overview-card span {
+    @apply block font-mono text-[10px] font-black uppercase tracking-wide text-slate-400;
+  }
+  .admin-metrics-overview-card strong {
+    @apply mt-2 block font-display text-2xl font-black tracking-tight text-slate-950;
+  }
+  .admin-metrics-overview-card small {
+    @apply mt-1 block text-xs font-semibold leading-snug text-slate-500;
+  }
+  .admin-metrics-overview-card.is-warning {
+    @apply border-amber-200 bg-amber-50;
+  }
+  .admin-metrics-overview-card.is-warning strong,
+  .admin-metrics-overview-card.is-warning small {
+    @apply text-amber-800;
+  }
+  .admin-metrics-note,
+  .admin-metrics-section,
+  .admin-custom-metric {
+    @apply rounded-xl border border-slate-200 bg-white shadow-3xs;
+  }
+  .admin-metrics-note {
+    @apply flex items-start gap-3 p-4;
+  }
+  .admin-metrics-note > svg,
+  .admin-metrics-section-head > svg,
+  .admin-custom-metric > header > svg {
+    @apply shrink-0 text-red-700;
+  }
+  .admin-metrics-note strong {
+    @apply block font-display text-sm font-black text-slate-950;
+  }
+  .admin-metrics-note p {
+    @apply m-0 mt-2 flex flex-wrap gap-1.5;
+  }
+  .admin-metrics-note code,
+  .admin-standalone-list-item code,
+  .admin-standalone-editor code,
+  .admin-metrics-report-table td code {
+    @apply inline-flex rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-600;
+  }
+  .admin-metrics-section-head,
+  .admin-custom-metric > header {
+    @apply flex items-start justify-between gap-4 border-b border-slate-100 px-4 py-4;
+  }
+  .admin-metrics-section-head h2,
+  .admin-custom-metric h2,
+  .admin-standalone-editor h3 {
+    @apply m-0 font-display text-base font-black tracking-tight text-slate-950;
+  }
+  .admin-metrics-section-head p,
+  .admin-custom-metric p,
+  .admin-standalone-editor header p {
+    @apply m-0 mt-1 text-xs font-semibold text-slate-500;
+  }
+  .admin-metrics-section-kicker {
+    @apply mb-1 block font-mono text-[10px] font-black uppercase tracking-wide text-red-700;
+  }
+  .admin-metrics-report-table {
+    @apply rounded-none border-0 shadow-none;
+  }
+  .admin-metrics-report-table table {
+    @apply min-w-[48rem];
+  }
+  .admin-metrics-report-table td:first-child {
+    @apply min-w-44;
+  }
+  .admin-metrics-report-table td:first-child strong {
+    @apply block font-display text-sm font-black text-slate-950;
+  }
+  .admin-metrics-report-table td:first-child code {
+    @apply mt-1;
+  }
+  .admin-metrics-report-table input[type='number'] {
+    @apply h-9 w-20 rounded-lg border border-slate-200 bg-white px-2 text-sm font-bold text-slate-800 shadow-3xs focus:border-red-500;
+  }
+  .admin-metrics-report-table select,
+  .admin-standalone-editor select,
+  .admin-standalone-editor input,
+  .admin-standalone-editor textarea,
+  .admin-custom-metric select,
+  .admin-custom-metric input {
+    @apply w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 shadow-3xs focus:border-red-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400;
+  }
+  .admin-metrics-report-table select,
+  .admin-standalone-editor select,
+  .admin-standalone-editor input,
+  .admin-custom-metric select,
+  .admin-custom-metric input {
+    @apply min-h-10;
+  }
+  .admin-standalone-editor textarea {
+    @apply min-h-28 py-2 leading-relaxed;
+  }
+  .admin-metric-switch {
+    @apply inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-600 shadow-3xs;
+  }
+  .admin-metric-switch input {
+    @apply sr-only;
+  }
+  .admin-metric-switch:has(input:checked) {
+    @apply border-green-200 bg-green-50 text-green-700;
+  }
+  .admin-standalone-layout {
+    @apply grid gap-0 lg:grid-cols-[minmax(15rem,0.85fr)_minmax(0,1.6fr)];
+  }
+  .admin-standalone-list {
+    @apply flex max-h-[44rem] flex-col gap-1 overflow-y-auto border-b border-slate-100 p-3 lg:border-b-0 lg:border-r;
+  }
+  .admin-standalone-list-item {
+    @apply flex min-h-[4rem] w-full items-center justify-between gap-3 rounded-lg border border-transparent bg-transparent px-3 py-2 text-left shadow-none hover:border-slate-200 hover:bg-slate-50;
+  }
+  .admin-standalone-list-item.is-active {
+    @apply border-red-200 bg-red-50 text-red-900;
+  }
+  .admin-standalone-list-item.is-disabled {
+    @apply opacity-60;
+  }
+  .admin-standalone-list-item strong {
+    @apply block font-display text-sm font-black text-slate-950;
+  }
+  .admin-standalone-list-item small {
+    @apply mt-1 flex flex-wrap items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400;
+  }
+  .admin-formula-dot {
+    @apply h-2.5 w-2.5 shrink-0 rounded-full bg-amber-400;
+  }
+  .admin-formula-dot.is-success {
+    @apply bg-green-500;
+  }
+  .admin-standalone-editor {
+    @apply p-4;
+  }
+  .admin-standalone-editor > header {
+    @apply mb-4 flex flex-wrap items-start justify-between gap-3;
+  }
+  .admin-standalone-editor-grid,
+  .admin-custom-metric-grid {
+    @apply grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(12rem,1fr))];
+  }
+  .admin-standalone-editor-grid label,
+  .admin-custom-metric-grid label {
+    @apply flex flex-col gap-1.5 text-xs font-black text-slate-500;
+  }
+  .admin-standalone-definition {
+    @apply sm:col-span-2;
+  }
+  .admin-metrics-auto-label {
+    @apply mb-4 flex items-center gap-2 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700;
+  }
+  .admin-standalone-editor footer {
+    @apply mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3;
+  }
+  .admin-formula-pill {
+    @apply inline-flex min-h-8 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 font-mono text-[11px] font-black text-amber-800;
+  }
+  .admin-formula-pill.is-success {
+    @apply border-green-200 bg-green-50 text-green-700;
+  }
+  .admin-custom-metric {
+    @apply overflow-hidden;
+  }
+  .admin-custom-metric-grid {
+    @apply p-4;
+  }
+  .admin-custom-metric-actions {
+    @apply flex flex-wrap items-end gap-2 sm:justify-end;
+  }
+
+  @media (max-width: 639px) {
+    .admin-metrics-overview {
+      @apply grid-cols-2 gap-2;
+    }
+    .admin-metrics-overview-card {
+      @apply p-3;
+    }
+    .admin-metrics-overview-card strong {
+      @apply text-xl;
+    }
+    .admin-metrics-section-head,
+    .admin-custom-metric > header {
+      @apply px-3 py-3;
+    }
+    .admin-standalone-list {
+      @apply max-h-none;
+    }
+    .admin-standalone-editor {
+      @apply p-3;
+    }
+    .admin-standalone-definition {
+      @apply col-span-1;
+    }
+  }
 }

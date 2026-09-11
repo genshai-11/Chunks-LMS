@@ -151,7 +151,7 @@ function ResultDot(props: any) {
       fill={fill}
       stroke="#0f172a"
       strokeWidth={2}
-      aria-label={`${payload?.label ?? 'Question'} CPD ${payload?.cpd ?? 'â€”'}`}
+      aria-label={`${payload?.label ?? 'Question'} CPD ${payload?.cpd ?? '-'}`}
     />
   )
 }
@@ -168,7 +168,7 @@ function formatStandaloneMetricValue(
   metric: StandaloneTestMetricSetting,
   value: number | null,
 ): string {
-  if (value == null || !Number.isFinite(value)) return 'â€”'
+  if (value == null || !Number.isFinite(value)) return '-'
   if (metric.unit === 'percent') return pct(value)
   if (metric.unit === 'ohm') return ohm(value)
   if (metric.unit === 'amp') return amp(value)
@@ -368,7 +368,7 @@ export function TeacherTestAnalysisPage() {
       avgPercentX: spectrum.avgPercentX ?? 0,
       sumPercentX: spectrum.sumPercentX,
       avgXColor,
-      avgPercentXTitle: `Avg %x = sum(%x) / n_bell = ${spectrum.sumPercentX.toFixed(1)}% / ${spectrum.totalRecords} = ${(spectrum.avgPercentX ?? 0).toFixed(1)}% (Band: ${COLOR_LABELS[avgXColor]}).\nâ€¢ Colors: Red (0%), Orange (17%), Yellow (34%), Green (50%), Blue (67%), Indigo (84%), Violet (100%).`,
+      avgPercentXTitle: `Avg %x = sum(%x) / n_bell = ${spectrum.sumPercentX.toFixed(1)}% / ${spectrum.totalRecords} = ${(spectrum.avgPercentX ?? 0).toFixed(1)}% (Band: ${COLOR_LABELS[avgXColor]}).\n* Colors: Red (0%), Orange (17%), Yellow (34%), Green (50%), Blue (67%), Indigo (84%), Purple (100%).`,
       rfcTitle: `RFC = warm records / N_total = ${spectrum.warmSteps} / ${spectrum.totalRecords}. Warm = Red + Orange + Yellow.`,
       percentCTitle: `${racMetricLabel} = Avg %x = sum(%x) / N_total = ${spectrum.sumPercentX.toFixed(1)}% / ${spectrum.totalRecords} = ${(spectrum.avgPercentX ?? 0).toFixed(1)}%.`,
       legacyRacTitle: `RAC legacy = cool records / N_total = ${spectrum.coolSteps} / ${spectrum.totalRecords}. Cool = Green + Blue + Indigo + Purple. When N_total > 0, RAC legacy = 100 - RFC.`,
@@ -432,8 +432,8 @@ export function TeacherTestAnalysisPage() {
           avgXColor,
           sumPercentX: spectrum.sumPercentX,
           avgCpd: Number(avgCpd.toFixed(2)),
-          percentCLabel: spectrum.avgPercentX == null ? 'â€”' : `${spectrum.avgPercentX.toFixed(1)}%`,
-          avgCpdLabel: finalized.length ? `CPD ${avgCpd.toFixed(0)}V` : 'CPD â€”',
+          percentCLabel: spectrum.avgPercentX == null ? '-' : `${spectrum.avgPercentX.toFixed(1)}%`,
+          avgCpdLabel: finalized.length ? `CPD ${avgCpd.toFixed(0)}V` : 'CPD -',
           finalized: finalized.length,
           nTotal: spectrum.totalRecords,
           warmSteps: spectrum.warmSteps,
@@ -683,15 +683,15 @@ export function TeacherTestAnalysisPage() {
 
   const enabledStandaloneMetricCount = metricSettings.standaloneTestMetrics.filter((metric) => metric.enabled).length
 
-  if (loading) return <EmptyState icon={BarChart3} title="Loading standalone analysisâ€¦" />
+  if (loading) return <EmptyState icon={BarChart3} title="Loading standalone analysis..." />
   if (error) return <EmptyState icon={BarChart3} title="Could not load analysis" description={error} />
 
   return (
     <div className="test-analysis-page">
       <PageHeader
         icon={BarChart3}
-        kicker="Teacher Â· Standalone Test Analysis"
-        title={learner?.displayName ? `${learner.displayName} Â· Test Analysis` : 'Standalone Test Analysis'}
+        kicker="Teacher - Standalone Test Analysis"
+        title={learner?.displayName ? `${learner.displayName} - Test Analysis` : 'Standalone Test Analysis'}
         subtitle="Dedicated analysis for Tests 1-1, separate from class/session analysis."
         actions={
           <Link className="btn ghost" to="/teacher/tests">
@@ -835,21 +835,21 @@ export function TeacherTestAnalysisPage() {
                   className={`test-analysis-chip justify-start text-left${acnConfig.config.preset === 'v2_completed' ? ' is-active' : ''}`}
                   onClick={() => acnConfig.setPreset('v2_completed')}
                 >
-                  v2: (N_total - Tá»•ng n) / ÄÃ£ hoÃ n thÃ nh
+                  v2: (N_total - n count) / completed items
                 </button>
                 <button
                   type="button"
                   className={`test-analysis-chip justify-start text-left${acnConfig.config.preset === 'v2_fixed49' ? ' is-active' : ''}`}
                   onClick={() => acnConfig.setPreset('v2_fixed49')}
                 >
-                  v2: (N_total - Tá»•ng n) / 49 cÃ¢u
+                  v2: (N_total - n count) / 49 items
                 </button>
                 <button
                   type="button"
                   className={`test-analysis-chip justify-start text-left${acnConfig.config.preset === 'v1_legacy_probe_avg' ? ' is-active' : ''}`}
                   onClick={() => acnConfig.setPreset('v1_legacy_probe_avg')}
                 >
-                  v1: Probed Depth Avg (CÅ©)
+                  v1: Probed Depth Avg (legacy)
                 </button>
                 <button
                   type="button"
@@ -956,13 +956,13 @@ export function TeacherTestAnalysisPage() {
                 <div className="test-analysis-tube-scroll" role="img" aria-label="Question record tube chart showing N_total color records by question">
                   {recordTubeRows.length ? recordTubeRows.map((row) => (
                     <div key={row.index} className="test-analysis-tube-col">
-                      <div className="test-analysis-tube-stack" title={`${row.label} Â· N_total ${row.records.length}`}>
+                      <div className="test-analysis-tube-stack" title={`${row.label} - N_total ${row.records.length}`}>
                         {row.records.map((record) => (
                           <span
                             key={`${row.index}-${record.index}`}
                             className="test-analysis-tube-bead"
                             style={{ background: COLOR_HEX[record.color] }}
-                            title={`${row.label} Â· ${record.label}`}
+                            title={`${row.label} - ${record.label}`}
                             aria-label={`${row.label} ${record.label}`}
                           />
                         ))}
@@ -1007,7 +1007,7 @@ export function TeacherTestAnalysisPage() {
                         return (
                           <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
                             <div className="mb-1 font-black text-slate-950">
-                              Session {row.session} Â· N_total {row.nTotal} Â· Avg %x: <span className="font-bold" style={{ color: COLOR_HEX[row.avgXColor] }}>{Number(row.avgPercentX ?? 0).toFixed(1)}%</span>
+                              Session {row.session} - N_total {row.nTotal} - Avg %x: <span className="font-bold" style={{ color: COLOR_HEX[row.avgXColor] }}>{Number(row.avgPercentX ?? 0).toFixed(1)}%</span>
                             </div>
                             <div className="grid grid-cols-2 gap-x-3 gap-y-1">
                               {SPECTRUM_COLORS.map((color) => (
@@ -1038,7 +1038,7 @@ export function TeacherTestAnalysisPage() {
                 className={chartPanelClass('recordCpdQuestion')}
                 icon={Zap}
                 title="Record CPD by Question"
-                description="Each question groups its N_total records. Record CPD = base CPD Ã— the 7-color factor for that record."
+                description="Each question groups its N_total records. Record CPD = base CPD x the 7-color factor for that record."
                 actions={chartActions('recordCpdQuestion')}
                 collapsible={false}
               >
@@ -1048,13 +1048,13 @@ export function TeacherTestAnalysisPage() {
                       const maxCpd = Math.max(...row.records.map((record) => record.cpd), 1)
                       return (
                         <div key={row.index} className="test-analysis-record-cpd-group">
-                          <div className="test-analysis-record-cpd-bars" title={`${row.label} Â· ${row.records.length} records`}>
+                          <div className="test-analysis-record-cpd-bars" title={`${row.label} - ${row.records.length} records`}>
                             {row.records.map((record) => (
                               <span
                                 key={`${row.index}-${record.index}`}
                                 className="test-analysis-record-cpd-bar"
                                 style={{ height: `${Math.max(8, (record.cpd / maxCpd) * 100)}%`, background: COLOR_HEX[record.color] }}
-                                title={`${row.shortLabel}-R${record.index} Â· ${COLOR_LABELS[record.color]} Â· CPD ${volt(record.cpd)}`}
+                                title={`${row.shortLabel}-R${record.index} - ${COLOR_LABELS[record.color]} - CPD ${volt(record.cpd)}`}
                               />
                             ))}
                           </div>
@@ -1100,7 +1100,7 @@ export function TeacherTestAnalysisPage() {
                             <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
                               <div className="mb-1 font-black text-slate-950">{row.label}</div>
                               <div>Record CPD: <strong style={{ color: METRIC_HEX.cpd }}>{volt(row.cpd)}</strong></div>
-                              <div>Formula: {volt(row.baseCpd)} Ã— {row.score}</div>
+                              <div>Formula: {volt(row.baseCpd)} x {row.score}</div>
                               <div>Result record: <strong style={{ color: row.colorHex }}>{row.colorLabel}</strong></div>
                               <div>Session: <strong>{row.session}</strong></div>
                             </div>
@@ -1142,7 +1142,7 @@ export function TeacherTestAnalysisPage() {
             className={chartPanelClass('questionCpd')}
             icon={LineChartIcon}
             title="CPD by Question"
-              description={`${metrics.finalized}/${metrics.total} finalized questions Â· Final CPD = CVR Ã— CCI Ã— color score.`}
+              description={`${metrics.finalized}/${metrics.total} finalized questions - Final CPD = CVR x CCI x color score.`}
               actions={chartActions('questionCpd')}
               collapsible={false}
             >
@@ -1167,11 +1167,11 @@ export function TeacherTestAnalysisPage() {
                           <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-xl">
                             <div className="mb-1 font-black text-slate-950">{row.label}</div>
                             <div>Final CPD: <strong style={{ color: METRIC_HEX.cpd }}>{volt(row.cpd)}</strong></div>
-                            <div>Formula: {volt(row.baseCpd)} Ã— {row.resultScore}</div>
-                            <div>CVR: <strong style={{ color: METRIC_HEX.cvr }}>{ohm(row.cvr)}</strong> Â· CCI: <strong style={{ color: METRIC_HEX.cci }}>{amp(row.cci)}</strong></div>
+                            <div>Formula: {volt(row.baseCpd)} x {row.resultScore}</div>
+                            <div>CVR: <strong style={{ color: METRIC_HEX.cvr }}>{ohm(row.cvr)}</strong> - CCI: <strong style={{ color: METRIC_HEX.cci }}>{amp(row.cci)}</strong></div>
                             <div>Result: <strong className="capitalize" style={{ color: row.colorHex }}>{row.color}</strong></div>
-                            <div>Session: <strong>{row.session}</strong> Â· {row.language}</div>
-                            {row.prompt ? <div className="mt-1 max-w-xs text-slate-600">â€œ{row.prompt}â€</div> : null}
+                            <div>Session: <strong>{row.session}</strong> - {row.language}</div>
+                            {row.prompt ? <div className="mt-1 max-w-xs text-slate-600">"{row.prompt}"</div> : null}
                           </div>
                         )
                       }}

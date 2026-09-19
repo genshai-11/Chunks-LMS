@@ -70,6 +70,7 @@ import { getSupabase } from '../../lib/supabase'
 import { triggerConfetti } from '../../lib/confetti'
 import { playColorClick, resultAudioUrl } from '../../lib/color-audio'
 import { SPECTRUM_COLORS } from '../../modules/result-lifecycle/types'
+import { COLOR_PERCENT_X_VALUES } from '../../modules/metrics/calculate'
 
 const COLORS: { key: ProvisionalColor; label: string; shortcut: string }[] = [
   { key: 'red', label: 'Red', shortcut: '0' },
@@ -552,19 +553,24 @@ export function TeacherObservePage() {
     : 0
   const done = summary ? summary.done : 0
   const rfcPct = summary?.totalRecords ? Math.round((warmRecords / summary.totalRecords) * 100) : 0
-  const racPct = summary?.totalRecords ? Math.round((coolRecords / summary.totalRecords) * 100) : 0
+  const sumPercentX = summary
+    ? SPECTRUM_COLORS.reduce((acc, c) => acc + summary.recordedByColor[c] * COLOR_PERCENT_X_VALUES[c], 0)
+    : 0
+  const avgPercentX = summary?.totalRecords ? sumPercentX / summary.totalRecords : 0
+  const racPct = Math.round(avgPercentX)
+  const legacyRacPct = summary?.totalRecords ? Math.round((coolRecords / summary.totalRecords) * 100) : 0
   const rfcTitle = summary
     ? `RFC = warm records / total records = ${warmRecords} / ${summary.totalRecords}. Warm = Red + Orange + Yellow.`
     : 'RFC = warm records / total records'
   const racTitle = summary
-    ? `%c = cool records / total records = ${coolRecords} / ${summary.totalRecords}. Cool = Green + Blue + Indigo + Purple.`
-    : '%c = cool records / total records'
+    ? `%c = Avg %x = sum(%x) / N_total = ${sumPercentX.toFixed(1)}% / ${summary.totalRecords} = ${avgPercentX.toFixed(1)}%. (Legacy RAC = ${legacyRacPct}%).`
+    : '%c = Avg %x = sum(%x) / N_total'
   const rfcTooltip = summary
     ? `Warm records / N_total = ${warmRecords} / ${summary.totalRecords}. Warm = Red + Orange + Yellow. Lower RFC means less observed struggle.`
     : 'RFC uses warm records once observations are finalized.'
   const racTooltip = summary
-    ? `Cool records / N_total = ${coolRecords} / ${summary.totalRecords}. Cool = Green + Blue + Indigo + Purple. Higher %c means more cool measurement steps.`
-    : '%c uses cool records once observations are finalized.'
+    ? `%c uses Avg %x: weighted mean across 7 spectrum colors (Red 0%, Orange 17%, Yellow 34%, Green 50%, Blue 67%, Indigo 84%, Purple 100%) over N_total. Legacy RAC (cool records / N_total) = ${legacyRacPct}%.`
+    : '%c uses Avg %x once observations are finalized.'
   const splitMode = capture?.learnerIds.length === 2
 
   const learnerName = useCallback(

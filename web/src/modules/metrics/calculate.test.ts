@@ -43,11 +43,15 @@ describe('metric calculations', () => {
       })),
     ]
     const metrics = calculateMetrics(finalized)
+    const breakdown = calculateSpectrumStepBreakdown(finalized)
     const rfc = metrics.find((m) => m.key === 'rfc')!
     const rac = metrics.find((m) => m.key === 'rac')!
     expect(rfc.value).toBeCloseTo(0.27)
-    expect(rac.value).toBeCloseTo(0.73)
+    expect(breakdown.rac).toBeCloseTo(0.73)
+    expect(rac.value).toBeCloseTo(0.6619)
+    expect(rac.value).toBeCloseTo((breakdown.avgPercentX ?? 0) / 100)
     expect(rfc.sampleSize).toBe(100)
+    expect(rac.sampleSize).toBe(100)
   })
 
   it('returns null for empty windows, never zero', () => {
@@ -98,8 +102,8 @@ describe('metric calculations', () => {
     const current = attempts(['indigo', 'indigo', 'red', 'red'])
     const previous = attempts(['indigo', 'red', 'red', 'red'])
     const cmp = compareEqualDurationWindows(current, previous)
-    // current RAC 0.5, previous RAC 0.25 → +25 pp
-    expect(cmp.deltas.rac).toBeCloseTo(25)
+    // current RAC (Avg %x) 0.42 (sum 168/4 = 42%), previous RAC 0.21 (sum 84/4 = 21%) → +21 pp
+    expect(cmp.deltas.rac).toBeCloseTo(21)
     expect(compareEqualDurationWindows(current, null).previous).toBeNull()
   })
 
@@ -114,7 +118,23 @@ describe('metric calculations', () => {
     const rac = metrics.find((m) => m.key === 'rac')!
     expect(rfc.sampleSize).toBe(7)
     expect(rfc.value).toBeCloseTo(3 / 7)
-    expect(rac.value).toBeCloseTo(4 / 7)
+    // Avg %x = (0 + 17 + 84 + 201) / 7 = 302 / 7. rac = (302 / 7) / 100 = 302 / 700
+    expect(rac.value).toBeCloseTo(302 / 700)
+  })
+
+  it('returns spectrum.avgPercentX / 100 for rac in calculateMetrics', () => {
+    const finalized: FinalizedAttempt[] = [
+      { effectiveColor: 'green', enteredProbeFlow: false, probeEventCount: 0 },
+      { effectiveColor: 'purple', enteredProbeFlow: false, probeEventCount: 0 },
+    ]
+    const breakdown = calculateSpectrumStepBreakdown(finalized)
+    const metrics = calculateMetrics(finalized)
+    const rac = metrics.find((m) => m.key === 'rac')!
+    expect(breakdown.avgPercentX).toBe(75)
+    expect(breakdown.rac).toBe(1)
+    expect(rac.value).toBe(0.75)
+    expect(rac.value).toBe(breakdown.avgPercentX! / 100)
+    expect(rac.sampleSize).toBe(breakdown.totalRecords)
   })
 
   it('breaks down recorded 7-color steps for observe confirmation tooltips', () => {

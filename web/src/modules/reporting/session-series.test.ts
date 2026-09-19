@@ -96,7 +96,7 @@ describe('session metric series', () => {
     expect(points).toHaveLength(2)
     expect(points[0]!.sessionNumber).toBe(1)
     expect(points[0]!.label).toBe('Day 1')
-    expect(points[0]!.metrics.rac).toBe(1)
+    expect(points[0]!.metrics.rac).toBe(0.75)
     expect(points[1]!.sessionNumber).toBe(2)
     expect(points[1]!.metrics.rfc).toBe(1)
   })

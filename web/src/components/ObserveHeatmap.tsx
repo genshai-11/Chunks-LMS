@@ -38,9 +38,10 @@ export function ObserveHeatmap({
   )
   const nTotal = spectrum.totalRecords
   const rfcPct = spectrum.rfc == null ? 0 : Math.round(spectrum.rfc * 100)
-  const racPct = spectrum.rac == null ? 0 : Math.round(spectrum.rac * 100)
+  const racPct = spectrum.avgPercentX == null ? 0 : Math.round(spectrum.avgPercentX)
+  const legacyRacPct = spectrum.rac == null ? 0 : Math.round(spectrum.rac * 100)
   const rfcTitle = `RFC = warm steps / N_total = ${spectrum.warmSteps} / ${nTotal}. Warm = Red + Orange + Yellow.`
-  const racTitle = `%c = cool steps / N_total = ${spectrum.coolSteps} / ${nTotal}. Cool = Green + Blue + Indigo + Purple.`
+  const racTitle = `%c = Avg %x = sum(%x) / N_total = ${spectrum.sumPercentX.toFixed(1)}% / ${nTotal} = ${(spectrum.avgPercentX ?? 0).toFixed(1)}%. Legacy RAC = ${legacyRacPct}%.`
   const totalTitle = `Total records = primary records + probe records = ${spectrum.primaryRecords} + ${spectrum.probeRecords} = ${nTotal}. Finalized attempts=${summary.done}; max chunks number=${summary.maxProbeDepth}.`
 
   const containerRef = useRef<HTMLDivElement>(null)

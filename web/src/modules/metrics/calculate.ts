@@ -114,7 +114,7 @@ export const METRIC_CATALOG: MetricCatalogEntry[] = [
     key: 'rac',
     version: '1.0.0',
     status: 'operational',
-    definition: 'cool spectrum steps / N_total',
+    definition: 'Package main %c value: mean normalized 7-color spectrum factor over N_total (Avg %x)',
     direction: 'higher_better',
     unit: 'ratio',
     minSample: 1,
@@ -315,7 +315,11 @@ export function calculateMetrics(finalized: FinalizedAttempt[]): MetricObservati
   ).length
 
   const rfc = observation('rfc', spectrum.rfc, spectrum.totalRecords)
-  const rac = observation('rac', spectrum.rac, spectrum.totalRecords)
+  const rac = observation(
+    'rac',
+    spectrum.avgPercentX == null ? null : spectrum.avgPercentX / 100,
+    spectrum.totalRecords,
+  )
   const avg = observation('average_performance', n === 0 ? null : scoreSum / n, n)
   const purpleRate = observation('purple_mastery_rate', ratio(purple, n), n)
   // Clarification rate: 0 when finalized sample > 0 and none probed; null when sample = 0

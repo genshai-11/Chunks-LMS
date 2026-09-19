@@ -40,10 +40,6 @@ export function ObserveHeatmap({
   const rfcPct = spectrum.rfc == null ? 0 : Math.round(spectrum.rfc * 100)
   const racPct = spectrum.avgPercentX == null ? 0 : Math.round(spectrum.avgPercentX)
   const legacyRacPct = spectrum.rac == null ? 0 : Math.round(spectrum.rac * 100)
-  const rfcTitle = `RFC = warm steps / N_total = ${spectrum.warmSteps} / ${nTotal}. Warm = Red + Orange + Yellow.`
-  const racTitle = `%c = Avg %x = sum(%x) / N_total = ${spectrum.sumPercentX.toFixed(1)}% / ${nTotal} = ${(spectrum.avgPercentX ?? 0).toFixed(1)}%. Legacy RAC = ${legacyRacPct}%.`
-  const totalTitle = `Total records = primary records + probe records = ${spectrum.primaryRecords} + ${spectrum.probeRecords} = ${nTotal}. Finalized attempts=${summary.done}; max chunks number=${summary.maxProbeDepth}.`
-
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -57,18 +53,109 @@ export function ObserveHeatmap({
   return (
     <div className={`observe-heat layout-${layout}`}>
       <div className="observe-heat-summary" aria-label="Session summary">
-        <span className="observe-heat-metric" title={rfcTitle}>
-          RFC <strong>{nTotal ? `${rfcPct}%` : '—'}</strong>
-        </span>
-        <span className="observe-heat-metric muted" title={racTitle}>
-          %c <strong>{nTotal ? `${racPct}%` : '—'}</strong>
-        </span>
         <span
-          className="observe-heat-metric muted tabular"
-          title={totalTitle}
+          className="observe-heat-metric observe-has-tooltip"
+          tabIndex={0}
+          aria-label={`Struggle RFC: ${nTotal ? `${rfcPct}%` : '—'}`}
+        >
+          RFC <strong>{nTotal ? `${rfcPct}%` : '—'}</strong>
+          <span className="observe-metric-tooltip observe-tooltip-rich tooltip-left" role="tooltip">
+            <span className="observe-tooltip-header">
+              <span>Struggle (RFC)</span>
+              <span className="font-mono text-amber-300 font-bold">{nTotal ? `${rfcPct}%` : '—'}</span>
+            </span>
+            <span className="observe-tooltip-divider" />
+            <span className="observe-tooltip-body">
+              <span className="observe-tooltip-row">
+                <span className="observe-tooltip-key">Formula:</span>
+                <span className="observe-tooltip-val font-mono text-[10px]">warm records / N_total</span>
+              </span>
+              <span className="observe-tooltip-row">
+                <span className="observe-tooltip-key">Warm steps:</span>
+                <span className="observe-tooltip-val">
+                  {spectrum.warmSteps} / {nTotal}{' '}
+                  <span className="text-slate-400 font-normal">(Red + Orange + Yellow)</span>
+                </span>
+              </span>
+              <span className="observe-tooltip-note">
+                Lower RFC indicates less observed struggle.
+              </span>
+            </span>
+          </span>
+        </span>
+
+        <span
+          className="observe-heat-metric muted observe-has-tooltip"
+          tabIndex={0}
+          aria-label={`Awareness / Success (%c): ${nTotal ? `${racPct}%` : '—'}`}
+        >
+          %c <strong>{nTotal ? `${racPct}%` : '—'}</strong>
+          <span className="observe-metric-tooltip observe-tooltip-rich tooltip-center" role="tooltip">
+            <span className="observe-tooltip-header">
+              <span>Awareness / Success (%c)</span>
+              <span className="font-mono text-emerald-300 font-bold">{nTotal ? `${racPct}%` : '—'}</span>
+            </span>
+            <span className="observe-tooltip-divider" />
+            <span className="observe-tooltip-body">
+              <span className="observe-tooltip-row">
+                <span className="observe-tooltip-key">Formula:</span>
+                <span className="observe-tooltip-val font-mono text-[10px]">Avg %x = sum(%x) / N_total</span>
+              </span>
+              <span className="observe-tooltip-row">
+                <span className="observe-tooltip-key">7-color weighted:</span>
+                <span className="observe-tooltip-val">
+                  {spectrum.sumPercentX.toFixed(1)}% / {nTotal} = {(spectrum.avgPercentX ?? 0).toFixed(1)}%
+                </span>
+              </span>
+              <span className="observe-tooltip-row">
+                <span className="observe-tooltip-key">Legacy RAC:</span>
+                <span className="observe-tooltip-val">
+                  {legacyRacPct}%{' '}
+                  <span className="text-slate-400 font-normal">
+                    ({spectrum.coolSteps}/{nTotal} cool records)
+                  </span>
+                </span>
+              </span>
+              <span className="observe-tooltip-note">
+                Weights: Red 0%, Orange 17%, Yellow 34%, Green 50%, Blue 67%, Indigo 84%, Purple 100%.
+              </span>
+            </span>
+          </span>
+        </span>
+
+        <span
+          className="observe-heat-metric muted tabular observe-has-tooltip"
+          tabIndex={0}
+          aria-label={`Total records: ${nTotal}`}
         >
           records {nTotal}/{Math.max(summary.total + spectrum.probeRecords, 1)}
           {summary.maxProbeDepth > 0 ? ` · max chunks=${summary.maxProbeDepth}` : ''}
+          <span className="observe-metric-tooltip observe-tooltip-rich tooltip-right" role="tooltip">
+            <span className="observe-tooltip-header">
+              <span>Total Records</span>
+              <span className="font-mono text-indigo-300 font-bold">{nTotal}</span>
+            </span>
+            <span className="observe-tooltip-divider" />
+            <span className="observe-tooltip-body">
+              <span className="observe-tooltip-row">
+                <span className="observe-tooltip-key">Primary attempts:</span>
+                <span className="observe-tooltip-val">
+                  {spectrum.primaryRecords}{' '}
+                  <span className="text-slate-400 font-normal">
+                    (Finalized: {summary.done}/{summary.total})
+                  </span>
+                </span>
+              </span>
+              <span className="observe-tooltip-row">
+                <span className="observe-tooltip-key">Probe records:</span>
+                <span className="observe-tooltip-val">{spectrum.probeRecords}</span>
+              </span>
+              <span className="observe-tooltip-row">
+                <span className="observe-tooltip-key">Max chunks depth:</span>
+                <span className="observe-tooltip-val">n{summary.maxProbeDepth}</span>
+              </span>
+            </span>
+          </span>
         </span>
       </div>
 
@@ -87,20 +174,19 @@ export function ObserveHeatmap({
           const active = i === currentQuestionIndex
           const cls = open ? 'is-open' : draft ? 'is-draft' : color ? `is-${color}` : 'is-empty'
           const chunksNumber = snap ? probeChunksNumber(snap) : null
-          const probeBit = chunksNumber != null
-            ? ` · probe records=${snap?.probeCount ?? 0}; chunks number=${chunksNumber}`
-            : open
-              ? ' · probe open'
-              : ''
+          const colorName = color ? color.charAt(0).toUpperCase() + color.slice(1) : null
+          const statusText = open
+            ? 'Probe open'
+            : draft
+              ? 'Not assessed'
+              : colorName ?? 'Not assessed'
+
           return (
             <button
               key={q.id}
               type="button"
               role="listitem"
               className={`observe-heat-dot-btn ${cls}${active ? ' is-current' : ''}`}
-              title={`Q${q.sequenceNumber} · ${learnerName(q.assignedLearnerUserId)}${
-                color ? ` · ${color}` : ''
-              }${probeBit || (draft ? ' · not assessed' : '')}`}
               aria-label={`Question ${q.sequenceNumber}, ${learnerName(
                 q.assignedLearnerUserId,
               )}, ${color ?? (open ? 'probe open' : 'not assessed')}${
@@ -113,6 +199,15 @@ export function ObserveHeatmap({
               {chunksNumber != null ? (
                 <span className="observe-heat-probe-badge">n{chunksNumber}</span>
               ) : null}
+              <span className="observe-dot-tooltip" role="tooltip">
+                <span className="observe-dot-tooltip-title">
+                  Q{q.sequenceNumber} · {learnerName(q.assignedLearnerUserId)}
+                </span>
+                <span className="observe-dot-tooltip-detail">
+                  {statusText}
+                  {chunksNumber != null ? ` · n${chunksNumber} (${snap?.probeCount ?? 0} step${(snap?.probeCount ?? 0) === 1 ? '' : 's'})` : ''}
+                </span>
+              </span>
             </button>
           )
         })}

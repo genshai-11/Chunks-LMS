@@ -1563,10 +1563,6 @@ export function TeacherObservePage() {
                   size="md"
                 />
               </div>
-              <p className="observe-day-line observe-hide-phone">{dayLabel}</p>
-              <h1 className="observe-learner observe-learner-solo">
-                {learner?.displayName ?? 'Learner'}
-              </h1>
               <div className="observe-meta-row">
                 {done > 0 ? (
                   <>

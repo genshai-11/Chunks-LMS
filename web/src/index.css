@@ -1810,7 +1810,9 @@
   }
 
   .observe-dot-tooltip {
-    @apply pointer-events-none absolute bottom-[calc(100%+6px)] left-1/2 -translate-x-1/2 z-30 hidden whitespace-nowrap rounded-lg border border-white/20 bg-slate-950/95 px-2.5 py-1 text-center font-sans text-[10px] leading-tight text-white shadow-xl shadow-black/80 backdrop-blur-md;
+    @apply pointer-events-none absolute bottom-[calc(100%+6px)] left-1/2 -translate-x-1/2 z-40 hidden rounded-lg border border-white/20 bg-slate-950/95 px-2.5 py-1 text-center font-sans text-[10px] leading-tight text-white shadow-xl shadow-black/80 backdrop-blur-md;
+    max-width: 14rem;
+    white-space: normal;
   }
   .observe-dot-tooltip::before {
     content: '';
@@ -1828,9 +1830,12 @@
   }
 
   .observe-stage {
-    @apply relative flex min-w-0 flex-1 flex-col items-center justify-center px-3 text-center overflow-hidden;
-    padding-top: clamp(0.375rem, 1.5dvh, 1.25rem);
-    padding-bottom: clamp(0.375rem, 1.5dvh, 1.25rem);
+    @apply relative flex min-w-0 flex-1 flex-col items-center justify-center px-3 text-center;
+    padding-top: clamp(0.25rem, 1dvh, 0.75rem);
+    padding-bottom: clamp(0.25rem, 1dvh, 0.75rem);
+    overflow: hidden;
+    height: 100%;
+    min-height: 0;
   }
 
   .observe-stage-tight {
@@ -2155,6 +2160,28 @@
 
   .observe-tooltip-note {
     @apply mt-2 pt-1.5 border-t border-white/5 text-[10px] italic text-slate-400 leading-normal;
+  }
+
+  .observe-heat.layout-column .observe-heat-summary {
+    position: relative;
+  }
+  .observe-heat.layout-column .observe-has-tooltip {
+    position: static;
+  }
+  .observe-heat.layout-column .observe-tooltip-rich {
+    left: 0 !important;
+    right: 0 !important;
+    top: calc(100% + 0.35rem) !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    transform: none !important;
+    box-sizing: border-box !important;
+    border-radius: 0.75rem !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.85), 0 0 15px rgba(99, 102, 241, 0.2) !important;
+  }
+  .observe-heat.layout-column .observe-tooltip-rich::before {
+    display: none !important;
   }
 
   .observe-depth-inline {
@@ -2489,21 +2516,15 @@
 
   /* Bottom dock — inline control panel inside stage */
   .observe-dock {
-    @apply mx-auto flex w-full shrink-0 flex-col items-center;
-    margin-top: clamp(0.375rem, 1.2dvh, 0.875rem);
-    gap: clamp(0.375rem, 1.2dvh, 0.75rem);
-    max-width: min(44rem, 100%);
-  }
-
-  .observe-dock-lg .observe-dock-colors {
-    @apply sm:mx-auto;
-    gap: clamp(0.625rem, 1.5vw, 1.25rem);
+    @apply mx-auto flex w-full max-w-[10rem] shrink-0 flex-col items-center;
+    margin-top: clamp(0.25rem, 0.8dvh, 0.625rem);
+    gap: clamp(0.25rem, 0.8dvh, 0.5rem);
   }
 
   .observe-dock-colors {
-    @apply relative mx-auto flex w-fit flex-row items-center justify-center rounded-full border-4 border-slate-600 bg-gradient-to-b from-slate-950 via-slate-800 to-slate-950 shadow-2xl ring-1 ring-black;
-    padding: clamp(0.375rem, 1dvh, 0.75rem) clamp(0.75rem, 1.8vw, 1.5rem);
-    gap: clamp(0.625rem, 1.5vw, 1.25rem);
+    @apply relative mx-auto flex w-fit flex-col items-center justify-center rounded-[3.2rem] border-4 border-slate-600 bg-gradient-to-b from-slate-950 via-slate-800 to-slate-950 shadow-2xl ring-1 ring-black;
+    padding: clamp(0.35rem, 0.8dvh, 0.6rem) clamp(0.5rem, 1vw, 0.75rem);
+    gap: clamp(0.25rem, 0.7dvh, 0.5rem);
     box-shadow:
       inset 0 0 0 2px rgb(255 255 255 / 0.08),
       inset 10px 0 18px rgb(255 255 255 / 0.025),
@@ -2513,11 +2534,11 @@
 
   .observe-dock-color {
     @apply relative flex shrink-0 cursor-pointer flex-col items-center justify-center rounded-full border-4 border-slate-950 text-white transition-all duration-200 active:scale-95 disabled:opacity-40;
-    height: clamp(3.75rem, 8.5dvh, 5.5rem);
-    width: clamp(3.75rem, 8.5dvh, 5.5rem);
+    height: clamp(3.25rem, 6.8dvh, 4.25rem);
+    width: clamp(3.25rem, 6.8dvh, 4.25rem);
     min-height: 0;
     min-width: 0;
-    padding: clamp(0.25rem, 0.6dvh, 0.5rem);
+    padding: clamp(0.2rem, 0.5dvh, 0.375rem);
     box-shadow:
       inset 0 7px 10px rgb(255 255 255 / 0.28),
       inset 0 -9px 12px rgb(0 0 0 / 0.32),
@@ -2649,31 +2670,30 @@
 
   .observe-dock-label {
     @apply block font-black uppercase tracking-wide opacity-90;
-    font-size: clamp(0.55rem, 1.2dvh, 0.75rem);
+    font-size: clamp(0.5rem, 1dvh, 0.65rem);
     margin-top: clamp(0.125rem, 0.3dvh, 0.25rem);
   }
 
   .observe-dock-num {
     @apply font-display font-black leading-none tracking-tight opacity-95;
-    font-size: clamp(0.75rem, 1.8dvh, 1rem);
+    font-size: clamp(0.7rem, 1.5dvh, 0.95rem);
   }
 
   .observe-dock-probe {
-    @apply relative mx-auto flex w-fit flex-row items-center justify-center rounded-full border border-white/10 bg-slate-950/95 shadow-2xl;
-    padding: clamp(0.375rem, 1dvh, 0.75rem) clamp(0.75rem, 1.8vw, 1.5rem);
-    gap: clamp(0.625rem, 1.5vw, 1.25rem);
-    max-width: none;
+    @apply relative mx-auto flex w-fit flex-col items-center justify-center rounded-[3.2rem] border-4 border-slate-600 bg-slate-950/95 shadow-2xl;
+    padding: clamp(0.35rem, 0.8dvh, 0.6rem) clamp(0.5rem, 1vw, 0.75rem);
+    gap: clamp(0.25rem, 0.7dvh, 0.5rem);
     box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
   }
 
   .observe-dock-probe-btn {
     @apply relative flex shrink-0 cursor-pointer flex-col items-center justify-center rounded-full border-2 border-slate-500 bg-slate-800 font-bold text-slate-100 shadow-lg transition-all duration-150 hover:border-slate-300 hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-45;
-    height: clamp(3.75rem, 8.5dvh, 5.5rem);
-    width: clamp(3.75rem, 8.5dvh, 5.5rem);
+    height: clamp(3.25rem, 6.8dvh, 4.25rem);
+    width: clamp(3.25rem, 6.8dvh, 4.25rem);
     min-height: 0;
     min-width: 0;
-    padding: clamp(0.25rem, 0.5dvh, 0.5rem);
-    font-size: clamp(0.65rem, 1.3dvh, 0.8rem);
+    padding: clamp(0.2rem, 0.5dvh, 0.375rem);
+    font-size: clamp(0.6rem, 1.2dvh, 0.75rem);
     box-shadow:
       inset 0 2px 5px rgb(255 255 255 / 0.08),
       0 8px 18px rgb(0 0 0 / 0.32);

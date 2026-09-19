@@ -1724,15 +1724,15 @@
   }
 
   .observe-heat-counts {
-    @apply inline-flex items-center gap-1;
+    @apply inline-flex items-center gap-1.5 flex-wrap;
   }
 
   .observe-heat-count {
-    @apply inline-flex items-center gap-0.5 font-mono text-[9px] font-bold text-slate-300;
+    @apply inline-flex items-center gap-1 font-mono text-[11px] sm:text-xs font-bold text-slate-200;
   }
 
   .observe-heat-count i {
-    @apply inline-block h-1.5 w-1.5 rounded-full;
+    @apply inline-block h-2 w-2 rounded-full ring-1 ring-white/20;
   }
   .observe-heat-count.is-red i {
     @apply bg-red-500;
@@ -1756,7 +1756,7 @@
     @apply bg-purple-500;
   }
   .observe-heat-count.is-total {
-    @apply ml-1 rounded-full border border-white/10 bg-white/10 px-1.5 text-slate-100;
+    @apply ml-1 rounded-full border border-white/10 bg-white/10 px-1.5 text-indigo-200 font-extrabold;
   }
 
   .observe-heat-grid {
@@ -2763,7 +2763,9 @@
   }
 
   .observe-dock-lg .observe-dock-label {
-    font-size: clamp(0.75rem, 1.7dvh, 1rem);
+    @apply text-white opacity-100 font-extrabold;
+    font-size: clamp(0.85rem, 1.85dvh, 1.15rem);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   }
 
   .observe-dock-lg .observe-dock-probe {

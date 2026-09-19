@@ -3,7 +3,7 @@ import type { CaptureSessionState } from '../modules/assessment/session-capture'
 import { sessionColorSummary } from '../modules/assessment/session-capture'
 import { calculateSpectrumStepBreakdown, COLOR_PERCENT_X_VALUES } from '../modules/metrics/calculate'
 import { probeChunksNumber } from '../modules/assessment/probe-metrics'
-import type { ResultColor } from '../modules/result-lifecycle/types'
+import { SPECTRUM_COLORS, type ResultColor } from '../modules/result-lifecycle/types'
 
 type Props = {
   capture: CaptureSessionState
@@ -124,46 +124,29 @@ export function ObserveHeatmap({
           </span>
         </span>
 
-        <span
-          className="observe-heat-metric muted tabular observe-has-tooltip"
-          tabIndex={0}
-          aria-label={`Total records: ${nTotal}`}
+        <div
+          className="observe-heat-counts observe-color-pills"
+          aria-label="Recorded 7-color counts"
         >
-          records {nTotal}/{Math.max(summary.total + spectrum.probeRecords, 1)}
-          {summary.maxProbeDepth > 0 ? ` · max chunks=${summary.maxProbeDepth}` : ''}
-          <span className="observe-metric-tooltip observe-tooltip-rich tooltip-right" role="tooltip">
-            <span className="observe-tooltip-header">
-              <span>N_total (Total Records)</span>
-              <span className="font-mono text-indigo-300 font-bold">{nTotal}</span>
+          {SPECTRUM_COLORS.map((color) => (
+            <span
+              key={color}
+              className={`observe-heat-count is-${color}`}
+              title={`${color}: ${summary ? summary.recordedByColor[color] : 0} recorded steps${
+                color === 'green' ? ' (Green probe openers)' : color === 'blue' ? ' (Continue probe steps)' : ''
+              }`}
+            >
+              <i aria-hidden />
+              {summary ? summary.recordedByColor[color] : 0}
             </span>
-            <span className="observe-tooltip-divider" />
-            <span className="observe-tooltip-body">
-              <span className="observe-tooltip-row">
-                <span className="observe-tooltip-key">Formula:</span>
-                <span className="observe-tooltip-val font-mono text-[10px]">primary records + probe records</span>
-              </span>
-              <span className="observe-tooltip-row">
-                <span className="observe-tooltip-key">Record count:</span>
-                <span className="observe-tooltip-val">
-                  {spectrum.primaryRecords} primary + {spectrum.probeRecords} probe = {nTotal}
-                </span>
-              </span>
-              <span className="observe-tooltip-row">
-                <span className="observe-tooltip-key">Finalized attempts:</span>
-                <span className="observe-tooltip-val">
-                  {summary.done} / {summary.total} (sample size)
-                </span>
-              </span>
-              <span className="observe-tooltip-row">
-                <span className="observe-tooltip-key">max chunks number:</span>
-                <span className="observe-tooltip-val">n{summary.maxProbeDepth}</span>
-              </span>
-              <span className="observe-tooltip-note">
-                Tests 1-1 standard: N_total sums all primary &amp; probe observations. max chunks number is the peak observed depth on one question (not session ceiling). Green opens at 1; each Continue adds 1.
-              </span>
-            </span>
+          ))}
+          <span
+            className="observe-heat-count is-total"
+            title={summary ? `Total records = primary + probe = ${summary.primaryRecords} + ${summary.probeRecords}` : 'Total records'}
+          >
+            Σ {summary ? summary.totalRecords : 0}
           </span>
-        </span>
+        </div>
       </div>
 
       <div

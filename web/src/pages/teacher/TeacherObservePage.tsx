@@ -155,7 +155,7 @@ function formatFinishSummary(
     `C Blue: ${summary.byColor.blue}`,
     `D Indigo: ${summary.byColor.indigo}`,
     `3 Purple: ${summary.byColor.purple}`,
-    `Total records: ${summary.totalRecords} (${summary.primaryRecords} main + ${summary.probeRecords} probe)`,
+    `Total records: ${summary.totalRecords} (${summary.primaryRecords} primary + ${summary.probeRecords} probe)`,
     `Max chunks number: ${summary.maxProbeDepth}`,
     unresolved > 0
       ? `Left unfinalized when session closed: ${unresolved}`
@@ -1656,7 +1656,7 @@ export function TeacherObservePage() {
                   ))}
                   <span
                     className="observe-heat-count is-total"
-                    title={summary ? `Total records = main + probe = ${summary.primaryRecords} + ${summary.probeRecords}` : 'Total records'}
+                    title={summary ? `Total records = primary + probe = ${summary.primaryRecords} + ${summary.probeRecords}` : 'Total records'}
                   >
                     Σ {summary ? summary.totalRecords : 0}
                   </span>

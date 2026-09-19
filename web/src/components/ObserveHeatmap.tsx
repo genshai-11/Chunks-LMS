@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react'
 import type { CaptureSessionState } from '../modules/assessment/session-capture'
 import { sessionColorSummary } from '../modules/assessment/session-capture'
-import { calculateSpectrumStepBreakdown } from '../modules/metrics/calculate'
+import { calculateSpectrumStepBreakdown, COLOR_PERCENT_X_VALUES } from '../modules/metrics/calculate'
 import { probeChunksNumber } from '../modules/assessment/probe-metrics'
+import type { ResultColor } from '../modules/result-lifecycle/types'
 
 type Props = {
   capture: CaptureSessionState
@@ -132,27 +133,33 @@ export function ObserveHeatmap({
           {summary.maxProbeDepth > 0 ? ` · max chunks=${summary.maxProbeDepth}` : ''}
           <span className="observe-metric-tooltip observe-tooltip-rich tooltip-right" role="tooltip">
             <span className="observe-tooltip-header">
-              <span>Total Records</span>
+              <span>N_total (Total Records)</span>
               <span className="font-mono text-indigo-300 font-bold">{nTotal}</span>
             </span>
             <span className="observe-tooltip-divider" />
             <span className="observe-tooltip-body">
               <span className="observe-tooltip-row">
-                <span className="observe-tooltip-key">Primary attempts:</span>
+                <span className="observe-tooltip-key">Formula:</span>
+                <span className="observe-tooltip-val font-mono text-[10px]">primary records + probe records</span>
+              </span>
+              <span className="observe-tooltip-row">
+                <span className="observe-tooltip-key">Record count:</span>
                 <span className="observe-tooltip-val">
-                  {spectrum.primaryRecords}{' '}
-                  <span className="text-slate-400 font-normal">
-                    (Finalized: {summary.done}/{summary.total})
-                  </span>
+                  {spectrum.primaryRecords} primary + {spectrum.probeRecords} probe = {nTotal}
                 </span>
               </span>
               <span className="observe-tooltip-row">
-                <span className="observe-tooltip-key">Probe records:</span>
-                <span className="observe-tooltip-val">{spectrum.probeRecords}</span>
+                <span className="observe-tooltip-key">Finalized attempts:</span>
+                <span className="observe-tooltip-val">
+                  {summary.done} / {summary.total} (sample size)
+                </span>
               </span>
               <span className="observe-tooltip-row">
-                <span className="observe-tooltip-key">Max chunks depth:</span>
+                <span className="observe-tooltip-key">max chunks number:</span>
                 <span className="observe-tooltip-val">n{summary.maxProbeDepth}</span>
+              </span>
+              <span className="observe-tooltip-note">
+                Tests 1-1 standard: N_total sums all primary &amp; probe observations. max chunks number is the peak observed depth on one question (not session ceiling). Green opens at 1; each Continue adds 1.
               </span>
             </span>
           </span>
@@ -175,11 +182,6 @@ export function ObserveHeatmap({
           const cls = open ? 'is-open' : draft ? 'is-draft' : color ? `is-${color}` : 'is-empty'
           const chunksNumber = snap ? probeChunksNumber(snap) : null
           const colorName = color ? color.charAt(0).toUpperCase() + color.slice(1) : null
-          const statusText = open
-            ? 'Probe open'
-            : draft
-              ? 'Not assessed'
-              : colorName ?? 'Not assessed'
 
           return (
             <button
@@ -201,12 +203,15 @@ export function ObserveHeatmap({
               ) : null}
               <span className="observe-dot-tooltip" role="tooltip">
                 <span className="observe-dot-tooltip-title">
-                  Q{q.sequenceNumber} · {learnerName(q.assignedLearnerUserId)}
+                  {open ? 'Probe in progress' : draft ? 'Not assessed' : `${colorName} (${COLOR_PERCENT_X_VALUES[color as ResultColor] ?? 0}%)`}
                 </span>
-                <span className="observe-dot-tooltip-detail">
-                  {statusText}
-                  {chunksNumber != null ? ` · n${chunksNumber} (${snap?.probeCount ?? 0} step${(snap?.probeCount ?? 0) === 1 ? '' : 's'})` : ''}
-                </span>
+                {chunksNumber != null ? (
+                  <span className="observe-dot-tooltip-detail">
+                    Chunks n{chunksNumber} · {snap?.probeCount ?? 0} step{(snap?.probeCount ?? 0) === 1 ? '' : 's'}
+                  </span>
+                ) : color ? (
+                  <span className="observe-dot-tooltip-detail">Finalized primary step</span>
+                ) : null}
               </span>
             </button>
           )

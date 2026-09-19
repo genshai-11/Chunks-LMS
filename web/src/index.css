@@ -1834,10 +1834,9 @@
   }
 
   .observe-stage {
-    @apply relative flex min-w-0 flex-1 flex-col items-center justify-center px-3 text-center;
+    @apply relative flex min-w-0 flex-1 flex-col items-center justify-center px-3 text-center overflow-y-auto;
     padding-top: clamp(0.25rem, 1dvh, 0.75rem);
     padding-bottom: clamp(0.25rem, 1dvh, 0.75rem);
-    overflow: hidden;
     height: 100%;
     min-height: 0;
   }
@@ -2740,50 +2739,50 @@
   /* Large variant for primary stage dock */
   .observe-dock.observe-dock-lg {
     @apply mx-auto flex w-full shrink-0 flex-col items-center;
-    max-width: clamp(12rem, 20vw, 16rem);
+    max-width: clamp(17rem, 28vw, 22.5rem);
     margin-top: clamp(0.35rem, 1dvh, 0.875rem);
-    gap: clamp(0.35rem, 1dvh, 0.75rem);
+    gap: clamp(0.5rem, 1.25dvh, 1rem);
   }
 
   .observe-dock-lg .observe-dock-colors {
-    padding: clamp(0.5rem, 1.1dvh, 0.85rem) clamp(0.65rem, 1.3vw, 1rem);
-    gap: clamp(0.35rem, 0.9dvh, 0.65rem);
-    border-radius: clamp(3.5rem, 8vw, 4.5rem);
+    padding: clamp(0.7rem, 1.5dvh, 1.2rem) clamp(0.9rem, 1.8vw, 1.4rem);
+    gap: clamp(0.5rem, 1.25dvh, 0.9rem);
+    border-radius: clamp(5rem, 11vw, 6.5rem);
   }
 
   .observe-dock-lg .observe-dock-color {
-    height: clamp(4.25rem, 9.8dvh, 5.75rem);
-    width: clamp(4.25rem, 9.8dvh, 5.75rem);
+    height: clamp(5.95rem, 13.7dvh, 8rem);
+    width: clamp(5.95rem, 13.7dvh, 8rem);
     min-height: 0;
     min-width: 0;
-    padding: clamp(0.25rem, 0.7dvh, 0.5rem);
+    padding: clamp(0.35rem, 1dvh, 0.7rem);
   }
 
   .observe-dock-lg .observe-dock-num {
-    font-size: clamp(0.95rem, 2.2dvh, 1.4rem);
+    font-size: clamp(1.35rem, 3.1dvh, 2rem);
   }
 
   .observe-dock-lg .observe-dock-label {
-    font-size: clamp(0.55rem, 1.2dvh, 0.75rem);
+    font-size: clamp(0.75rem, 1.7dvh, 1rem);
   }
 
   .observe-dock-lg .observe-dock-probe {
-    padding: clamp(0.5rem, 1.1dvh, 0.85rem) clamp(0.65rem, 1.3vw, 1rem);
-    gap: clamp(0.35rem, 0.9dvh, 0.65rem);
-    border-radius: clamp(3.5rem, 8vw, 4.5rem);
+    padding: clamp(0.7rem, 1.5dvh, 1.2rem) clamp(0.9rem, 1.8vw, 1.4rem);
+    gap: clamp(0.5rem, 1.25dvh, 0.9rem);
+    border-radius: clamp(5rem, 11vw, 6.5rem);
   }
 
   .observe-dock-lg .observe-dock-probe-btn {
-    height: clamp(4.25rem, 9.8dvh, 5.75rem);
-    width: clamp(4.25rem, 9.8dvh, 5.75rem);
+    height: clamp(5.95rem, 13.7dvh, 8rem);
+    width: clamp(5.95rem, 13.7dvh, 8rem);
     min-height: 0;
     min-width: 0;
-    padding: clamp(0.25rem, 0.7dvh, 0.5rem);
-    font-size: clamp(0.68rem, 1.4dvh, 0.85rem);
+    padding: clamp(0.35rem, 1dvh, 0.7rem);
+    font-size: clamp(0.95rem, 2dvh, 1.2rem);
   }
 
   .observe-dock-lg .observe-dock-tools {
-    max-width: clamp(12rem, 20vw, 16rem);
+    max-width: clamp(17rem, 28vw, 22.5rem);
   }
 
   /*

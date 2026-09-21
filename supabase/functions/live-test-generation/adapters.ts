@@ -322,6 +322,18 @@ export function createGoogleCloudTtsAdapter(
       const cleanVoice = input.voiceId.replace(/^(google|google-cloud)\//, "");
       const languageCode = input.language === "vi" ? "vi-VN" : "en-US";
 
+      const isSsml =
+        input.text.trim().startsWith("<speak>") || input.text.includes("<break");
+      // Note: Journey voices (en-US-Journey-*) do not support SSML tags like <break>.
+      // If SSML is present and a Journey voice was requested, fallback to a Neural2 voice (e.g. 'en-US-Neural2-F').
+      let targetVoice = cleanVoice;
+      if (isSsml && targetVoice.includes("Journey")) {
+        targetVoice = input.language === "vi" ? "vi-VN-Neural2-A" : "en-US-Neural2-F";
+      }
+      const requestInput = isSsml
+        ? { ssml: input.text.trim().startsWith("<speak>") ? input.text : `<speak>${input.text}</speak>` }
+        : { text: input.text };
+
       const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
       const response = await fetchImpl(url, {
         method: "POST",
@@ -329,10 +341,10 @@ export function createGoogleCloudTtsAdapter(
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          input: { text: input.text },
+          input: requestInput,
           voice: {
             languageCode,
-            name: cleanVoice,
+            name: targetVoice,
           },
           audioConfig: {
             audioEncoding: "MP3",
@@ -367,8 +379,9 @@ export function createGoogleCloudTtsAdapter(
         provider: "google-cloud-tts",
         endpoint: "/v1/text:synthesize",
         model: input.voiceId,
-        voiceName: cleanVoice,
+        voiceName: targetVoice,
         languageCode,
+        isSsml,
         bytes: bytes.byteLength,
       }) as Record<string, unknown>;
 

@@ -6,8 +6,11 @@ import { PageHeader } from '../../components/PageHeader'
 import { EmptyState, Panel } from '../../components/ui'
 import {
   generateNarration,
+  generatePackageFromVocab,
   getNarrationPlaybackUrl,
+  listFirestoreLessons,
   listTtsModels,
+  type FirestoreLesson,
   type NarrationGenerationTarget,
 } from '../../modules/catalog/live-test-generation'
 import {
@@ -61,9 +64,77 @@ import type {
 type PackageScope = {
   packageId: string
   packageTitle: string
+  packageSlug?: string
   version: TestPackageVersion
 }
+type PackageCategoryFilter = 'all' | 'green' | 'red'
 type ResourceTab = 'sessions' | 'items' | 'cci' | 'audio' | 'flow'
+
+function isGreenPackage(scope: PackageScope): boolean {
+  const title = (scope.packageTitle ?? '').toUpperCase()
+  const slug = (scope.packageSlug ?? '').toLowerCase()
+  return title.startsWith('G') || title.includes('GREEN') || slug.includes('green')
+}
+
+function isRedPackage(scope: PackageScope): boolean {
+  const title = (scope.packageTitle ?? '').toUpperCase()
+  const slug = (scope.packageSlug ?? '').toLowerCase()
+  return title.startsWith('R') || title.includes('RED') || slug.includes('red')
+}
+
+function matchesPackageCategory(scope: PackageScope, filter: PackageCategoryFilter): boolean {
+  if (filter === 'green') return isGreenPackage(scope)
+  if (filter === 'red') return isRedPackage(scope)
+  return true
+}
+
+function parseSsmlBreakTime(script: string | null | undefined): string | null {
+  if (!script) return null
+  const match = script.match(/<break[^>]*time=["']?(\d+(?:ms|s))["']?[^>]*\/?>/i)
+  return match ? match[1] : null
+}
+
+function hasSsml(script: string | null | undefined): boolean {
+  if (!script) return false
+  return script.includes('<break') || script.includes('<speak')
+}
+
+function isRedMultiTermItem(item: TestItem, scope: PackageScope | null): boolean {
+  if (item.spokenScriptEn?.includes('<break') || item.spokenScriptVi?.includes('<break')) {
+    return true
+  }
+  const termEn = item.termEn?.trim() ?? ''
+  if (termEn.includes(';') || termEn.includes('+') || (termEn.includes(',') && termEn.split(',').length > 1)) {
+    return true
+  }
+  if (item.tl != null && item.tl >= 2) {
+    return true
+  }
+  if (scope && isRedPackage(scope) && (termEn.length > 0 || (item.tl != null && item.tl >= 2))) {
+    return true
+  }
+  return false
+}
+
+function computePackageCode(params: {
+  testType: 'green' | 'red'
+  dayNumber: number
+  questionCount: number
+  targetVoltage: number
+  topic?: string
+}): string {
+  const prefix = params.testType === 'green' ? 'G' : 'R'
+  const dayStr = String(params.dayNumber).padStart(2, '0')
+  const qStr = `${params.questionCount}Q`
+  const vStr = `${params.targetVoltage}V`
+  const topicClean = params.topic ? params.topic.trim().replace(/^[-_]+|[-_]+$/g, '') : ''
+  const topicSegment = topicClean
+    ? topicClean.toLowerCase().startsWith('topic')
+      ? `-${topicClean.toLowerCase()}`
+      : `-topic${topicClean.toLowerCase()}`
+    : ''
+  return `${prefix}${dayStr}-${qStr}${topicSegment}-${vStr}`
+}
 
 function metricOhm(value: number | null | undefined): string {
   return value == null ? '—' : `${value} Ω`
@@ -102,10 +173,10 @@ export function AdminResourcesPage() {
   const [previewingVoice, setPreviewingVoice] = useState(false)
   const [generatingItemId, setGeneratingItemId] = useState<string | null>(null)
   const [itemReviewRecords, setItemReviewRecords] = useState<Record<string, NarrationReviewRecord>>({})
-  const [itemHashes, setItemHashes] = useState<Record<string, string>>({})
+  const [, setItemHashes] = useState<Record<string, string>>({})
   const [playingVariantId, setPlayingVariantId] = useState<string | null>(null)
   const [flowVariants, setFlowVariants] = useState<Record<string, any>>({})
-  const [flowLoading, setFlowLoading] = useState(false)
+  const [, setFlowLoading] = useState(false)
   const [generatingFlowTarget, setGeneratingFlowTarget] = useState<string | null>(null)
   const [flowScripts, setFlowScripts] = useState({
     package_start: '',
@@ -118,7 +189,19 @@ export function AdminResourcesPage() {
   const [publishing, setPublishing] = useState(false)
   const [audioStatuses, setAudioStatuses] = useState<AudioTargetStatus[]>([])
   const [showItemDetails, setShowItemDetails] = useState(false)
+  const [packageCategory, setPackageCategory] = useState<PackageCategoryFilter>('all')
   const [showPackageBuilder, setShowPackageBuilder] = useState(false)
+  const [packageBuilderMode, setPackageBuilderMode] = useState<'ai' | 'manual'>('ai')
+  const [aiTestType, setAiTestType] = useState<'green' | 'red'>('green')
+  const [lessons, setLessons] = useState<FirestoreLesson[]>([])
+  const [lessonsLoading, setLessonsLoading] = useState(false)
+  const [selectedLessonId, setSelectedLessonId] = useState('')
+  const [aiQuestionCount, setAiQuestionCount] = useState<21 | 42 | 49>(21)
+  const [aiTargetVoltage, setAiTargetVoltage] = useState<number>(12)
+  const [aiTopic, setAiTopic] = useState('')
+  const [aiPackageTitle, setAiPackageTitle] = useState('')
+  const [titleTouched, setTitleTouched] = useState(false)
+  const [generatingPackage, setGeneratingPackage] = useState(false)
   const [packageEditTitle, setPackageEditTitle] = useState('')
   const [newPackageDraft, setNewPackageDraft] = useState({ title: '', version: 'v1', sessions: '8', items: '1' })
   const [showAddSession, setShowAddSession] = useState(false)
@@ -273,7 +356,7 @@ export function AdminResourcesPage() {
         return
       }
       for (const version of versions.data)
-        next.push({ packageId: pkg.id, packageTitle: pkg.title, version })
+        next.push({ packageId: pkg.id, packageTitle: pkg.title, packageSlug: pkg.slug, version })
     }
     next.sort(
       (a, b) =>
@@ -286,6 +369,102 @@ export function AdminResourcesPage() {
     )
     setState('ready')
   }, [])
+
+  const filteredScopes = useMemo(() => {
+    return scopes.filter((scope) => matchesPackageCategory(scope, packageCategory))
+  }, [scopes, packageCategory])
+
+  useEffect(() => {
+    if (filteredScopes.length > 0 && !filteredScopes.some((s) => s.version.id === versionId)) {
+      setVersionId(filteredScopes[0].version.id)
+    }
+  }, [filteredScopes, versionId])
+
+  useEffect(() => {
+    if (showPackageBuilder && lessons.length === 0 && !lessonsLoading) {
+      let active = true
+      setLessonsLoading(true)
+      listFirestoreLessons()
+        .then((data) => {
+          if (!active) return
+          setLessons(data)
+          if (data.length > 0 && !selectedLessonId) {
+            setSelectedLessonId(data[0].id)
+          }
+        })
+        .catch((err) => {
+          if (!active) return
+          setError(err instanceof Error ? err.message : 'Could not load lessons')
+        })
+        .finally(() => {
+          if (active) setLessonsLoading(false)
+        })
+      return () => {
+        active = false
+      }
+    }
+  }, [showPackageBuilder, lessons.length, lessonsLoading, selectedLessonId])
+
+  useEffect(() => {
+    if (!titleTouched) {
+      const selectedLesson = lessons.find((l) => l.id === selectedLessonId)
+      const day = selectedLesson?.dayNumber ?? 1
+      setAiPackageTitle(
+        computePackageCode({
+          testType: aiTestType,
+          dayNumber: day,
+          questionCount: aiQuestionCount,
+          targetVoltage: aiTargetVoltage,
+          topic: aiTopic,
+        }),
+      )
+    }
+  }, [aiTestType, selectedLessonId, aiQuestionCount, aiTargetVoltage, aiTopic, lessons, titleTouched])
+
+  async function handleAiGeneratePackage() {
+    const selectedLesson = lessons.find((l) => l.id === selectedLessonId)
+    if (!selectedLesson) {
+      setError('Please select a lesson from Firestore vocabulary.')
+      return
+    }
+    const finalTitle =
+      aiPackageTitle.trim() ||
+      computePackageCode({
+        testType: aiTestType,
+        dayNumber: selectedLesson.dayNumber,
+        questionCount: aiQuestionCount,
+        targetVoltage: aiTargetVoltage,
+        topic: aiTopic,
+      })
+
+    setGeneratingPackage(true)
+    setError(null)
+    setMessage(null)
+
+    try {
+      const result = await generatePackageFromVocab({
+        testType: aiTestType,
+        lessonId: selectedLesson.id,
+        lessonTitle: selectedLesson.lessonTitle,
+        levelCode: selectedLesson.levelCode,
+        dayNumber: selectedLesson.dayNumber,
+        questionCount: aiQuestionCount,
+        targetVoltage: aiTargetVoltage,
+        title: finalTitle,
+        topic: aiTopic.trim() || undefined,
+      })
+
+      await loadRoot()
+      setVersionId(result.packageVersionId)
+      setMessage(`Successfully created package "${result.title}" with ${result.itemsCount} generated items.`)
+      setShowPackageBuilder(false)
+      setActiveTab('items')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Failed to generate package')
+    } finally {
+      setGeneratingPackage(false)
+    }
+  }
 
   useEffect(() => {
     void loadRoot()
@@ -572,7 +751,7 @@ export function AdminResourcesPage() {
       if (vErr || !data) return
 
       const mapped: Record<string, any> = {}
-      for (const row of data) {
+      for (const row of (data as any[])) {
         let key = row.narration_target
         if (row.narration_target === 'part_intro') {
           const p = row.provider_metadata?.part ?? 1
@@ -619,7 +798,7 @@ export function AdminResourcesPage() {
       }
 
       if (part && receipt.narrationVariantId) {
-        const sb = getSupabase()
+        const sb = getSupabase() as any
         if (sb) {
           await sb
             .from('narration_variants')
@@ -968,15 +1147,80 @@ export function AdminResourcesPage() {
             description="Choose one immutable version; the workspace stays inside that package."
             collapsible={false}
           >
+            {/* Package Category Filter */}
+            <div className="flex flex-wrap items-center gap-2 mb-3 bg-slate-50 border border-slate-200/80 rounded-xl p-1.5">
+              <span className="text-xs font-bold text-slate-500 mr-1 pl-1">Category:</span>
+              <button
+                type="button"
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer min-h-[38px] ${
+                  packageCategory === 'all'
+                    ? 'bg-slate-900 text-white shadow-3xs'
+                    : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                }`}
+                onClick={() => setPackageCategory('all')}
+              >
+                All Packages
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                    packageCategory === 'all' ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  {scopes.length}
+                </span>
+              </button>
+              <button
+                type="button"
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer min-h-[38px] ${
+                  packageCategory === 'green'
+                    ? 'bg-emerald-700 text-white shadow-3xs'
+                    : 'bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50/60'
+                }`}
+                onClick={() => setPackageCategory('green')}
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                Green Tests (Focus)
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                    packageCategory === 'green' ? 'bg-emerald-800 text-emerald-100' : 'bg-emerald-100 text-emerald-800'
+                  }`}
+                >
+                  {scopes.filter(isGreenPackage).length}
+                </span>
+              </button>
+              <button
+                type="button"
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer min-h-[38px] ${
+                  packageCategory === 'red'
+                    ? 'bg-red-700 text-white shadow-3xs'
+                    : 'bg-white text-red-700 border border-red-200 hover:bg-red-50/60'
+                }`}
+                onClick={() => setPackageCategory('red')}
+              >
+                <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+                Red Tests (Awareness)
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                    packageCategory === 'red' ? 'bg-red-800 text-red-100' : 'bg-red-100 text-red-800'
+                  }`}
+                >
+                  {scopes.filter(isRedPackage).length}
+                </span>
+              </button>
+            </div>
+
             <div className="resource-scope-bar">
               <label className="field">
                 Package / Version
                 <select value={versionId} onChange={(e) => setVersionId(e.target.value)}>
-                  {scopes.map((scope) => (
-                    <option key={scope.version.id} value={scope.version.id}>
-                      {scope.packageTitle} · {scope.version.versionLabel}
-                    </option>
-                  ))}
+                  {filteredScopes.length === 0 ? (
+                    <option value="">No packages in this category</option>
+                  ) : (
+                    filteredScopes.map((scope) => (
+                      <option key={scope.version.id} value={scope.version.id}>
+                        {scope.packageTitle} · {scope.version.versionLabel}
+                      </option>
+                    ))
+                  )}
                 </select>
               </label>
               <div className="resource-scope-summary">
@@ -998,34 +1242,353 @@ export function AdminResourcesPage() {
                   Package name
                   <input value={packageEditTitle} onChange={(event) => setPackageEditTitle(event.target.value)} />
                 </label>
-                <button className="ghost" disabled={!selectedScope || !packageEditTitle.trim()} onClick={() => void savePackageName()}>
+                <button className="ghost min-h-[44px]" disabled={!selectedScope || !packageEditTitle.trim()} onClick={() => void savePackageName()}>
                   Save package name
                 </button>
-                <button className="ghost" onClick={() => setShowPackageBuilder((value) => !value)}>
+                <button className="ghost min-h-[44px] flex items-center gap-1.5" onClick={() => setShowPackageBuilder((value) => !value)}>
                   <Plus className="h-4 w-4" /> New draft package
                 </button>
               </div>
               {showPackageBuilder ? (
-                <div className="grid gap-3 sm:grid-cols-4">
-                  <label className="field">
-                    Title
-                    <input value={newPackageDraft.title} onChange={(event) => setNewPackageDraft((current) => ({ ...current, title: event.target.value }))} />
-                  </label>
-                  <label className="field">
-                    Version
-                    <input value={newPackageDraft.version} onChange={(event) => setNewPackageDraft((current) => ({ ...current, version: event.target.value }))} />
-                  </label>
-                  <label className="field">
-                    Sessions
-                    <input type="number" min="1" value={newPackageDraft.sessions} onChange={(event) => setNewPackageDraft((current) => ({ ...current, sessions: event.target.value }))} />
-                  </label>
-                  <label className="field">
-                    Placeholder items/session
-                    <input type="number" min="1" value={newPackageDraft.items} onChange={(event) => setNewPackageDraft((current) => ({ ...current, items: event.target.value }))} />
-                  </label>
-                  <button className="primary" disabled={!newPackageDraft.title.trim()} onClick={() => void createPackageDraft()}>
-                    Create draft package
-                  </button>
+                <div className="mt-4 bg-white border border-slate-200/90 rounded-2xl p-5 shadow-3xs">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+                    <div>
+                      <h3 className="font-display font-bold text-sm text-slate-900 flex items-center gap-2">
+                        <WandSparkles className="w-4 h-4 text-indigo-600" />
+                        Create New Test Package
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Build an AI-generated assessment from lesson chunks or scaffold a blank draft.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="ghost compact-action-btn text-slate-400 hover:text-slate-700"
+                      onClick={() => setShowPackageBuilder(false)}
+                      title="Close builder"
+                      style={{ padding: '0.25rem 0.5rem' }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* Mode Tab Switcher */}
+                  <div className="flex items-center gap-2 mb-4 p-1 bg-slate-100/80 rounded-xl max-w-fit">
+                    <button
+                      type="button"
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer min-h-[38px] flex items-center gap-1.5 ${
+                        packageBuilderMode === 'ai'
+                          ? 'bg-white text-slate-900 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                      onClick={() => setPackageBuilderMode('ai')}
+                    >
+                      <WandSparkles className="w-3.5 h-3.5 text-indigo-600" />
+                      AI Generator (From Lesson Vocab)
+                      <span className="text-[9px] font-bold uppercase tracking-wide bg-indigo-50 text-indigo-700 border border-indigo-200/70 px-1.5 py-0.5 rounded-full">
+                        Recommended
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer min-h-[38px] flex items-center gap-1.5 ${
+                        packageBuilderMode === 'manual'
+                          ? 'bg-white text-slate-900 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                      onClick={() => setPackageBuilderMode('manual')}
+                    >
+                      <Plus className="w-3.5 h-3.5 text-slate-500" />
+                      Manual Blank Draft
+                    </button>
+                  </div>
+
+                  {/* AI Generator Tab */}
+                  {packageBuilderMode === 'ai' ? (
+                    <div className="space-y-4">
+                      {/* Test Type Selector */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                          1. Test Type
+                        </label>
+                        <div className="grid sm:grid-cols-2 gap-3">
+                          <div
+                            className={`border-2 rounded-xl p-3.5 cursor-pointer transition-all ${
+                              aiTestType === 'green'
+                                ? 'border-emerald-600 bg-emerald-50/40 ring-1 ring-emerald-600'
+                                : 'border-slate-200 bg-white hover:border-slate-300'
+                            }`}
+                            onClick={() => {
+                              setAiTestType('green')
+                              if (aiTargetVoltage === 56) setAiTargetVoltage(12)
+                            }}
+                          >
+                            <div className="flex items-center justify-between mb-1.5">
+                              <div className="flex items-center gap-2">
+                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                                <span className="font-display font-bold text-sm text-slate-900">Green Test (Focus)</span>
+                              </div>
+                              <span className="font-mono text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md">
+                                G-Series
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-600 leading-relaxed">
+                              Sentence-based, dynamic CVR difficulty A2→C1, TL=1.0. Fast assessment of focus & sentence fluid production.
+                            </p>
+                          </div>
+
+                          <div
+                            className={`border-2 rounded-xl p-3.5 cursor-pointer transition-all ${
+                              aiTestType === 'red'
+                                ? 'border-red-600 bg-red-50/40 ring-1 ring-red-600'
+                                : 'border-slate-200 bg-white hover:border-slate-300'
+                            }`}
+                            onClick={() => {
+                              setAiTestType('red')
+                              if (aiTargetVoltage === 12) setAiTargetVoltage(56)
+                              if (aiQuestionCount === 21) setAiQuestionCount(42)
+                            }}
+                          >
+                            <div className="flex items-center justify-between mb-1.5">
+                              <div className="flex items-center gap-2">
+                                <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                                <span className="font-display font-bold text-sm text-slate-900">Red Test (Awareness)</span>
+                              </div>
+                              <span className="font-mono text-[10px] font-bold text-red-700 bg-red-100/80 px-2 py-0.5 rounded-md">
+                                R-Series
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-600 leading-relaxed">
+                              Multi-term combine, cognitive traps, TL≥2.0, SSML pause gaps. Measures cognitive resistance and split awareness.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Source Lesson & Question Scale */}
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                            2. Source Lesson (Firestore Vocabulary)
+                          </label>
+                          {lessonsLoading ? (
+                            <div className="flex items-center gap-2 text-xs text-slate-500 py-2.5 px-3 border border-slate-200 rounded-lg min-h-[44px]">
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+                              <span>Loading lessons from Firestore...</span>
+                            </div>
+                          ) : (
+                            <select
+                              className="w-full text-xs font-semibold bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-indigo-500 cursor-pointer min-h-[44px]"
+                              value={selectedLessonId}
+                              onChange={(e) => setSelectedLessonId(e.target.value)}
+                            >
+                              {lessons.map((lesson) => (
+                                <option key={lesson.id} value={lesson.id}>
+                                  Level {lesson.levelCode} - Day {lesson.dayNumber} ({lesson.totalChunks} chunks) · {lesson.lessonTitle}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                          <span className="text-[11px] text-slate-400 mt-1 block">
+                            Extracts vocabulary chunks to generate assessment items and distractors.
+                          </span>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                            3. Question Count & Scale
+                          </label>
+                          <select
+                            className="w-full text-xs font-semibold bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-indigo-500 cursor-pointer min-h-[44px]"
+                            value={aiQuestionCount}
+                            onChange={(e) => setAiQuestionCount(Number(e.target.value) as 21 | 42 | 49)}
+                          >
+                            <option value={21}>21Q (1-1 Fast Test)</option>
+                            <option value={42}>42Q (2 Parts of 21)</option>
+                            <option value={49}>49Q (7 Sessions Standard)</option>
+                          </select>
+                          <span className="text-[11px] text-slate-400 mt-1 block">
+                            Controls partition depth and assessment duration.
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Target Voltage & Topic Modifier */}
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                            <span>4. Target Voltage / CPD</span>
+                            <span className="font-mono text-[11px] text-slate-400 font-normal">
+                              Default: {aiTestType === 'green' ? '12V' : '56V'}
+                            </span>
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              min="1"
+                              max="300"
+                              className="w-full text-xs font-mono font-bold bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-indigo-500 min-h-[44px]"
+                              value={aiTargetVoltage}
+                              onChange={(e) => setAiTargetVoltage(Math.max(1, Number(e.target.value) || 1))}
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs font-bold text-slate-400">
+                              Volts
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-slate-500 mt-1 block">
+                            CPD = CVR × CCI (Volts) - định lượng độ khó nhận thức.
+                          </span>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                            5. Topic Modifier (Optional)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. topic12, travel, food"
+                            className="w-full text-xs bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-indigo-500 min-h-[44px]"
+                            value={aiTopic}
+                            onChange={(e) => setAiTopic(e.target.value)}
+                          />
+                          <span className="text-[11px] text-slate-400 mt-1 block">
+                            Optional modifier included in package code (e.g. R01-42Q-topic12-56V).
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Package Code / Title */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-xs font-bold text-slate-700">
+                            6. Package Title / Code (Naming Convention)
+                          </label>
+                          {titleTouched ? (
+                            <button
+                              type="button"
+                              className="text-[11px] text-indigo-600 hover:text-indigo-800 underline font-semibold cursor-pointer"
+                              onClick={() => {
+                                setTitleTouched(false)
+                                const selectedLesson = lessons.find((l) => l.id === selectedLessonId)
+                                setAiPackageTitle(
+                                  computePackageCode({
+                                    testType: aiTestType,
+                                    dayNumber: selectedLesson?.dayNumber ?? 1,
+                                    questionCount: aiQuestionCount,
+                                    targetVoltage: aiTargetVoltage,
+                                    topic: aiTopic,
+                                  }),
+                                )
+                              }}
+                            >
+                              Reset to suggested format
+                            </button>
+                          ) : (
+                            <span className="text-[10px] font-mono font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                              Auto-suggested
+                            </span>
+                          )}
+                        </div>
+                        <input
+                          type="text"
+                          className="w-full text-sm font-mono font-bold bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 outline-none focus:border-indigo-500 min-h-[44px]"
+                          value={aiPackageTitle}
+                          onChange={(e) => {
+                            setTitleTouched(true)
+                            setAiPackageTitle(e.target.value)
+                          }}
+                        />
+                        <span className="text-[11px] text-slate-500 mt-1 block">
+                          Naming convention format: <code className="font-mono text-slate-700 bg-slate-100 px-1 py-0.5 rounded">R01-42Q-56V</code>, <code className="font-mono text-slate-700 bg-slate-100 px-1 py-0.5 rounded">G01-21Q-12V</code>, or <code className="font-mono text-slate-700 bg-slate-100 px-1 py-0.5 rounded">R01-42Q-topic12-56V</code>.
+                        </span>
+                      </div>
+
+                      {/* Action Row */}
+                      <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-100">
+                        <button
+                          type="button"
+                          className="ghost min-h-[44px]"
+                          onClick={() => setShowPackageBuilder(false)}
+                          disabled={generatingPackage}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          className="primary flex items-center gap-2 min-h-[44px] px-5 font-display"
+                          disabled={generatingPackage || !selectedLessonId}
+                          onClick={() => void handleAiGeneratePackage()}
+                        >
+                          {generatingPackage ? (
+                            <>
+                              <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                              <span>Generating & Building Package...</span>
+                            </>
+                          ) : (
+                            <>
+                              <WandSparkles className="w-4 h-4" />
+                              <span>Generate & Create Package</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Manual Blank Draft Tab */
+                    <div className="space-y-4">
+                      <div className="grid gap-3 sm:grid-cols-4">
+                        <label className="field">
+                          Title
+                          <input
+                            value={newPackageDraft.title}
+                            onChange={(event) => setNewPackageDraft((current) => ({ ...current, title: event.target.value }))}
+                            placeholder="e.g. CUSTOM-TEST-01"
+                          />
+                        </label>
+                        <label className="field">
+                          Version
+                          <input
+                            value={newPackageDraft.version}
+                            onChange={(event) => setNewPackageDraft((current) => ({ ...current, version: event.target.value }))}
+                          />
+                        </label>
+                        <label className="field">
+                          Sessions
+                          <input
+                            type="number"
+                            min="1"
+                            value={newPackageDraft.sessions}
+                            onChange={(event) => setNewPackageDraft((current) => ({ ...current, sessions: event.target.value }))}
+                          />
+                        </label>
+                        <label className="field">
+                          Placeholder items/session
+                          <input
+                            type="number"
+                            min="1"
+                            value={newPackageDraft.items}
+                            onChange={(event) => setNewPackageDraft((current) => ({ ...current, items: event.target.value }))}
+                          />
+                        </label>
+                      </div>
+                      <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
+                        <button
+                          type="button"
+                          className="ghost min-h-[44px]"
+                          onClick={() => setShowPackageBuilder(false)}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          className="primary min-h-[44px] px-5"
+                          disabled={!newPackageDraft.title.trim()}
+                          onClick={() => void createPackageDraft()}
+                        >
+                          Create draft package
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : null}
             </div>
@@ -1511,6 +2074,21 @@ export function AdminResourcesPage() {
                               </div>
                             ) : (
                               <>
+                                {isRedMultiTermItem(item, selectedScope) ? (
+                                  <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                                    <span className="badge badge-warning text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                                      Multi-Term + SSML Gap
+                                    </span>
+                                    {parseSsmlBreakTime(item.spokenScriptEn || item.spokenScriptVi) ? (
+                                      <span
+                                        className="inline-flex items-center gap-1 font-mono text-[10px] text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded"
+                                        title={`Semantic gap pause duration: ${parseSsmlBreakTime(item.spokenScriptEn || item.spokenScriptVi)}`}
+                                      >
+                                        Pause: {parseSsmlBreakTime(item.spokenScriptEn || item.spokenScriptVi)}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                ) : null}
                                 {resourceLanguage === 'all' ? (
                                   <div className="resource-bilingual-prompt">
                                     <div><span>VI</span>{item.promptVi ?? '—'}</div>
@@ -1519,6 +2097,24 @@ export function AdminResourcesPage() {
                                 ) : (
                                   <div>{prompt ?? '—'}</div>
                                 )}
+                                {(hasSsml(item.spokenScriptVi) || hasSsml(item.spokenScriptEn)) ? (
+                                  <div
+                                    className="mt-1 text-[11px] font-mono text-amber-800 bg-amber-50/70 border border-amber-200/60 rounded px-2 py-1 flex items-center gap-2 cursor-help"
+                                    title={item.spokenScriptEn || item.spokenScriptVi || ''}
+                                  >
+                                    <span className="font-bold uppercase text-[9px] bg-amber-200/70 text-amber-900 px-1 rounded">
+                                      SSML Spoken
+                                    </span>
+                                    <span className="truncate max-w-[340px]">
+                                      {item.spokenScriptEn || item.spokenScriptVi}
+                                    </span>
+                                    {parseSsmlBreakTime(item.spokenScriptEn || item.spokenScriptVi) ? (
+                                      <span className="ml-auto font-bold text-[10px] text-amber-900 shrink-0">
+                                        Pause: {parseSsmlBreakTime(item.spokenScriptEn || item.spokenScriptVi)}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                ) : null}
                                 {showItemDetails ? (
                                   <div className="resource-row-details">
                                     {resourceLanguage !== 'all' ? <div>{translation ?? '—'}</div> : null}
@@ -1529,6 +2125,13 @@ export function AdminResourcesPage() {
                                     <span>
                                       Terms: VI {item.termVi ?? '—'} · EN {item.termEn ?? '—'}
                                     </span>
+                                    {(item.spokenScriptVi || item.spokenScriptEn) ? (
+                                      <div className="text-[11px] text-slate-500 font-mono mt-1 bg-slate-50 p-1.5 rounded border border-slate-200/60">
+                                        <div className="text-[10px] font-bold text-slate-400 uppercase">Spoken Script Audio:</div>
+                                        {item.spokenScriptVi ? <div>VI: {item.spokenScriptVi}</div> : null}
+                                        {item.spokenScriptEn ? <div>EN: {item.spokenScriptEn}</div> : null}
+                                      </div>
+                                    ) : null}
                                   </div>
                                 ) : null}
                               </>

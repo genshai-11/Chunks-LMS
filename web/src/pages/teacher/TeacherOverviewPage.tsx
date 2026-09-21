@@ -407,7 +407,7 @@ export function TeacherOverviewPage() {
                 <option value="">Do not enroll in a class yet</option>
                 {options.map((opt) => (
                   <option key={opt.classRow.id} value={opt.classRow.id}>
-                    {opt.classRow.name} ({opt.course.code} - {opt.course.name})
+                    {opt.classRow.name} ({opt.course ? `${opt.course.code} - ${opt.course.name}` : 'No course'})
                   </option>
                 ))}
               </select>

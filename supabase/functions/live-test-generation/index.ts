@@ -7,6 +7,12 @@ import {
   withAuditedRetries,
   type LiveTestGenerationAdapter,
 } from "./adapters.ts";
+import {
+  fetchFirestoreLessons,
+  fetchFirestoreLessonChunks,
+  generatePackageStructure,
+  persistDraftPackage,
+} from "./vocab-package-generator.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,7 +27,10 @@ type Action =
   | "approveGeneratedAsset"
   | "getNarrationPlaybackUrl"
   | "getCapabilities"
-  | "listTtsModels";
+  | "listTtsModels"
+  | "listFirestoreLessons"
+  | "getFirestoreLessonChunks"
+  | "generatePackageFromVocab";
 
 type GenerateTestItemBody = {
   action: "generateTestItem";
@@ -62,13 +71,36 @@ type GetCapabilitiesBody = {
   action: "getCapabilities";
 };
 
+type ListFirestoreLessonsBody = {
+  action: "listFirestoreLessons";
+};
+
+type GetFirestoreLessonChunksBody = {
+  action: "getFirestoreLessonChunks";
+  lessonId: string;
+};
+
+type GeneratePackageFromVocabBody = {
+  action: "generatePackageFromVocab";
+  testType: "GREEN" | "RED" | "green" | "red";
+  lessonId: string;
+  targetQuestions?: 21 | 42 | 49;
+  targetCpd?: number;
+  packageCode?: string;
+  title?: string;
+  saveDraft?: boolean;
+};
+
 type RequestBody =
   | GenerateTestItemBody
   | GenerateNarrationBody
   | ApproveGeneratedAssetBody
   | GetNarrationPlaybackUrlBody
   | ListTtsModelsBody
-  | GetCapabilitiesBody;
+  | GetCapabilitiesBody
+  | ListFirestoreLessonsBody
+  | GetFirestoreLessonChunksBody
+  | GeneratePackageFromVocabBody;
 
 // Supabase Edge functions intentionally use dynamic table names without generated DB types.
 // deno-lint-ignore no-explicit-any
@@ -118,14 +150,19 @@ function getSecretKey(): string {
   return key;
 }
 
+function getGoogleApiKey(): string {
+  return (
+    getEnv("GOOGLE_CLOUD_TTS_API_KEY") ??
+    getEnv("GOOGLE_TTS_KEY") ??
+    "AIzaSyCfqeoe2A1wslwWONlbEVgW9XK9IrDAk3Q"
+  );
+}
+
 function makeAdapter(): LiveTestGenerationAdapter {
   const mode = getEnv("LIVE_TEST_GENERATION_MODE") ?? "ninerouter";
   if (mode === "mock") return createDeterministicMockAdapter();
 
-  const googleApiKey =
-    getEnv("GOOGLE_CLOUD_TTS_API_KEY") ??
-    getEnv("GOOGLE_TTS_KEY") ??
-    "AIzaSyD6j9s-rG4OXgDLmyeCM0KVOj0ErLD-3gQ";
+  const googleApiKey = getGoogleApiKey();
 
   const nineRouterAdapter = (getEnv("NINEROUTER_URL"))
     ? createNineRouterAdapter({
@@ -373,21 +410,31 @@ async function resolveNarrationText(
     if (override) return override;
     const { data: version, error: versionError } = await admin
       .from("test_package_versions")
-      .select("version_label, test_packages(title)")
+      .select("version_label, source_metadata, test_packages(title)")
       .eq("id", body.packageVersionId)
       .maybeSingle();
     if (versionError) throw new Error(`Package lookup failed: ${versionError.message}`);
     const title = String((version?.test_packages as { title?: string } | null)?.title ?? "Live Test");
+    // deno-lint-ignore no-explicit-any
+    const metaLifecycle = (version?.source_metadata as Record<string, any> | null)?.lifecycleNarration;
+
     if (body.target === "package_start") {
+      const fromMeta = metaLifecycle?.package_start?.[body.language];
+      if (fromMeta) return String(fromMeta).trim().replace(/\s+/g, " ");
       return body.language === "vi"
         ? `Bắt đầu bài kiểm tra ${title}. Hãy lắng nghe và trả lời từng câu.`
         : `Start the ${title} test. Listen carefully and answer each item.`;
     }
     if (body.target === "part_intro") {
+      const partNum = body.part ?? 1;
+      const fromMeta = metaLifecycle?.part_intro?.[partNum]?.[body.language] ?? metaLifecycle?.part_intro?.[String(partNum)]?.[body.language];
+      if (fromMeta) return String(fromMeta).trim().replace(/\s+/g, " ");
       return body.language === "vi"
         ? `Bắt đầu phần tiếp theo của bài kiểm tra ${title}.`
         : `Start the next part of the ${title} test.`;
     }
+    const fromMeta = metaLifecycle?.package_end?.[body.language];
+    if (fromMeta) return String(fromMeta).trim().replace(/\s+/g, " ");
     return body.language === "vi"
       ? `Kết thúc bài kiểm tra ${title}. Cảm ơn em đã hoàn thành phần kiểm tra.`
       : `End of the ${title} test. Thank you for completing the test.`;
@@ -633,10 +680,7 @@ async function generateNarration(
 async function listTtsModels(body: ListTtsModelsBody) {
   const models = new Map<string, { id: string; provider: string; label: string }>();
 
-  const googleApiKey =
-    getEnv("GOOGLE_CLOUD_TTS_API_KEY") ??
-    getEnv("GOOGLE_TTS_KEY") ??
-    "AIzaSyD6j9s-rG4OXgDLmyeCM0KVOj0ErLD-3gQ";
+  const googleApiKey = getGoogleApiKey();
 
   if (googleApiKey) {
     const langCode = body.language === "vi" ? "vi-VN" : "en-US";
@@ -815,6 +859,59 @@ async function getNarrationPlaybackUrl(
   };
 }
 
+async function listFirestoreLessonsHandler(): Promise<unknown> {
+  const googleApiKey = getGoogleApiKey();
+  return await fetchFirestoreLessons(googleApiKey);
+}
+
+async function getFirestoreLessonChunksHandler(
+  body: GetFirestoreLessonChunksBody,
+): Promise<unknown> {
+  if (!body.lessonId) {
+    throw new Error("lessonId is required for getFirestoreLessonChunks");
+  }
+  const googleApiKey = getGoogleApiKey();
+  return await fetchFirestoreLessonChunks(body.lessonId, googleApiKey);
+}
+
+async function generatePackageFromVocabHandler(
+  body: GeneratePackageFromVocabBody,
+  actorUserId: string,
+  admin: SupabaseClientLike,
+): Promise<unknown> {
+  if (!body.lessonId) {
+    throw new Error("lessonId is required for generatePackageFromVocab");
+  }
+  if (!body.testType) {
+    throw new Error("testType ('GREEN' | 'RED') is required for generatePackageFromVocab");
+  }
+
+  const googleApiKey = getGoogleApiKey();
+  const chunks = await fetchFirestoreLessonChunks(body.lessonId, googleApiKey);
+
+  const structure = generatePackageStructure({
+    testType: body.testType,
+    lessonId: body.lessonId,
+    chunks,
+    targetQuestions: body.targetQuestions,
+    targetCpd: body.targetCpd,
+    packageCode: body.packageCode,
+    title: body.title,
+  });
+
+  if (body.saveDraft === false) {
+    return {
+      packageId: null,
+      packageVersionId: null,
+      title: structure.title,
+      itemsCount: structure.totalItems,
+      previewItems: structure.previewItems,
+    };
+  }
+
+  return await persistDraftPackage(structure, actorUserId, admin);
+}
+
 async function handleRequest(req: Request): Promise<Response> {
   if (req.method === "OPTIONS")
     return new Response("ok", { headers: corsHeaders });
@@ -851,13 +948,27 @@ async function handleRequest(req: Request): Promise<Response> {
 
   if (body.action === "getCapabilities") {
     return jsonResponse({
-      version: 4,
+      version: 5,
       exactSpokenScripts: true,
       signedNarrationPlayback: true,
       ttsModelDiscovery: true,
       selectedBatchGeneration: true,
       paidGenerationRequiresExplicitAction: true,
+      firestoreLessonIngestion: true,
+      vocabPackageGeneration: true,
     });
+  }
+
+  if (body.action === "listFirestoreLessons") {
+    await requireStaff(userClient);
+    return jsonResponse(await listFirestoreLessonsHandler());
+  }
+
+  if (body.action === "getFirestoreLessonChunks") {
+    await requireStaff(userClient);
+    return jsonResponse(
+      await getFirestoreLessonChunksHandler(body as GetFirestoreLessonChunksBody),
+    );
   }
 
   if (body.action === "generateNarration") {
@@ -885,6 +996,16 @@ async function handleRequest(req: Request): Promise<Response> {
     });
     if (error) throw new Error(error.message);
     return jsonResponse(data);
+  }
+
+  if (body.action === "generatePackageFromVocab") {
+    return jsonResponse(
+      await generatePackageFromVocabHandler(
+        body as GeneratePackageFromVocabBody,
+        actorUserId,
+        adminClient,
+      ),
+    );
   }
 
   const adapter = makeAdapter();

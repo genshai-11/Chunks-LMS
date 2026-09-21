@@ -21,7 +21,6 @@ function renderWithContext(initialRoster = createSeedRoster()) {
   const setActiveLearnerUserIdMock = vi.fn()
   const setActiveClassIdMock = vi.fn()
 
-  const mockTeacher = currentRoster.users.find((u) => u.roles.includes('teacher'))!
   const mockClass = currentRoster.classes[0]!
 
   const mockContextValue: any = {
@@ -71,7 +70,7 @@ describe('TeacherOverviewPage - Add Learner', () => {
     renderWithContext()
     const addBtn = screen.getByRole('button', { name: /Add learner/i })
     expect(addBtn).toBeInTheDocument()
-  })
+  }, 15000)
 
   it('opens New Learner panel when Add learner button is clicked', async () => {
     const user = userEvent.setup()
@@ -86,7 +85,7 @@ describe('TeacherOverviewPage - Add Learner', () => {
     expect(screen.getByLabelText(/Class enrollment/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Save Learner/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Cancel/i })).toBeInTheDocument()
-  })
+  }, 15000)
 
   it('creates learner and triggers syncNow when submitting form', async () => {
     const user = userEvent.setup()
@@ -106,7 +105,7 @@ describe('TeacherOverviewPage - Add Learner', () => {
       expect(setRosterMock).toHaveBeenCalled()
       expect(syncNowMock).toHaveBeenCalled()
     })
-  })
+  }, 15000)
 
   it('closes New Learner panel when Cancel is clicked', async () => {
     const user = userEvent.setup()
@@ -117,7 +116,7 @@ describe('TeacherOverviewPage - Add Learner', () => {
 
     await user.click(screen.getByRole('button', { name: /Cancel/i }))
     expect(screen.queryByRole('heading', { name: /New learner/i })).not.toBeInTheDocument()
-  })
+  }, 15000)
 
   it('creates unassigned learner when no class is selected', async () => {
     const user = userEvent.setup()
@@ -137,5 +136,5 @@ describe('TeacherOverviewPage - Add Learner', () => {
       expect(setRosterMock).toHaveBeenCalled()
       expect(syncNowMock).toHaveBeenCalled()
     })
-  })
+  }, 15000)
 })

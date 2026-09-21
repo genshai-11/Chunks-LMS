@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jev Mental Model & Parallel Sampler Architecture</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --paper: #161b22;
+      --paper-card: #21262d;
+      --ink: #f0f6fc;
+      --muted: #8b949e;
+      --subtle: #484f58;
+      --rule: #30363d;
+      --accent: #f97316; /* Tangerine/Coral */
+      --accent-tint: rgba(249, 115, 22, 0.12);
+      --green: #10b981;
+      --green-tint: rgba(16, 185, 129, 0.12);
+      --blue: #38bdf8;
+      --blue-tint: rgba(56, 189, 248, 0.12);
+      --red: #ef4444;
+      --red-tint: rgba(239, 68, 68, 0.12);
+      --code-bg: #090d13;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--ink);
+      font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.65;
+      padding: 3rem 1.25rem;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1140px;
+      display: flex;
+      flex-direction: column;
+      gap: 2.25rem;
+    }
+
+    /* Editorial Header */
+    .header-box {
+      background: var(--paper);
+      border: 1px solid var(--rule);
+      border-radius: 12px;
+      padding: 3rem 2.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .header-box::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: linear-gradient(90deg, var(--accent), var(--blue));
+    }
+    .eyebrow {
+      font-family: 'Geist Mono', monospace;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    h1 {
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-size: 3rem;
+      font-weight: 400;
+      color: #ffffff;
+      line-height: 1.15;
+      margin-bottom: 1.25rem;
+    }
+    .lead {
+      font-size: 1.15rem;
+      color: var(--muted);
+      max-width: 940px;
+      line-height: 1.7;
+    }
+
+    /* Diagram Card */
+    .diagram-card {
+      background: var(--paper);
+      border: 1px solid var(--rule);
+      border-radius: 12px;
+      padding: 1.75rem;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+    .diagram-header {
+      font-family: 'Geist Mono', monospace;
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-bottom: 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--rule);
+      padding-bottom: 0.75rem;
+    }
+    svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    /* Grids & Cards */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.75rem;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1.5rem;
+    }
+    @media (max-width: 860px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--paper);
+      border: 1px solid var(--rule);
+      border-radius: 10px;
+      padding: 2rem;
+    }
+    .card h2, .card h3 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #ffffff;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .card p, .card li {
+      font-size: 0.98rem;
+      color: var(--muted);
+    }
+    .card ul {
+      padding-left: 1.25rem;
+      margin-top: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    /* Callout & Highlights */
+    .callout {
+      border-left: 3px solid var(--accent);
+      background: var(--accent-tint);
+      padding: 1.25rem 1.5rem;
+      border-radius: 0 8px 8px 0;
+      margin: 1.25rem 0;
+    }
+    .callout-title {
+      font-family: 'Geist Mono', monospace;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 0.4rem;
+    }
+    .callout p {
+      color: var(--ink);
+      font-size: 0.95rem;
+    }
+
+    /* Code Blocks */
+    .code-container {
+      background: var(--code-bg);
+      border: 1px solid var(--rule);
+      border-radius: 8px;
+      margin-top: 1rem;
+      overflow: hidden;
+    }
+    .code-header {
+      background: #11161d;
+      padding: 0.5rem 1rem;
+      font-family: 'Geist Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--muted);
+      border-bottom: 1px solid var(--rule);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    pre {
+      padding: 1.25rem;
+      font-family: 'Geist Mono', monospace;
+      font-size: 0.86rem;
+      color: #e6edf3;
+      overflow-x: auto;
+      line-height: 1.6;
+    }
+    .kw { color: #ff7b72; font-weight: 600; }
+    .fn { color: #d2a8ff; }
+    .str { color: #a5d6ff; }
+    .cm { color: #8b949e; font-style: italic; }
+    .num { color: #79c0ff; }
+
+    /* Comparison Table */
+    .table-box {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1.25rem;
+      font-size: 0.92rem;
+    }
+    .table-box th, .table-box td {
+      padding: 1rem 1.25rem;
+      text-align: left;
+      border-bottom: 1px solid var(--rule);
+    }
+    .table-box th {
+      background: #1c2128;
+      font-family: 'Geist Mono', monospace;
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .table-box tr:hover {
+      background: #1c2128;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.55rem;
+      border-radius: 4px;
+      font-family: 'Geist Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-accent { background: var(--accent-tint); color: var(--accent); }
+    .badge-green { background: var(--green-tint); color: var(--green); }
+    .badge-blue { background: var(--blue-tint); color: var(--blue); }
+    .badge-red { background: var(--red-tint); color: var(--red); }
+
+    footer {
+      text-align: center;
+      font-family: 'Geist Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--subtle);
+      padding: 2rem 0;
+      border-top: 1px solid var(--rule);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <header class="header-box">
+      <div class="eyebrow">
+        <span>ARCHITECTURAL GUIDE</span> &bull; <span>SYSTEM 1 DEPLOYMENT</span>
+      </div>
+      <h1>Áp Dụng Mental Model Của Jev Trên Các Model Khác &amp; Giải Phẫu Parallel Sampler</h1>
+      <p class="lead">
+        Làm thế nào để ứng dụng tư duy phân loại System 1 (Choice, Score, Noul) ngay hôm nay bằng GPT-4o, Llama-3.2 hoặc ModernBERT; và phân tích chuyên sâu về mặt phần cứng GPU giải thích tại sao Parallel Sampler đạt độ trễ 70ms không tốn chi phí output token.
+      </p>
+    </header>
+
+    <!-- SECTION 1: PARALLEL SAMPLER HARDWARE ARCHITECTURE -->
+    <section class="diagram-card">
+      <div class="diagram-header">
+        <span>HARDWARE MECHANICS &bull; AUTOREGRESSIVE VS PARALLEL SAMPLER &bull; SVG SCHEMATIC</span>
+        <span>GEIST MONO &bull; 1000 &times; 520</span>
+      </div>
+
+      <svg viewBox="0 0 1000 520" width="1000" height="520" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#8b949e"/>
+          </marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#f97316"/>
+          </marker>
+          <marker id="arrow-green" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#10b981"/>
+          </marker>
+        </defs>
+
+        <!-- Background Ground -->
+        <rect width="100%" height="100%" fill="#161b22"/>
+
+        <!-- LEFT SIDE: TRADITIONAL AUTOREGRESSIVE -->
+        <g transform="translate(40, 40)">
+          <!-- Container Box -->
+          <rect width="430" height="440" rx="8" fill="#0d1117" stroke="#30363d" stroke-width="1.2"/>
+          <text x="20" y="36" fill="#ef4444" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" letter-spacing="0.08em">1. LLM TRUYỀN THỐNG (AUTOREGRESSIVE)</text>
+          <text x="20" y="58" fill="#8b949e" font-family="'Geist', sans-serif" font-size="12">Next-Token Prediction &bull; Vòng Lặp N Lần</text>
+
+          <!-- Input Block -->
+          <rect x="20" y="80" width="390" height="44" rx="6" fill="#161b22" stroke="#30363d"/>
+          <text x="35" y="108" fill="#f0f6fc" font-family="'Geist', sans-serif" font-size="12">Input Prompt: "Ticket #1234: Phân loại lỗi..."</text>
+
+          <!-- Loop Step 1 -->
+          <path d="M 215 124 L 215 146" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arrow)"/>
+          <rect x="20" y="150" width="390" height="54" rx="6" fill="#21262d" stroke="#ef4444" stroke-width="1.2"/>
+          <text x="35" y="174" fill="#f0f6fc" font-family="'Geist', sans-serif" font-size="12" font-weight="600">Lượt 1: Nạp Toàn Bộ VRAM &rarr; Sinh Token 1</text>
+          <text x="35" y="192" fill="#ef4444" font-family="'Geist Mono', monospace" font-size="10">Memory Bandwidth Bound (GPU ngồi chờ load weights)</text>
+
+          <!-- KV Cache Box -->
+          <path d="M 215 204 L 215 226" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arrow)"/>
+          <rect x="20" y="230" width="390" height="50" rx="6" fill="#161b22" stroke="#f97316" stroke-dasharray="4,4"/>
+          <text x="35" y="252" fill="#f97316" font-family="'Geist Mono', monospace" font-size="11" font-weight="600">Phình To Bộ Nhớ KV-Cache</text>
+          <text x="35" y="270" fill="#8b949e" font-family="'Geist', sans-serif" font-size="10">Lưu lại vector K, V của token vừa sinh để chuẩn bị lượt 2</text>
+
+          <!-- Loop Step 2..N -->
+          <path d="M 215 280 L 215 302" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arrow)"/>
+          <rect x="20" y="306" width="390" height="54" rx="6" fill="#21262d" stroke="#ef4444" stroke-width="1.2"/>
+          <text x="35" y="330" fill="#f0f6fc" font-family="'Geist', sans-serif" font-size="12" font-weight="600">Lượt 2 &rarr; Lượt N: Sinh Từng Từ Tiếp Theo</text>
+          <text x="35" y="348" fill="#8b949e" font-family="'Geist Mono', monospace" font-size="10">Lặp lại 50 - 500 lần để ra câu trả lời text hoàn chỉnh</text>
+
+          <!-- Outcome Box -->
+          <rect x="20" y="380" width="390" height="42" rx="6" fill="#2a1215" stroke="#ef4444"/>
+          <text x="35" y="406" fill="#ff7b72" font-family="'Geist Mono', monospace" font-size="11" font-weight="600">
+            &bull; Độ trễ: 1,500ms - 5,000ms &bull; Chi phí Token Cao
+          </text>
+        </g>
+
+        <!-- RIGHT SIDE: PARALLEL SAMPLER (JEV) -->
+        <g transform="translate(530, 40)">
+          <!-- Container Box -->
+          <rect width="430" height="440" rx="8" fill="#0d1117" stroke="#30363d" stroke-width="1.2"/>
+          <text x="20" y="36" fill="#10b981" font-family="'Geist Mono', monospace" font-size="11" font-weight="600" letter-spacing="0.08em">2. JEV PARALLEL SAMPLER (SYSTEM 1)</text>
+          <text x="20" y="58" fill="#8b949e" font-family="'Geist', sans-serif" font-size="12">Single-Pass Inference &bull; Non-Autoregressive</text>
+
+          <!-- Input Block -->
+          <rect x="20" y="80" width="390" height="44" rx="6" fill="#161b22" stroke="#30363d"/>
+          <text x="35" y="108" fill="#f0f6fc" font-family="'Geist', sans-serif" font-size="12">Input State + Schema (Choice, Score, Noul)</text>
+
+          <!-- The Single Forward Pass GEMM -->
+          <path d="M 215 124 L 215 146" stroke="#10b981" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+          <rect x="20" y="150" width="390" height="74" rx="6" fill="rgba(16, 185, 129, 0.08)" stroke="#10b981" stroke-width="1.6"/>
+          <text x="35" y="176" fill="#ffffff" font-family="'Geist', sans-serif" font-size="13" font-weight="600">ĐÚNG 1 LƯỢT FORWARD PASS DUY NHẤT</text>
+          <text x="35" y="196" fill="#10b981" font-family="'Geist Mono', monospace" font-size="10">Compute-Bound: Khai thác 100% Tensor Core GPU</text>
+          <text x="35" y="212" fill="#8b949e" font-family="'Geist', sans-serif" font-size="10">Zero KV-Cache Memory &bull; Biểu diễn ẩn Hidden State hoàn chỉnh</text>
+
+          <!-- Split into Parallel Heads -->
+          <path d="M 215 224 L 215 246" stroke="#f97316" stroke-width="1.5" marker-end="url(#arrow-accent)"/>
+          
+          <g transform="translate(20, 250)">
+            <!-- Head 1 -->
+            <rect x="0" y="0" width="122" height="106" rx="6" fill="#21262d" stroke="#f97316"/>
+            <text x="12" y="24" fill="#f97316" font-family="'Geist Mono', monospace" font-size="9" font-weight="600">CHOICE HEAD</text>
+            <text x="12" y="52" fill="#f0f6fc" font-family="'Geist', sans-serif" font-size="11" font-weight="600">Softmax Probs</text>
+            <text x="12" y="74" fill="#8b949e" font-family="'Geist Mono', monospace" font-size="9">N-Classes map</text>
+            <text x="12" y="92" fill="#10b981" font-family="'Geist Mono', monospace" font-size="8">Conf = 0.94</text>
+
+            <!-- Head 2 -->
+            <rect x="134" y="0" width="122" height="106" rx="6" fill="#21262d" stroke="#38bdf8"/>
+            <text x="146" y="24" fill="#38bdf8" font-family="'Geist Mono', monospace" font-size="9" font-weight="600">SCORE HEAD</text>
+            <text x="146" y="52" fill="#f0f6fc" font-family="'Geist', sans-serif" font-size="11" font-weight="600">Ordinal Interp</text>
+            <text x="146" y="74" fill="#8b949e" font-family="'Geist Mono', monospace" font-size="9">Continuous float</text>
+            <text x="146" y="92" fill="#38bdf8" font-family="'Geist Mono', monospace" font-size="8">Score = 3.4/4</text>
+
+            <!-- Head 3 -->
+            <rect x="268" y="0" width="122" height="106" rx="6" fill="#21262d" stroke="#10b981"/>
+            <text x="280" y="24" fill="#10b981" font-family="'Geist Mono', monospace" font-size="9" font-weight="600">NOUL HEAD</text>
+            <text x="280" y="52" fill="#f0f6fc" font-family="'Geist', sans-serif" font-size="11" font-weight="600">Sigmoid Truth</text>
+            <text x="280" y="74" fill="#8b949e" font-family="'Geist Mono', monospace" font-size="9">Calibrated 0..1</text>
+            <text x="280" y="92" fill="#10b981" font-family="'Geist Mono', monospace" font-size="8">P(True) = 0.98</text>
+          </g>
+
+          <!-- Outcome Box -->
+          <rect x="20" y="380" width="390" height="42" rx="6" fill="#0c2b1f" stroke="#10b981"/>
+          <text x="35" y="406" fill="#10b981" font-family="'Geist Mono', monospace" font-size="11" font-weight="600">
+            &bull; Độ trễ: 70ms - 150ms &bull; Output Token = $0 (Miễn Phí)
+          </text>
+        </g>
+      </svg>
+    </section>
+
+    <!-- SECTION 2: HARDWARE ANALYSIS -->
+    <div class="card">
+      <h2>Bóc Tách Chi Tiết Cơ Chế "Parallel Sampler" Ở Mức Độ Phần Cứng GPU</h2>
+      <p>
+        Tại sao Jev có thể trả lời nhiều câu hỏi cùng lúc chỉ trong <strong>70 mili-giây</strong> mà không tính phí output token? Bí mật nằm ở sự khác biệt giữa hai chế độ tính toán trên chip đồ họa:
+      </p>
+
+      <div class="grid-3" style="margin-top: 1.5rem;">
+        <div>
+          <strong style="color: var(--red); font-size: 1.05rem;">1. Nghẽn Băng Thông (Memory-Bound)</strong>
+          <p style="margin-top: 0.5rem; font-size: 0.92rem;">
+            Trong LLM sinh chữ, mỗi khi muốn đoán từ tiếp theo, GPU phải tải toàn bộ trọng số (Weights) từ VRAM vào nhân xử lý Tensor Core chỉ để tính toán ra <strong>1 token duy nhất</strong>. Nhân tính toán chạy chưa đến 5% công suất nhưng phải ngồi chờ RAM truyền dữ liệu. Đây là lý do vì sao LLM sinh văn bản luôn có độ trễ cao.
+          </p>
+        </div>
+        <div>
+          <strong style="color: var(--green); font-size: 1.05rem;">2. Khai Thác 100% FLOPS (Compute-Bound)</strong>
+          <p style="margin-top: 0.5rem; font-size: 0.92rem;">
+            Parallel Sampler không chạy vòng lặp. Nó nạp dữ liệu một lần và chạy một phép nhân ma trận khổng lồ (GEMM) xuyên suốt qua toàn bộ mạng nơ-ron trong <strong>1 lượt duy nhất (Single Forward Pass)</strong>. GPU tận dụng tối đa 100% công suất tính toán, hoàn thành toàn bộ tác vụ phân loại chỉ trong tích tắc.
+          </p>
+        </div>
+        <div>
+          <strong style="color: var(--blue); font-size: 1.05rem;">3. Xóa Bỏ Hoàn Toàn KV-Cache</strong>
+          <p style="margin-top: 0.5rem; font-size: 0.92rem;">
+            Vì Jev không sinh token nối tiếp, nó không cần phân bổ hay mở rộng bộ đệm KV-Cache. Bộ nhớ VRAM là hằng số cố định $O(1)$, không bao giờ bị lỗi tràn RAM (Out-Of-Memory) khi tải hàng ngàn request đồng thời, cho phép máy chủ phục vụ lượng traffic khổng lồ với chi phí cực thấp.
+          </p>
+        </div>
+      </div>
+
+      <div class="callout">
+        <div class="callout-title">Tại sao Output Token lại miễn phí ($0)?</div>
+        <p>
+          Trong kinh doanh AI, các nhà cung cấp thu tiền output token đắt gấp 3–4 lần input token vì sinh mỗi token đầu ra đòi hỏi 1 lượt forward pass riêng biệt gây nghẽn phần cứng. Jev <strong>không hề sinh token đầu ra</strong> mà chỉ đọc các giá trị xác suất từ các lớp Softmax/Sigmoid cuối cùng, do đó chi phí biên để sinh kết quả xấp xỉ bằng 0!
+        </p>
+      </div>
+    </div>
+
+    <!-- SECTION 3: REPLICATING JEV MENTAL MODEL ON OTHER MODELS -->
+    <div class="card">
+      <h2>Cách Tái Lập Mental Model Của Jev Bằng Các Mô Hình Khác</h2>
+      <p>
+        Bạn không cần phải chờ đến khi có tài khoản TypeSafe Jev. Dưới đây là 3 phương pháp sản xuất (production-ready) để áp dụng ngay hôm nay:
+      </p>
+
+      <!-- METHOD 1 -->
+      <div style="margin-top: 2rem;">
+        <h3 style="color: var(--accent);"><span class="badge badge-accent">Cách 1</span> Dùng Cloud LLM (GPT-4o-mini / Claude 3.5) với max_tokens=1 + Logprobs</h3>
+        <p>
+          Ép mô hình chỉ được sinh đúng 1 ký tự duy nhất đại diện cho nhãn, sau đó trích xuất phân phối xác suất toán học thật từ trường <code>logprobs</code>:
+        </p>
+
+        <div class="code-container">
+          <div class="code-header">
+            <span>python &bull; openai_jev_emulator.py</span>
+            <span>Latency: ~280ms &bull; Zero Server Setup</span>
+          </div>
+          <pre>
+<span class="kw">from</span> openai <span class="kw">import</span> OpenAI
+<span class="kw">import</span> math
+
+client = OpenAI()
+
+ticket_text = <span class="str">"Tài khoản bị trừ 2 lần cho đơn #1234. Cần hoàn tiền gấp!"</span>
+
+prompt = f<span class="str">"""Quy tắc: Đọc văn bản và chỉ chọn 1 ký tự:
+A: billing (Hóa đơn, trừ tiền)
+B: tech (Lỗi phần mềm)
+C: other (Khác)
+
+Văn bản: "{ticket_text}"
+Đáp án:"""</span>
+
+<span class="cm"># ÉP MODEL DỪNG NGAY SAU TOKEN ĐẦU TIÊN VÀ TRẢ VỀ XÁC SUẤT</span>
+response = client.chat.completions.create(
+    model=<span class="str">"gpt-4o-mini"</span>,
+    messages=[{<span class="str">"role"</span>: <span class="str">"user"</span>, <span class="str">"content"</span>: prompt}],
+    max_tokens=<span class="num">1</span>,          <span class="cm"># Cắt bỏ hoàn toàn giải thích chatty dông dài</span>
+    logprobs=<span class="kw">True</span>,         <span class="cm"># Bật trích xuất xác suất</span>
+    top_logprobs=<span class="num">3</span>,
+    temperature=<span class="num">0</span>
+)
+
+<span class="cm"># Chuyển đổi log-probability sang xác suất thực P = exp(logprob):</span>
+top_choices = response.choices[<span class="num">0</span>].logprobs.content[<span class="num">0</span>].top_logprobs
+probs = {item.token.strip(): math.exp(item.logprob) <span class="kw">for</span> item <span class="kw">in</span> top_choices}
+
+print(<span class="str">"Xác suất tính toán:"</span>, probs)
+<span class="cm"># Output: {'A': 0.952, 'B': 0.038, 'C': 0.010} &rarr; Nhãn 'billing' thắng với 95.2% tin cậy!</span>
+          </pre>
+        </div>
+      </div>
+
+      <!-- METHOD 2 -->
+      <div style="margin-top: 2.5rem;">
+        <h3 style="color: var(--blue);"><span class="badge badge-blue">Cách 2</span> Dùng SLM Mã Nguồn Mở (Llama-3.2-1B) + Thư Viện Outlines (FSM Decoding)</h3>
+        <p>
+          Nếu bạn tự host server với GPU nội bộ (RTX 4090 / A10G), sử dụng thư viện <strong>Outlines</strong> để áp đặt máy trạng thái hữu hạn (FSM), ép mô hình chỉ được chọn đúng danh sách Choice mà bạn muốn:
+        </p>
+
+        <div class="code-container">
+          <div class="code-header">
+            <span>python &bull; local_slm_outlines.py</span>
+            <span>Latency: ~40ms - 80ms &bull; Chi Phí $0</span>
+          </div>
+          <pre>
+<span class="kw">import</span> outlines
+
+<span class="cm"># Load mô hình siêu nhẹ 1 tỷ tham số của Meta</span>
+model = outlines.models.transformers(<span class="str">"meta-llama/Llama-3.2-1B-Instruct"</span>)
+
+<span class="cm"># Giả lập Primitive Choice: FSM khóa hoàn toàn từ điển token</span>
+choice_generator = outlines.generate.choice(
+    model, 
+    [<span class="str">"billing"</span>, <span class="str">"technical_bug"</span>, <span class="str">"feature_request"</span>]
+)
+
+result = choice_generator(<span class="str">"Tôi không thể đăng nhập được vào app từ sáng nay"</span>)
+print(<span class="str">"Phân loại:"</span>, result) <span class="cm"># 'technical_bug' trong 50ms</span>
+          </pre>
+        </div>
+      </div>
+
+      <!-- METHOD 3 -->
+      <div style="margin-top: 2.5rem;">
+        <h3 style="color: var(--green);"><span class="badge badge-green">Cách 3</span> Dùng Mô Hình Encoder Siêu Tốc (ModernBERT / DeBERTa)</h3>
+        <p>
+          Nếu bài toán phân loại của bạn cố định (ví dụ: phát hiện spam, lọc nội dung độc hại), hãy dùng mô hình Encoder thuần túy. Nó hoạt động <strong>hoàn toàn giống Parallel Sampler</strong> vì bản chất Encoder không bao giờ sinh từ nối tiếp:
+        </p>
+        <div class="grid-2" style="margin-top: 1rem;">
+          <div style="background: var(--paper-card); padding: 1.25rem; border-radius: 8px;">
+            <strong style="color: #ffffff;">Đặc điểm của ModernBERT:</strong>
+            <ul style="margin-top: 0.5rem; font-size: 0.9rem;">
+              <li>Độ trễ cực thấp: <strong>&lt; 10ms</strong> (chạy mượt trên CPU máy chủ).</li>
+              <li>Chi phí vận hành: <strong>0 đồng tiền API</strong>.</li>
+              <li>Cần chuẩn bị sẵn dữ liệu gắn nhãn để fine-tune lớp phân loại (Classification Head).</li>
+            </ul>
+          </div>
+          <div style="background: var(--paper-card); padding: 1.25rem; border-radius: 8px;">
+            <strong style="color: #ffffff;">So với Jev:</strong>
+            <ul style="margin-top: 0.5rem; font-size: 0.9rem;">
+              <li>Jev có ưu thế vượt trội: Không cần fine-tune, nhận hướng dẫn (instructions) dạng zero-shot linh hoạt.</li>
+              <li>ModernBERT phù hợp cho bài toán cố định lặp lại hàng tỷ lần mỗi ngày.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 4: COMPARISON MATRIX -->
+    <div class="card">
+      <h2>Bảng So Sánh Quyết Định Lựa Chọn Công Nghệ</h2>
+      <table class="table-box">
+        <thead>
+          <tr>
+            <th>Giải Pháp</th>
+            <th>Độ Trễ (Latency)</th>
+            <th>Hạ Tầng Cần Có</th>
+            <th>Khả Năng Zero-Shot</th>
+            <th>Độ Chuẩn Xác Số Đo (Calibration)</th>
+            <th>Chi Phí Vận Hành</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>GPT-4o-mini (Logprobs)</strong></td>
+            <td>250ms &ndash; 400ms</td>
+            <td>API Cloud (Zero ops)</td>
+            <td><span class="badge badge-green">Rất Cao</span></td>
+            <td>Trung Bình (Cần chuẩn hóa)</td>
+            <td>Thấp (~$0.15/1M tokens)</td>
+          </tr>
+          <tr>
+            <td><strong>Llama-3.2-1B + Outlines</strong></td>
+            <td>40ms &ndash; 80ms</td>
+            <td>GPU riêng (A10G/4090)</td>
+            <td><span class="badge badge-green">Cao</span></td>
+            <td>Trung Bình (Cần Temperature Scaling)</td>
+            <td>Tiền thuê máy chủ cố định</td>
+          </tr>
+          <tr>
+            <td><strong>ModernBERT (Encoder)</strong></td>
+            <td><span class="badge badge-green">&lt; 10ms</span></td>
+            <td>Chạy ngay trên CPU</td>
+            <td><span class="badge badge-red">Kém (Cần train)</span></td>
+            <td>Tùy thuộc Loss Function</td>
+            <td><span class="badge badge-green">0 Đồng API</span></td>
+          </tr>
+          <tr>
+            <td><strong>TypeSafe AI: JEV</strong></td>
+            <td><span class="badge badge-accent">70ms &ndash; 150ms</span></td>
+            <td>API Cloud (Zero ops)</td>
+            <td><span class="badge badge-green">Tuyệt Đối</span></td>
+            <td><span class="badge badge-accent">Toán Học Chuẩn Xác (RLCD)</span></td>
+            <td><span class="badge badge-green">$0.042/1M (Output $0)</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- SECTION 5: BLUEPRINT STRATEGY -->
+    <div class="card">
+      <h2>Chiến Lược Kiến Trúc "Cắm Là Chạy" (Plug-and-Play Architecture)</h2>
+      <p>
+        Để không bị phụ thuộc vào việc có key Jev hay chưa, bạn nên thiết kế hệ thống theo mẫu thiết kế <strong>Strategy Pattern</strong> với một Interface thống nhất trong mã nguồn:
+      </p>
+
+      <div class="code-container">
+        <div class="code-header">
+          <span>typescript &bull; system1-provider.ts</span>
+          <span>Unified Interface Architecture</span>
+        </div>
+        <pre>
+<span class="kw">interface</span> SystemOneDecision {
+  choice: <span class="str">string</span>;
+  confidence: <span class="str">number</span>;
+  probabilities: Record&lt;<span class="str">string</span>, <span class="str">number</span>&gt;;
+}
+
+<span class="kw">interface</span> SystemOneProvider {
+  classify(text: <span class="str">string</span>, options: <span class="str">string</span>[]): Promise&lt;SystemOneDecision&gt;;
+}
+
+<span class="cm">// 1. Hiện tại: Sử dụng GPT-4o-mini qua Logprobs</span>
+<span class="kw">class</span> OpenAILogprobProvider <span class="kw">implements</span> SystemOneProvider { ... }
+
+<span class="cm">// 2. Khi có API Key TypeSafe Jev: Chỉ việc đổi 1 dòng config!</span>
+<span class="kw">class</span> TypeSafeJevProvider <span class="kw">implements</span> SystemOneProvider { ... }
+        </pre>
+      </div>
+    </div>
+
+    <footer>
+      CẨM NANG KỸ THUẬT PHÂN TÍCH HỆ THỐNG &bull; BIÊN TẬP BỞI ANTIGRAVITY &bull; CHUNKS-LMS
+    </footer>
+  </div>
+
+</body>
+</html>

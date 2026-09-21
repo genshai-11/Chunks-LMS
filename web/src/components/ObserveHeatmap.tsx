@@ -4,6 +4,7 @@ import { sessionColorSummary } from '../modules/assessment/session-capture'
 import { calculateSpectrumStepBreakdown } from '../modules/metrics/calculate'
 import { probeChunksNumber } from '../modules/assessment/probe-metrics'
 import { SPECTRUM_COLORS } from '../modules/result-lifecycle/types'
+import { ScreenTooltip } from './ScreenTooltip'
 
 type Props = {
   capture: CaptureSessionState
@@ -56,75 +57,81 @@ export function ObserveHeatmap({
   return (
     <div className={`observe-heat layout-${layout}`}>
       <div className="observe-heat-summary" aria-label="Session summary">
-        <span
-          className="observe-heat-metric observe-has-tooltip"
-          tabIndex={0}
-          aria-label={`Struggle RFC: ${nTotal ? `${rfcPct}%` : '—'}`}
-        >
-          RFC <strong>{nTotal ? `${rfcPct}%` : '—'}</strong>
-          <span className="observe-metric-tooltip observe-tooltip-rich tooltip-left" role="tooltip">
-            <span className="observe-tooltip-header">
-              <span>Struggle (RFC)</span>
-              <span className="font-mono text-amber-300 font-bold">{nTotal ? `${rfcPct}%` : '—'}</span>
-            </span>
-            <span className="observe-tooltip-divider" />
-            <span className="observe-tooltip-body">
-              <span className="observe-tooltip-row">
-                <span className="observe-tooltip-key">Formula:</span>
-                <span className="observe-tooltip-val font-mono text-[10px]">warm records / N_total</span>
+        <ScreenTooltip
+          ariaLabel={`Struggle RFC: ${nTotal ? `${rfcPct}%` : '—'}`}
+          width={290}
+          content={
+            <>
+              <span className="observe-tooltip-header">
+                <span>Struggle (RFC)</span>
+                <span className="font-mono text-amber-300 font-bold">{nTotal ? `${rfcPct}%` : '—'}</span>
               </span>
-              <span className="observe-tooltip-row">
-                <span className="observe-tooltip-key">Warm steps:</span>
-                <span className="observe-tooltip-val">
-                  {spectrum.warmSteps} / {nTotal}{' '}
-                  <span className="text-slate-400 font-normal">(Red + Orange + Yellow)</span>
+              <span className="observe-tooltip-divider" />
+              <span className="observe-tooltip-body">
+                <span className="observe-tooltip-row">
+                  <span className="observe-tooltip-key">Formula:</span>
+                  <span className="observe-tooltip-val font-mono text-[10px]">warm records / N_total</span>
                 </span>
-              </span>
-              <span className="observe-tooltip-note">
-                Lower RFC indicates less observed struggle.
-              </span>
-            </span>
-          </span>
-        </span>
-
-        <span
-          className="observe-heat-metric muted observe-has-tooltip"
-          tabIndex={0}
-          aria-label={`Awareness / Success (%c): ${nTotal ? `${racPct}%` : '—'}`}
-        >
-          %c <strong>{nTotal ? `${racPct}%` : '—'}</strong>
-          <span className="observe-metric-tooltip observe-tooltip-rich tooltip-center" role="tooltip">
-            <span className="observe-tooltip-header">
-              <span>Awareness / Success (%c)</span>
-              <span className="font-mono text-emerald-300 font-bold">{nTotal ? `${racPct}%` : '—'}</span>
-            </span>
-            <span className="observe-tooltip-divider" />
-            <span className="observe-tooltip-body">
-              <span className="observe-tooltip-row">
-                <span className="observe-tooltip-key">Formula:</span>
-                <span className="observe-tooltip-val font-mono text-[10px]">Avg %x = sum(%x) / N_total</span>
-              </span>
-              <span className="observe-tooltip-row">
-                <span className="observe-tooltip-key">7-color weighted:</span>
-                <span className="observe-tooltip-val">
-                  {spectrum.sumPercentX.toFixed(1)}% / {nTotal} = {(spectrum.avgPercentX ?? 0).toFixed(1)}%
-                </span>
-              </span>
-              <span className="observe-tooltip-row">
-                <span className="observe-tooltip-key">Legacy RAC:</span>
-                <span className="observe-tooltip-val">
-                  {legacyRacPct}%{' '}
-                  <span className="text-slate-400 font-normal">
-                    ({spectrum.coolSteps}/{nTotal} cool records)
+                <span className="observe-tooltip-row">
+                  <span className="observe-tooltip-key">Warm steps:</span>
+                  <span className="observe-tooltip-val">
+                    {spectrum.warmSteps} / {nTotal}{' '}
+                    <span className="text-slate-400 font-normal">(Red + Orange + Yellow)</span>
                   </span>
                 </span>
+                <span className="observe-tooltip-note">
+                  Lower RFC indicates less observed struggle.
+                </span>
               </span>
-              <span className="observe-tooltip-note">
-                Weights: Red 0%, Orange 17%, Yellow 34%, Green 50%, Blue 67%, Indigo 84%, Purple 100%.
-              </span>
-            </span>
+            </>
+          }
+        >
+          <span className="observe-heat-metric" tabIndex={0}>
+            RFC <strong>{nTotal ? `${rfcPct}%` : '—'}</strong>
           </span>
-        </span>
+        </ScreenTooltip>
+
+        <ScreenTooltip
+          ariaLabel={`Awareness / Success (%c): ${nTotal ? `${racPct}%` : '—'}`}
+          width={310}
+          content={
+            <>
+              <span className="observe-tooltip-header">
+                <span>Awareness / Success (%c)</span>
+                <span className="font-mono text-emerald-300 font-bold">{nTotal ? `${racPct}%` : '—'}</span>
+              </span>
+              <span className="observe-tooltip-divider" />
+              <span className="observe-tooltip-body">
+                <span className="observe-tooltip-row">
+                  <span className="observe-tooltip-key">Formula:</span>
+                  <span className="observe-tooltip-val font-mono text-[10px]">Avg %x = sum(%x) / N_total</span>
+                </span>
+                <span className="observe-tooltip-row">
+                  <span className="observe-tooltip-key">7-color weighted:</span>
+                  <span className="observe-tooltip-val">
+                    {spectrum.sumPercentX.toFixed(1)}% / {nTotal} = {(spectrum.avgPercentX ?? 0).toFixed(1)}%
+                  </span>
+                </span>
+                <span className="observe-tooltip-row">
+                  <span className="observe-tooltip-key">Legacy RAC:</span>
+                  <span className="observe-tooltip-val">
+                    {legacyRacPct}%{' '}
+                    <span className="text-slate-400 font-normal">
+                      ({spectrum.coolSteps}/{nTotal} cool records)
+                    </span>
+                  </span>
+                </span>
+                <span className="observe-tooltip-note">
+                  Weights: Red 0%, Orange 17%, Yellow 34%, Green 50%, Blue 67%, Indigo 84%, Purple 100%.
+                </span>
+              </span>
+            </>
+          }
+        >
+          <span className="observe-heat-metric muted" tabIndex={0}>
+            %c <strong>{nTotal ? `${racPct}%` : '—'}</strong>
+          </span>
+        </ScreenTooltip>
 
         <div
           className="observe-heat-counts observe-color-pills"

@@ -89,6 +89,8 @@ export function ScreenTooltip({
                 display: 'block',
                 margin: 0,
                 transform: 'none',
+                backgroundColor: '#030712',
+                opacity: 1,
               }}
               role="tooltip"
             >
@@ -103,7 +105,7 @@ export function ScreenTooltip({
                   height: '10px',
                   borderLeft: '1px solid rgba(255,255,255,0.15)',
                   borderTop: '1px solid rgba(255,255,255,0.15)',
-                  backgroundColor: '#020617',
+                  backgroundColor: '#030712',
                 }}
               />
               {content}

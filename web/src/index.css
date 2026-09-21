@@ -1663,7 +1663,7 @@
   }
 
   .observe-rail.is-open .observe-heat.layout-column .observe-heat-summary {
-    @apply relative z-10 mb-2 flex flex-col gap-1 rounded-xl border border-white/5 bg-white/5 p-2 text-[10px] sm:text-xs;
+    @apply relative z-30 mb-2 flex flex-col gap-1 rounded-xl border border-white/5 bg-white/5 p-2 text-[10px] sm:text-xs;
   }
 
   .observe-rail.is-open .observe-heat.layout-column .observe-heat-summary .observe-heat-metric {
@@ -1675,7 +1675,7 @@
   }
 
   .observe-heat-hero {
-    @apply relative z-10 w-full mb-1;
+    @apply relative z-20 w-full mb-1;
   }
 
   .observe-rail.is-open .observe-heat.layout-column .observe-heat-grid {
@@ -1686,7 +1686,7 @@
     align-items: start;
     justify-content: center;
     justify-items: center;
-    @apply relative z-20 mt-1 min-h-0 flex-1 overflow-y-auto pt-2 pb-2 px-1;
+    @apply relative z-10 mt-1 min-h-0 flex-1 overflow-y-auto pt-2 pb-2 px-1;
   }
 
   /* Heatmap column */
@@ -2106,11 +2106,14 @@
   }
 
   .observe-screen-tooltip-portal {
-    @apply pointer-events-none rounded-xl border border-white/15 bg-slate-950/95 p-3 text-left font-sans text-xs leading-relaxed text-slate-200 shadow-2xl backdrop-blur-md;
+    @apply pointer-events-none rounded-xl border border-white/20 p-3 text-left font-sans text-xs leading-relaxed text-slate-100 shadow-2xl backdrop-blur-md;
+    background-color: #030712 !important;
+    opacity: 1 !important;
+    z-index: 99999 !important;
     box-shadow:
-      0 0 24px rgba(99, 102, 241, 0.25),
-      0 20px 30px rgba(0, 0, 0, 0.85),
-      inset 0 1px 0 rgba(255, 255, 255, 0.15);
+      0 0 24px rgba(99, 102, 241, 0.35),
+      0 20px 35px rgba(0, 0, 0, 0.95),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
     white-space: normal;
   }
 

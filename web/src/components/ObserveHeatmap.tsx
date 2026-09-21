@@ -142,7 +142,7 @@ export function ObserveHeatmap({
           ))}
           <span
             className="observe-heat-count is-total"
-            title={summary ? `Total records = primary + probe = ${summary.primaryRecords} + ${summary.probeRecords}` : 'Total records'}
+            title={summary ? `N_total = primary + probe = ${summary.primaryRecords} + ${summary.probeRecords}` : 'N_total'}
           >
             Σ {summary ? summary.totalRecords : 0}
           </span>

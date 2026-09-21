@@ -155,7 +155,7 @@ function formatFinishSummary(
     `C Blue: ${summary.byColor.blue}`,
     `D Indigo: ${summary.byColor.indigo}`,
     `3 Purple: ${summary.byColor.purple}`,
-    `Total records: ${summary.totalRecords} (${summary.primaryRecords} primary + ${summary.probeRecords} probe)`,
+    `N_total: ${summary.totalRecords} (${summary.primaryRecords} primary + ${summary.probeRecords} probe)`,
     `Max chunks number: ${summary.maxProbeDepth}`,
     unresolved > 0
       ? `Left unfinalized when session closed: ${unresolved}`
@@ -560,8 +560,8 @@ export function TeacherObservePage() {
   const racPct = Math.round(avgPercentX)
   const legacyRacPct = summary?.totalRecords ? Math.round((coolRecords / summary.totalRecords) * 100) : 0
   const rfcTitle = summary
-    ? `RFC = warm records / total records = ${warmRecords} / ${summary.totalRecords}. Warm = Red + Orange + Yellow.`
-    : 'RFC = warm records / total records'
+    ? `RFC = warm records / N_total = ${warmRecords} / ${summary.totalRecords}. Warm = Red + Orange + Yellow.`
+    : 'RFC = warm records / N_total'
   const racTitle = summary
     ? `%c = Avg %x = sum(%x) / N_total = ${sumPercentX.toFixed(1)}% / ${summary.totalRecords} = ${avgPercentX.toFixed(1)}%. (Legacy RAC = ${legacyRacPct}%).`
     : '%c = Avg %x = sum(%x) / N_total'
@@ -1641,13 +1641,13 @@ export function TeacherObservePage() {
                   <span
                     className="observe-heat-metric muted tabular observe-has-tooltip observe-hide-phone"
                     tabIndex={0}
-                    aria-label={`Total records: ${summary.totalRecords}`}
+                    aria-label={`N_total: ${summary.totalRecords}`}
                   >
-                    records {summary.totalRecords}/{Math.max(summary.total + summary.probeRecords, 1)}
+                    N_total {summary.totalRecords}/{Math.max(summary.total + summary.probeRecords, 1)}
                     {summary.maxProbeDepth > 0 ? ` · max chunks=${summary.maxProbeDepth}` : ''}
                     <span className="observe-metric-tooltip observe-tooltip-rich tooltip-center" role="tooltip">
                       <span className="observe-tooltip-header">
-                        <span>N_total (Total Records)</span>
+                        <span>N_total (Total Bells / Records)</span>
                         <span className="font-mono text-indigo-300 font-bold">{summary.totalRecords}</span>
                       </span>
                       <span className="observe-tooltip-divider" />
@@ -1657,7 +1657,7 @@ export function TeacherObservePage() {
                           <span className="observe-tooltip-val font-mono text-[10px]">primary records + probe records</span>
                         </span>
                         <span className="observe-tooltip-row">
-                          <span className="observe-tooltip-key">Record count:</span>
+                          <span className="observe-tooltip-key">Bells / Records:</span>
                           <span className="observe-tooltip-val">
                             {summary.primaryRecords} primary + {summary.probeRecords} probe = {summary.totalRecords}
                           </span>
@@ -2023,7 +2023,7 @@ export function TeacherObservePage() {
 
                 {/* Additional metrics */}
                 <div className="flex justify-between items-center text-xs pt-1 border-t border-white/5">
-                  <span className="text-slate-400">Total records:</span>
+                  <span className="text-slate-400">N_total:</span>
                   <span className="font-mono font-bold text-white">{finishMetrics.totalRecords}</span>
                 </div>
                 <div className="flex justify-between items-center text-xs pt-1 border-t border-white/5">

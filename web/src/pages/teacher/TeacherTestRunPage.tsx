@@ -2082,8 +2082,28 @@ export function TeacherTestRunPage() {
                 >
                   {audioState === 'error' ? <RotateCcw className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
                   <span className="live-test-wave" aria-hidden><i /><i /><i /><i /></span>
-                  <span>{audioState === 'error' ? 'Retry' : 'Play'}</span>
+                  <span>{audioState === 'error' ? 'Retry' : audioState === 'playing' ? 'Playing' : 'Play'}</span>
                 </button>
+                <div className="inline-flex items-center rounded-lg bg-slate-800/80 p-0.5 text-xs font-medium border border-slate-700/60" role="group" aria-label="Audio playback speed">
+                  {[0.75, 1, 1.25].map((rate) => (
+                    <button
+                      key={rate}
+                      type="button"
+                      className={`px-2 py-0.5 rounded text-xs transition-colors ${audioRate === rate ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+                      onClick={() => {
+                        setAudioRate(rate)
+                        try {
+                          window.localStorage.setItem(AUDIO_RATE_KEY, String(rate))
+                        } catch {
+                          /* ignore */
+                        }
+                      }}
+                      title={`Tốc độ đọc ${rate}x`}
+                    >
+                      {rate}x
+                    </button>
+                  ))}
+                </div>
                 <button type="button" className="ghost" disabled={selectedIndex === items.length - 1} onClick={() => setSelectedIndex((prev) => Math.min(items.length - 1, prev + 1))}>
                   Next <ChevronRight className="h-4 w-4" />
                 </button>

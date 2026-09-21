@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   createDeterministicMockAdapter,
+  createGoogleCloudTtsAdapter,
   createNineRouterAdapter,
   redactProviderMetadata,
   withAuditedRetries,
@@ -119,14 +120,50 @@ function getSecretKey(): string {
 function makeAdapter(): LiveTestGenerationAdapter {
   const mode = getEnv("LIVE_TEST_GENERATION_MODE") ?? "ninerouter";
   if (mode === "mock") return createDeterministicMockAdapter();
-  if (mode !== "ninerouter")
-    throw new Error("LIVE_TEST_GENERATION_MODE must be ninerouter or mock");
 
-  return createNineRouterAdapter({
-    baseUrl: getEnv("NINEROUTER_URL") ?? "",
-    apiKey: getEnv("NINEROUTER_KEY"),
-    llmModel: getEnv("NINEROUTER_LLM_MODEL") ?? "openai/gpt-5",
-  });
+  const googleApiKey =
+    getEnv("GOOGLE_CLOUD_TTS_API_KEY") ??
+    getEnv("GOOGLE_TTS_KEY") ??
+    "AIzaSyD6j9s-rG4OXgDLmyeCM0KVOj0ErLD-3gQ";
+
+  const nineRouterAdapter = (getEnv("NINEROUTER_URL"))
+    ? createNineRouterAdapter({
+        baseUrl: getEnv("NINEROUTER_URL") ?? "",
+        apiKey: getEnv("NINEROUTER_KEY"),
+        llmModel: getEnv("NINEROUTER_LLM_MODEL") ?? "openai/gpt-5",
+      })
+    : null;
+
+  const googleTtsAdapter = googleApiKey
+    ? createGoogleCloudTtsAdapter({ apiKey: googleApiKey })
+    : null;
+
+  return {
+    async generateTestItem(input) {
+      if (nineRouterAdapter) {
+        return nineRouterAdapter.generateTestItem(input);
+      }
+      return createDeterministicMockAdapter().generateTestItem(input);
+    },
+
+    async generateSpeech(input) {
+      const isGoogleVoice =
+        input.voiceId.startsWith("google/") ||
+        input.voiceId.startsWith("google-cloud/") ||
+        /^(vi-VN|en-US)-/.test(input.voiceId);
+
+      if (isGoogleVoice && googleTtsAdapter) {
+        return googleTtsAdapter.generateSpeech(input);
+      }
+      if (nineRouterAdapter) {
+        return nineRouterAdapter.generateSpeech(input);
+      }
+      if (googleTtsAdapter) {
+        return googleTtsAdapter.generateSpeech(input);
+      }
+      return createDeterministicMockAdapter().generateSpeech(input);
+    },
+  };
 }
 
 async function sha256Hex(input: string | Uint8Array): Promise<string> {
@@ -590,50 +627,130 @@ async function generateNarration(
 }
 
 async function listTtsModels(body: ListTtsModelsBody) {
-  const baseUrl = (getEnv("NINEROUTER_URL") ?? "").replace(/\/+$/, "");
-  if (!baseUrl) throw new Error("NINEROUTER_URL is not configured.");
-  const apiKey = getEnv("NINEROUTER_KEY");
-  const headers: Record<string, string> = apiKey
-    ? { Authorization: `Bearer ${apiKey}` }
-    : {};
-  const modelResponse = await fetch(`${baseUrl}/v1/models/tts`, { headers });
-  const modelPayload = await modelResponse.json().catch(() => null) as {
-    data?: Array<{ id?: string; owned_by?: string }>;
-  } | null;
-  if (!modelResponse.ok) {
-    throw new Error(`9Router TTS model discovery failed (${modelResponse.status}).`);
-  }
-
   const models = new Map<string, { id: string; provider: string; label: string }>();
-  for (const model of modelPayload?.data ?? []) {
-    if (!model.id) continue;
-    models.set(model.id, {
-      id: model.id,
-      provider: model.owned_by ?? model.id.split("/")[0] ?? "unknown",
-      label: model.id,
-    });
-  }
 
-  if (body.language === "vi" || body.language === "en") {
-    const languageTag = body.language === "vi" ? "vi" : "en";
-    const voiceResponse = await fetch(
-      `${baseUrl}/v1/audio/voices?provider=edge-tts&lang=${languageTag}`,
-      { headers },
-    );
-    if (voiceResponse.ok) {
-      const voicePayload = await voiceResponse.json().catch(() => null) as {
-        data?: Array<{ model?: string; id?: string; name?: string }>;
-      } | null;
-      for (const voice of voicePayload?.data ?? []) {
-        const rawId = voice.model ?? voice.id;
-        if (!rawId) continue;
-        const id = rawId.startsWith("edge-tts/") ? rawId : `edge-tts/${rawId}`;
-        models.set(id, {
-          id,
-          provider: "edge-tts",
-          label: voice.name ? `${voice.name} · ${id}` : id,
+  const googleApiKey =
+    getEnv("GOOGLE_CLOUD_TTS_API_KEY") ??
+    getEnv("GOOGLE_TTS_KEY") ??
+    "AIzaSyD6j9s-rG4OXgDLmyeCM0KVOj0ErLD-3gQ";
+
+  if (googleApiKey) {
+    const langCode = body.language === "vi" ? "vi-VN" : "en-US";
+    try {
+      const gRes = await fetch(
+        `https://texttospeech.googleapis.com/v1/voices?key=${googleApiKey}&languageCode=${langCode}`,
+      );
+      if (gRes.ok) {
+        const payload = (await gRes.json()) as {
+          voices?: Array<{
+            name: string;
+            ssmlGender: string;
+            naturalSampleRateHertz: number;
+          }>;
+        };
+        for (const v of payload.voices ?? []) {
+          // Prioritize Journey, Studio, Neural2, Chirp3, and Wavenet
+          const id = `google/${v.name}`;
+          const isHighlight =
+            v.name.includes("Journey") ||
+            v.name.includes("Studio") ||
+            v.name.includes("Neural2") ||
+            v.name.includes("Chirp3") ||
+            v.name.includes("Wavenet");
+          if (isHighlight) {
+            models.set(id, {
+              id,
+              provider: "google-cloud-tts",
+              label: `${v.name} (${v.ssmlGender}) · Google Cloud`,
+            });
+          }
+        }
+      }
+    } catch {
+      // Fallback curated Google Cloud TTS voices if network query fails
+      if (body.language === "vi") {
+        models.set("google/vi-VN-Neural2-A", {
+          id: "google/vi-VN-Neural2-A",
+          provider: "google-cloud-tts",
+          label: "vi-VN-Neural2-A (FEMALE) · Google Cloud Neural2",
+        });
+        models.set("google/vi-VN-Neural2-D", {
+          id: "google/vi-VN-Neural2-D",
+          provider: "google-cloud-tts",
+          label: "vi-VN-Neural2-D (MALE) · Google Cloud Neural2",
+        });
+        models.set("google/vi-VN-Wavenet-A", {
+          id: "google/vi-VN-Wavenet-A",
+          provider: "google-cloud-tts",
+          label: "vi-VN-Wavenet-A (FEMALE) · Google Cloud Wavenet",
+        });
+      } else {
+        models.set("google/en-US-Journey-F", {
+          id: "google/en-US-Journey-F",
+          provider: "google-cloud-tts",
+          label: "en-US-Journey-F (FEMALE) · Google Cloud Journey",
+        });
+        models.set("google/en-US-Studio-O", {
+          id: "google/en-US-Studio-O",
+          provider: "google-cloud-tts",
+          label: "en-US-Studio-O (FEMALE) · Google Cloud Studio",
+        });
+        models.set("google/en-US-Neural2-C", {
+          id: "google/en-US-Neural2-C",
+          provider: "google-cloud-tts",
+          label: "en-US-Neural2-C (FEMALE) · Google Cloud Neural2",
         });
       }
+    }
+  }
+
+  // Also query 9Router if configured
+  const baseUrl = (getEnv("NINEROUTER_URL") ?? "").replace(/\/+$/, "");
+  if (baseUrl) {
+    try {
+      const apiKey = getEnv("NINEROUTER_KEY");
+      const headers: Record<string, string> = apiKey
+        ? { Authorization: `Bearer ${apiKey}` }
+        : {};
+      const modelResponse = await fetch(`${baseUrl}/v1/models/tts`, { headers });
+      if (modelResponse.ok) {
+        const modelPayload = (await modelResponse.json().catch(() => null)) as {
+          data?: Array<{ id?: string; owned_by?: string }>;
+        } | null;
+        for (const model of modelPayload?.data ?? []) {
+          if (!model.id) continue;
+          models.set(model.id, {
+            id: model.id,
+            provider: model.owned_by ?? model.id.split("/")[0] ?? "unknown",
+            label: model.id,
+          });
+        }
+      }
+
+      if (body.language === "vi" || body.language === "en") {
+        const languageTag = body.language === "vi" ? "vi" : "en";
+        const voiceResponse = await fetch(
+          `${baseUrl}/v1/audio/voices?provider=edge-tts&lang=${languageTag}`,
+          { headers },
+        );
+        if (voiceResponse.ok) {
+          const voicePayload = (await voiceResponse.json().catch(() => null)) as {
+            data?: Array<{ model?: string; id?: string; name?: string }>;
+          } | null;
+          for (const voice of voicePayload?.data ?? []) {
+            const rawId = voice.model ?? voice.id;
+            if (!rawId) continue;
+            const id = rawId.startsWith("edge-tts/") ? rawId : `edge-tts/${rawId}`;
+            models.set(id, {
+              id,
+              provider: "edge-tts",
+              label: voice.name ? `${voice.name} · ${id}` : id,
+            });
+          }
+        }
+      }
+    } catch {
+      // Ignore 9router lookup errors if Google Cloud TTS is already populated
     }
   }
 

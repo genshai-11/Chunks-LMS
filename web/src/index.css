@@ -1667,7 +1667,7 @@
   }
 
   .observe-rail.is-open .observe-heat.layout-column .observe-heat-summary .observe-heat-metric {
-    @apply flex items-center justify-between;
+    @apply flex items-center justify-between w-full;
   }
 
   .observe-rail.is-open .observe-heat.layout-column .observe-heat-summary .observe-heat-counts {

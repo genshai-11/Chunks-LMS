@@ -59,6 +59,7 @@ export function ObserveHeatmap({
       <div className="observe-heat-summary" aria-label="Session summary">
         <ScreenTooltip
           ariaLabel={`Struggle RFC: ${nTotal ? `${rfcPct}%` : '—'}`}
+          className="observe-heat-metric w-full flex items-center justify-between cursor-help"
           width={290}
           content={
             <>
@@ -86,13 +87,13 @@ export function ObserveHeatmap({
             </>
           }
         >
-          <span className="observe-heat-metric" tabIndex={0}>
-            RFC <strong>{nTotal ? `${rfcPct}%` : '—'}</strong>
-          </span>
+          <span>RFC</span>
+          <strong>{nTotal ? `${rfcPct}%` : '—'}</strong>
         </ScreenTooltip>
 
         <ScreenTooltip
           ariaLabel={`Awareness / Success (%c): ${nTotal ? `${racPct}%` : '—'}`}
+          className="observe-heat-metric muted w-full flex items-center justify-between cursor-help"
           width={310}
           content={
             <>
@@ -128,9 +129,8 @@ export function ObserveHeatmap({
             </>
           }
         >
-          <span className="observe-heat-metric muted" tabIndex={0}>
-            %c <strong>{nTotal ? `${racPct}%` : '—'}</strong>
-          </span>
+          <span>%c</span>
+          <strong>{nTotal ? `${racPct}%` : '—'}</strong>
         </ScreenTooltip>
 
         <div

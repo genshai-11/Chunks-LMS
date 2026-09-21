@@ -36,6 +36,7 @@ import {
   type CaptureSessionState,
 } from '../../modules/assessment/session-capture'
 import { ObserveHeatmap } from '../../components/ObserveHeatmap'
+import { ScreenTooltip } from '../../components/ScreenTooltip'
 import { UserAvatar } from '../../components/UserAvatar'
 import type { ProvisionalColor, ResultColor } from '../../modules/result-lifecycle/types'
 import { PROBE_ACTIONS } from '../../modules/assessment/probe-actions'
@@ -1214,10 +1215,33 @@ export function TeacherObservePage() {
               </span>
             </h2>
             <div className="observe-meta-row">
-              <span className="observe-learner-rfc is-rfc">
-                <Activity className="h-3.5 w-3.5" aria-hidden />
-                RFC {learnerDone ? `${learnerRfc}%` : '—'}
-              </span>
+              <ScreenTooltip
+                width={280}
+                ariaLabel={`Learner Struggle (RFC): ${learnerDone ? `${learnerRfc}%` : '—'}`}
+                content={
+                  <>
+                    <span className="observe-tooltip-header">
+                      <span>Learner Struggle (RFC)</span>
+                      <span className="font-mono text-amber-300 font-bold">{learnerDone ? `${learnerRfc}%` : '—'}</span>
+                    </span>
+                    <span className="observe-tooltip-divider" />
+                    <span className="observe-tooltip-body">
+                      <span className="observe-tooltip-row">
+                        <span className="observe-tooltip-key">Warm steps / finalized:</span>
+                        <span className="observe-tooltip-val">{learnerWarm} / {learnerDone}</span>
+                      </span>
+                      <span className="observe-tooltip-note">
+                        Learner RFC uses this learner's finalized effective colors only.
+                      </span>
+                    </span>
+                  </>
+                }
+              >
+                <span className="observe-learner-rfc is-rfc">
+                  <Activity className="h-3.5 w-3.5" aria-hidden />
+                  RFC {learnerDone ? `${learnerRfc}%` : '—'}
+                </span>
+              </ScreenTooltip>
               <span className="observe-meta-muted">
                 {learnerDone}/{Math.max(learnerAttempts.length, 1)} done
               </span>
@@ -1332,16 +1356,85 @@ export function TeacherObservePage() {
       <div className="observe-meta-row">
         {done > 0 ? (
           <>
-            <span
-              className="observe-learner-rfc is-rfc"
-              aria-label={rfcTitle}
+            <ScreenTooltip
+              ariaLabel={rfcTitle}
+              width={290}
+              content={
+                <>
+                  <span className="observe-tooltip-header">
+                    <span>Struggle (RFC)</span>
+                    <span className="font-mono text-amber-300 font-bold">{rfcPct}%</span>
+                  </span>
+                  <span className="observe-tooltip-divider" />
+                  <span className="observe-tooltip-body">
+                    <span className="observe-tooltip-row">
+                      <span className="observe-tooltip-key">Formula:</span>
+                      <span className="observe-tooltip-val font-mono text-[10px]">warm records / N_total</span>
+                    </span>
+                    <span className="observe-tooltip-row">
+                      <span className="observe-tooltip-key">Warm steps:</span>
+                      <span className="observe-tooltip-val">
+                        {warmRecords} / {summary?.totalRecords ?? 0}{' '}
+                        <span className="text-slate-400 font-normal">(Red + Orange + Yellow)</span>
+                      </span>
+                    </span>
+                    <span className="observe-tooltip-note">
+                      Lower RFC indicates less observed struggle.
+                    </span>
+                  </span>
+                </>
+              }
             >
-              <Activity className="h-3.5 w-3.5" aria-hidden />
-              RFC {rfcPct}%
-            </span>
-            <span className="observe-learner-rfc is-percent-c" aria-label={racTitle}>
-              %c {racPct}%
-            </span>
+              <span
+                className="observe-learner-rfc is-rfc"
+                aria-label={rfcTitle}
+              >
+                <Activity className="h-3.5 w-3.5" aria-hidden />
+                RFC {rfcPct}%
+              </span>
+            </ScreenTooltip>
+
+            <ScreenTooltip
+              ariaLabel={racTitle}
+              width={310}
+              content={
+                <>
+                  <span className="observe-tooltip-header">
+                    <span>Awareness / Success (%c)</span>
+                    <span className="font-mono text-emerald-300 font-bold">{racPct}%</span>
+                  </span>
+                  <span className="observe-tooltip-divider" />
+                  <span className="observe-tooltip-body">
+                    <span className="observe-tooltip-row">
+                      <span className="observe-tooltip-key">Formula:</span>
+                      <span className="observe-tooltip-val font-mono text-[10px]">Avg %x = sum(%x) / N_total</span>
+                    </span>
+                    <span className="observe-tooltip-row">
+                      <span className="observe-tooltip-key">7-color weighted:</span>
+                      <span className="observe-tooltip-val">
+                        {sumPercentX.toFixed(1)}% / {summary?.totalRecords ?? 0} = {avgPercentX.toFixed(1)}%
+                      </span>
+                    </span>
+                    <span className="observe-tooltip-row">
+                      <span className="observe-tooltip-key">Legacy RAC:</span>
+                      <span className="observe-tooltip-val">
+                        {legacyRacPct}%{' '}
+                        <span className="text-slate-400 font-normal">
+                          ({summary ? summary.recordedByColor.green + summary.recordedByColor.blue + summary.recordedByColor.indigo + summary.recordedByColor.purple : 0}/{summary?.totalRecords ?? 0} cool records)
+                        </span>
+                      </span>
+                    </span>
+                    <span className="observe-tooltip-note">
+                      Weights: Red 0%, Orange 17%, Yellow 34%, Green 50%, Blue 67%, Indigo 84%, Purple 100%.
+                    </span>
+                  </span>
+                </>
+              }
+            >
+              <span className="observe-learner-rfc is-percent-c" aria-label={racTitle}>
+                %c {racPct}%
+              </span>
+            </ScreenTooltip>
           </>
         ) : (
           <span className="observe-meta-muted observe-phone-only observe-hint-phone">

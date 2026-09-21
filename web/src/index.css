@@ -2105,6 +2105,15 @@
     white-space: normal;
   }
 
+  .observe-screen-tooltip-portal {
+    @apply pointer-events-none rounded-xl border border-white/15 bg-slate-950/95 p-3 text-left font-sans text-xs leading-relaxed text-slate-200 shadow-2xl backdrop-blur-md;
+    box-shadow:
+      0 0 24px rgba(99, 102, 241, 0.25),
+      0 20px 30px rgba(0, 0, 0, 0.85),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    white-space: normal;
+  }
+
   .observe-tooltip-rich.tooltip-left {
     @apply left-0 -translate-x-0;
   }

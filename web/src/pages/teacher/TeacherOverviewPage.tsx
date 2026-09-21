@@ -6,8 +6,10 @@ import {
   List,
   Play,
   School,
+  Upload,
   UserPlus,
   Users,
+  X,
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Flash } from '../../components/Flash'
@@ -22,6 +24,39 @@ import {
   enrollLearner,
   listActiveLearners,
 } from '../../modules/roster/service'
+
+export const PRESET_AVATARS = [
+  {
+    id: 'avatar-1',
+    label: 'Coral Star',
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%23FF5E62"/><stop offset="100%" stop-color="%23FF9966"/></linearGradient></defs><circle cx="50" cy="50" r="50" fill="url(%23g1)"/><circle cx="50" cy="40" r="18" fill="white" opacity="0.95"/><path d="M22 86 C24 64, 76 64, 78 86" fill="white" opacity="0.95"/></svg>',
+  },
+  {
+    id: 'avatar-2',
+    label: 'Sky Wave',
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%2300c6ff"/><stop offset="100%" stop-color="%230072ff"/></linearGradient></defs><circle cx="50" cy="50" r="50" fill="url(%23g2)"/><circle cx="50" cy="40" r="18" fill="white" opacity="0.95"/><path d="M22 86 C24 64, 76 64, 78 86" fill="white" opacity="0.95"/></svg>',
+  },
+  {
+    id: 'avatar-3',
+    label: 'Emerald Spark',
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g3" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%2311998e"/><stop offset="100%" stop-color="%2338ef7d"/></linearGradient></defs><circle cx="50" cy="50" r="50" fill="url(%23g3)"/><circle cx="50" cy="40" r="18" fill="white" opacity="0.95"/><path d="M22 86 C24 64, 76 64, 78 86" fill="white" opacity="0.95"/></svg>',
+  },
+  {
+    id: 'avatar-4',
+    label: 'Violet Glow',
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g4" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%238A2387"/><stop offset="100%" stop-color="%23E94057"/></linearGradient></defs><circle cx="50" cy="50" r="50" fill="url(%23g4)"/><circle cx="50" cy="40" r="18" fill="white" opacity="0.95"/><path d="M22 86 C24 64, 76 64, 78 86" fill="white" opacity="0.95"/></svg>',
+  },
+  {
+    id: 'avatar-5',
+    label: 'Amber Sun',
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g5" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%23f7971e"/><stop offset="100%" stop-color="%23ffd200"/></linearGradient></defs><circle cx="50" cy="50" r="50" fill="url(%23g5)"/><circle cx="50" cy="40" r="18" fill="white" opacity="0.95"/><path d="M22 86 C24 64, 76 64, 78 86" fill="white" opacity="0.95"/></svg>',
+  },
+  {
+    id: 'avatar-6',
+    label: 'Indigo Aurora',
+    url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g6" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%234A00E0"/><stop offset="100%" stop-color="%238E2DE2"/></linearGradient></defs><circle cx="50" cy="50" r="50" fill="url(%23g6)"/><circle cx="50" cy="40" r="18" fill="white" opacity="0.95"/><path d="M22 86 C24 64, 76 64, 78 86" fill="white" opacity="0.95"/></svg>',
+  },
+]
 import {
   formatPercent,
   learnerRfcStats,
@@ -64,6 +99,7 @@ export function TeacherOverviewPage() {
     displayName: '',
     email: '',
     classId: '',
+    avatarUrl: '',
   })
 
   const selectedOptions = options.filter((o) => selectedClassIds.includes(o.classRow.id))
@@ -147,6 +183,7 @@ export function TeacherOverviewPage() {
       displayName: '',
       email: '',
       classId: classRow?.id ?? (options[0]?.classRow.id ?? ''),
+      avatarUrl: '',
     })
     setShowAddLearner(true)
   }
@@ -157,6 +194,7 @@ export function TeacherOverviewPage() {
     if (!name) return err('Display Name is required')
     const email = addLearnerDraft.email.trim() || undefined
     const classId = addLearnerDraft.classId
+    const avatarUrl = addLearnerDraft.avatarUrl.trim() || undefined
 
     setSavingLearner(true)
     try {
@@ -167,6 +205,7 @@ export function TeacherOverviewPage() {
         const res = createLearnerAndEnroll(roster, classId, {
           displayName: name,
           email,
+          avatarUrl,
         })
         if (!res.ok) {
           return err(res.error)
@@ -179,6 +218,7 @@ export function TeacherOverviewPage() {
         const res = addLearnerProfile(roster, {
           displayName: name,
           email,
+          avatarUrl,
         })
         if (!res.ok) {
           return err(res.error)
@@ -192,7 +232,7 @@ export function TeacherOverviewPage() {
       await syncNow({ roster: nextRoster })
       ok(`Learner ${learnerName} created`)
       setShowAddLearner(false)
-      setAddLearnerDraft({ displayName: '', email: '', classId: classRow?.id ?? '' })
+      setAddLearnerDraft({ displayName: '', email: '', classId: classRow?.id ?? '', avatarUrl: '' })
     } finally {
       setSavingLearner(false)
     }
@@ -375,9 +415,110 @@ export function TeacherOverviewPage() {
         <Panel
           icon={UserPlus}
           title="New learner"
-          description="Creates a staff-managed learner profile and optionally enrolls them into a class."
+          description="Creates a staff-managed learner profile with customizable avatar and optional class enrollment."
         >
           <form className="accounts-add-form" onSubmit={(e) => void handleCreateLearner(e)}>
+            {/* Sleek Avatar Uploader */}
+            <div className="avatar-uploader-section p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/40 mb-4">
+              <span className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3">
+                Learner Avatar
+              </span>
+              <div className="flex flex-wrap items-center gap-5">
+                {/* Circular Avatar Preview */}
+                <div className="relative flex-shrink-0">
+                  <div className="h-20 w-20 rounded-full border-2 border-indigo-500/30 shadow-md overflow-hidden bg-white dark:bg-slate-800 flex items-center justify-center">
+                    {addLearnerDraft.avatarUrl ? (
+                      <img
+                        src={addLearnerDraft.avatarUrl}
+                        alt="Avatar preview"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
+                        <UserPlus className="h-7 w-7 opacity-60" />
+                        <span className="text-[10px] mt-0.5 font-medium">No photo</span>
+                      </div>
+                    )}
+                  </div>
+                  {addLearnerDraft.avatarUrl ? (
+                    <button
+                      type="button"
+                      onClick={() => setAddLearnerDraft((d) => ({ ...d, avatarUrl: '' }))}
+                      className="absolute -top-1 -right-1 p-1 rounded-full bg-rose-500 text-white shadow hover:bg-rose-600 transition-colors"
+                      title="Clear avatar"
+                      aria-label="Clear avatar"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
+                </div>
+
+                {/* Upload & Preset Palette */}
+                <div className="flex-1 min-w-[220px] space-y-3">
+                  <div className="flex items-center gap-2">
+                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer shadow-sm transition-all text-slate-700 dark:text-slate-200">
+                      <Upload className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                      <span>Upload file</span>
+                      <input
+                        type="file"
+                        accept="image/png, image/jpeg, image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (!file) return
+                          const reader = new FileReader()
+                          reader.onload = () => {
+                            if (typeof reader.result === 'string') {
+                              setAddLearnerDraft((d) => ({ ...d, avatarUrl: reader.result as string }))
+                            }
+                          }
+                          reader.readAsDataURL(file)
+                        }}
+                      />
+                    </label>
+
+                    {addLearnerDraft.avatarUrl ? (
+                      <button
+                        type="button"
+                        onClick={() => setAddLearnerDraft((d) => ({ ...d, avatarUrl: '' }))}
+                        className="px-2.5 py-1.5 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors"
+                      >
+                        Clear avatar
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mb-1.5 font-medium">
+                      Or pick an avatar preset:
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {PRESET_AVATARS.map((preset) => {
+                        const isSelected = addLearnerDraft.avatarUrl === preset.url
+                        return (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            onClick={() =>
+                              setAddLearnerDraft((d) => ({ ...d, avatarUrl: preset.url }))
+                            }
+                            className={`h-8 w-8 rounded-full overflow-hidden transition-transform hover:scale-110 ${
+                              isSelected
+                                ? 'ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-slate-900 scale-105'
+                                : 'opacity-85 hover:opacity-100'
+                            }`}
+                            title={preset.label}
+                          >
+                            <img src={preset.url} alt={preset.label} className="h-full w-full object-cover" />
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <label>
               Display Name <span className="text-red-500">*</span>
               <input
@@ -422,7 +563,7 @@ export function TeacherOverviewPage() {
                 disabled={savingLearner}
                 onClick={() => {
                   setShowAddLearner(false)
-                  setAddLearnerDraft({ displayName: '', email: '', classId: classRow?.id ?? '' })
+                  setAddLearnerDraft({ displayName: '', email: '', classId: classRow?.id ?? '', avatarUrl: '' })
                 }}
               >
                 Cancel

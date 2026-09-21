@@ -85,6 +85,80 @@ export function approveGeneratedAsset(
   return invoke({ action: 'approveGeneratedAsset', generationJobId, notes })
 }
 
+export async function synthesizeSpeech(input: {
+  text: string
+  language: 'vi' | 'en'
+  voiceId: string
+}): Promise<{ audioContent: string; mimeType: string }> {
+  try {
+    const res = await invoke<{ audioContent: string; mimeType?: string }>({
+      action: 'synthesizeSpeech',
+      text: input.text,
+      language: input.language,
+      voiceId: input.voiceId,
+    })
+    if (res?.audioContent) {
+      return { audioContent: res.audioContent, mimeType: res.mimeType ?? 'audio/mpeg' }
+    }
+  } catch (edgeErr) {
+    // If edge function invoke fails, fallback to direct Google Cloud TTS API call
+    const apiKey =
+      (import.meta as any).env?.VITE_GOOGLE_TTS_KEY ||
+      (import.meta as any).env?.VITE_GOOGLE_CLOUD_TTS_API_KEY ||
+      'AIzaSyD6j9s-rG4OXgDLmyeCM0KVOj0ErLD-3gQ'
+
+    const cleanVoice = input.voiceId.replace(/^(google|google-cloud)\//, '')
+    const languageCode = input.language === 'vi' ? 'vi-VN' : 'en-US'
+    const isSsml = input.text.trim().startsWith('<speak>') || input.text.includes('<break')
+    let targetVoice = cleanVoice
+    if (isSsml && targetVoice.includes('Journey')) {
+      targetVoice = input.language === 'vi' ? 'vi-VN-Neural2-A' : 'en-US-Neural2-F'
+    }
+    const requestInput = isSsml
+      ? { ssml: input.text.trim().startsWith('<speak>') ? input.text : `<speak>${input.text}</speak>` }
+      : { text: input.text }
+
+    const res = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        input: requestInput,
+        voice: { languageCode, name: targetVoice },
+        audioConfig: { audioEncoding: 'MP3' },
+      }),
+    })
+
+    if (res.ok) {
+      const data = await res.json()
+      if (data?.audioContent) {
+        return { audioContent: data.audioContent, mimeType: 'audio/mpeg' }
+      }
+    }
+    throw new Error(
+      `TTS generation failed: ${edgeErr instanceof Error ? edgeErr.message : String(edgeErr)}`,
+    )
+  }
+
+  throw new Error('TTS response did not include audioContent')
+}
+
+export async function playGoogleCloudTts(
+  text: string,
+  language: 'vi' | 'en',
+  voiceId: string,
+): Promise<void> {
+  const data = await synthesizeSpeech({ text, language, voiceId })
+  if (!data?.audioContent) {
+    throw new Error('TTS response did not return audioContent')
+  }
+  return new Promise((resolve, reject) => {
+    const audio = new Audio(`data:audio/mp3;base64,${data.audioContent}`)
+    audio.onended = () => resolve()
+    audio.onerror = (e) => reject(new Error('Audio playback failed: ' + String(e)))
+    audio.play().catch(reject)
+  })
+}
+
 async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', bytes)
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
@@ -321,7 +395,7 @@ export async function generatePackageFromVocab(input: GeneratePackageFromVocabIn
       .insert({
         organization_id: organizationId,
         name: profileName,
-        version_label: 'LIVE',
+        version_label: 'v1',
         status: 'active',
         description: `CCI metrics for ${input.testType === 'green' ? 'Green Focus' : 'Red Awareness'} test package`,
       })

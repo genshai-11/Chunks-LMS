@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  Boxes,
   ChartColumn,
   Database,
   Gauge,
@@ -12,6 +13,7 @@ import { useAppState } from '../../state/useAppState'
 
 const ITEMS = [
   { to: '/admin', label: 'Home', icon: LayoutDashboard, end: true },
+  { to: '/admin/package-tests', label: 'Package Tests', icon: Boxes },
   { to: '/admin/people', label: 'Accounts', icon: Users },
   { to: '/admin/courses', label: 'Courses', icon: BookOpen },
   { to: '/admin/classes', label: 'Classes', icon: GraduationCap },

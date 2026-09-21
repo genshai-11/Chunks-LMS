@@ -22,6 +22,7 @@ function mapTestPackage(row: any): TestPackage {
     organizationId: row.organization_id,
     title: row.title,
     slug: row.slug,
+    description: row.description ?? null,
     createdByUserId: row.created_by_user_id,
     sourceMetadata: (row.source_metadata ?? {}) as Record<string, unknown>,
     archivedAt: row.archived_at,
@@ -1104,4 +1105,54 @@ export async function createDraftTestPackage(input: {
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Could not create Test Package' }
   }
+}
+
+export async function deleteTestPackage(packageId: string): Promise<void> {
+  const sb = client()
+  if (!sb) throw new Error('Supabase is not configured')
+
+  // Find all versions of this package
+  const { data: versions, error: vErr } = await sb
+    .from('test_package_versions')
+    .select('id')
+    .eq('package_id', packageId)
+  if (vErr) throw new Error(vErr.message)
+
+  const versionIds = (versions ?? []).map((v: any) => v.id)
+
+  if (versionIds.length > 0) {
+    // Delete narration_variants
+    await sb.from('narration_variants').delete().in('package_version_id', versionIds)
+    // Delete test_items
+    await sb.from('test_items').delete().in('package_version_id', versionIds)
+    // Delete section_measurement_snapshots
+    await sb.from('section_measurement_snapshots').delete().in('package_version_id', versionIds)
+    // Delete test_sections
+    await sb.from('test_sections').delete().in('package_version_id', versionIds)
+    // Delete test_package_versions
+    await sb.from('test_package_versions').delete().eq('package_id', packageId)
+  }
+
+  const { error: pkgErr } = await sb.from('test_packages').delete().eq('id', packageId)
+  if (pkgErr) throw new Error(pkgErr.message)
+  clearRequestCache()
+}
+
+export async function updateTestPackageMetadata(
+  packageId: string,
+  updates: { title?: string; slug?: string; description?: string },
+): Promise<void> {
+  const sb = client()
+  if (!sb) throw new Error('Supabase is not configured')
+
+  const payload: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+  if (updates.title !== undefined) payload.title = updates.title.trim()
+  if (updates.slug !== undefined) payload.slug = updates.slug.trim()
+  if (updates.description !== undefined) payload.description = updates.description.trim()
+
+  const { error } = await sb.from('test_packages').update(payload).eq('id', packageId)
+  if (error) throw new Error(error.message)
+  clearRequestCache()
 }

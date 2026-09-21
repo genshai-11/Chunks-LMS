@@ -10,6 +10,7 @@ import {
   getNarrationPlaybackUrl,
   listFirestoreLessons,
   listTtsModels,
+  playGoogleCloudTts,
   type FirestoreLesson,
   type NarrationGenerationTarget,
 } from '../../modules/catalog/live-test-generation'
@@ -621,47 +622,10 @@ export function AdminResourcesPage() {
     setPreviewingVoice(true)
     setError(null)
     try {
-      const apiKey =
-        (import.meta as any).env?.VITE_GOOGLE_TTS_KEY ||
-        (import.meta as any).env?.VITE_GOOGLE_CLOUD_TTS_API_KEY ||
-        'AIzaSyD6j9s-rG4OXgDLmyeCM0KVOj0ErLD-3gQ'
-      const cleanVoice = voiceToPreview.replace(/^(google|google-cloud)\//, '')
-      const languageCode = lang === 'vi' ? 'vi-VN' : 'en-US'
-
-      const res = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          input: { text: sample },
-          voice: { languageCode, name: cleanVoice },
-          audioConfig: { audioEncoding: 'MP3' },
-        }),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        if (data.audioContent) {
-          const audio = new Audio(`data:audio/mp3;base64,${data.audioContent}`)
-          audio.onended = () => setPreviewingVoice(false)
-          audio.onerror = () => setPreviewingVoice(false)
-          await audio.play()
-          return
-        }
-      }
-    } catch {
-      // Fallback to SpeechSynthesis
-    }
-
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel()
-      const utterance = new SpeechSynthesisUtterance(sample)
-      utterance.lang = lang === 'vi' ? 'vi-VN' : 'en-US'
-      const voices = window.speechSynthesis.getVoices()
-      const matched = voices.find((v) => v.lang.startsWith(lang))
-      if (matched) utterance.voice = matched
-      utterance.onend = () => setPreviewingVoice(false)
-      utterance.onerror = () => setPreviewingVoice(false)
-      window.speechSynthesis.speak(utterance)
-    } else {
+      await playGoogleCloudTts(sample, lang, voiceToPreview)
+    } catch (err: any) {
+      setError(err instanceof Error ? err.message : 'Không thể phát âm thanh xem trước.')
+    } finally {
       setPreviewingVoice(false)
     }
   }
@@ -1217,7 +1181,7 @@ export function AdminResourcesPage() {
                   ) : (
                     filteredScopes.map((scope) => (
                       <option key={scope.version.id} value={scope.version.id}>
-                        {scope.packageTitle} · {scope.version.versionLabel}
+                        {scope.packageTitle.replace(/ · LIVE$/i, '')}{scope.version.versionLabel && scope.version.versionLabel !== 'LIVE' ? ` · ${scope.version.versionLabel}` : ''}
                       </option>
                     ))
                   )}

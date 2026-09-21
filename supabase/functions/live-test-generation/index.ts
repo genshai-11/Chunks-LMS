@@ -30,7 +30,9 @@ type Action =
   | "listTtsModels"
   | "listFirestoreLessons"
   | "getFirestoreLessonChunks"
-  | "generatePackageFromVocab";
+  | "generatePackageFromVocab"
+  | "synthesizeSpeech"
+  | "previewVoice";
 
 type GenerateTestItemBody = {
   action: "generateTestItem";
@@ -47,6 +49,13 @@ type GenerateNarrationBody = {
   testSectionId?: string | null;
   testItemId?: string | null;
   textOverride?: string | null;
+  language: "vi" | "en";
+  voiceId: string;
+};
+
+type SynthesizeSpeechBody = {
+  action: "synthesizeSpeech" | "previewVoice";
+  text: string;
   language: "vi" | "en";
   voiceId: string;
 };
@@ -88,12 +97,14 @@ type GeneratePackageFromVocabBody = {
   targetCpd?: number;
   packageCode?: string;
   title?: string;
+  versionLabel?: string;
   saveDraft?: boolean;
 };
 
 type RequestBody =
   | GenerateTestItemBody
   | GenerateNarrationBody
+  | SynthesizeSpeechBody
   | ApproveGeneratedAssetBody
   | GetNarrationPlaybackUrlBody
   | ListTtsModelsBody
@@ -897,6 +908,7 @@ async function generatePackageFromVocabHandler(
     targetCpd: body.targetCpd,
     packageCode: body.packageCode,
     title: body.title,
+    versionLabel: body.versionLabel || "v1",
   });
 
   if (body.saveDraft === false) {
@@ -956,6 +968,7 @@ async function handleRequest(req: Request): Promise<Response> {
       paidGenerationRequiresExplicitAction: true,
       firestoreLessonIngestion: true,
       vocabPackageGeneration: true,
+      synthesizeSpeech: true,
     });
   }
 
@@ -981,6 +994,32 @@ async function handleRequest(req: Request): Promise<Response> {
         makeAdapter(),
       ),
     );
+  }
+
+  if (body.action === "synthesizeSpeech" || body.action === "previewVoice") {
+    await requireStaff(userClient);
+    const speechBody = body as unknown as SynthesizeSpeechBody;
+    if (!speechBody.text || !speechBody.language || !speechBody.voiceId) {
+      throw new Error("text, language, and voiceId are required for synthesizeSpeech");
+    }
+    const googleApiKey = getGoogleApiKey();
+    const ttsAdapter = createGoogleCloudTtsAdapter({ apiKey: googleApiKey });
+    const speechResult = await ttsAdapter.generateSpeech({
+      text: speechBody.text,
+      language: speechBody.language,
+      voiceId: speechBody.voiceId,
+    });
+    let binary = "";
+    const bytes = speechResult.bytes;
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    const audioContent = btoa(binary);
+    return jsonResponse({
+      audioContent,
+      mimeType: speechResult.mimeType || "audio/mpeg",
+      format: speechResult.format || "mp3",
+    });
   }
 
   const actorUserId = await requireAdmin(userClient);

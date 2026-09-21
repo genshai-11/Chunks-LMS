@@ -7,6 +7,7 @@ export type TestPackage = {
   organizationId: string
   title: string
   slug: string
+  description?: string | null
   createdByUserId: string | null
   sourceMetadata: Record<string, unknown>
   archivedAt: string | null

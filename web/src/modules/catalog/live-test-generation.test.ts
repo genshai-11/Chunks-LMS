@@ -92,4 +92,81 @@ describe('live-test-generation client bridge', () => {
     })
     expect(result).toEqual(mockResponse)
   })
+
+  it('synthesizeSpeech invokes edge function synthesizeSpeech', async () => {
+    const mockTtsResult = {
+      audioContent: 'AAAA',
+      mimeType: 'audio/mpeg',
+    }
+
+    const mockInvoke = vi.fn().mockResolvedValue({
+      data: mockTtsResult,
+      error: null,
+    })
+
+    vi.spyOn(supabaseLib, 'getSupabase').mockReturnValue({
+      functions: { invoke: mockInvoke },
+    } as any)
+
+    const { synthesizeSpeech } = await import('./live-test-generation')
+    const result = await synthesizeSpeech({
+      text: 'Hello world',
+      language: 'en',
+      voiceId: 'google/en-US-Neural2-F',
+    })
+
+    expect(mockInvoke).toHaveBeenCalledWith('live-test-generation', {
+      body: {
+        action: 'synthesizeSpeech',
+        text: 'Hello world',
+        language: 'en',
+        voiceId: 'google/en-US-Neural2-F',
+      },
+    })
+    expect(result.audioContent).toBe('AAAA')
+    expect(result.mimeType).toBe('audio/mpeg')
+  })
+
+  it('playGoogleCloudTts constructs Audio and plays base64 data', async () => {
+    const mockTtsResult = {
+      audioContent: 'AAAA',
+      mimeType: 'audio/mpeg',
+    }
+
+    const mockInvoke = vi.fn().mockResolvedValue({
+      data: mockTtsResult,
+      error: null,
+    })
+
+    vi.spyOn(supabaseLib, 'getSupabase').mockReturnValue({
+      functions: { invoke: mockInvoke },
+    } as any)
+
+    let createdAudioSrc = ''
+    const playMock = vi.fn().mockResolvedValue(undefined)
+
+    // Mock Audio global
+    vi.stubGlobal('Audio', class MockAudio {
+      src: string
+      onended: (() => void) | null = null
+      onerror: ((e: any) => void) | null = null
+      constructor(src: string) {
+        this.src = src
+        createdAudioSrc = src
+      }
+      play() {
+        if (this.onended) {
+          setTimeout(this.onended, 10)
+        }
+        return playMock()
+      }
+    })
+
+    const { playGoogleCloudTts } = await import('./live-test-generation')
+    await playGoogleCloudTts('Xin chào', 'vi', 'google/vi-VN-Neural2-A')
+
+    expect(playMock).toHaveBeenCalled()
+    expect(createdAudioSrc).toBe('data:audio/mp3;base64,AAAA')
+    vi.unstubAllGlobals()
+  })
 })

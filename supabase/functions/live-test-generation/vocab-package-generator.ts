@@ -137,6 +137,7 @@ export type GeneratePackageStructureInput = {
   targetCpd?: number;
   packageCode?: string;
   title?: string;
+  versionLabel?: string;
 };
 
 export type GeneratedPackageStructure = {
@@ -144,6 +145,7 @@ export type GeneratedPackageStructure = {
   title: string;
   slug: string;
   description: string;
+  versionLabel: string;
   testType: "GREEN" | "RED";
   targetQuestions: number;
   targetCpd: number;
@@ -484,6 +486,7 @@ export function generatePackageStructure(
     title,
     slug,
     description,
+    versionLabel: input.versionLabel?.trim() || "v1",
     testType,
     targetQuestions,
     targetCpd,
@@ -554,7 +557,7 @@ export async function persistDraftPackage(
     .from("test_package_versions")
     .insert({
       package_id: pkgRow.id,
-      version_label: "v1",
+      version_label: structure.versionLabel || "v1",
       status: "draft",
       created_by_user_id: actorUserId,
       source_metadata: {

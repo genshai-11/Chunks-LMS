@@ -6,6 +6,7 @@ import {
   List,
   Play,
   School,
+  UserPlus,
   Users,
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -16,6 +17,8 @@ import { EmptyState, Panel } from '../../components/ui'
 import { useFlash } from '../../hooks/useFlash'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import {
+  addLearnerProfile,
+  createLearnerAndEnroll,
   enrollLearner,
   listActiveLearners,
 } from '../../modules/roster/service'
@@ -55,6 +58,13 @@ export function TeacherOverviewPage() {
   const { message, error, ok, err } = useFlash()
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [startingLearnerId, setStartingLearnerId] = useState<string | null>(null)
+  const [showAddLearner, setShowAddLearner] = useState(false)
+  const [savingLearner, setSavingLearner] = useState(false)
+  const [addLearnerDraft, setAddLearnerDraft] = useState({
+    displayName: '',
+    email: '',
+    classId: '',
+  })
 
   const selectedOptions = options.filter((o) => selectedClassIds.includes(o.classRow.id))
   const totalSeats = selectedOptions.reduce((sum, o) => sum + o.seats, 0)
@@ -125,12 +135,68 @@ export function TeacherOverviewPage() {
       }
     })
 
-    if (selectedClassIds.length === 0) return []
-    return mapped.filter((learner) => learner.assignedToSelectedClasses)
+    if (selectedClassIds.length === 0) return mapped
+    return mapped.filter((learner) => learner.assignedToSelectedClasses || learner.classIds.length === 0)
   }, [classRow, ledger, roster, scheduling, selectedClassIds])
 
   const selectedLearner =
     learners.find((learner) => learner.id === activeLearnerUserId) ?? learners[0] ?? null
+
+  function openAddLearnerModal() {
+    setAddLearnerDraft({
+      displayName: '',
+      email: '',
+      classId: classRow?.id ?? (options[0]?.classRow.id ?? ''),
+    })
+    setShowAddLearner(true)
+  }
+
+  async function handleCreateLearner(e: React.FormEvent) {
+    e.preventDefault()
+    const name = addLearnerDraft.displayName.trim()
+    if (!name) return err('Display Name is required')
+    const email = addLearnerDraft.email.trim() || undefined
+    const classId = addLearnerDraft.classId
+
+    setSavingLearner(true)
+    try {
+      let nextRoster = roster
+      let learnerName = name
+
+      if (classId) {
+        const res = createLearnerAndEnroll(roster, classId, {
+          displayName: name,
+          email,
+        })
+        if (!res.ok) {
+          return err(res.error)
+        }
+        nextRoster = res.state
+        learnerName = res.value.learner.displayName
+        setActiveLearnerUserId(res.value.learner.id)
+        setActiveClassId(classId)
+      } else {
+        const res = addLearnerProfile(roster, {
+          displayName: name,
+          email,
+        })
+        if (!res.ok) {
+          return err(res.error)
+        }
+        nextRoster = res.state
+        learnerName = res.value.displayName
+        setActiveLearnerUserId(res.value.id)
+      }
+
+      setRoster(nextRoster)
+      await syncNow({ roster: nextRoster })
+      ok(`Learner ${learnerName} created`)
+      setShowAddLearner(false)
+      setAddLearnerDraft({ displayName: '', email: '', classId: classRow?.id ?? '' })
+    } finally {
+      setSavingLearner(false)
+    }
+  }
 
   async function assignActiveClass(learnerId: string) {
     if (!classRow) return err('Create or select a class label first')
@@ -276,6 +342,14 @@ export function TeacherOverviewPage() {
           <div className="page-actions">
             <button
               type="button"
+              className="primary"
+              onClick={openAddLearnerModal}
+            >
+              <UserPlus className="h-4 w-4" aria-hidden />
+              <span>Add learner</span>
+            </button>
+            <button
+              type="button"
               className={viewMode === 'grid' ? 'active' : 'ghost'}
               onClick={() => setViewMode('grid')}
               title="Grid card view"
@@ -296,6 +370,67 @@ export function TeacherOverviewPage() {
         }
       />
       <Flash message={message} error={error} />
+
+      {showAddLearner ? (
+        <Panel
+          icon={UserPlus}
+          title="New learner"
+          description="Creates a staff-managed learner profile and optionally enrolls them into a class."
+        >
+          <form className="accounts-add-form" onSubmit={(e) => void handleCreateLearner(e)}>
+            <label>
+              Display Name <span className="text-red-500">*</span>
+              <input
+                type="text"
+                value={addLearnerDraft.displayName}
+                onChange={(e) => setAddLearnerDraft((d) => ({ ...d, displayName: e.target.value }))}
+                required
+                placeholder="Learner name (e.g. Alex Nguyen)"
+                autoFocus
+              />
+            </label>
+            <label>
+              Email (optional)
+              <input
+                type="email"
+                value={addLearnerDraft.email}
+                onChange={(e) => setAddLearnerDraft((d) => ({ ...d, email: e.target.value }))}
+                placeholder="learner@school.edu"
+              />
+            </label>
+            <label>
+              Class enrollment
+              <select
+                value={addLearnerDraft.classId}
+                onChange={(e) => setAddLearnerDraft((d) => ({ ...d, classId: e.target.value }))}
+              >
+                <option value="">Do not enroll in a class yet</option>
+                {options.map((opt) => (
+                  <option key={opt.classRow.id} value={opt.classRow.id}>
+                    {opt.classRow.name} ({opt.course.code} - {opt.course.name})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="btn-row">
+              <button type="submit" className="primary" disabled={savingLearner}>
+                {savingLearner ? 'Saving…' : 'Save Learner'}
+              </button>
+              <button
+                type="button"
+                className="ghost"
+                disabled={savingLearner}
+                onClick={() => {
+                  setShowAddLearner(false)
+                  setAddLearnerDraft({ displayName: '', email: '', classId: classRow?.id ?? '' })
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </Panel>
+      ) : null}
 
       <Panel
         icon={Users}

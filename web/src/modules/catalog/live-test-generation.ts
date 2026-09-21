@@ -68,6 +68,7 @@ export type NarrationGenerationTarget =
 export function generateNarration(input: {
   packageVersionId: string
   target: NarrationGenerationTarget
+  part?: number
   testSectionId?: string
   testItemId?: string
   textOverride?: string

@@ -34,6 +34,7 @@ type GenerateNarrationBody = {
   action: "generateNarration";
   packageVersionId: string;
   target: "package_start" | "part_intro" | "package_end" | "section_intro" | "test_item";
+  part?: number | null;
   testSectionId?: string | null;
   testItemId?: string | null;
   textOverride?: string | null;
@@ -592,7 +593,10 @@ async function generateNarration(
       audio_asset_id: audio.id,
       approval_status: "generated",
       generation_job_id: jobId,
-      provider_metadata: redactProviderMetadata(speech.providerMetadata),
+      provider_metadata: redactProviderMetadata({
+        ...speech.providerMetadata,
+        ...(body.part ? { part: body.part } : {}),
+      }),
     })
     .select("id")
     .single();

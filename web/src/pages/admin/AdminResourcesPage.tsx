@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Database, Gauge, ListChecks, Pencil, Plus, RefreshCw, Search, Trash2, Volume2 } from 'lucide-react'
+import { Database, Gauge, ListChecks, Pencil, Play, Plus, RefreshCw, Search, Trash2, Volume2, WandSparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Flash } from '../../components/Flash'
 import { PageHeader } from '../../components/PageHeader'
 import { EmptyState, Panel } from '../../components/ui'
-import { generateNarration } from '../../modules/catalog/live-test-generation'
+import {
+  generateNarration,
+  getNarrationPlaybackUrl,
+  listTtsModels,
+  type NarrationGenerationTarget,
+} from '../../modules/catalog/live-test-generation'
 import {
   createStandaloneAssignment,
   prepareStandaloneRun,
@@ -32,6 +37,7 @@ import {
   updateDraftTestItem,
   updateDraftTestSection,
   updateTestPackage,
+  type NarrationReviewRecord,
   type TestPackagePublicationReadiness,
 } from '../../lib/test-packages'
 import {
@@ -57,7 +63,7 @@ type PackageScope = {
   packageTitle: string
   version: TestPackageVersion
 }
-type ResourceTab = 'sessions' | 'items' | 'cci' | 'audio'
+type ResourceTab = 'sessions' | 'items' | 'cci' | 'audio' | 'flow'
 
 function metricOhm(value: number | null | undefined): string {
   return value == null ? '—' : `${value} Ω`
@@ -91,6 +97,23 @@ export function AdminResourcesPage() {
   const [voiceId, setVoiceId] = useState('google/vi-VN-Neural2-A')
   const [publishVoiceVi, setPublishVoiceVi] = useState('google/vi-VN-Neural2-A')
   const [publishVoiceEn, setPublishVoiceEn] = useState('google/en-US-Journey-F')
+  const [ttsModels, setTtsModels] = useState<Array<{ id: string; provider: string; label: string }>>([])
+  const [modelsLoading, setModelsLoading] = useState(false)
+  const [previewingVoice, setPreviewingVoice] = useState(false)
+  const [generatingItemId, setGeneratingItemId] = useState<string | null>(null)
+  const [itemReviewRecords, setItemReviewRecords] = useState<Record<string, NarrationReviewRecord>>({})
+  const [itemHashes, setItemHashes] = useState<Record<string, string>>({})
+  const [playingVariantId, setPlayingVariantId] = useState<string | null>(null)
+  const [flowVariants, setFlowVariants] = useState<Record<string, any>>({})
+  const [flowLoading, setFlowLoading] = useState(false)
+  const [generatingFlowTarget, setGeneratingFlowTarget] = useState<string | null>(null)
+  const [flowScripts, setFlowScripts] = useState({
+    package_start: '',
+    part_intro_1: '',
+    part_intro_2: '',
+    part_intro_3: '',
+    package_end: '',
+  })
   const [publication, setPublication] = useState<TestPackagePublicationReadiness | null>(null)
   const [publishing, setPublishing] = useState(false)
   const [audioStatuses, setAudioStatuses] = useState<AudioTargetStatus[]>([])
@@ -211,6 +234,7 @@ export function AdminResourcesPage() {
 
       setMessage(`Successfully generated ${totalAudioTargets} audio assets for Session ${section.sectionOrder} (${language.toUpperCase()})`)
       await loadPublicationReadiness()
+      await loadSectionAudioReview()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Batch generation failed')
     } finally {
@@ -315,45 +339,303 @@ export function AdminResourcesPage() {
     void loadItems()
   }, [loadItems])
 
-  useEffect(() => {
+  const loadSectionAudioReview = useCallback(async () => {
     if (!selectedSection || !selectedScope) {
       setAudioStatuses(Array((items.length || 10) + 1).fill('missing'))
+      setItemReviewRecords({})
+      setItemHashes({})
       return
     }
-    void (async () => {
-      const review = await listSectionNarrationReview({
+    const review = await listSectionNarrationReview({
+      packageVersionId: selectedScope.version.id,
+      sectionId: selectedSection.id,
+      itemIds: items.map((item) => item.id),
+      language,
+      voiceId,
+    })
+    if (!review.ok) {
+      setError(review.error)
+      return
+    }
+    const introText =
+      language === 'vi' ? selectedSection.introTextVi : selectedSection.introTextEn
+    const introHash = introText
+      ? await narrationSourceHash(introText, language, voiceId)
+      : undefined
+    const introKey = `section:${selectedSection.id}`
+    const statuses = [
+      audioTargetStatus(resolveNarrationRecord(review.data, introKey, introHash), introHash),
+    ]
+    const itemRecs: Record<string, NarrationReviewRecord> = {}
+    const nextHashes: Record<string, string> = {}
+    for (const item of items) {
+      const prompt = language === 'vi' ? item.promptVi : item.promptEn
+      const override = language === 'vi' ? item.spokenScriptVi : item.spokenScriptEn
+      const script = prompt
+        ? resolveItemSpokenScript({ itemOrder: item.itemOrder, prompt, language, override })
+        : ''
+      const hash = script ? await narrationSourceHash(script, language, voiceId) : undefined
+      if (hash) nextHashes[item.id] = hash
+      const itemKey = `item:${item.id}`
+      const rec = resolveNarrationRecord(review.data, itemKey, hash)
+      if (rec) itemRecs[item.id] = rec
+      statuses.push(audioTargetStatus(rec, hash))
+    }
+    setAudioStatuses(statuses)
+    setItemReviewRecords(itemRecs)
+    setItemHashes(nextHashes)
+  }, [items, language, selectedScope, selectedSection, voiceId])
+
+  useEffect(() => {
+    void loadSectionAudioReview()
+  }, [loadSectionAudioReview])
+
+  useEffect(() => {
+    let active = true
+    setModelsLoading(true)
+    void listTtsModels(language)
+      .then((res) => {
+        if (!active) return
+        setTtsModels(res.models)
+        setVoiceId((current) => {
+          if (res.models.some((m) => m.id === current)) return current
+          const needle = language === 'vi' ? 'vi-' : 'en-'
+          return (
+            res.models.find((m) => m.id.toLowerCase().includes(needle))?.id ??
+            res.models.find((m) => m.id.toLowerCase().includes('multilingual'))?.id ??
+            res.models[0]?.id ??
+            (language === 'vi' ? 'google/vi-VN-Neural2-A' : 'google/en-US-Journey-F')
+          )
+        })
+      })
+      .catch(() => {
+        if (!active) return
+        const fallbackModels =
+          language === 'vi'
+            ? [
+                { id: 'google/vi-VN-Neural2-A', provider: 'google', label: 'Google vi-VN-Neural2-A (Female)' },
+                { id: 'google/vi-VN-Neural2-D', provider: 'google', label: 'Google vi-VN-Neural2-D (Male)' },
+                { id: 'google/vi-VN-Wavenet-A', provider: 'google', label: 'Google vi-VN-Wavenet-A (Female)' },
+                { id: 'google/vi-VN-Wavenet-C', provider: 'google', label: 'Google vi-VN-Wavenet-C (Male)' },
+              ]
+            : [
+                { id: 'google/en-US-Journey-F', provider: 'google', label: 'Google en-US-Journey-F (Female)' },
+                { id: 'google/en-US-Journey-D', provider: 'google', label: 'Google en-US-Journey-D (Male)' },
+                { id: 'google/en-US-Neural2-F', provider: 'google', label: 'Google en-US-Neural2-F (Female)' },
+                { id: 'google/en-US-Neural2-J', provider: 'google', label: 'Google en-US-Neural2-J (Male)' },
+              ]
+        setTtsModels(fallbackModels)
+      })
+      .finally(() => {
+        if (active) setModelsLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [language])
+
+  async function previewVoice(voiceToPreview: string, lang: 'vi' | 'en') {
+    const sample =
+      lang === 'vi'
+        ? 'Xin chào, đây là giọng đọc chuẩn trên Chunks LMS.'
+        : 'Hello, this is a sample voice on Chunks LMS.'
+    setPreviewingVoice(true)
+    setError(null)
+    try {
+      const apiKey =
+        (import.meta as any).env?.VITE_GOOGLE_TTS_KEY ||
+        (import.meta as any).env?.VITE_GOOGLE_CLOUD_TTS_API_KEY ||
+        'AIzaSyD6j9s-rG4OXgDLmyeCM0KVOj0ErLD-3gQ'
+      const cleanVoice = voiceToPreview.replace(/^(google|google-cloud)\//, '')
+      const languageCode = lang === 'vi' ? 'vi-VN' : 'en-US'
+
+      const res = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          input: { text: sample },
+          voice: { languageCode, name: cleanVoice },
+          audioConfig: { audioEncoding: 'MP3' },
+        }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.audioContent) {
+          const audio = new Audio(`data:audio/mp3;base64,${data.audioContent}`)
+          audio.onended = () => setPreviewingVoice(false)
+          audio.onerror = () => setPreviewingVoice(false)
+          await audio.play()
+          return
+        }
+      }
+    } catch {
+      // Fallback to SpeechSynthesis
+    }
+
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel()
+      const utterance = new SpeechSynthesisUtterance(sample)
+      utterance.lang = lang === 'vi' ? 'vi-VN' : 'en-US'
+      const voices = window.speechSynthesis.getVoices()
+      const matched = voices.find((v) => v.lang.startsWith(lang))
+      if (matched) utterance.voice = matched
+      utterance.onend = () => setPreviewingVoice(false)
+      utterance.onerror = () => setPreviewingVoice(false)
+      window.speechSynthesis.speak(utterance)
+    } else {
+      setPreviewingVoice(false)
+    }
+  }
+
+  async function playNarrationVariant(variantId: string) {
+    setPlayingVariantId(variantId)
+    setError(null)
+    try {
+      const playback = await getNarrationPlaybackUrl(variantId)
+      const audio = new Audio(playback.signedUrl)
+      audio.onended = () => setPlayingVariantId(null)
+      audio.onerror = () => setPlayingVariantId(null)
+      await audio.play()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Playback failed')
+      setPlayingVariantId(null)
+    }
+  }
+
+  async function generateSingleItemAudio(item: TestItem) {
+    if (!selectedScope) return
+    setGeneratingItemId(item.id)
+    setError(null)
+    try {
+      const receipt = await generateNarration({
         packageVersionId: selectedScope.version.id,
-        sectionId: selectedSection.id,
-        itemIds: items.map((item) => item.id),
+        target: 'test_item',
+        testItemId: item.id,
         language,
         voiceId,
       })
-      if (!review.ok) {
-        setError(review.error)
-        return
+      if (receipt.status === 'failed') {
+        throw new Error(receipt.errorMessage ?? `Generation failed for item #${item.itemOrder}`)
       }
-      const introText =
-        language === 'vi' ? selectedSection.introTextVi : selectedSection.introTextEn
-      const introHash = introText
-        ? await narrationSourceHash(introText, language, voiceId)
-        : undefined
-      const introKey = `section:${selectedSection.id}`
-      const statuses = [
-        audioTargetStatus(resolveNarrationRecord(review.data, introKey, introHash), introHash),
-      ]
-      for (const item of items) {
-        const prompt = language === 'vi' ? item.promptVi : item.promptEn
-        const override = language === 'vi' ? item.spokenScriptVi : item.spokenScriptEn
-        const script = prompt
-          ? resolveItemSpokenScript({ itemOrder: item.itemOrder, prompt, language, override })
-          : ''
-        const hash = script ? await narrationSourceHash(script, language, voiceId) : undefined
-        const itemKey = `item:${item.id}`
-        statuses.push(audioTargetStatus(resolveNarrationRecord(review.data, itemKey, hash), hash))
+      setMessage(`Generated audio for item #${item.itemOrder} (${language.toUpperCase()} · ${voiceId})`)
+      await loadSectionAudioReview()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Item audio generation failed')
+    } finally {
+      setGeneratingItemId(null)
+    }
+  }
+
+  useEffect(() => {
+    const title = selectedScope?.packageTitle ?? 'Live Test'
+    setFlowScripts({
+      package_start:
+        language === 'vi'
+          ? `Bắt đầu bài kiểm tra ${title}. Hãy lắng nghe và trả lời từng câu.`
+          : `Start the ${title} test. Listen carefully and answer each item.`,
+      part_intro_1:
+        language === 'vi'
+          ? `Bắt đầu Phần 1 của bài kiểm tra ${title}.`
+          : `Start Part 1 of the ${title} test.`,
+      part_intro_2:
+        language === 'vi'
+          ? `Bắt đầu Phần 2 của bài kiểm tra ${title}.`
+          : `Start Part 2 of the ${title} test.`,
+      part_intro_3:
+        language === 'vi'
+          ? `Bắt đầu Phần 3 của bài kiểm tra ${title}.`
+          : `Start Part 3 of the ${title} test.`,
+      package_end:
+        language === 'vi'
+          ? `Kết thúc bài kiểm tra ${title}. Cảm ơn em đã hoàn thành phần kiểm tra.`
+          : `End of the ${title} test. Thank you for completing the test.`,
+    })
+  }, [language, selectedScope?.packageTitle])
+
+  const loadPackageFlowVariants = useCallback(async () => {
+    if (!versionId) {
+      setFlowVariants({})
+      return
+    }
+    setFlowLoading(true)
+    try {
+      const sb = getSupabase()
+      if (!sb) return
+      const { data, error: vErr } = await sb
+        .from('narration_variants')
+        .select('*')
+        .eq('package_version_id', versionId)
+        .eq('language', language)
+        .in('narration_target', ['package_start', 'part_intro', 'package_end'])
+        .order('created_at', { ascending: false })
+
+      if (vErr || !data) return
+
+      const mapped: Record<string, any> = {}
+      for (const row of data) {
+        let key = row.narration_target
+        if (row.narration_target === 'part_intro') {
+          const p = row.provider_metadata?.part ?? 1
+          key = `part_intro_${p}`
+        }
+        if (!mapped[key]) {
+          mapped[key] = row
+        }
       }
-      setAudioStatuses(statuses)
-    })()
-  }, [items, language, selectedScope, selectedSection, voiceId])
+      setFlowVariants(mapped)
+    } finally {
+      setFlowLoading(false)
+    }
+  }, [language, versionId])
+
+  useEffect(() => {
+    void loadPackageFlowVariants()
+  }, [loadPackageFlowVariants])
+
+  async function generateFlowAudio(targetKey: 'package_start' | 'part_intro_1' | 'part_intro_2' | 'part_intro_3' | 'package_end') {
+    if (!selectedScope) return
+    setGeneratingFlowTarget(targetKey)
+    setError(null)
+    try {
+      let target: NarrationGenerationTarget = 'package_start'
+      let part: number | undefined = undefined
+      if (targetKey === 'package_start') target = 'package_start'
+      else if (targetKey === 'package_end') target = 'package_end'
+      else if (targetKey === 'part_intro_1') { target = 'part_intro'; part = 1 }
+      else if (targetKey === 'part_intro_2') { target = 'part_intro'; part = 2 }
+      else if (targetKey === 'part_intro_3') { target = 'part_intro'; part = 3 }
+
+      const textOverride = flowScripts[targetKey]
+      const receipt = await generateNarration({
+        packageVersionId: selectedScope.version.id,
+        target,
+        part,
+        textOverride,
+        language,
+        voiceId,
+      })
+      if (receipt.status === 'failed') {
+        throw new Error(receipt.errorMessage ?? `Generation failed for ${targetKey}`)
+      }
+
+      if (part && receipt.narrationVariantId) {
+        const sb = getSupabase()
+        if (sb) {
+          await sb
+            .from('narration_variants')
+            .update({ provider_metadata: { part } })
+            .eq('id', receipt.narrationVariantId)
+        }
+      }
+
+      setMessage(`Generated audio for ${targetKey.replace(/_/g, ' ')} (${language.toUpperCase()} · ${voiceId})`)
+      await loadPackageFlowVariants()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Flow audio generation failed')
+    } finally {
+      setGeneratingFlowTarget(null)
+    }
+  }
 
   const [sectionsReadiness, setSectionsReadiness] = useState<Record<string, { vi: number; en: number }>>({})
   const [sectionItemCounts, setSectionItemCounts] = useState<Record<string, number>>({})
@@ -789,8 +1071,48 @@ export function AdminResourcesPage() {
                 </div>
               ) : null}
             </div>
+            <div className="resource-voice-toolbar" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', padding: '0.625rem 1rem', background: 'var(--surface-subtle, #f8fafc)', border: '1px solid var(--line-subtle, #e2e8f0)', borderRadius: '0.5rem', margin: '0.75rem 0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8125rem', fontWeight: 600 }}>
+                <Volume2 className="h-4 w-4 text-indigo-600" />
+                <span>TTS Voice:</span>
+              </div>
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value as AudioLanguage)}
+                style={{ fontSize: '0.8125rem', padding: '0.25rem 0.5rem' }}
+                title="Target Audio Language"
+              >
+                <option value="vi">Vietnamese (VI)</option>
+                <option value="en">English (EN)</option>
+              </select>
+              <select
+                value={voiceId}
+                onChange={(e) => setVoiceId(e.target.value)}
+                disabled={modelsLoading}
+                style={{ fontSize: '0.8125rem', padding: '0.25rem 0.5rem', minWidth: '220px' }}
+                title="TTS Voice Model"
+              >
+                {ttsModels.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label || m.id}
+                  </option>
+                ))}
+                {ttsModels.length === 0 ? <option value={voiceId}>{voiceId}</option> : null}
+              </select>
+              <button
+                type="button"
+                className="ghost"
+                disabled={previewingVoice}
+                onClick={() => void previewVoice(voiceId, language)}
+                title="Nghe thử giọng đọc mẫu với model đã chọn"
+                style={{ fontSize: '0.8125rem', display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}
+              >
+                <Volume2 className={`h-3.5 w-3.5 ${previewingVoice ? 'text-indigo-600 animate-pulse' : ''}`} />
+                <span>{previewingVoice ? 'Đang phát…' : 'Nghe thử model'}</span>
+              </button>
+            </div>
             <div className="resource-tabs">
-              {(['sessions', 'items', 'cci', 'audio'] as ResourceTab[]).map((tab) => (
+              {(['sessions', 'items', 'cci', 'audio', 'flow'] as ResourceTab[]).map((tab) => (
                 <button
                   key={tab}
                   className={activeTab === tab ? 'primary' : 'ghost'}
@@ -800,7 +1122,9 @@ export function AdminResourcesPage() {
                     ? 'Items / CVR'
                     : tab === 'audio'
                       ? 'Audio Prep'
-                      : tab[0].toUpperCase() + tab.slice(1)}
+                      : tab === 'flow'
+                        ? 'Package Flow Audio'
+                        : tab[0].toUpperCase() + tab.slice(1)}
                 </button>
               ))}
             </div>
@@ -983,19 +1307,15 @@ export function AdminResourcesPage() {
                             </div>
                           </td>
                           <td>
-                            {selectedScope?.version.status === 'draft' ? (
-                              <button
-                                className="ghost"
-                                disabled={generatingSectionId !== null}
-                                onClick={() => void generateSessionAudio(section.id)}
-                              >
-                                {generatingSectionId === section.id
-                                  ? `Generating ${genProgress?.done}/${genProgress?.total}…`
-                                  : 'Generate Audio'}
-                              </button>
-                            ) : (
-                              <span className="meta">Immutable (Published)</span>
-                            )}
+                            <button
+                              className="ghost"
+                              disabled={generatingSectionId !== null}
+                              onClick={() => void generateSessionAudio(section.id)}
+                            >
+                              {generatingSectionId === section.id
+                                ? `Generating ${genProgress?.done}/${genProgress?.total}…`
+                                : 'Generate Audio'}
+                            </button>
                           </td>
                           <td>
                             <div className="resource-row-actions">
@@ -1220,9 +1540,53 @@ export function AdminResourcesPage() {
                             </span>
                           </td>
                           <td>
-                            <span className="badge">
-                              {audioStatuses[item.itemOrder] ?? 'missing'}
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                              <span
+                                className={`badge ${
+                                  audioStatuses[item.itemOrder] === 'approved'
+                                    ? 'success'
+                                    : audioStatuses[item.itemOrder] === 'generated'
+                                    ? 'info'
+                                    : audioStatuses[item.itemOrder] === 'stale'
+                                    ? 'experimental'
+                                    : ''
+                                }`}
+                              >
+                                {audioStatuses[item.itemOrder] ?? 'missing'}
+                              </span>
+                              {itemReviewRecords[item.id]?.variant?.id &&
+                              (audioStatuses[item.itemOrder] === 'approved' ||
+                                audioStatuses[item.itemOrder] === 'generated') ? (
+                                <button
+                                  type="button"
+                                  className="ghost compact-action-btn"
+                                  title="Play prompt audio"
+                                  style={{ padding: '0.2rem', height: '1.75rem', width: '1.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                                  disabled={playingVariantId === itemReviewRecords[item.id].variant.id}
+                                  onClick={() => void playNarrationVariant(itemReviewRecords[item.id].variant.id)}
+                                >
+                                  <Play className={`h-3.5 w-3.5 ${playingVariantId === itemReviewRecords[item.id].variant.id ? 'text-indigo-600 animate-pulse' : ''}`} />
+                                </button>
+                              ) : null}
+                              {(audioStatuses[item.itemOrder] === 'missing' ||
+                                audioStatuses[item.itemOrder] === 'stale' ||
+                                !audioStatuses[item.itemOrder]) ? (
+                                <button
+                                  type="button"
+                                  className="ghost compact-action-btn"
+                                  title="Generate TTS for item"
+                                  style={{ padding: '0.2rem', height: '1.75rem', width: '1.75rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                                  disabled={generatingItemId === item.id}
+                                  onClick={() => void generateSingleItemAudio(item)}
+                                >
+                                  {generatingItemId === item.id ? (
+                                    <RefreshCw className="h-3.5 w-3.5 animate-spin text-indigo-600" />
+                                  ) : (
+                                    <WandSparkles className="h-3.5 w-3.5" />
+                                  )}
+                                </button>
+                              ) : null}
+                            </div>
                           </td>
                           <td>
                             {selectedScope?.version.status === 'draft' ? (
@@ -1330,7 +1694,30 @@ export function AdminResourcesPage() {
                     <option value="vi">Vietnamese</option>
                     <option value="en">English</option>
                   </select>
-                  <input value={voiceId} onChange={(e) => setVoiceId(e.target.value)} />
+                  <select
+                    value={voiceId}
+                    onChange={(e) => setVoiceId(e.target.value)}
+                    disabled={modelsLoading}
+                    style={{ minWidth: '180px' }}
+                    title="Voice Model"
+                  >
+                    {ttsModels.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label || m.id}
+                      </option>
+                    ))}
+                    {ttsModels.length === 0 ? <option value={voiceId}>{voiceId}</option> : null}
+                  </select>
+                  <button
+                    type="button"
+                    className="ghost"
+                    disabled={previewingVoice}
+                    onClick={() => void previewVoice(voiceId, language)}
+                    title="Nghe thử giọng đọc mẫu"
+                  >
+                    <Volume2 className={`h-4 w-4 ${previewingVoice ? 'text-indigo-600 animate-pulse' : ''}`} />
+                    <span>{previewingVoice ? 'Đang phát…' : 'Nghe thử model'}</span>
+                  </button>
                   <Link
                     className="btn primary"
                     to={`/admin/resources/audio?version=${versionId}&section=${selectedSectionId}&language=${language}&voice=${encodeURIComponent(voiceId)}`}
@@ -1338,6 +1725,171 @@ export function AdminResourcesPage() {
                     Open Audio Preparation
                   </Link>
                 </div>
+                <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--line-subtle, #e2e8f0)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  <div>
+                    <strong>Package Flow Audio</strong>
+                    <div className="meta">
+                      Manage package start intro, part transitions (Parts I, II, III), and end outro narration.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => setActiveTab('flow')}
+                  >
+                    Manage Package Flow Audio →
+                  </button>
+                </div>
+              </div>
+            </Panel>
+          ) : null}
+          {activeTab === 'flow' ? (
+            <Panel
+              icon={Volume2}
+              title="Package Flow Audio"
+              description="Manage start intro, part transitions (Parts I, II, III), and end outro narration with exact scripts and instant TTS."
+              collapsible={false}
+              actions={
+                <div className="btn-row" style={{ margin: 0 }}>
+                  <select
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value as AudioLanguage)}
+                    title="Target Language"
+                  >
+                    <option value="vi">Vietnamese (VI)</option>
+                    <option value="en">English (EN)</option>
+                  </select>
+                  <select
+                    value={voiceId}
+                    onChange={(e) => setVoiceId(e.target.value)}
+                    disabled={modelsLoading}
+                    style={{ minWidth: '180px' }}
+                    title="Voice Model"
+                  >
+                    {ttsModels.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label || m.id}
+                      </option>
+                    ))}
+                    {ttsModels.length === 0 ? <option value={voiceId}>{voiceId}</option> : null}
+                  </select>
+                  <button
+                    type="button"
+                    className="ghost"
+                    disabled={previewingVoice}
+                    onClick={() => void previewVoice(voiceId, language)}
+                    title="Nghe thử giọng đọc mẫu"
+                  >
+                    <Volume2 className={`h-4 w-4 ${previewingVoice ? 'text-indigo-600 animate-pulse' : ''}`} />
+                    <span>{previewingVoice ? 'Đang phát…' : 'Nghe thử model'}</span>
+                  </button>
+                </div>
+              }
+            >
+              <div className="package-flow-audio-grid" style={{ display: 'grid', gap: '1.25rem' }}>
+                {[
+                  {
+                    key: 'package_start' as const,
+                    title: 'Package Start Intro',
+                    badge: flowVariants.package_start?.approval_status ?? (flowVariants.package_start ? 'generated' : 'missing'),
+                    variant: flowVariants.package_start,
+                    description: 'Played once when starting the test package before any sessions.',
+                  },
+                  {
+                    key: 'part_intro_1' as const,
+                    title: 'Part I Intro',
+                    badge: flowVariants.part_intro_1?.approval_status ?? (flowVariants.part_intro_1 ? 'generated' : 'missing'),
+                    variant: flowVariants.part_intro_1,
+                    description: 'Played before Part I sessions begin.',
+                  },
+                  {
+                    key: 'part_intro_2' as const,
+                    title: 'Part II Intro',
+                    badge: flowVariants.part_intro_2?.approval_status ?? (flowVariants.part_intro_2 ? 'generated' : 'missing'),
+                    variant: flowVariants.part_intro_2,
+                    description: 'Played before Part II sessions begin.',
+                  },
+                  {
+                    key: 'part_intro_3' as const,
+                    title: 'Part III Intro',
+                    badge: flowVariants.part_intro_3?.approval_status ?? (flowVariants.part_intro_3 ? 'generated' : 'missing'),
+                    variant: flowVariants.part_intro_3,
+                    description: 'Played before Part III sessions begin.',
+                  },
+                  {
+                    key: 'package_end' as const,
+                    title: 'Package End Outro',
+                    badge: flowVariants.package_end?.approval_status ?? (flowVariants.package_end ? 'generated' : 'missing'),
+                    variant: flowVariants.package_end,
+                    description: 'Played at test conclusion after all sessions complete.',
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.key}
+                    style={{
+                      border: '1px solid var(--line-subtle, #e2e8f0)',
+                      borderRadius: '0.625rem',
+                      padding: '1rem',
+                      background: 'var(--surface-base, #ffffff)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <strong style={{ fontSize: '0.9375rem' }}>{item.title}</strong>
+                        <span className={`badge ${item.badge === 'approved' ? 'success' : item.badge === 'generated' ? 'info' : 'experimental'}`}>
+                          {item.badge}
+                        </span>
+                        {item.variant?.voice_id ? (
+                          <span className="meta" style={{ fontSize: '0.75rem' }}>
+                            Model: {item.variant.voice_id}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="meta" style={{ fontSize: '0.75rem' }}>
+                        {item.description}
+                      </div>
+                    </div>
+                    <textarea
+                      rows={2}
+                      value={flowScripts[item.key]}
+                      onChange={(e) => setFlowScripts((s) => ({ ...s, [item.key]: e.target.value }))}
+                      placeholder={`Spoken script for ${item.title}`}
+                      style={{ width: '100%', marginBottom: '0.75rem', fontSize: '0.875rem' }}
+                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <button
+                        type="button"
+                        className="primary"
+                        disabled={generatingFlowTarget !== null || !flowScripts[item.key].trim()}
+                        onClick={() => void generateFlowAudio(item.key)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}
+                      >
+                        {generatingFlowTarget === item.key ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                            <span>Generating…</span>
+                          </>
+                        ) : (
+                          <>
+                            <WandSparkles className="h-4 w-4" />
+                            <span>Generate TTS</span>
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost"
+                        disabled={!item.variant?.id || playingVariantId === item.variant?.id}
+                        onClick={() => void playNarrationVariant(item.variant.id)}
+                        title={item.variant?.id ? 'Play audio' : 'No audio asset generated yet'}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}
+                      >
+                        <Play className={`h-4 w-4 ${playingVariantId === item.variant?.id ? 'text-indigo-600 animate-pulse' : ''}`} />
+                        <span>{playingVariantId === item.variant?.id ? 'Playing…' : 'Play Audio'}</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </Panel>
           ) : null}

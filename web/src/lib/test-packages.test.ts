@@ -10,6 +10,7 @@ describe('test-packages CRUD helpers', () => {
       return {
         select: vi.fn(() => ({
           eq: vi.fn(() => Promise.resolve({ data: [{ id: 'ver-1' }], error: null })),
+          in: vi.fn(() => Promise.resolve({ data: [], error: null })),
         })),
         delete: vi.fn(() => {
           deleteQueries.push(table)

@@ -101,39 +101,44 @@ export async function synthesizeSpeech(input: {
       return { audioContent: res.audioContent, mimeType: res.mimeType ?? 'audio/mpeg' }
     }
   } catch (edgeErr) {
-    // If edge function invoke fails, fallback to direct Google Cloud TTS API call
     const apiKey =
       (import.meta as any).env?.VITE_GOOGLE_TTS_KEY ||
-      (import.meta as any).env?.VITE_GOOGLE_CLOUD_TTS_API_KEY ||
-      'AIzaSyD6j9s-rG4OXgDLmyeCM0KVOj0ErLD-3gQ'
+      (import.meta as any).env?.VITE_GOOGLE_CLOUD_TTS_API_KEY
 
-    const cleanVoice = input.voiceId.replace(/^(google|google-cloud)\//, '')
-    const languageCode = input.language === 'vi' ? 'vi-VN' : 'en-US'
-    const isSsml = input.text.trim().startsWith('<speak>') || input.text.includes('<break')
-    let targetVoice = cleanVoice
-    if (isSsml && targetVoice.includes('Journey')) {
-      targetVoice = input.language === 'vi' ? 'vi-VN-Neural2-A' : 'en-US-Neural2-F'
-    }
-    const requestInput = isSsml
-      ? { ssml: input.text.trim().startsWith('<speak>') ? input.text : `<speak>${input.text}</speak>` }
-      : { text: input.text }
+    if (apiKey) {
+      const cleanVoice = input.voiceId.replace(/^(google|google-cloud)\//, '')
+      const languageCode = input.language === 'vi' ? 'vi-VN' : 'en-US'
+      const isSsml = input.text.trim().startsWith('<speak>') || input.text.includes('<break')
+      let targetVoice = cleanVoice
+      if (isSsml && targetVoice.includes('Journey')) {
+        targetVoice = input.language === 'vi' ? 'vi-VN-Neural2-A' : 'en-US-Neural2-F'
+      }
+      const requestInput = isSsml
+        ? { ssml: input.text.trim().startsWith('<speak>') ? input.text : `<speak>${input.text}</speak>` }
+        : { text: input.text }
 
-    const res = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        input: requestInput,
-        voice: { languageCode, name: targetVoice },
-        audioConfig: { audioEncoding: 'MP3' },
-      }),
-    })
+      try {
+        const res = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            input: requestInput,
+            voice: { languageCode, name: targetVoice },
+            audioConfig: { audioEncoding: 'MP3' },
+          }),
+        })
 
-    if (res.ok) {
-      const data = await res.json()
-      if (data?.audioContent) {
-        return { audioContent: data.audioContent, mimeType: 'audio/mpeg' }
+        if (res.ok) {
+          const data = await res.json()
+          if (data?.audioContent) {
+            return { audioContent: data.audioContent, mimeType: 'audio/mpeg' }
+          }
+        }
+      } catch {
+        // Continue to throwing edgeErr
       }
     }
+
     throw new Error(
       `TTS generation failed: ${edgeErr instanceof Error ? edgeErr.message : String(edgeErr)}`,
     )

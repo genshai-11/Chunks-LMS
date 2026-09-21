@@ -1173,23 +1173,63 @@ export function AdminPackageTestsPage() {
 
             {/* Preview Modal Body */}
             <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
-              {/* Hierarchy View (Parts breakdown) */}
+              {/* Hierarchy View (Parts & CVR Curve) */}
               <div>
-                <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3 flex items-center gap-2">
-                  <Layers className="h-4 w-4 text-indigo-500" />
-                  <span>Test Structure Hierarchy (Sessions & Parts)</span>
-                </h4>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                    <Layers className="h-4 w-4 text-indigo-500" />
+                    <span>Test Structure & CVR Progression Curve</span>
+                  </h4>
+                  <span className="text-[11px] font-mono text-slate-400">
+                    Target: {previewPackage.items.length}Q · {previewPackage.sections.length} Sessions
+                  </span>
+                </div>
+
+                {/* Visual CVR Resistance Curve */}
+                <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 mb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      Cognitive Resistance Curve (CVR Ohms per Session)
+                    </span>
+                    <span className="text-[10px] font-mono text-indigo-600 dark:text-indigo-400">
+                      Peak: {Math.max(...previewPackage.sections.map((s) => s.targetCvrOhm ?? s.sectionOrder * 2), 1)}Ω
+                    </span>
+                  </div>
+                  <div className="h-16 flex items-end gap-2 pt-2 px-1">
+                    {previewPackage.sections.map((sec) => {
+                      const cvrVal = sec.targetCvrOhm ?? sec.sectionOrder * 2
+                      const maxCvr = Math.max(...previewPackage.sections.map((s) => s.targetCvrOhm ?? s.sectionOrder * 2), 10)
+                      const pct = Math.max(15, Math.min(100, Math.round((cvrVal / maxCvr) * 100)))
+                      return (
+                        <div key={sec.id} className="flex-1 flex flex-col items-center gap-1 group">
+                          <span className="text-[10px] font-mono font-bold text-slate-700 dark:text-slate-300 group-hover:text-indigo-600">
+                            {cvrVal}Ω
+                          </span>
+                          <div
+                            style={{ height: `${pct}%` }}
+                            className="w-full rounded-t-md bg-gradient-to-t from-indigo-500 to-indigo-400 dark:from-indigo-600 dark:to-indigo-500 transition-all group-hover:from-indigo-600 group-hover:to-indigo-300"
+                            title={`Session ${sec.sectionOrder}: CVR ${cvrVal}Ω`}
+                          />
+                          <span className="text-[9px] font-medium text-slate-400">
+                            S{sec.sectionOrder}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {previewPackage.sections.map((sec) => (
                     <div
                       key={sec.id}
-                      className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40"
+                      className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/80 shadow-xs"
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-bold text-slate-900 dark:text-white">
                           Session {sec.sectionOrder}
                         </span>
-                        <span className="font-mono text-[11px] text-indigo-600 dark:text-indigo-400">
+                        <span className="font-mono text-[11px] font-bold text-indigo-600 dark:text-indigo-400">
                           {sec.targetCvrOhm ?? sec.sectionOrder * 2}Ω CVR
                         </span>
                       </div>
@@ -1198,7 +1238,7 @@ export function AdminPackageTestsPage() {
                       </div>
                       <div className="text-[10px] text-slate-400 mt-2 flex items-center justify-between">
                         <span>Items: {previewPackage.items.filter((i) => i.sectionId === sec.id).length}</span>
-                        <span>Intro Spoken ✓</span>
+                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">Intro Audio ✓</span>
                       </div>
                     </div>
                   ))}

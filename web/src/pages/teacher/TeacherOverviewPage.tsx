@@ -457,7 +457,7 @@ export function TeacherOverviewPage() {
                 <div className="flex-1 min-w-[220px] space-y-3">
                   <div className="flex items-center gap-2">
                     <label className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer shadow-sm transition-all text-slate-700 dark:text-slate-200">
-                      <Upload className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                      <Upload className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                       <span>Upload file</span>
                       <input
                         type="file"
@@ -469,7 +469,31 @@ export function TeacherOverviewPage() {
                           const reader = new FileReader()
                           reader.onload = () => {
                             if (typeof reader.result === 'string') {
-                              setAddLearnerDraft((d) => ({ ...d, avatarUrl: reader.result as string }))
+                              const img = new Image()
+                              img.onload = () => {
+                                const maxDim = 128
+                                let width = img.width
+                                let height = img.height
+                                if (width > height) {
+                                  if (width > maxDim) {
+                                    height = Math.round((height * maxDim) / width)
+                                    width = maxDim
+                                  }
+                                } else {
+                                  if (height > maxDim) {
+                                    width = Math.round((width * maxDim) / height)
+                                    height = maxDim
+                                  }
+                                }
+                                const canvas = document.createElement('canvas')
+                                canvas.width = width
+                                canvas.height = height
+                                const ctx = canvas.getContext('2d')
+                                ctx?.drawImage(img, 0, 0, width, height)
+                                const compressedUrl = canvas.toDataURL('image/jpeg', 0.85)
+                                setAddLearnerDraft((d) => ({ ...d, avatarUrl: compressedUrl }))
+                              }
+                              img.src = reader.result
                             }
                           }
                           reader.readAsDataURL(file)
@@ -481,7 +505,7 @@ export function TeacherOverviewPage() {
                       <button
                         type="button"
                         onClick={() => setAddLearnerDraft((d) => ({ ...d, avatarUrl: '' }))}
-                        className="px-2.5 py-1.5 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors"
+                        className="min-h-[44px] px-3 py-2 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors inline-flex items-center"
                       >
                         Clear avatar
                       </button>
@@ -502,14 +526,14 @@ export function TeacherOverviewPage() {
                             onClick={() =>
                               setAddLearnerDraft((d) => ({ ...d, avatarUrl: preset.url }))
                             }
-                            className={`h-8 w-8 rounded-full overflow-hidden transition-transform hover:scale-110 ${
+                            className={`min-h-[44px] min-w-[44px] p-1 inline-flex items-center justify-center rounded-full transition-transform hover:scale-105 ${
                               isSelected
                                 ? 'ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-slate-900 scale-105'
                                 : 'opacity-85 hover:opacity-100'
                             }`}
                             title={preset.label}
                           >
-                            <img src={preset.url} alt={preset.label} className="h-full w-full object-cover" />
+                            <img src={preset.url} alt={preset.label} className="h-8 w-8 rounded-full object-cover" />
                           </button>
                         )
                       })}

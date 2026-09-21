@@ -17,10 +17,12 @@ function client() {
 }
 
 function mapTestPackage(row: any): TestPackage {
+  const rawTitle = row.title ?? ''
+  const cleanTitle = rawTitle.replace(/\s*·\s*LIVE\s*$/i, '').trim()
   return {
     id: row.id,
     organizationId: row.organization_id,
-    title: row.title,
+    title: cleanTitle,
     slug: row.slug,
     description: row.description ?? null,
     createdByUserId: row.created_by_user_id,
@@ -1121,6 +1123,20 @@ export async function deleteTestPackage(packageId: string): Promise<void> {
   const versionIds = (versions ?? []).map((v: any) => v.id)
 
   if (versionIds.length > 0) {
+    // Cascade delete standalone assignments and runs if any
+    const { data: assignments } = await sb
+      .from('standalone_assignments')
+      .select('id')
+      .in('package_version_id', versionIds)
+    const assignmentIds = (assignments ?? []).map((a: any) => a.id)
+    if (assignmentIds.length > 0) {
+      await sb.from('standalone_runs').delete().in('assignment_id', assignmentIds)
+      await sb.from('standalone_assignments').delete().in('id', assignmentIds)
+    }
+
+    // Cascade delete generation_jobs
+    await sb.from('generation_jobs').delete().in('package_version_id', versionIds)
+
     // Delete narration_variants
     await sb.from('narration_variants').delete().in('package_version_id', versionIds)
     // Delete test_items

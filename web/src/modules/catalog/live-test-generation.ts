@@ -386,29 +386,21 @@ export async function generatePackageFromVocab(input: GeneratePackageFromVocabIn
   const organizationId = orgs?.[0]?.id
   if (!organizationId) throw new Error('No organization available')
 
-  // 2. Find or create profile
-  const profileName = input.testType === 'green' ? 'GREEN-TEST-FOCUS-CCI' : 'RED-TEST-AWARENESS-CCI'
-  let { data: profile } = await sb
+  // 2. Create dedicated CCI profile in draft status for this package
+  const isGreen = input.testType.toLowerCase() === 'green'
+  const profileName = `${input.title} CCI (${Date.now().toString(36)})`
+  const { data: profile, error: pErr } = await sb
     .from('cci_profiles')
+    .insert({
+      organization_id: organizationId,
+      name: profileName,
+      version_label: 'v1',
+      status: 'draft',
+      description: `CCI metrics for ${isGreen ? 'Green Focus' : 'Red Awareness'} test package: ${input.title}`,
+    })
     .select('id, name')
-    .eq('name', profileName)
-    .maybeSingle()
-
-  if (!profile) {
-    const { data: newProfile, error: pErr } = await sb
-      .from('cci_profiles')
-      .insert({
-        organization_id: organizationId,
-        name: profileName,
-        version_label: 'v1',
-        status: 'active',
-        description: `CCI metrics for ${input.testType === 'green' ? 'Green Focus' : 'Red Awareness'} test package`,
-      })
-      .select('id, name')
-      .single()
-    if (pErr) throw new Error(pErr.message)
-    profile = newProfile
-  }
+    .single()
+  if (pErr) throw new Error(pErr.message)
 
   // 3. Create package
   const slug = `${input.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`
@@ -470,38 +462,27 @@ export async function generatePackageFromVocab(input: GeneratePackageFromVocabIn
   }
 
   const effectiveVoltage = input.targetCpd ?? input.targetVoltage ?? (input.testType.toUpperCase() === 'RED' ? 56 : 12)
-  const isGreen = input.testType.toLowerCase() === 'green'
   const cciValue = isGreen ? 4 : 8
   const baseCvr = Math.max(1, Math.round(effectiveVoltage / cciValue))
 
-  // Find or create categories
+  // Insert categories into the new draft profile
   const categoriesToUse: Array<{ id: string; label: string; value: number }> = []
   for (let s = 1; s <= sessionCount; s++) {
     const sessionLabel = `${isGreen ? 'Focus Sprint' : 'Awareness Trap'} ${s}`
-    let { data: cat } = await sb
+    const { data: newCat, error: cErr } = await sb
       .from('cci_categories')
+      .insert({
+        profile_id: profile.id,
+        category_order: s,
+        label: sessionLabel,
+        value: cciValue,
+        description: `${isGreen ? 'Sentence Fluidity' : 'Multi-Term Cognitive Resistance'} - Part ${s}`,
+        metadata: { targetCvrOhm: baseCvr, cpd: effectiveVoltage },
+      })
       .select('id, label, value')
-      .eq('profile_id', profile.id)
-      .eq('category_order', s)
-      .maybeSingle()
-
-    if (!cat) {
-      const { data: newCat, error: cErr } = await sb
-        .from('cci_categories')
-        .insert({
-          profile_id: profile.id,
-          category_order: s,
-          label: sessionLabel,
-          value: cciValue,
-          description: `${isGreen ? 'Sentence Fluidity' : 'Multi-Term Cognitive Resistance'} - Part ${s}`,
-          metadata: { targetCvrOhm: baseCvr, cpd: effectiveVoltage },
-        })
-        .select('id, label, value')
-        .single()
-      if (cErr) throw new Error(cErr.message)
-      cat = newCat
-    }
-    categoriesToUse.push(cat)
+      .single()
+    if (cErr) throw new Error(cErr.message)
+    categoriesToUse.push(newCat)
   }
 
   let totalItemsCreated = 0
@@ -672,6 +653,9 @@ export async function generatePackageFromVocab(input: GeneratePackageFromVocabIn
     const { error: itemsErr } = await sb.from('test_items').insert(itemRows)
     if (itemsErr) throw new Error(itemsErr.message)
   }
+
+  // 6. Mark dedicated CCI profile as active (immutable measurement baseline)
+  await sb.from('cci_profiles').update({ status: 'active' }).eq('id', profile.id)
 
   clearRequestCache()
 

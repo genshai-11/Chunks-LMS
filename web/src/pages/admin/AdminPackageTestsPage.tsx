@@ -54,6 +54,38 @@ import {
 
 type FilterTab = 'all' | 'green' | 'red'
 
+export function detectPackageTestType(pkg: {
+  title: string
+  slug?: string | null
+  sourceMetadata?: Record<string, any> | null
+}): 'green' | 'red' {
+  const metadataType = pkg.sourceMetadata?.testType
+  if (typeof metadataType === 'string') {
+    const lower = metadataType.toLowerCase()
+    if (lower === 'red') return 'red'
+    if (lower === 'green') return 'green'
+  }
+
+  const title = (pkg.title || '').trim().toUpperCase()
+  const slug = (pkg.slug || '').trim().toLowerCase()
+
+  // Red test detection:
+  // - Starts with 'R' (e.g. R4-31V-0826, R01-42Q-56V)
+  // - Contains 'RED' or 'AWARENESS'
+  // - Slug starts with 'r' or contains 'red'
+  if (
+    title.startsWith('R') ||
+    title.includes('RED') ||
+    title.includes('AWARENESS') ||
+    slug.startsWith('r') ||
+    slug.includes('red')
+  ) {
+    return 'red'
+  }
+
+  return 'green'
+}
+
 export type PackageSummary = {
   pkg: TestPackage
   version: TestPackageVersion | null
@@ -207,14 +239,7 @@ export function AdminPackageTestsPage() {
             }
           }
 
-          const rawTitle = pkg.title.toUpperCase()
-          const isRed =
-            pkg.sourceMetadata?.testType === 'red' ||
-            rawTitle.includes('RED') ||
-            rawTitle.includes('AWARENESS') ||
-            pkg.slug.startsWith('r-') ||
-            pkg.slug.startsWith('red')
-          const testType: 'green' | 'red' = isRed ? 'red' : 'green'
+          const testType = detectPackageTestType(pkg)
 
           const targetVoltage = Number(
             pkg.sourceMetadata?.targetVoltage ??
@@ -546,15 +571,15 @@ export function AdminPackageTestsPage() {
       <Flash message={message} error={error} />
 
       {/* Catalog Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
         {/* Tabs */}
-        <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/70 p-1 rounded-xl">
+        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200/60">
           <button
             type="button"
             className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               filterTab === 'all'
-                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                ? 'bg-white text-slate-900 shadow-sm border border-slate-200/50'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
             onClick={() => setFilterTab('all')}
           >
@@ -565,7 +590,7 @@ export function AdminPackageTestsPage() {
             className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
               filterTab === 'green'
                 ? 'bg-emerald-600 text-white shadow-sm'
-                : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
+                : 'text-emerald-700 hover:bg-emerald-50'
             }`}
             onClick={() => setFilterTab('green')}
           >
@@ -577,7 +602,7 @@ export function AdminPackageTestsPage() {
             className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
               filterTab === 'red'
                 ? 'bg-rose-600 text-white shadow-sm'
-                : 'text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40'
+                : 'text-rose-700 hover:bg-rose-50'
             }`}
             onClick={() => setFilterTab('red')}
           >
@@ -594,14 +619,14 @@ export function AdminPackageTestsPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by title, code, slug..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
       </div>
 
       {/* Package Cards Grid */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center p-12 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
+        <div className="flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-slate-200 shadow-sm">
           <Loader2 className="h-8 w-8 animate-spin text-indigo-500 mb-3" />
           <span className="text-sm text-slate-500">Loading test packages catalog...</span>
         </div>
@@ -641,7 +666,7 @@ export function AdminPackageTestsPage() {
             return (
               <div
                 key={summary.pkg.id}
-                className="group relative flex flex-col justify-between bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm hover:shadow-md transition-all hover:border-indigo-300 dark:hover:border-indigo-700"
+                className="group relative flex flex-col justify-between bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-all hover:border-indigo-300"
               >
                 <div>
                   {/* Card Header Badges */}
@@ -649,8 +674,8 @@ export function AdminPackageTestsPage() {
                     <span
                       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wider uppercase ${
                         isRed
-                          ? 'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800'
-                          : 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800'
+                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                          : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                       }`}
                     >
                       {isRed ? <Activity className="h-3 w-3" /> : <Zap className="h-3 w-3" />}
@@ -660,8 +685,8 @@ export function AdminPackageTestsPage() {
                     <span
                       className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
                         summary.version?.status === 'published'
-                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300'
-                          : 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-amber-100 text-amber-800'
                       }`}
                     >
                       {summary.version?.status === 'published' ? 'Published' : 'Draft'} · {versionLabel}
@@ -669,36 +694,36 @@ export function AdminPackageTestsPage() {
                   </div>
 
                   {/* Title & Code */}
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white leading-snug line-clamp-2 mb-1">
+                  <h3 className="text-base font-bold text-slate-900 leading-snug line-clamp-2 mb-1">
                     {cleanTitle}
                   </h3>
-                  <div className="text-xs font-mono text-slate-500 dark:text-slate-400 mb-4">
+                  <div className="text-xs font-mono text-slate-500 mb-4">
                     {String(summary.pkg.sourceMetadata?.packageCode || summary.pkg.slug)}
                   </div>
 
                   {/* Metrics Badges Row */}
                   <div className="grid grid-cols-2 gap-2 text-xs mb-4">
-                    <div className="bg-slate-50 dark:bg-slate-800/60 p-2 rounded-xl border border-slate-100 dark:border-slate-800">
+                    <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
                       <div className="text-[10px] text-slate-400 uppercase font-semibold">Questions</div>
-                      <div className="font-bold text-slate-800 dark:text-slate-200">
+                      <div className="font-bold text-slate-800">
                         {summary.questionCount}Q · {summary.sections.length} Sessions
                       </div>
                     </div>
-                    <div className="bg-slate-50 dark:bg-slate-800/60 p-2 rounded-xl border border-slate-100 dark:border-slate-800">
+                    <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
                       <div className="text-[10px] text-slate-400 uppercase font-semibold">Target Voltage</div>
-                      <div className="font-bold text-indigo-600 dark:text-indigo-400">
+                      <div className="font-bold text-indigo-600">
                         {summary.targetVoltage}V CPD
                       </div>
                     </div>
-                    <div className="bg-slate-50 dark:bg-slate-800/60 p-2 rounded-xl border border-slate-100 dark:border-slate-800">
+                    <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
                       <div className="text-[10px] text-slate-400 uppercase font-semibold">CVR Range</div>
-                      <div className="font-semibold text-slate-700 dark:text-slate-300">
+                      <div className="font-semibold text-slate-700">
                         {summary.cvrMin}Ω – {summary.cvrMax}Ω
                       </div>
                     </div>
-                    <div className="bg-slate-50 dark:bg-slate-800/60 p-2 rounded-xl border border-slate-100 dark:border-slate-800">
+                    <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
                       <div className="text-[10px] text-slate-400 uppercase font-semibold">Audio Readiness</div>
-                      <div className="font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                      <div className="font-semibold text-slate-700 flex items-center justify-between">
                         <span>{summary.audioApprovedCount}/{summary.audioTotalCount}</span>
                         <span className="text-[10px] text-slate-400">{audioPercent}%</span>
                       </div>
@@ -706,14 +731,14 @@ export function AdminPackageTestsPage() {
                   </div>
 
                   {/* Audio Progress Bar */}
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden mb-4">
+                  <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden mb-4">
                     <div
                       className={`h-full transition-all ${
                         audioPercent === 100
                           ? 'bg-emerald-500'
                           : audioPercent > 0
                           ? 'bg-indigo-500'
-                          : 'bg-slate-300 dark:bg-slate-700'
+                          : 'bg-slate-300'
                       }`}
                       style={{ width: `${audioPercent}%` }}
                     />
@@ -721,11 +746,11 @@ export function AdminPackageTestsPage() {
                 </div>
 
                 {/* Card Actions */}
-                <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-1">
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-1">
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
-                      className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:hover:bg-indigo-900 dark:text-indigo-300 flex items-center gap-1.5 transition-colors"
+                      className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 flex items-center gap-1.5 transition-colors"
                       onClick={() => setPreviewPackage(summary)}
                     >
                       <Eye className="h-3.5 w-3.5" />
@@ -733,7 +758,7 @@ export function AdminPackageTestsPage() {
                     </button>
                     <button
                       type="button"
-                      className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 flex items-center gap-1.5 transition-colors"
+                      className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-1.5 transition-colors"
                       onClick={() => setAudioStudioPackage(summary)}
                     >
                       <Headphones className="h-3.5 w-3.5 text-indigo-500" />
@@ -744,7 +769,7 @@ export function AdminPackageTestsPage() {
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
                       title="Edit metadata"
                       onClick={() => {
                         setEditingPackage(summary.pkg)
@@ -757,7 +782,7 @@ export function AdminPackageTestsPage() {
                     </button>
                     <button
                       type="button"
-                      className="p-1.5 rounded-lg text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                      className="p-1.5 rounded-lg text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                       title="Delete package"
                       onClick={() => setDeletingPackage(summary.pkg)}
                     >
@@ -773,16 +798,16 @@ export function AdminPackageTestsPage() {
 
       {/* CREATE PACKAGE MODAL */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden my-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden my-8">
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
+            <div className="flex items-center justify-between p-5 border-b border-slate-200 bg-slate-50/80">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600">
                   <WandSparkles className="h-5 w-5" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">Create Test Package</h2>
+                  <h2 className="text-lg font-bold text-slate-900">Create Test Package</h2>
                   <p className="text-xs text-slate-500">
                     Generate from Firestore Vocab with dual-term cognition or create blank package.
                   </p>
@@ -790,7 +815,7 @@ export function AdminPackageTestsPage() {
               </div>
               <button
                 type="button"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
                 onClick={() => setShowCreateModal(false)}
               >
                 <X className="h-5 w-5" />
@@ -798,12 +823,12 @@ export function AdminPackageTestsPage() {
             </div>
 
             {/* Modal Tabs */}
-            <div className="flex border-b border-slate-200 dark:border-slate-800 px-5 pt-3">
+            <div className="flex border-b border-slate-200 px-5 pt-3 bg-white">
               <button
                 type="button"
                 className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all ${
                   createTab === 'ai'
-                    ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
+                    ? 'border-indigo-600 text-indigo-600'
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
                 onClick={() => setCreateTab('ai')}
@@ -814,7 +839,7 @@ export function AdminPackageTestsPage() {
                 type="button"
                 className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all ${
                   createTab === 'manual'
-                    ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
+                    ? 'border-indigo-600 text-indigo-600'
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
                 onClick={() => setCreateTab('manual')}
@@ -825,17 +850,17 @@ export function AdminPackageTestsPage() {
 
             {/* Form Body */}
             {createTab === 'ai' ? (
-              <form onSubmit={(e) => void handleGenerateAiPackage(e)} className="p-6 space-y-5">
+              <form onSubmit={(e) => void handleGenerateAiPackage(e)} className="p-6 space-y-5 bg-white">
                 {/* Lesson Selector */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     Source Lesson (Firestore) <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={selectedLessonId}
                     onChange={(e) => setSelectedLessonId(e.target.value)}
                     required
-                    className="w-full text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   >
                     {lessons.length === 0 ? (
                       <option value="">Loading lessons from Firestore...</option>
@@ -853,7 +878,7 @@ export function AdminPackageTestsPage() {
                       Loading lesson chunks...
                     </div>
                   ) : lessonChunks.length > 0 ? (
-                    <div className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1">
+                    <div className="text-[11px] text-emerald-600 mt-1">
                       ✓ {lessonChunks.length} chunks ready for synthesis
                     </div>
                   ) : null}
@@ -861,7 +886,7 @@ export function AdminPackageTestsPage() {
 
                 {/* Test Type Selector */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
                     Dynamic Test Type <span className="text-red-500">*</span>
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -870,20 +895,20 @@ export function AdminPackageTestsPage() {
                       onClick={() => setAiTestType('green')}
                       className={`p-3.5 rounded-xl text-left border-2 transition-all ${
                         aiTestType === 'green'
-                          ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/30'
-                          : 'border-slate-200 dark:border-slate-800 hover:border-slate-300'
+                          ? 'border-emerald-500 bg-emerald-50/50'
+                          : 'border-slate-200 hover:border-slate-300 bg-white'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-emerald-700 flex items-center gap-1.5">
                           <Zap className="h-3.5 w-3.5" />
                           Green Test (Focus)
                         </span>
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200">
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
                           12V CPD
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      <p className="text-[11px] text-slate-500">
                         Baseline cognitive focus test. Single-chunk recognition with latency measurement.
                       </p>
                     </button>
@@ -893,20 +918,20 @@ export function AdminPackageTestsPage() {
                       onClick={() => setAiTestType('red')}
                       className={`p-3.5 rounded-xl text-left border-2 transition-all ${
                         aiTestType === 'red'
-                          ? 'border-rose-500 bg-rose-50/50 dark:bg-rose-950/30'
-                          : 'border-slate-200 dark:border-slate-800 hover:border-slate-300'
+                          ? 'border-rose-500 bg-rose-50/50'
+                          : 'border-slate-200 hover:border-slate-300 bg-white'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-rose-700 flex items-center gap-1.5">
                           <Activity className="h-3.5 w-3.5" />
                           Red Test (Awareness)
                         </span>
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-900 text-rose-800 dark:text-rose-200">
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800">
                           56V CPD
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      <p className="text-[11px] text-slate-500">
                         High cognitive load with dual contrasting terms and 650ms SSML pauses.
                       </p>
                     </button>
@@ -916,7 +941,7 @@ export function AdminPackageTestsPage() {
                 {/* Question Count & Topic */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                       Question Count
                     </label>
                     <div className="flex items-center gap-2">
@@ -927,8 +952,8 @@ export function AdminPackageTestsPage() {
                           onClick={() => setAiQuestionCount(count)}
                           className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all ${
                             aiQuestionCount === count
-                              ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300'
-                              : 'border-slate-200 dark:border-slate-800 text-slate-600 hover:border-slate-300'
+                              ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                              : 'border-slate-200 text-slate-600 hover:border-slate-300 bg-white'
                           }`}
                         >
                           {count}Q
@@ -938,7 +963,7 @@ export function AdminPackageTestsPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                       Topic Keyword (e.g. topic12)
                     </label>
                     <input
@@ -946,14 +971,14 @@ export function AdminPackageTestsPage() {
                       value={aiTopic}
                       onChange={(e) => setAiTopic(e.target.value)}
                       placeholder="topic12, animals, verbs..."
-                      className="w-full text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full text-xs rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                 </div>
 
                 {/* Target CPD Voltage */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     Target CPD Voltage (Volts)
                   </label>
                   <input
@@ -962,7 +987,7 @@ export function AdminPackageTestsPage() {
                     onChange={(e) => setAiTargetVoltage(Number(e.target.value) || 0)}
                     min={1}
                     max={120}
-                    className="w-full text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full text-xs rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                   <span className="text-[11px] text-slate-400 mt-1 block">
                     Standard: 12V for Green Tests (Focus), 56V for Red Tests (Awareness).
@@ -970,12 +995,12 @@ export function AdminPackageTestsPage() {
                 </div>
 
                 {/* Real-time Computed Code & Title Preview */}
-                <div className="p-4 rounded-xl border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50/50 dark:bg-indigo-950/20 space-y-2">
+                <div className="p-4 rounded-xl border border-indigo-100 bg-indigo-50/50 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-indigo-900 dark:text-indigo-300">
+                    <span className="text-xs font-bold text-indigo-900">
                       Auto-computed Metadata:
                     </span>
-                    <label className="flex items-center gap-1.5 text-[11px] text-indigo-700 dark:text-indigo-400 cursor-pointer">
+                    <label className="flex items-center gap-1.5 text-[11px] text-indigo-700 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={allowCustomCode}
@@ -999,7 +1024,7 @@ export function AdminPackageTestsPage() {
                           type="text"
                           value={customPackageCode}
                           onChange={(e) => setCustomPackageCode(e.target.value)}
-                          className="w-full text-xs font-mono rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-slate-800 dark:text-slate-200"
+                          className="w-full text-xs font-mono rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-slate-800"
                         />
                       </div>
                       <div>
@@ -1008,16 +1033,16 @@ export function AdminPackageTestsPage() {
                           type="text"
                           value={customTitle}
                           onChange={(e) => setCustomTitle(e.target.value)}
-                          className="w-full text-xs font-bold rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-slate-800 dark:text-slate-200"
+                          className="w-full text-xs font-bold rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-slate-800"
                         />
                       </div>
                     </div>
                   ) : (
                     <div>
-                      <div className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                      <div className="text-xs font-mono font-bold text-indigo-600">
                         {computedPackageCode}
                       </div>
-                      <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                      <div className="text-xs font-semibold text-slate-800">
                         {computedTitle}
                       </div>
                     </div>
@@ -1025,7 +1050,7 @@ export function AdminPackageTestsPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
                   <button
                     type="button"
                     className="ghost text-xs"
@@ -1054,9 +1079,9 @@ export function AdminPackageTestsPage() {
                 </div>
               </form>
             ) : (
-              <form onSubmit={(e) => void handleCreateManualPackage(e)} className="p-6 space-y-4">
+              <form onSubmit={(e) => void handleCreateManualPackage(e)} className="p-6 space-y-4 bg-white">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     Package Title <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -1065,13 +1090,13 @@ export function AdminPackageTestsPage() {
                     onChange={(e) => setManualTitle(e.target.value)}
                     required
                     placeholder="e.g. Green Test Practice 21Q"
-                    className="w-full text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    className="w-full text-xs rounded-xl border border-slate-300 bg-white px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                       Version Label
                     </label>
                     <input
@@ -1079,11 +1104,11 @@ export function AdminPackageTestsPage() {
                       value={manualVersionLabel}
                       onChange={(e) => setManualVersionLabel(e.target.value)}
                       placeholder="v1"
-                      className="w-full text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
+                      className="w-full text-xs rounded-xl border border-slate-300 bg-white px-3 py-2"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                       Sessions Count
                     </label>
                     <input
@@ -1092,13 +1117,13 @@ export function AdminPackageTestsPage() {
                       onChange={(e) => setManualSessionCount(Number(e.target.value) || 1)}
                       min={1}
                       max={10}
-                      className="w-full text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
+                      className="w-full text-xs rounded-xl border border-slate-300 bg-white px-3 py-2"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     Items Per Session
                   </label>
                   <input
@@ -1107,11 +1132,11 @@ export function AdminPackageTestsPage() {
                     onChange={(e) => setManualItemsPerSession(Number(e.target.value) || 1)}
                     min={1}
                     max={20}
-                    className="w-full text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
+                    className="w-full text-xs rounded-xl border border-slate-300 bg-white px-3 py-2"
                   />
                 </div>
 
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
                   <button
                     type="button"
                     className="ghost text-xs"
@@ -1136,17 +1161,17 @@ export function AdminPackageTestsPage() {
 
       {/* FULL PACKAGE PREVIEW MODAL */}
       {previewPackage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden my-6 max-h-[92vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden my-6 max-h-[92vh] flex flex-col">
             {/* Preview Modal Header */}
-            <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 flex items-center justify-between flex-shrink-0">
+            <div className="p-5 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between flex-shrink-0">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <span
                     className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
                       previewPackage.testType === 'red'
-                        ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
-                        : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                        ? 'bg-rose-100 text-rose-800'
+                        : 'bg-emerald-100 text-emerald-800'
                     }`}
                   >
                     {previewPackage.testType === 'red' ? 'Red Test (Awareness)' : 'Green Test (Focus)'}
@@ -1154,17 +1179,17 @@ export function AdminPackageTestsPage() {
                   <span className="text-xs font-mono text-slate-500">
                     {String(previewPackage.pkg.sourceMetadata?.packageCode || previewPackage.pkg.slug)}
                   </span>
-                  <span className="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 font-bold">
+                  <span className="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold">
                     {previewPackage.targetVoltage}V CPD
                   </span>
                 </div>
-                <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                <h2 className="text-lg font-bold text-slate-900">
                   {previewPackage.pkg.title.replace(/ · LIVE$/i, '')}
                 </h2>
               </div>
               <button
                 type="button"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
                 onClick={() => setPreviewPackage(null)}
               >
                 <X className="h-5 w-5" />
@@ -1172,11 +1197,11 @@ export function AdminPackageTestsPage() {
             </div>
 
             {/* Preview Modal Body */}
-            <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+            <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs bg-white">
               {/* Hierarchy View (Parts & CVR Curve) */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
                     <Layers className="h-4 w-4 text-indigo-500" />
                     <span>Test Structure & CVR Progression Curve</span>
                   </h4>
@@ -1186,12 +1211,12 @@ export function AdminPackageTestsPage() {
                 </div>
 
                 {/* Visual CVR Resistance Curve */}
-                <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 mb-3">
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 mb-3">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                       Cognitive Resistance Curve (CVR Ohms per Session)
                     </span>
-                    <span className="text-[10px] font-mono text-indigo-600 dark:text-indigo-400">
+                    <span className="text-[10px] font-mono text-indigo-600 font-bold">
                       Peak: {Math.max(...previewPackage.sections.map((s) => s.targetCvrOhm ?? s.sectionOrder * 2), 1)}Ω
                     </span>
                   </div>
@@ -1202,12 +1227,12 @@ export function AdminPackageTestsPage() {
                       const pct = Math.max(15, Math.min(100, Math.round((cvrVal / maxCvr) * 100)))
                       return (
                         <div key={sec.id} className="flex-1 flex flex-col items-center gap-1 group">
-                          <span className="text-[10px] font-mono font-bold text-slate-700 dark:text-slate-300 group-hover:text-indigo-600">
+                          <span className="text-[10px] font-mono font-bold text-slate-700 group-hover:text-indigo-600">
                             {cvrVal}Ω
                           </span>
                           <div
                             style={{ height: `${pct}%` }}
-                            className="w-full rounded-t-md bg-gradient-to-t from-indigo-500 to-indigo-400 dark:from-indigo-600 dark:to-indigo-500 transition-all group-hover:from-indigo-600 group-hover:to-indigo-300"
+                            className="w-full rounded-t-md bg-gradient-to-t from-indigo-500 to-indigo-400 transition-all group-hover:from-indigo-600 group-hover:to-indigo-300"
                             title={`Session ${sec.sectionOrder}: CVR ${cvrVal}Ω`}
                           />
                           <span className="text-[9px] font-medium text-slate-400">
@@ -1223,22 +1248,22 @@ export function AdminPackageTestsPage() {
                   {previewPackage.sections.map((sec) => (
                     <div
                       key={sec.id}
-                      className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/80 shadow-xs"
+                      className="p-3 rounded-xl border border-slate-200 bg-white shadow-xs"
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-bold text-slate-900 dark:text-white">
+                        <span className="font-bold text-slate-900">
                           Session {sec.sectionOrder}
                         </span>
-                        <span className="font-mono text-[11px] font-bold text-indigo-600 dark:text-indigo-400">
+                        <span className="font-mono text-[11px] font-bold text-indigo-600">
                           {sec.targetCvrOhm ?? sec.sectionOrder * 2}Ω CVR
                         </span>
                       </div>
-                      <div className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1">
+                      <div className="text-[11px] text-slate-500 line-clamp-1">
                         {sec.title || `Section ${sec.sectionOrder}`}
                       </div>
                       <div className="text-[10px] text-slate-400 mt-2 flex items-center justify-between">
                         <span>Items: {previewPackage.items.filter((i) => i.sectionId === sec.id).length}</span>
-                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">Intro Audio ✓</span>
+                        <span className="text-emerald-600 font-medium">Intro Audio ✓</span>
                       </div>
                     </div>
                   ))}
@@ -1247,13 +1272,13 @@ export function AdminPackageTestsPage() {
 
               {/* Items Table */}
               <div>
-                <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3 flex items-center gap-2">
                   <FileText className="h-4 w-4 text-indigo-500" />
                   <span>Items Table ({previewPackage.items.length} questions)</span>
                 </h4>
-                <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+                <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
                   <table className="w-full text-left border-collapse">
-                    <thead className="bg-slate-100 dark:bg-slate-800/80 text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                    <thead className="bg-slate-100 text-[10px] font-bold uppercase tracking-wider text-slate-600">
                       <tr>
                         <th className="p-3">#</th>
                         <th className="p-3">Target Term(s)</th>
@@ -1263,7 +1288,7 @@ export function AdminPackageTestsPage() {
                         <th className="p-3 text-right">TTS Audio</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                    <tbody className="divide-y divide-slate-200">
                       {previewPackage.items.map((item, idx) => {
                         const hasSsml =
                           (item.spokenScriptEn && item.spokenScriptEn.includes('<break')) ||
@@ -1271,16 +1296,16 @@ export function AdminPackageTestsPage() {
                         const isPlaying = previewPlayingId === item.id
 
                         return (
-                          <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                          <tr key={item.id} className="hover:bg-slate-50">
                             <td className="p-3 font-mono font-bold text-slate-400">{idx + 1}</td>
-                            <td className="p-3 font-medium text-slate-900 dark:text-white">
+                            <td className="p-3 font-medium text-slate-900">
                               <div>{item.termEn || item.termVi || '—'}</div>
                               {item.termEn && item.termVi && (
                                 <div className="text-[11px] text-slate-400">{item.termVi}</div>
                               )}
                             </td>
                             <td className="p-3 space-y-0.5 max-w-xs">
-                              <div className="font-semibold text-slate-800 dark:text-slate-200">
+                              <div className="font-semibold text-slate-800">
                                 {item.promptEn || item.spokenScriptEn || '—'}
                               </div>
                               <div className="text-[11px] text-slate-400">
@@ -1289,15 +1314,15 @@ export function AdminPackageTestsPage() {
                             </td>
                             <td className="p-3 font-mono text-[10px]">
                               {hasSsml ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
                                   Pause 650ms
                                 </span>
                               ) : (
                                 <span className="text-slate-400">Standard</span>
                               )}
                             </td>
-                            <td className="p-3 font-mono text-slate-600 dark:text-slate-400">
-                              <div className="font-bold text-slate-900 dark:text-white">
+                            <td className="p-3 font-mono text-slate-600">
+                              <div className="font-bold text-slate-900">
                                 {item.measuredCvr ? `${item.measuredCvr}Ω` : '—'}
                               </div>
                               <div className="text-[10px] text-slate-400">
@@ -1307,7 +1332,7 @@ export function AdminPackageTestsPage() {
                             <td className="p-3 text-right">
                               <button
                                 type="button"
-                                className="p-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:hover:bg-indigo-900 dark:text-indigo-300 transition-colors inline-flex items-center gap-1"
+                                className="p-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors inline-flex items-center gap-1"
                                 onClick={() => void playItemAudio(item)}
                                 disabled={isPlaying}
                                 title="Play Google Cloud TTS"
@@ -1329,7 +1354,7 @@ export function AdminPackageTestsPage() {
             </div>
 
             {/* Preview Modal Footer */}
-            <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between flex-shrink-0">
+            <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between flex-shrink-0">
               <span className="text-xs text-slate-500">
                 {previewPackage.items.length} total questions · {previewPackage.sections.length} sessions
               </span>
@@ -1361,16 +1386,16 @@ export function AdminPackageTestsPage() {
 
       {/* AUDIO STUDIO MODAL */}
       {audioStudioPackage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden my-6 max-h-[92vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden my-6 max-h-[92vh] flex flex-col">
             {/* Header */}
-            <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 flex items-center justify-between flex-shrink-0">
+            <div className="p-5 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600">
                   <Headphones className="h-5 w-5" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                  <h2 className="text-lg font-bold text-slate-900">
                     Audio Studio: {audioStudioPackage.pkg.title.replace(/ · LIVE$/i, '')}
                   </h2>
                   <p className="text-xs text-slate-500">
@@ -1380,7 +1405,7 @@ export function AdminPackageTestsPage() {
               </div>
               <button
                 type="button"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
                 onClick={() => setAudioStudioPackage(null)}
               >
                 <X className="h-5 w-5" />
@@ -1388,10 +1413,10 @@ export function AdminPackageTestsPage() {
             </div>
 
             {/* Body */}
-            <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+            <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs bg-white">
               {/* Voice Model Selector */}
-              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-4">
-                <span className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-4">
+                <span className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
                   Google Cloud Voice Model
                 </span>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1406,7 +1431,7 @@ export function AdminPackageTestsPage() {
                           lang === 'vi' ? 'google/vi-VN-Neural2-A' : 'google/en-US-Neural2-F',
                         )
                       }}
-                      className="w-full text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-slate-800 dark:text-slate-200"
+                      className="w-full text-xs rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800"
                     >
                       <option value="en">English (US)</option>
                       <option value="vi">Tiếng Việt (VN)</option>
@@ -1421,7 +1446,7 @@ export function AdminPackageTestsPage() {
                       <select
                         value={ttsVoiceId}
                         onChange={(e) => setTtsVoiceId(e.target.value)}
-                        className="flex-1 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-slate-800 dark:text-slate-200"
+                        className="flex-1 text-xs rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800"
                       >
                         {ttsModels.map((m) => (
                           <option key={m.id} value={m.id}>
@@ -1434,7 +1459,7 @@ export function AdminPackageTestsPage() {
                         type="button"
                         onClick={() => void handleTestTtsVoice()}
                         disabled={testingTtsVoice}
-                        className="px-3 py-2 text-xs font-semibold rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:hover:bg-indigo-900 dark:text-indigo-300 flex items-center gap-1.5 transition-colors whitespace-nowrap"
+                        className="px-3 py-2 text-xs font-semibold rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 flex items-center gap-1.5 transition-colors whitespace-nowrap"
                       >
                         {testingTtsVoice ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1450,14 +1475,14 @@ export function AdminPackageTestsPage() {
 
               {/* Lifecycle Scripts Preview & Audio */}
               <div className="space-y-3">
-                <span className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                <span className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
                   Lifecycle Narrations
                 </span>
 
                 <div className="space-y-2">
-                  <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
+                  <div className="p-3 rounded-xl border border-slate-200 bg-white flex items-center justify-between gap-4 shadow-xs">
                     <div>
-                      <div className="font-bold text-slate-800 dark:text-slate-200">Package Start Script</div>
+                      <div className="font-bold text-slate-800">Package Start Script</div>
                       <div className="text-[11px] text-slate-500">
                         {audioStudioPackage.testType === 'red'
                           ? 'Bắt đầu bài kiểm tra Red Test (Awareness & Traps). Lắng nghe hai cụm từ và phát âm chính xác.'
@@ -1475,16 +1500,16 @@ export function AdminPackageTestsPage() {
                           'en',
                         )
                       }
-                      className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300"
+                      className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
                       title="Play Audio"
                     >
                       <Play className="h-3.5 w-3.5 fill-current" />
                     </button>
                   </div>
 
-                  <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
+                  <div className="p-3 rounded-xl border border-slate-200 bg-white flex items-center justify-between gap-4 shadow-xs">
                     <div>
-                      <div className="font-bold text-slate-800 dark:text-slate-200">Package Outro Script</div>
+                      <div className="font-bold text-slate-800">Package Outro Script</div>
                       <div className="text-[11px] text-slate-500">
                         Chúc mừng em đã hoàn thành toàn bộ bài kiểm tra. Em đã thể hiện sự tập trung rất tốt!
                       </div>
@@ -1498,7 +1523,7 @@ export function AdminPackageTestsPage() {
                           'en',
                         )
                       }
-                      className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300"
+                      className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
                       title="Play Audio"
                     >
                       <Play className="h-3.5 w-3.5 fill-current" />
@@ -1508,10 +1533,10 @@ export function AdminPackageTestsPage() {
               </div>
 
               {/* Batch Item Generation Card */}
-              <div className="p-4 rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 dark:bg-indigo-950/20 space-y-3">
+              <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/50 space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="font-bold text-slate-900 dark:text-white">Batch Audio Generation</h4>
+                    <h4 className="font-bold text-slate-900">Batch Audio Generation</h4>
                     <p className="text-[11px] text-slate-500">
                       Generate Google Cloud speech assets for all {audioStudioPackage.items.length} questions in this package.
                     </p>
@@ -1538,14 +1563,14 @@ export function AdminPackageTestsPage() {
 
                 {batchAudioProgress && (
                   <div className="space-y-1 pt-2">
-                    <div className="flex justify-between text-[11px] text-indigo-700 dark:text-indigo-300 font-semibold">
+                    <div className="flex justify-between text-[11px] text-indigo-700 font-semibold">
                       <span>Generating audio items...</span>
                       <span>
                         {batchAudioProgress.done} / {batchAudioProgress.total} (
                         {Math.round((batchAudioProgress.done / batchAudioProgress.total) * 100)}%)
                       </span>
                     </div>
-                    <div className="w-full bg-indigo-200 dark:bg-indigo-900 rounded-full h-2 overflow-hidden">
+                    <div className="w-full bg-indigo-200 rounded-full h-2 overflow-hidden">
                       <div
                         className="bg-indigo-600 h-full transition-all duration-300"
                         style={{
@@ -1558,14 +1583,14 @@ export function AdminPackageTestsPage() {
               </div>
 
               {/* Link to Full Studio */}
-              <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/40 text-[11px]">
+              <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50 text-[11px]">
                 <span className="text-slate-500">
                   Need waveform editor, approval sign-off, or custom file upload?
                 </span>
                 {audioStudioPackage.version && (
                   <Link
                     to={`/admin/resources/audio?version=${audioStudioPackage.version.id}`}
-                    className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline flex items-center gap-1"
+                    className="text-indigo-600 font-bold hover:underline flex items-center gap-1"
                   >
                     <span>Open Advanced Studio</span>
                     <ArrowRight className="h-3 w-3" />
@@ -1575,7 +1600,7 @@ export function AdminPackageTestsPage() {
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-end flex-shrink-0">
+            <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end flex-shrink-0">
               <button
                 type="button"
                 className="ghost text-xs"
@@ -1590,9 +1615,9 @@ export function AdminPackageTestsPage() {
 
       {/* EDIT METADATA MODAL */}
       {editingPackage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
+            <h3 className="text-base font-bold text-slate-900">
               Edit Package Metadata
             </h3>
             <form onSubmit={(e) => void handleSaveMetadata(e)} className="space-y-4 text-xs">
@@ -1603,7 +1628,7 @@ export function AdminPackageTestsPage() {
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
                   required
-                  className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800"
                 />
               </div>
               <div>
@@ -1613,7 +1638,7 @@ export function AdminPackageTestsPage() {
                   value={editSlug}
                   onChange={(e) => setEditSlug(e.target.value)}
                   required
-                  className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 font-mono"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono text-slate-800"
                 />
               </div>
               <div>
@@ -1622,7 +1647,7 @@ export function AdminPackageTestsPage() {
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
                   rows={3}
-                  className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800"
                 />
               </div>
 
@@ -1646,14 +1671,14 @@ export function AdminPackageTestsPage() {
 
       {/* DELETE CONFIRMATION MODAL */}
       {deletingPackage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
             <div className="flex items-center gap-3 text-rose-600">
               <AlertTriangle className="h-6 w-6 flex-shrink-0" />
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">Delete Package?</h3>
+              <h3 className="text-base font-bold text-slate-900">Delete Package?</h3>
             </div>
-            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-              Are you sure you want to delete <strong className="text-slate-900 dark:text-white">{deletingPackage.title.replace(/ · LIVE$/i, '')}</strong>? This will cascade-delete all versions, sections, items, and narration assets permanently.
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Are you sure you want to delete <strong className="text-slate-900">{deletingPackage.title.replace(/ · LIVE$/i, '')}</strong>? This will cascade-delete all versions, sections, items, and narration assets permanently.
             </p>
             <div className="flex items-center justify-end gap-2 pt-2">
               <button

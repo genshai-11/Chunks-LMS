@@ -1372,17 +1372,22 @@
       grid-template-areas:
         'rail bar'
         'rail stage';
+      height: 100dvh;
+      max-height: 100dvh;
     }
     .observe-bar {
       grid-area: bar;
     }
     .observe-rail {
       grid-area: rail;
-      height: 100vh;
+      height: 100dvh;
+      max-height: 100dvh;
     }
     .observe-stage {
       grid-area: stage;
       height: 100%;
+      min-height: 0;
+      overflow: hidden;
     }
   }
 
@@ -1601,7 +1606,8 @@
   }
 
   .observe-rail-map {
-    @apply flex min-h-0 flex-1 flex-col overflow-y-auto px-1.5 py-1.5;
+    @apply flex min-h-0 flex-1 flex-col px-1.5 py-1.5;
+    overflow: visible;
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
@@ -1653,34 +1659,34 @@
 
   .observe-rail.is-open .observe-heat {
     @apply flex min-h-0 flex-1 flex-col;
+    overflow: visible;
   }
 
   .observe-rail.is-open .observe-heat.layout-column .observe-heat-summary {
-    @apply mb-2 flex flex-col gap-1 rounded-xl border border-white/5 bg-white/5 p-2 text-[10px] sm:text-xs;
+    @apply relative z-30 mb-2 flex flex-col gap-1 rounded-xl border border-white/5 bg-white/5 p-2 text-[10px] sm:text-xs;
   }
 
   .observe-rail.is-open .observe-heat.layout-column .observe-heat-summary .observe-heat-metric {
-    @apply flex items-center justify-between;
+    @apply flex items-center justify-between w-full;
   }
 
   .observe-rail.is-open .observe-heat.layout-column .observe-heat-summary .observe-heat-counts {
     @apply mt-0.5 flex items-center justify-around border-t border-white/5 pt-1.5;
   }
 
+  .observe-heat-hero {
+    @apply relative z-20 w-full mb-1;
+  }
+
   .observe-rail.is-open .observe-heat.layout-column .observe-heat-grid {
-    @apply mt-2 grid min-h-0 flex-1 grid-cols-4 justify-items-center gap-1.5 overflow-y-auto;
-  }
-
-  .observe-rail.is-mid .observe-heat.layout-column .observe-heat-grid {
-    @apply grid-cols-5 gap-2;
-  }
-
-  .observe-rail.is-wide .observe-heat.layout-column .observe-heat-grid {
-    @apply grid-cols-6 gap-2;
-  }
-
-  .observe-rail.is-compact .observe-heat.layout-column .observe-heat-grid {
-    @apply grid-cols-3 gap-1;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 2rem);
+    gap: 0.375rem;
+    align-content: start;
+    align-items: start;
+    justify-content: center;
+    justify-items: center;
+    @apply relative z-10 mt-1 min-h-0 flex-1 overflow-y-auto pt-2 pb-2 px-1;
   }
 
   /* Heatmap column */
@@ -1722,15 +1728,15 @@
   }
 
   .observe-heat-counts {
-    @apply inline-flex items-center gap-1;
+    @apply inline-flex items-center gap-1.5 flex-wrap;
   }
 
   .observe-heat-count {
-    @apply inline-flex items-center gap-0.5 font-mono text-[9px] font-bold text-slate-300;
+    @apply inline-flex items-center gap-1 font-mono text-[11px] sm:text-xs font-bold text-slate-200;
   }
 
   .observe-heat-count i {
-    @apply inline-block h-1.5 w-1.5 rounded-full;
+    @apply inline-block h-2 w-2 rounded-full ring-1 ring-white/20;
   }
   .observe-heat-count.is-red i {
     @apply bg-red-500;
@@ -1754,11 +1760,18 @@
     @apply bg-purple-500;
   }
   .observe-heat-count.is-total {
-    @apply ml-1 rounded-full border border-white/10 bg-white/10 px-1.5 text-slate-100;
+    @apply ml-1 rounded-full border border-white/10 bg-white/10 px-1.5 text-indigo-200 font-extrabold;
   }
 
   .observe-heat-grid {
-    @apply flex flex-wrap gap-1;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 2rem);
+    gap: 0.375rem;
+    align-content: start;
+    align-items: start;
+    justify-content: center;
+    justify-items: center;
+    width: 100%;
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
@@ -1767,10 +1780,10 @@
   }
 
   .observe-heat-dot-btn {
-    @apply relative flex h-7 w-7 min-h-0 min-w-0 shrink-0 items-center justify-center justify-self-center rounded-full border-0 bg-white/10 p-0 text-[10px] font-bold text-slate-300 shadow-none transition hover:scale-115 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white;
+    @apply relative flex h-7 w-7 min-h-0 min-w-0 shrink-0 items-center justify-center justify-self-center rounded-full border border-white/10 bg-white/10 p-0 font-mono text-[10px] font-bold text-slate-300 shadow-none transition duration-150 ease-out hover:scale-110 active:scale-95 hover:bg-white/20 hover:border-white/25 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white;
   }
   .observe-heat-dot-btn.is-current {
-    @apply ring-2 ring-white ring-offset-2 ring-offset-slate-950 scale-105;
+    @apply ring-2 ring-white ring-offset-2 ring-offset-slate-950 scale-105 border-white/40;
   }
   .observe-heat-dot-btn.is-red {
     @apply bg-red-500 text-white;
@@ -1794,7 +1807,7 @@
     @apply bg-purple-500 text-white;
   }
   .observe-heat-probe-badge {
-    @apply absolute -right-1.5 -top-1.5 rounded-full bg-slate-950 px-1 text-[8px] font-black leading-3 text-white ring-1 ring-white/70;
+    @apply absolute -top-1.5 -right-1.5 z-10 flex h-3.5 min-w-[0.875rem] items-center justify-center rounded-full bg-slate-950 px-1 font-mono text-[8px] font-black leading-none text-amber-300 ring-1 ring-amber-400/80 shadow-md pointer-events-none;
   }
   .observe-heat-dot-btn.is-open {
     @apply bg-amber-400 text-amber-950 animate-pulse;
@@ -1804,12 +1817,21 @@
     @apply bg-white/10 text-slate-400;
   }
 
+  .observe-dot-tooltip {
+    @apply hidden!;
+  }
+
   .observe-stage {
-    @apply relative flex min-w-0 flex-1 flex-col items-center justify-center px-3 py-4 text-center;
+    @apply relative flex min-w-0 flex-1 flex-col items-center justify-center px-3 text-center overflow-y-auto;
+    padding-top: clamp(0.25rem, 1dvh, 0.75rem);
+    padding-bottom: clamp(0.25rem, 1dvh, 0.75rem);
+    height: 100%;
+    min-height: 0;
   }
 
   .observe-stage-tight {
-    @apply py-2;
+    padding-top: clamp(0.25rem, 1dvh, 0.75rem);
+    padding-bottom: clamp(0.25rem, 1dvh, 0.75rem);
   }
 
   .observe-split {
@@ -1892,7 +1914,12 @@
   }
 
   .observe-heat.layout-row .observe-heat-grid {
-    @apply flex flex-row flex-wrap gap-1.5 justify-start py-1 overflow-y-auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(2rem, 1fr));
+    gap: 0.375rem;
+    justify-items: center;
+    align-items: center;
+    @apply w-full py-1 pt-5 overflow-y-auto;
   }
 
   /* Utility to hide scrollbar */
@@ -1963,7 +1990,22 @@
   }
 
   .observe-stage-hero {
-    @apply flex w-full max-w-lg -translate-y-3 flex-col items-center gap-1 px-2;
+    @apply flex w-full max-w-lg flex-col items-center px-2;
+    transform: none;
+    gap: clamp(0.125rem, 0.6dvh, 0.375rem);
+  }
+
+  .observe-rail .observe-stage-hero {
+    @apply w-full max-w-none px-1 mb-2 text-center text-xs;
+  }
+  .observe-rail .observe-stage-hero .observe-phone-avatar {
+    @apply hidden;
+  }
+  .observe-rail .observe-stage-hero .observe-meta-row {
+    @apply flex-wrap justify-center gap-1.5 text-[10px];
+  }
+  .observe-rail .observe-stage-hero .observe-learner-rfc {
+    @apply hidden;
   }
 
   .observe-phone-avatar {
@@ -1987,7 +2029,8 @@
   }
 
   .observe-learner-solo {
-    @apply m-0 max-w-[92vw] font-display text-[clamp(1.6rem,6vw,3rem)] font-bold leading-tight tracking-tight text-white;
+    @apply m-0 max-w-[92vw] font-display font-bold leading-tight tracking-tight text-white;
+    font-size: clamp(1.4rem, 4.2dvh, 2.75rem);
   }
 
   .observe-learner-rfc {
@@ -2051,6 +2094,110 @@
   .observe-has-tooltip:hover .observe-metric-tooltip,
   .observe-has-tooltip:focus-visible .observe-metric-tooltip {
     @apply block;
+  }
+
+  .observe-tooltip-rich {
+    @apply pointer-events-none absolute top-[calc(100%+0.625rem)] z-50 hidden min-w-[15.5rem] max-w-[min(20rem,90vw)] rounded-xl border border-white/15 bg-slate-950/95 p-3 text-left font-sans text-xs leading-relaxed text-slate-200 shadow-2xl backdrop-blur-md;
+    box-shadow:
+      0 0 24px rgba(99, 102, 241, 0.18),
+      0 20px 30px rgba(0, 0, 0, 0.75),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    white-space: normal;
+  }
+
+  .observe-screen-tooltip-portal {
+    @apply pointer-events-none rounded-xl border border-white/20 p-3 text-left font-sans text-xs leading-relaxed text-slate-100 shadow-2xl backdrop-blur-md;
+    background-color: #030712 !important;
+    opacity: 1 !important;
+    z-index: 99999 !important;
+    box-shadow:
+      0 0 24px rgba(99, 102, 241, 0.35),
+      0 20px 35px rgba(0, 0, 0, 0.95),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    white-space: normal;
+  }
+
+  .observe-tooltip-rich.tooltip-left {
+    @apply left-0 -translate-x-0;
+  }
+
+  .observe-tooltip-rich.tooltip-left::before {
+    left: 1.25rem;
+    transform: none;
+  }
+
+  .observe-tooltip-rich.tooltip-right {
+    @apply right-0 left-auto translate-x-0;
+  }
+
+  .observe-tooltip-rich.tooltip-right::before {
+    right: 1.25rem;
+    left: auto;
+    transform: none;
+  }
+
+  .observe-tooltip-rich.tooltip-center {
+    @apply left-1/2 -translate-x-1/2;
+  }
+
+  .observe-tooltip-rich.tooltip-center::before {
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+  }
+
+  .observe-tooltip-rich::before {
+    content: '';
+    @apply absolute -top-1.5 h-2.5 w-2.5 rotate-45 border-l border-t border-white/15 bg-slate-950;
+  }
+
+  .observe-tooltip-header {
+    @apply font-display text-xs font-bold tracking-wide text-white flex items-center justify-between gap-2;
+  }
+
+  .observe-tooltip-divider {
+    @apply my-2 h-px w-full bg-white/10;
+  }
+
+  .observe-tooltip-body {
+    @apply flex flex-col gap-1.5 text-[11px];
+  }
+
+  .observe-tooltip-row {
+    @apply flex items-baseline justify-between gap-2;
+  }
+
+  .observe-tooltip-key {
+    @apply font-medium text-slate-400 shrink-0;
+  }
+
+  .observe-tooltip-val {
+    @apply font-mono font-semibold text-slate-100 text-right;
+  }
+
+  .observe-tooltip-note {
+    @apply mt-2 pt-1.5 border-t border-white/5 text-[10px] italic text-slate-400 leading-normal;
+  }
+
+  .observe-heat.layout-column .observe-heat-summary {
+    position: relative;
+  }
+  .observe-heat.layout-column .observe-has-tooltip {
+    position: static;
+  }
+  .observe-heat.layout-column .observe-tooltip-rich {
+    left: 0 !important;
+    right: 0 !important;
+    top: calc(100% + 0.35rem) !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    transform: none !important;
+    box-sizing: border-box !important;
+    border-radius: 0.75rem !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.85), 0 0 15px rgba(99, 102, 241, 0.2) !important;
+  }
+  .observe-heat.layout-column .observe-tooltip-rich::before {
+    display: none !important;
   }
 
   .observe-depth-inline {
@@ -2385,15 +2532,15 @@
 
   /* Bottom dock — inline control panel inside stage */
   .observe-dock {
-    @apply mt-3 mx-auto flex w-full max-w-[12rem] shrink-0 flex-col items-center gap-4;
-  }
-
-  .observe-dock-lg .observe-dock-colors {
-    @apply gap-4 sm:mx-auto;
+    @apply mx-auto flex w-full max-w-[10rem] shrink-0 flex-col items-center;
+    margin-top: clamp(0.25rem, 0.8dvh, 0.625rem);
+    gap: clamp(0.25rem, 0.8dvh, 0.5rem);
   }
 
   .observe-dock-colors {
-    @apply relative mx-auto flex w-fit flex-col items-center justify-center gap-4 rounded-[3.5rem] border-4 border-slate-600 bg-gradient-to-b from-slate-950 via-slate-800 to-slate-950 p-4 shadow-2xl ring-1 ring-black;
+    @apply relative mx-auto flex w-fit flex-col items-center justify-center rounded-[3.2rem] border-4 border-slate-600 bg-gradient-to-b from-slate-950 via-slate-800 to-slate-950 shadow-2xl ring-1 ring-black;
+    padding: clamp(0.35rem, 0.8dvh, 0.6rem) clamp(0.5rem, 1vw, 0.75rem);
+    gap: clamp(0.25rem, 0.7dvh, 0.5rem);
     box-shadow:
       inset 0 0 0 2px rgb(255 255 255 / 0.08),
       inset 10px 0 18px rgb(255 255 255 / 0.025),
@@ -2402,7 +2549,12 @@
   }
 
   .observe-dock-color {
-    @apply relative flex h-[7rem] min-h-0 w-[7rem] min-w-0 shrink-0 cursor-pointer flex-col items-center justify-center rounded-full border-4 border-slate-950 p-2 text-white transition-all duration-200 active:scale-95 disabled:opacity-40 sm:h-[8.5rem] sm:w-[8.5rem];
+    @apply relative flex shrink-0 cursor-pointer flex-col items-center justify-center rounded-full border-4 border-slate-950 text-white transition-all duration-200 active:scale-95 disabled:opacity-40;
+    height: clamp(3.25rem, 6.8dvh, 4.25rem);
+    width: clamp(3.25rem, 6.8dvh, 4.25rem);
+    min-height: 0;
+    min-width: 0;
+    padding: clamp(0.2rem, 0.5dvh, 0.375rem);
     box-shadow:
       inset 0 7px 10px rgb(255 255 255 / 0.28),
       inset 0 -9px 12px rgb(0 0 0 / 0.32),
@@ -2533,20 +2685,31 @@
   }
 
   .observe-dock-label {
-    @apply block text-[10px] sm:text-xs font-black uppercase tracking-wide opacity-90;
+    @apply block font-black uppercase tracking-wide opacity-90;
+    font-size: clamp(0.5rem, 1dvh, 0.65rem);
+    margin-top: clamp(0.125rem, 0.3dvh, 0.25rem);
   }
 
   .observe-dock-num {
-    @apply font-display text-xs sm:text-sm font-black leading-none tracking-tight opacity-95;
+    @apply font-display font-black leading-none tracking-tight opacity-95;
+    font-size: clamp(0.7rem, 1.5dvh, 0.95rem);
   }
 
   .observe-dock-probe {
-    @apply flex flex-col items-center justify-center gap-4 w-full max-w-[8.5rem] rounded-[3.5rem] border border-white/10 bg-slate-950/95 p-4 shadow-2xl mx-auto;
+    @apply relative mx-auto flex w-fit flex-col items-center justify-center rounded-[3.2rem] border-4 border-slate-600 bg-slate-950/95 shadow-2xl;
+    padding: clamp(0.35rem, 0.8dvh, 0.6rem) clamp(0.5rem, 1vw, 0.75rem);
+    gap: clamp(0.25rem, 0.7dvh, 0.5rem);
     box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
   }
 
   .observe-dock-probe-btn {
-    @apply relative flex h-[5.5rem] w-[5.5rem] shrink-0 cursor-pointer flex-col items-center justify-center rounded-full border-2 border-slate-500 bg-slate-800 text-xs font-bold text-slate-100 shadow-lg transition-all duration-150 hover:border-slate-300 hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 sm:h-[7rem] sm:w-[7rem] sm:text-sm;
+    @apply relative flex shrink-0 cursor-pointer flex-col items-center justify-center rounded-full border-2 border-slate-500 bg-slate-800 font-bold text-slate-100 shadow-lg transition-all duration-150 hover:border-slate-300 hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-45;
+    height: clamp(3.25rem, 6.8dvh, 4.25rem);
+    width: clamp(3.25rem, 6.8dvh, 4.25rem);
+    min-height: 0;
+    min-width: 0;
+    padding: clamp(0.2rem, 0.5dvh, 0.375rem);
+    font-size: clamp(0.6rem, 1.2dvh, 0.75rem);
     box-shadow:
       inset 0 2px 5px rgb(255 255 255 / 0.08),
       0 8px 18px rgb(0 0 0 / 0.32);
@@ -2563,11 +2726,15 @@
   }
 
   .observe-dock-probe-btn kbd {
-    @apply mt-1 rounded border border-white/20 bg-black/20 px-1.5 py-0.5 font-mono text-[8px] text-slate-300;
+    @apply rounded border border-white/20 bg-black/20 font-mono text-slate-300;
+    margin-top: clamp(0.125rem, 0.3dvh, 0.25rem);
+    padding: 0.125rem 0.375rem;
+    font-size: clamp(0.5rem, 1dvh, 0.65rem);
   }
 
   .observe-dock-tools {
-    @apply mt-5 mx-auto flex items-center justify-between w-full max-w-[10.5rem] rounded-full border border-white/5 bg-slate-950/40 p-1 shadow-lg backdrop-blur-md transition-all duration-300 hover:border-white/10;
+    @apply mx-auto flex items-center justify-between w-full max-w-[10.5rem] rounded-full border border-white/5 bg-slate-950/40 p-1 shadow-lg backdrop-blur-md transition-all duration-300 hover:border-white/10;
+    margin-top: clamp(0.25rem, 0.8dvh, 0.5rem);
   }
 
   .observe-tool {
@@ -2580,6 +2747,56 @@
 
   .observe-dock-q {
     @apply font-mono text-xs font-bold text-slate-300 tracking-wider;
+  }
+
+  /* Large variant for primary stage dock */
+  .observe-dock.observe-dock-lg {
+    @apply mx-auto flex w-full shrink-0 flex-col items-center;
+    max-width: clamp(20rem, 33vw, 27rem);
+    margin-top: clamp(0.35rem, 1dvh, 0.875rem);
+    gap: clamp(0.6rem, 1.4dvh, 1.15rem);
+  }
+
+  .observe-dock-lg .observe-dock-colors {
+    padding: clamp(0.85rem, 1.8dvh, 1.45rem) clamp(1.1rem, 2.2vw, 1.7rem);
+    gap: clamp(0.6rem, 1.5dvh, 1.1rem);
+    border-radius: clamp(6rem, 13vw, 7.8rem);
+  }
+
+  .observe-dock-lg .observe-dock-color {
+    height: clamp(7rem, 16.2dvh, 9.5rem);
+    width: clamp(7rem, 16.2dvh, 9.5rem);
+    min-height: 0;
+    min-width: 0;
+    padding: clamp(0.4rem, 1.2dvh, 0.85rem);
+  }
+
+  .observe-dock-lg .observe-dock-num {
+    font-size: clamp(1.6rem, 3.65dvh, 2.35rem);
+    @apply font-black tracking-wide;
+  }
+
+  .observe-dock-lg .observe-dock-label {
+    @apply hidden!;
+  }
+
+  .observe-dock-lg .observe-dock-probe {
+    padding: clamp(0.85rem, 1.8dvh, 1.45rem) clamp(1.1rem, 2.2vw, 1.7rem);
+    gap: clamp(0.6rem, 1.5dvh, 1.1rem);
+    border-radius: clamp(6rem, 13vw, 7.8rem);
+  }
+
+  .observe-dock-lg .observe-dock-probe-btn {
+    height: clamp(7rem, 16.2dvh, 9.5rem);
+    width: clamp(7rem, 16.2dvh, 9.5rem);
+    min-height: 0;
+    min-width: 0;
+    padding: clamp(0.4rem, 1.2dvh, 0.85rem);
+    font-size: clamp(1.05rem, 2.35dvh, 1.35rem);
+  }
+
+  .observe-dock-lg .observe-dock-tools {
+    max-width: clamp(20rem, 33vw, 27rem);
   }
 
   /*

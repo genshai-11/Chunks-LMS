@@ -1595,7 +1595,7 @@ export function TeacherTestRunPage() {
       avgPercentX,
       sumPercentX,
       avgXColor,
-      avgPercentXTitle: `Avg %x = sum(%x) / n_bell = ${sumPercentX.toFixed(1)}% / ${nTotal} = ${avgPercentX.toFixed(1)}% (Band: ${COLOR_LABEL[avgXColor]}).\n• Colors: Red (0%), Orange (17%), Yellow (34%), Green (50%), Blue (67%), Indigo (84%), Violet (100%).`,
+      avgPercentXTitle: `Avg %x = sum(%x) / N_total = ${sumPercentX.toFixed(1)}% / ${nTotal} = ${avgPercentX.toFixed(1)}% (Band: ${COLOR_LABEL[avgXColor]}).\n• Colors: Red (0%), Orange (17%), Yellow (34%), Green (50%), Blue (67%), Indigo (84%), Violet (100%).`,
       rfcTitle: `RFC = warm records / N_total = ${spectrum.warmSteps} / ${nTotal}. Warm = Red + Orange + Yellow.`,
       racTitle: `${racMetricLabel} = Avg %x = sum(%x) / N_total = ${sumPercentX.toFixed(1)}% / ${nTotal} = ${avgPercentX.toFixed(1)}%.`,
       legacyRacTitle: `Legacy RAC = cool records / N_total = ${spectrum.coolSteps} / ${nTotal}. Cool = Green + Blue + Indigo + Purple. When N_total > 0, legacy RAC = 100 - RFC.`,

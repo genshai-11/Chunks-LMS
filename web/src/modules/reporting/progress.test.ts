@@ -69,7 +69,7 @@ describe('course progress projections', () => {
     expect(report.overall.current.find((m) => m.key === 'rfc')?.sampleSize).toBe(3)
     const l1 = report.byLearner.find((x) => x.learnerUserId === 'l1')!
     expect(l1.attemptCount).toBe(2)
-    expect(l1.comparison.current.find((m) => m.key === 'rac')?.value).toBeCloseTo(0.5)
+    expect(l1.comparison.current.find((m) => m.key === 'rac')?.value).toBeCloseTo(0.25)
   })
 
   it('shows no trend when prior window empty', () => {

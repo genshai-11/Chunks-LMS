@@ -740,7 +740,7 @@ export function ProgressAnalysisView({
                 <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
                   <Info className="h-3.5 w-3.5" />
                   <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
-                    <strong>Success (%c)</strong> = (Green + Purple) ÷ sample. Higher %c is better.
+                    <strong>Success (%c)</strong> = Avg %x: mean normalized 7-color spectrum factor over N_total (Red 0%, Orange 17%, Yellow 34%, Green 50%, Blue 67%, Indigo 84%, Purple 100%). Higher %c is better. (Legacy RAC = cool records / N_total).
                   </span>
                 </span>
               </p>
@@ -756,7 +756,15 @@ export function ProgressAnalysisView({
               </p>
             </div>
             <div className="stat-card">
-              <p className="stat-label">Results</p>
+              <p className="stat-label flex items-center gap-1">
+                <span>Results</span>
+                <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
+                  <Info className="h-3.5 w-3.5" />
+                  <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
+                    <strong>Finalized Results</strong> = total finalized attempts in the window (sample size). Each question contributes 1 primary result; probe steps generate additional observations in N_total.
+                  </span>
+                </span>
+              </p>
               <p className="stat-value">{total}</p>
               <p className="meta">
                 G/P {counts.green + counts.purple} · R/Y {counts.red + counts.yellow}
@@ -812,7 +820,7 @@ export function ProgressAnalysisView({
                   <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
                     <Info className="h-3.5 w-3.5" />
                     <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
-                      <strong>max chunks number</strong> = maximum observed chunks number on one question. Example: Green + Continue ×8 + Done → chunks number 9.
+                      <strong>max chunks number</strong> = maximum observed chunks number on one question (not session ceiling). Green opens at 1; each Continue adds 1. Example: Green + Continue ×8 + Done → chunks number 9.
                     </span>
                   </span>
                 </p>

@@ -36,6 +36,7 @@ import {
   type CaptureSessionState,
 } from '../../modules/assessment/session-capture'
 import { ObserveHeatmap } from '../../components/ObserveHeatmap'
+import { ScreenTooltip } from '../../components/ScreenTooltip'
 import { UserAvatar } from '../../components/UserAvatar'
 import type { ProvisionalColor, ResultColor } from '../../modules/result-lifecycle/types'
 import { PROBE_ACTIONS } from '../../modules/assessment/probe-actions'
@@ -70,6 +71,7 @@ import { getSupabase } from '../../lib/supabase'
 import { triggerConfetti } from '../../lib/confetti'
 import { playColorClick, resultAudioUrl } from '../../lib/color-audio'
 import { SPECTRUM_COLORS } from '../../modules/result-lifecycle/types'
+import { COLOR_PERCENT_X_VALUES } from '../../modules/metrics/calculate'
 
 const COLORS: { key: ProvisionalColor; label: string; shortcut: string }[] = [
   { key: 'red', label: 'Red', shortcut: '0' },
@@ -154,7 +156,7 @@ function formatFinishSummary(
     `C Blue: ${summary.byColor.blue}`,
     `D Indigo: ${summary.byColor.indigo}`,
     `3 Purple: ${summary.byColor.purple}`,
-    `Total records: ${summary.totalRecords} (${summary.primaryRecords} main + ${summary.probeRecords} probe)`,
+    `N_total: ${summary.totalRecords} (${summary.primaryRecords} primary + ${summary.probeRecords} probe)`,
     `Max chunks number: ${summary.maxProbeDepth}`,
     unresolved > 0
       ? `Left unfinalized when session closed: ${unresolved}`
@@ -552,19 +554,18 @@ export function TeacherObservePage() {
     : 0
   const done = summary ? summary.done : 0
   const rfcPct = summary?.totalRecords ? Math.round((warmRecords / summary.totalRecords) * 100) : 0
-  const racPct = summary?.totalRecords ? Math.round((coolRecords / summary.totalRecords) * 100) : 0
+  const sumPercentX = summary
+    ? SPECTRUM_COLORS.reduce((acc, c) => acc + summary.recordedByColor[c] * COLOR_PERCENT_X_VALUES[c], 0)
+    : 0
+  const avgPercentX = summary?.totalRecords ? sumPercentX / summary.totalRecords : 0
+  const racPct = Math.round(avgPercentX)
+  const legacyRacPct = summary?.totalRecords ? Math.round((coolRecords / summary.totalRecords) * 100) : 0
   const rfcTitle = summary
-    ? `RFC = warm records / total records = ${warmRecords} / ${summary.totalRecords}. Warm = Red + Orange + Yellow.`
-    : 'RFC = warm records / total records'
+    ? `RFC = warm records / N_total = ${warmRecords} / ${summary.totalRecords}. Warm = Red + Orange + Yellow.`
+    : 'RFC = warm records / N_total'
   const racTitle = summary
-    ? `%c = cool records / total records = ${coolRecords} / ${summary.totalRecords}. Cool = Green + Blue + Indigo + Purple.`
-    : '%c = cool records / total records'
-  const rfcTooltip = summary
-    ? `Warm records / N_total = ${warmRecords} / ${summary.totalRecords}. Warm = Red + Orange + Yellow. Lower RFC means less observed struggle.`
-    : 'RFC uses warm records once observations are finalized.'
-  const racTooltip = summary
-    ? `Cool records / N_total = ${coolRecords} / ${summary.totalRecords}. Cool = Green + Blue + Indigo + Purple. Higher %c means more cool measurement steps.`
-    : '%c uses cool records once observations are finalized.'
+    ? `%c = Avg %x = sum(%x) / N_total = ${sumPercentX.toFixed(1)}% / ${summary.totalRecords} = ${avgPercentX.toFixed(1)}%. (Legacy RAC = ${legacyRacPct}%).`
+    : '%c = Avg %x = sum(%x) / N_total'
   const splitMode = capture?.learnerIds.length === 2
 
   const learnerName = useCallback(
@@ -661,7 +662,8 @@ export function TeacherObservePage() {
             setCapture(next)
             appendFinalizedFromCapture(next)
           }
-          flash(color)
+        } else if (color === 'green') {
+          playReaction('green')
         }
       } finally {
         setLiveSaving(false)
@@ -702,7 +704,6 @@ export function TeacherObservePage() {
           next = await advanceAfterFinal(next)
           setCapture(next)
           appendFinalizedFromCapture(next)
-          flash(color)
         } else if (outcome === 'continue') {
           try {
             playColorClick('blue')
@@ -781,7 +782,8 @@ export function TeacherObservePage() {
             setCapture(next)
             appendFinalizedFromCapture(next)
           }
-          flash(color)
+        } else if (color === 'green') {
+          playReaction('green')
         }
       } finally {
         setLiveSaving(false)
@@ -822,7 +824,6 @@ export function TeacherObservePage() {
           next = await advanceLearnerPane(next, learnerUserId)
           setCapture(next)
           appendFinalizedFromCapture(next)
-          flash(color)
         } else if (outcome === 'continue') {
           try {
             playColorClick('blue')
@@ -1214,13 +1215,33 @@ export function TeacherObservePage() {
               </span>
             </h2>
             <div className="observe-meta-row">
-              <span className="observe-learner-rfc observe-has-tooltip is-rfc" tabIndex={0}>
-                <Activity className="h-3.5 w-3.5" aria-hidden />
-                RFC {learnerDone ? `${learnerRfc}%` : '—'}
-                <span className="observe-metric-tooltip" role="tooltip">
-                  Learner RFC uses this learner's finalized effective colors only. Warm / finalized sample = {learnerWarm} / {learnerDone}.
+              <ScreenTooltip
+                width={280}
+                ariaLabel={`Learner Struggle (RFC): ${learnerDone ? `${learnerRfc}%` : '—'}`}
+                content={
+                  <>
+                    <span className="observe-tooltip-header">
+                      <span>Learner Struggle (RFC)</span>
+                      <span className="font-mono text-amber-300 font-bold">{learnerDone ? `${learnerRfc}%` : '—'}</span>
+                    </span>
+                    <span className="observe-tooltip-divider" />
+                    <span className="observe-tooltip-body">
+                      <span className="observe-tooltip-row">
+                        <span className="observe-tooltip-key">Warm steps / finalized:</span>
+                        <span className="observe-tooltip-val">{learnerWarm} / {learnerDone}</span>
+                      </span>
+                      <span className="observe-tooltip-note">
+                        Learner RFC uses this learner's finalized effective colors only.
+                      </span>
+                    </span>
+                  </>
+                }
+              >
+                <span className="observe-learner-rfc is-rfc">
+                  <Activity className="h-3.5 w-3.5" aria-hidden />
+                  RFC {learnerDone ? `${learnerRfc}%` : '—'}
                 </span>
-              </span>
+              </ScreenTooltip>
               <span className="observe-meta-muted">
                 {learnerDone}/{Math.max(learnerAttempts.length, 1)} done
               </span>
@@ -1322,6 +1343,139 @@ export function TeacherObservePage() {
       </section>
     )
   }
+
+  const stageHeroNode = (
+    <div className="observe-stage-hero">
+      <div className="observe-phone-avatar" aria-hidden={false}>
+        <UserAvatar
+          name={learner?.displayName ?? 'Learner'}
+          avatarUrl={learner?.avatarUrl}
+          size="md"
+        />
+      </div>
+      <div className="observe-meta-row">
+        {done > 0 ? (
+          <>
+            <ScreenTooltip
+              ariaLabel={rfcTitle}
+              width={290}
+              content={
+                <>
+                  <span className="observe-tooltip-header">
+                    <span>Struggle (RFC)</span>
+                    <span className="font-mono text-amber-300 font-bold">{rfcPct}%</span>
+                  </span>
+                  <span className="observe-tooltip-divider" />
+                  <span className="observe-tooltip-body">
+                    <span className="observe-tooltip-row">
+                      <span className="observe-tooltip-key">Formula:</span>
+                      <span className="observe-tooltip-val font-mono text-[10px]">warm records / N_total</span>
+                    </span>
+                    <span className="observe-tooltip-row">
+                      <span className="observe-tooltip-key">Warm steps:</span>
+                      <span className="observe-tooltip-val">
+                        {warmRecords} / {summary?.totalRecords ?? 0}{' '}
+                        <span className="text-slate-400 font-normal">(Red + Orange + Yellow)</span>
+                      </span>
+                    </span>
+                    <span className="observe-tooltip-note">
+                      Lower RFC indicates less observed struggle.
+                    </span>
+                  </span>
+                </>
+              }
+            >
+              <span
+                className="observe-learner-rfc is-rfc"
+                aria-label={rfcTitle}
+              >
+                <Activity className="h-3.5 w-3.5" aria-hidden />
+                RFC {rfcPct}%
+              </span>
+            </ScreenTooltip>
+
+            <ScreenTooltip
+              ariaLabel={racTitle}
+              width={310}
+              content={
+                <>
+                  <span className="observe-tooltip-header">
+                    <span>Awareness / Success (%c)</span>
+                    <span className="font-mono text-emerald-300 font-bold">{racPct}%</span>
+                  </span>
+                  <span className="observe-tooltip-divider" />
+                  <span className="observe-tooltip-body">
+                    <span className="observe-tooltip-row">
+                      <span className="observe-tooltip-key">Formula:</span>
+                      <span className="observe-tooltip-val font-mono text-[10px]">Avg %x = sum(%x) / N_total</span>
+                    </span>
+                    <span className="observe-tooltip-row">
+                      <span className="observe-tooltip-key">7-color weighted:</span>
+                      <span className="observe-tooltip-val">
+                        {sumPercentX.toFixed(1)}% / {summary?.totalRecords ?? 0} = {avgPercentX.toFixed(1)}%
+                      </span>
+                    </span>
+                    <span className="observe-tooltip-row">
+                      <span className="observe-tooltip-key">Legacy RAC:</span>
+                      <span className="observe-tooltip-val">
+                        {legacyRacPct}%{' '}
+                        <span className="text-slate-400 font-normal">
+                          ({summary ? summary.recordedByColor.green + summary.recordedByColor.blue + summary.recordedByColor.indigo + summary.recordedByColor.purple : 0}/{summary?.totalRecords ?? 0} cool records)
+                        </span>
+                      </span>
+                    </span>
+                    <span className="observe-tooltip-note">
+                      Weights: Red 0%, Orange 17%, Yellow 34%, Green 50%, Blue 67%, Indigo 84%, Purple 100%.
+                    </span>
+                  </span>
+                </>
+              }
+            >
+              <span className="observe-learner-rfc is-percent-c" aria-label={racTitle}>
+                %c {racPct}%
+              </span>
+            </ScreenTooltip>
+          </>
+        ) : (
+          <span className="observe-meta-muted observe-phone-only observe-hint-phone">
+            Tap a color
+          </span>
+        )}
+        {done > 0 && summary ? (
+          <span
+            className="observe-heat-metric muted tabular observe-hide-phone"
+            aria-label={`N_total: ${summary.totalRecords}`}
+          >
+            N_total {summary.totalRecords}/{Math.max(summary.total + summary.probeRecords, 1)}
+            {summary.maxProbeDepth > 0 ? ` · max chunks=${summary.maxProbeDepth}` : ''}
+          </span>
+        ) : null}
+      </div>
+      {probeOpen ? (
+        <p className="observe-depth-inline" title="Chunks Number starts at 1 when Green opens probe; each Continue adds 1.">
+          CHUNKS NUMBER <strong>{chunksNumber}</strong>
+        </p>
+      ) : null}
+      {isLiveTest ? (
+        <div className="mt-3 rounded-2xl border border-indigo-300/20 bg-indigo-950/25 px-4 py-3 text-center shadow-lg shadow-indigo-950/20">
+          <p className="text-[11px] uppercase tracking-[0.2em] text-indigo-200/80">
+            {liveTestBlockSummary ?? 'Live Test'} · {liveTestLanguage.toUpperCase()}
+          </p>
+          <p className="mt-1 text-sm font-black text-white">
+            Number {String(qNum).padStart(2, '0')}
+          </p>
+          <p className="mt-1 text-base font-semibold text-indigo-50">
+            {currentLiveTestPrompt ?? 'Prompt pending'}
+          </p>
+          {currentLiveTestItem ? (
+            <p className="mt-1 text-xs text-indigo-100/80">
+              CCI {currentLiveTestItem.cciValue == null ? '—' : `${currentLiveTestItem.cciValue}A`} · CVR {currentLiveTestItem.cvrValue == null ? '—' : `${currentLiveTestItem.cvrValue} Ω`} · CPD {currentLiveTestItem.cpdValue == null ? '—' : `${currentLiveTestItem.cpdValue}V`}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  )
 
   return (
     <div
@@ -1445,7 +1599,9 @@ export function TeacherObservePage() {
                 learnerName={learnerName}
                 onSelectQuestion={selectQuestion}
                 layout="column"
-              />
+              >
+                {stageHeroNode}
+              </ObserveHeatmap>
             </div>
           ) : (
             <button
@@ -1542,93 +1698,7 @@ export function TeacherObservePage() {
           </div>
         ) : (
           <>
-            <div className="observe-stage-hero">
-              <div className="observe-phone-avatar" aria-hidden={false}>
-                <UserAvatar
-                  name={learner?.displayName ?? 'Learner'}
-                  avatarUrl={learner?.avatarUrl}
-                  size="md"
-                />
-              </div>
-              <p className="observe-day-line observe-hide-phone">{dayLabel}</p>
-              <h1 className="observe-learner observe-learner-solo">
-                {learner?.displayName ?? 'Learner'}
-              </h1>
-              <div className="observe-meta-row">
-                {done > 0 ? (
-                  <>
-                    <span
-                      className="observe-learner-rfc observe-has-tooltip is-rfc"
-                      aria-label={rfcTitle}
-                      tabIndex={0}
-                    >
-                      <Activity className="h-3.5 w-3.5" aria-hidden />
-                      RFC {rfcPct}%
-                      <span className="observe-metric-tooltip" role="tooltip">
-                        {rfcTooltip}
-                      </span>
-                    </span>
-                    <span className="observe-learner-rfc observe-has-tooltip is-percent-c" aria-label={racTitle} tabIndex={0}>
-                      %c {racPct}%
-                      <span className="observe-metric-tooltip" role="tooltip">
-                        {racTooltip}
-                      </span>
-                    </span>
-                  </>
-                ) : (
-                  <span className="observe-meta-muted observe-phone-only observe-hint-phone">
-                    Tap a color
-                  </span>
-                )}
-                {/* Counts live in map on phone — keep pills on tablet/desktop only */}
-                <div
-                  className="observe-heat-counts observe-color-pills observe-hide-phone"
-                  aria-label="Recorded 7-color counts"
-                >
-                  {SPECTRUM_COLORS.map((color) => (
-                    <span
-                      key={color}
-                      className={`observe-heat-count is-${color}`}
-                      title={`${color}: ${summary ? summary.recordedByColor[color] : 0} recorded steps${
-                        color === 'green' ? ' (Green probe openers)' : color === 'blue' ? ' (Continue probe steps)' : ''
-                      }`}
-                    >
-                      <i aria-hidden />
-                      {summary ? summary.recordedByColor[color] : 0}
-                    </span>
-                  ))}
-                  <span
-                    className="observe-heat-count is-total"
-                    title={summary ? `Total records = main + probe = ${summary.primaryRecords} + ${summary.probeRecords}` : 'Total records'}
-                  >
-                    Σ {summary ? summary.totalRecords : 0}
-                  </span>
-                </div>
-              </div>
-              {probeOpen ? (
-                <p className="observe-depth-inline" title="Chunks Number starts at 1 when Green opens probe; each Continue adds 1.">
-                  CHUNKS NUMBER <strong>{chunksNumber}</strong>
-                </p>
-              ) : null}
-              {isLiveTest ? (
-                <div className="mt-3 rounded-2xl border border-indigo-300/20 bg-indigo-950/25 px-4 py-3 text-center shadow-lg shadow-indigo-950/20">
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-indigo-200/80">
-                    {liveTestBlockSummary ?? 'Live Test'} · {liveTestLanguage.toUpperCase()}
-                  </p>
-                  <p className="mt-1 text-sm font-black text-white">
-                    Number {String(qNum).padStart(2, '0')}
-                  </p>
-                  <p className="mt-1 text-base font-semibold text-indigo-50">
-                    {currentLiveTestPrompt ?? 'Prompt pending'}
-                  </p>
-                  {currentLiveTestItem ? (
-                    <p className="mt-1 text-xs text-indigo-100/80">
-                      CCI {currentLiveTestItem.cciValue == null ? '—' : `${currentLiveTestItem.cciValue}A`} · CVR {currentLiveTestItem.cvrValue == null ? '—' : `${currentLiveTestItem.cvrValue} Ω`} · CPD {currentLiveTestItem.cpdValue == null ? '—' : `${currentLiveTestItem.cpdValue}V`}
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
+            {(!mapOpen || isPhone) ? stageHeroNode : null}
 
             {reaction && reaction.kind === 'happy' ? (
               <div key={reaction.id} className="observe-react observe-react-happy" aria-hidden>
@@ -1646,6 +1716,9 @@ export function TeacherObservePage() {
             >
               {probeOpen ? (
                 <div className="observe-dock-probe" role="group" aria-label="Resolve probe">
+                  <p className="live-test-probe-depth observe-depth-inline">
+                    CHUNKS NUMBER <strong>{chunksNumber}</strong>
+                  </p>
                   {PROBE_ACTIONS.map((action) => (
                     <button
                       key={action.outcome}
@@ -1948,7 +2021,7 @@ export function TeacherObservePage() {
 
                 {/* Additional metrics */}
                 <div className="flex justify-between items-center text-xs pt-1 border-t border-white/5">
-                  <span className="text-slate-400">Total records:</span>
+                  <span className="text-slate-400">N_total:</span>
                   <span className="font-mono font-bold text-white">{finishMetrics.totalRecords}</span>
                 </div>
                 <div className="flex justify-between items-center text-xs pt-1 border-t border-white/5">

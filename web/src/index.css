@@ -1663,7 +1663,7 @@
   }
 
   .observe-rail.is-open .observe-heat.layout-column .observe-heat-summary {
-    @apply relative z-20 mb-2 flex flex-col gap-1 rounded-xl border border-white/5 bg-white/5 p-2 text-[10px] sm:text-xs;
+    @apply relative z-10 mb-2 flex flex-col gap-1 rounded-xl border border-white/5 bg-white/5 p-2 text-[10px] sm:text-xs;
   }
 
   .observe-rail.is-open .observe-heat.layout-column .observe-heat-summary .observe-heat-metric {
@@ -1674,6 +1674,10 @@
     @apply mt-0.5 flex items-center justify-around border-t border-white/5 pt-1.5;
   }
 
+  .observe-heat-hero {
+    @apply relative z-10 w-full mb-1;
+  }
+
   .observe-rail.is-open .observe-heat.layout-column .observe-heat-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, 2rem);
@@ -1682,7 +1686,7 @@
     align-items: start;
     justify-content: center;
     justify-items: center;
-    @apply mt-2 min-h-0 flex-1 overflow-y-auto pt-5 pb-2 px-1;
+    @apply relative z-20 mt-2 min-h-0 flex-1 overflow-y-auto pt-12 pb-2 px-1;
   }
 
   /* Heatmap column */
@@ -1814,13 +1818,17 @@
   }
 
   .observe-dot-tooltip {
-    @apply pointer-events-none absolute bottom-[calc(100%+6px)] left-1/2 -translate-x-1/2 z-40 hidden rounded-lg border border-white/20 bg-slate-950/95 px-2.5 py-1 text-center font-sans text-[10px] leading-tight text-white shadow-xl shadow-black/80 backdrop-blur-md;
+    @apply pointer-events-none absolute bottom-[calc(100%+6px)] left-1/2 -translate-x-1/2 z-[100] hidden rounded-lg border border-white/20 bg-slate-950/95 px-2.5 py-1 text-center font-sans text-[10px] leading-tight text-white shadow-xl shadow-black/80 backdrop-blur-md;
     max-width: 14rem;
     white-space: normal;
   }
   .observe-dot-tooltip::before {
     content: '';
     @apply absolute -bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rotate-45 border-b border-r border-white/20 bg-slate-950;
+  }
+  .observe-heat-dot-btn:hover,
+  .observe-heat-dot-btn:focus-visible {
+    @apply z-50;
   }
   .observe-heat-dot-btn:hover .observe-dot-tooltip,
   .observe-heat-dot-btn:focus-visible .observe-dot-tooltip {
@@ -2005,6 +2013,19 @@
     @apply flex w-full max-w-lg flex-col items-center px-2;
     transform: none;
     gap: clamp(0.125rem, 0.6dvh, 0.375rem);
+  }
+
+  .observe-rail .observe-stage-hero {
+    @apply w-full max-w-none px-1 mb-2 text-center text-xs;
+  }
+  .observe-rail .observe-stage-hero .observe-phone-avatar {
+    @apply hidden;
+  }
+  .observe-rail .observe-stage-hero .observe-meta-row {
+    @apply flex-wrap justify-center gap-1.5 text-[10px];
+  }
+  .observe-rail .observe-stage-hero .observe-learner-rfc {
+    @apply hidden;
   }
 
   .observe-phone-avatar {
@@ -2739,52 +2760,51 @@
   /* Large variant for primary stage dock */
   .observe-dock.observe-dock-lg {
     @apply mx-auto flex w-full shrink-0 flex-col items-center;
-    max-width: clamp(17rem, 28vw, 22.5rem);
+    max-width: clamp(20rem, 33vw, 27rem);
     margin-top: clamp(0.35rem, 1dvh, 0.875rem);
-    gap: clamp(0.5rem, 1.25dvh, 1rem);
+    gap: clamp(0.6rem, 1.4dvh, 1.15rem);
   }
 
   .observe-dock-lg .observe-dock-colors {
-    padding: clamp(0.7rem, 1.5dvh, 1.2rem) clamp(0.9rem, 1.8vw, 1.4rem);
-    gap: clamp(0.5rem, 1.25dvh, 0.9rem);
-    border-radius: clamp(5rem, 11vw, 6.5rem);
+    padding: clamp(0.85rem, 1.8dvh, 1.45rem) clamp(1.1rem, 2.2vw, 1.7rem);
+    gap: clamp(0.6rem, 1.5dvh, 1.1rem);
+    border-radius: clamp(6rem, 13vw, 7.8rem);
   }
 
   .observe-dock-lg .observe-dock-color {
-    height: clamp(5.95rem, 13.7dvh, 8rem);
-    width: clamp(5.95rem, 13.7dvh, 8rem);
+    height: clamp(7rem, 16.2dvh, 9.5rem);
+    width: clamp(7rem, 16.2dvh, 9.5rem);
     min-height: 0;
     min-width: 0;
-    padding: clamp(0.35rem, 1dvh, 0.7rem);
+    padding: clamp(0.4rem, 1.2dvh, 0.85rem);
   }
 
   .observe-dock-lg .observe-dock-num {
-    font-size: clamp(1.35rem, 3.1dvh, 2rem);
+    font-size: clamp(1.6rem, 3.65dvh, 2.35rem);
+    @apply font-black tracking-wide;
   }
 
   .observe-dock-lg .observe-dock-label {
-    @apply text-white opacity-100 font-extrabold;
-    font-size: clamp(0.85rem, 1.85dvh, 1.15rem);
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+    @apply hidden!;
   }
 
   .observe-dock-lg .observe-dock-probe {
-    padding: clamp(0.7rem, 1.5dvh, 1.2rem) clamp(0.9rem, 1.8vw, 1.4rem);
-    gap: clamp(0.5rem, 1.25dvh, 0.9rem);
-    border-radius: clamp(5rem, 11vw, 6.5rem);
+    padding: clamp(0.85rem, 1.8dvh, 1.45rem) clamp(1.1rem, 2.2vw, 1.7rem);
+    gap: clamp(0.6rem, 1.5dvh, 1.1rem);
+    border-radius: clamp(6rem, 13vw, 7.8rem);
   }
 
   .observe-dock-lg .observe-dock-probe-btn {
-    height: clamp(5.95rem, 13.7dvh, 8rem);
-    width: clamp(5.95rem, 13.7dvh, 8rem);
+    height: clamp(7rem, 16.2dvh, 9.5rem);
+    width: clamp(7rem, 16.2dvh, 9.5rem);
     min-height: 0;
     min-width: 0;
-    padding: clamp(0.35rem, 1dvh, 0.7rem);
-    font-size: clamp(0.95rem, 2dvh, 1.2rem);
+    padding: clamp(0.4rem, 1.2dvh, 0.85rem);
+    font-size: clamp(1.05rem, 2.35dvh, 1.35rem);
   }
 
   .observe-dock-lg .observe-dock-tools {
-    max-width: clamp(17rem, 28vw, 22.5rem);
+    max-width: clamp(20rem, 33vw, 27rem);
   }
 
   /*

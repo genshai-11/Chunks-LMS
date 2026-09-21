@@ -12,6 +12,7 @@ type Props = {
   onSelectQuestion: (questionIndex: number) => void
   /** Vertical column (left rail) vs horizontal strip */
   layout?: 'column' | 'row'
+  children?: React.ReactNode
 }
 
 /**
@@ -23,6 +24,7 @@ export function ObserveHeatmap({
   learnerName,
   onSelectQuestion,
   layout = 'column',
+  children,
 }: Props) {
   const summary = sessionColorSummary(capture)
   const finalizedAttempts = capture.attempts.filter(
@@ -148,6 +150,12 @@ export function ObserveHeatmap({
           </span>
         </div>
       </div>
+
+      {children ? (
+        <div className="observe-heat-hero">
+          {children}
+        </div>
+      ) : null}
 
       <div
         ref={containerRef}

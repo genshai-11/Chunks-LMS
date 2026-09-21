@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react'
 import type { CaptureSessionState } from '../modules/assessment/session-capture'
 import { sessionColorSummary } from '../modules/assessment/session-capture'
-import { calculateSpectrumStepBreakdown, COLOR_PERCENT_X_VALUES } from '../modules/metrics/calculate'
+import { calculateSpectrumStepBreakdown } from '../modules/metrics/calculate'
 import { probeChunksNumber } from '../modules/assessment/probe-metrics'
-import { SPECTRUM_COLORS, type ResultColor } from '../modules/result-lifecycle/types'
+import { SPECTRUM_COLORS } from '../modules/result-lifecycle/types'
 
 type Props = {
   capture: CaptureSessionState
@@ -172,7 +172,6 @@ export function ObserveHeatmap({
           const active = i === currentQuestionIndex
           const cls = open ? 'is-open' : draft ? 'is-draft' : color ? `is-${color}` : 'is-empty'
           const chunksNumber = snap ? probeChunksNumber(snap) : null
-          const colorName = color ? color.charAt(0).toUpperCase() + color.slice(1) : null
 
           return (
             <button
@@ -192,18 +191,6 @@ export function ObserveHeatmap({
               {chunksNumber != null ? (
                 <span className="observe-heat-probe-badge">n{chunksNumber}</span>
               ) : null}
-              <span className="observe-dot-tooltip" role="tooltip">
-                <span className="observe-dot-tooltip-title">
-                  {open ? 'Probe in progress' : draft ? 'Not assessed' : `${colorName} (${COLOR_PERCENT_X_VALUES[color as ResultColor] ?? 0}%)`}
-                </span>
-                {chunksNumber != null ? (
-                  <span className="observe-dot-tooltip-detail">
-                    Chunks n{chunksNumber} · {snap?.probeCount ?? 0} step{(snap?.probeCount ?? 0) === 1 ? '' : 's'}
-                  </span>
-                ) : color ? (
-                  <span className="observe-dot-tooltip-detail">Finalized primary step</span>
-                ) : null}
-              </span>
             </button>
           )
         })}

@@ -1686,7 +1686,7 @@
     align-items: start;
     justify-content: center;
     justify-items: center;
-    @apply relative z-20 mt-2 min-h-0 flex-1 overflow-y-auto pt-12 pb-2 px-1;
+    @apply relative z-20 mt-1 min-h-0 flex-1 overflow-y-auto pt-2 pb-2 px-1;
   }
 
   /* Heatmap column */
@@ -1818,27 +1818,7 @@
   }
 
   .observe-dot-tooltip {
-    @apply pointer-events-none absolute bottom-[calc(100%+6px)] left-1/2 -translate-x-1/2 z-[100] hidden rounded-lg border border-white/20 bg-slate-950/95 px-2.5 py-1 text-center font-sans text-[10px] leading-tight text-white shadow-xl shadow-black/80 backdrop-blur-md;
-    max-width: 14rem;
-    white-space: normal;
-  }
-  .observe-dot-tooltip::before {
-    content: '';
-    @apply absolute -bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rotate-45 border-b border-r border-white/20 bg-slate-950;
-  }
-  .observe-heat-dot-btn:hover,
-  .observe-heat-dot-btn:focus-visible {
-    @apply z-50;
-  }
-  .observe-heat-dot-btn:hover .observe-dot-tooltip,
-  .observe-heat-dot-btn:focus-visible .observe-dot-tooltip {
-    @apply block;
-  }
-  .observe-dot-tooltip-title {
-    @apply block font-bold text-white;
-  }
-  .observe-dot-tooltip-detail {
-    @apply block text-[9px] text-slate-300 mt-0.5;
+    @apply hidden!;
   }
 
   .observe-stage {

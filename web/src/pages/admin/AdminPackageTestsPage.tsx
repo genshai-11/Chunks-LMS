@@ -35,11 +35,12 @@ import {
   listTestSections,
   updateTestPackageMetadata,
 } from '../../lib/test-packages'
-import type {
-  TestItem,
-  TestPackage,
-  TestPackageVersion,
-  TestSection,
+import {
+  detectPackageTestType,
+  type TestItem,
+  type TestPackage,
+  type TestPackageVersion,
+  type TestSection,
 } from '../../modules/catalog/test-package-catalog'
 import {
   generateNarration,
@@ -54,37 +55,7 @@ import {
 
 type FilterTab = 'all' | 'green' | 'red'
 
-export function detectPackageTestType(pkg: {
-  title: string
-  slug?: string | null
-  sourceMetadata?: Record<string, any> | null
-}): 'green' | 'red' {
-  const metadataType = pkg.sourceMetadata?.testType
-  if (typeof metadataType === 'string') {
-    const lower = metadataType.toLowerCase()
-    if (lower === 'red') return 'red'
-    if (lower === 'green') return 'green'
-  }
-
-  const title = (pkg.title || '').trim().toUpperCase()
-  const slug = (pkg.slug || '').trim().toLowerCase()
-
-  // Red test detection:
-  // - Starts with 'R' (e.g. R4-31V-0826, R01-42Q-56V)
-  // - Contains 'RED' or 'AWARENESS'
-  // - Slug starts with 'r' or contains 'red'
-  if (
-    title.startsWith('R') ||
-    title.includes('RED') ||
-    title.includes('AWARENESS') ||
-    slug.startsWith('r') ||
-    slug.includes('red')
-  ) {
-    return 'red'
-  }
-
-  return 'green'
-}
+export { detectPackageTestType }
 
 export type PackageSummary = {
   pkg: TestPackage

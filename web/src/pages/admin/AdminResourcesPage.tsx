@@ -53,13 +53,14 @@ import {
   type AudioLanguage,
   type AudioTargetStatus,
 } from '../../modules/catalog/spoken-scripts'
-import type {
-  CciCategory,
-  CciProfile,
-  SectionMeasurementSnapshot,
-  TestItem,
-  TestPackageVersion,
-  TestSection,
+import {
+  detectPackageTestType,
+  type CciCategory,
+  type CciProfile,
+  type SectionMeasurementSnapshot,
+  type TestItem,
+  type TestPackageVersion,
+  type TestSection,
 } from '../../modules/catalog/test-package-catalog'
 
 type PackageScope = {
@@ -72,15 +73,19 @@ type PackageCategoryFilter = 'all' | 'green' | 'red'
 type ResourceTab = 'sessions' | 'items' | 'cci' | 'audio' | 'flow'
 
 function isGreenPackage(scope: PackageScope): boolean {
-  const title = (scope.packageTitle ?? '').toUpperCase()
-  const slug = (scope.packageSlug ?? '').toLowerCase()
-  return title.startsWith('G') || title.includes('GREEN') || slug.includes('green')
+  return detectPackageTestType({
+    title: scope.packageTitle,
+    slug: scope.packageSlug,
+    sourceMetadata: scope.version?.sourceMetadata,
+  }) === 'green'
 }
 
 function isRedPackage(scope: PackageScope): boolean {
-  const title = (scope.packageTitle ?? '').toUpperCase()
-  const slug = (scope.packageSlug ?? '').toLowerCase()
-  return title.startsWith('R') || title.includes('RED') || slug.includes('red')
+  return detectPackageTestType({
+    title: scope.packageTitle,
+    slug: scope.packageSlug,
+    sourceMetadata: scope.version?.sourceMetadata,
+  }) === 'red'
 }
 
 function matchesPackageCategory(scope: PackageScope, filter: PackageCategoryFilter): boolean {

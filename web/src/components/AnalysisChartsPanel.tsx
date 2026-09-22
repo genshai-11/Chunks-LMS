@@ -15,27 +15,24 @@ import {
   RotateCcw,
   Target,
   X,
-  Zap,
 } from 'lucide-react'
 import {
   Bar,
   BarChart,
-  Brush,
   CartesianGrid,
   Cell,
   ComposedChart,
   LabelList,
   Line,
-  LineChart as RechartsLineChart,
   Pie,
   PieChart as RechartsPieChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
 import { Panel } from './ui'
-import { probeChunksNumber } from '../modules/assessment/probe-metrics'
 import {
   calculateSpectrumStepBreakdown,
   colorForAvgPercentX,
@@ -74,24 +71,22 @@ export type Props = {
   metricSettings?: MetricSettingsState
 }
 
-export type ChartKey = 'tube' | 'mix' | 'trend' | 'combo' | 'distribution'
+export type ChartKey = 'tube' | 'mix' | 'sessionPercentC' | 'distribution'
 export type ChartUiState = Record<ChartKey, { showLabels: boolean; expanded: boolean; hidden: boolean }>
 
 const DEFAULT_CHART_UI: ChartUiState = {
   tube: { showLabels: true, expanded: false, hidden: false },
   mix: { showLabels: true, expanded: false, hidden: false },
-  trend: { showLabels: true, expanded: false, hidden: false },
-  combo: { showLabels: true, expanded: false, hidden: false },
+  sessionPercentC: { showLabels: true, expanded: false, hidden: false },
   distribution: { showLabels: true, expanded: false, hidden: false },
 }
 
-const DEFAULT_CHART_ORDER: ChartKey[] = ['tube', 'mix', 'trend', 'combo', 'distribution']
+const DEFAULT_CHART_ORDER: ChartKey[] = ['tube', 'mix', 'sessionPercentC', 'distribution']
 
 const CHART_NAMES: Record<ChartKey, string> = {
   tube: 'Record Tube',
   mix: '7-Color Record Mix',
-  trend: 'RFC & %c Trend',
-  combo: 'Combo & Depth',
+  sessionPercentC: '%c theo Session',
   distribution: 'Color Distribution',
 }
 
@@ -123,7 +118,6 @@ const COLOR_GROUPS = {
 const METRIC_HEX = {
   rfc: '#ef4444',
   percentC: '#16a34a',
-  depth: '#8b5cf6',
   attempts: '#38bdf8',
 }
 
@@ -159,12 +153,10 @@ export function AnalysisChartsPanel({
   const [chartUi, setChartUi] = useState<ChartUiState>(DEFAULT_CHART_UI)
   const [chartOrder, setChartOrder] = useState<ChartKey[]>(DEFAULT_CHART_ORDER)
   const [draggingChart, setDraggingChart] = useState<ChartKey | null>(null)
-  const [sessionBrushRange, setSessionBrushRange] = useState<{ startIndex?: number; endIndex?: number }>({})
+  const [sessionGroupMode, setSessionGroupMode] = useState<'dynamic' | 'day'>('dynamic')
+  const [dynamicChunkSize, setDynamicChunkSize] = useState<number>(10)
+  const [sessionChartType, setSessionChartType] = useState<'bar' | 'line'>('bar')
   const filterCardRef = useRef<HTMLElement | null>(null)
-
-  useEffect(() => {
-    setSessionBrushRange({})
-  }, [selectedColors, selectedSessions])
 
   useEffect(() => {
     function closeFilters(event: PointerEvent) {
@@ -205,7 +197,6 @@ export function AnalysisChartsPanel({
       const color = r.effectiveColor
       const enteredProbeFlow = Boolean(r.enteredProbeFlow)
       const probeEventCount = Math.max(0, r.probeEventCount ?? 0)
-      const probeDepth = probeChunksNumber({ enteredProbeFlow, probeCount: probeEventCount }) ?? 0
 
       return {
         id: r.id,
@@ -220,7 +211,6 @@ export function AnalysisChartsPanel({
         colorHex: COLOR_HEX[color],
         enteredProbeFlow,
         probeEventCount,
-        probeDepth,
         finalizedAt: r.finalizedAt,
       }
     })
@@ -246,10 +236,9 @@ export function AnalysisChartsPanel({
     })
   }, [attempts, selectedColors, selectedSessions])
 
-  // Summary KPIs for live scope (RFC, %c, sample size, N_total, probed count, probe depth)
+  // Summary KPIs for live scope (RFC, %c, sample size, N_total)
   const summary = useMemo(() => {
     const count = chartAttempts.length
-    const probed = chartAttempts.filter((a) => a.enteredProbeFlow)
     const spectrum = calculateSpectrumStepBreakdown(
       chartAttempts.map((a) => ({
         effectiveColor: a.color,
@@ -257,11 +246,6 @@ export function AnalysisChartsPanel({
         probeEventCount: a.probeEventCount,
       })),
     )
-
-    const chunksNumbers = probed.map((a) => Math.max(1, a.probeEventCount + 1))
-    const chunksNumberTotal = chunksNumbers.reduce((s, v) => s + v, 0)
-    const avgChunksNumber = probed.length > 0 ? chunksNumberTotal / probed.length : null
-    const maxChunksNumber = probed.length > 0 ? Math.max(...chunksNumbers) : null
     const avgXColor = colorForAvgPercentX(spectrum.avgPercentX)
 
     return {
@@ -275,9 +259,6 @@ export function AnalysisChartsPanel({
       avgPercentX: spectrum.avgPercentX ?? 0,
       sumPercentX: spectrum.sumPercentX,
       avgXColor,
-      probedCount: probed.length,
-      avgChunksNumber,
-      maxChunksNumber,
     }
   }, [chartAttempts])
 
@@ -359,66 +340,97 @@ export function AnalysisChartsPanel({
       })
   }, [recordTubeRows, availableSessions, learningSessions, totalDays, selectedSessions])
 
-  // Timeline rows across days for Trend & Combo charts
-  const timelineRows = useMemo(() => {
-    const map = new Map<number, typeof chartAttempts>()
-    for (const row of chartAttempts) {
-      if (!map.has(row.session)) map.set(row.session, [])
-      map.get(row.session)!.push(row)
-    }
+  // Dynamic Session Aggregator Logic for %c theo Session
+  const sessionPercentCBuckets = useMemo(() => {
+    if (chartAttempts.length === 0) return []
 
-    const sessionsToInclude = availableSessions.filter(
-      (s) => selectedSessions.length === 0 || selectedSessions.includes(s),
-    )
+    if (sessionGroupMode === 'dynamic') {
+      const sorted = [...chartAttempts].sort((a, b) => a.index - b.index)
+      const buckets: {
+        id: string
+        label: string
+        shortLabel: string
+        percentC: number
+        bandColor: ResultColor
+        questionCount: number
+        rfc: number
+      }[] = []
 
-    return sessionsToInclude.map((session) => {
-      const group = map.get(session) ?? []
-      const sOpt = learningSessions.find((ls) => ls.sessionNumber === session || (ls.sessionNumber == null && session === 1))
-      const label = sessionLabel(session, sOpt?.startedAt, totalDays)
-      const probed = group.filter((a) => a.enteredProbeFlow)
-      const spectrum = calculateSpectrumStepBreakdown(
-        group.map((a) => ({
-          effectiveColor: a.color,
-          enteredProbeFlow: a.enteredProbeFlow,
-          probeEventCount: a.probeEventCount,
-        })),
+      const totalAttempts = sorted.length
+      const size = Math.max(1, dynamicChunkSize)
+      const numBuckets = Math.ceil(totalAttempts / size)
+
+      for (let i = 0; i < numBuckets; i++) {
+        const startQ = i * size + 1
+        const endQ = Math.min((i + 1) * size, totalAttempts)
+        const bucketAttempts = sorted.slice(i * size, endQ)
+
+        const spectrum = calculateSpectrumStepBreakdown(
+          bucketAttempts.map((a) => ({
+            effectiveColor: a.color,
+            enteredProbeFlow: a.enteredProbeFlow,
+            probeEventCount: a.probeEventCount,
+          })),
+        )
+
+        const percentC = Number((spectrum.avgPercentX ?? 0).toFixed(1))
+        const bandColor = colorForAvgPercentX(percentC)
+        const rfc = spectrum.rfc == null ? 0 : Number((spectrum.rfc * 100).toFixed(1))
+
+        buckets.push({
+          id: `dynamic-${i}`,
+          label: `Session ${i + 1} (Q${startQ}-Q${endQ})`,
+          shortLabel: `S${i + 1} (Q${startQ}-${endQ})`,
+          percentC,
+          bandColor,
+          questionCount: bucketAttempts.length,
+          rfc,
+        })
+      }
+
+      return buckets
+    } else {
+      // sessionGroupMode === 'day'
+      const map = new Map<number, typeof chartAttempts>()
+      for (const row of chartAttempts) {
+        if (!map.has(row.session)) map.set(row.session, [])
+        map.get(row.session)!.push(row)
+      }
+
+      const sessionsToInclude = availableSessions.filter(
+        (s) => selectedSessions.length === 0 || selectedSessions.includes(s),
       )
 
-      const chunksNumbers = probed.map((a) => Math.max(1, a.probeEventCount + 1))
-      const chunksNumberTotal = chunksNumbers.reduce((s, v) => s + v, 0)
-      const avgChunksNumber = probed.length > 0 ? chunksNumberTotal / probed.length : null
-      const avgPercentX = spectrum.avgPercentX ?? 0
-      const avgXColor = colorForAvgPercentX(spectrum.avgPercentX)
-      const rfc = spectrum.rfc == null ? 0 : Number((spectrum.rfc * 100).toFixed(1))
+      return sessionsToInclude.map((session) => {
+        const bucketAttempts = map.get(session) ?? []
+        const sOpt = learningSessions.find(
+          (ls) => ls.sessionNumber === session || (ls.sessionNumber == null && session === 1),
+        )
+        const label = sessionLabel(session, sOpt?.startedAt, totalDays)
+        const spectrum = calculateSpectrumStepBreakdown(
+          bucketAttempts.map((a) => ({
+            effectiveColor: a.color,
+            enteredProbeFlow: a.enteredProbeFlow,
+            probeEventCount: a.probeEventCount,
+          })),
+        )
 
-      return {
-        session,
-        label,
-        shortLabel: `D${session}`,
-        attempts: group.length,
-        nTotal: spectrum.totalRecords,
-        rfc,
-        percentC: Number(avgPercentX.toFixed(1)),
-        avgPercentX,
-        avgXColor,
-        probedCount: probed.length,
-        avgChunksNumber,
-        byColor: spectrum.byColor,
-      }
-    })
-  }, [chartAttempts, availableSessions, selectedSessions, learningSessions, totalDays])
+        const percentC = Number((spectrum.avgPercentX ?? 0).toFixed(1))
+        const bandColor = colorForAvgPercentX(percentC)
+        const rfc = spectrum.rfc == null ? 0 : Number((spectrum.rfc * 100).toFixed(1))
 
-  const maxSessionBrushIndex = Math.max(timelineRows.length - 1, 0)
-  const sessionBrushStart = Math.min(maxSessionBrushIndex, Math.max(0, sessionBrushRange.startIndex ?? 0))
-  const sessionBrushEnd = Math.max(
-    sessionBrushStart,
-    Math.min(maxSessionBrushIndex, sessionBrushRange.endIndex ?? maxSessionBrushIndex),
-  )
-
-  const handleSessionBrushChange = useCallback((range: { startIndex?: number; endIndex?: number } | null) => {
-    if (!range) return
-    setSessionBrushRange(range)
-  }, [])
+        return {
+          id: `day-${session}`,
+          label,
+          shortLabel: `D${session}`,
+          percentC,
+          bandColor,
+          questionCount: bucketAttempts.length,
+          rfc,
+        }
+      })
+    }
+  }, [chartAttempts, sessionGroupMode, dynamicChunkSize, availableSessions, selectedSessions, learningSessions, totalDays])
 
   // Spectrum pie distribution
   const colorDistribution = useMemo(() => {
@@ -585,26 +597,6 @@ export function AnalysisChartsPanel({
           <Layers className="h-5 w-5 text-indigo-500" />
           <span>N_total records</span>
           <strong>{summary.totalRecords}</strong>
-        </div>
-
-        <div
-          className="standalone-metric-card metric-percent-c cursor-default"
-          title={`Attempts where teacher selected Green (2) and entered probe flow: ${summary.probedCount}.`}
-        >
-          <Zap className="h-5 w-5 text-emerald-500" />
-          <span>Chunks count</span>
-          <strong className="text-emerald-500">{summary.probedCount}</strong>
-        </div>
-
-        <div
-          className="standalone-metric-card cursor-default"
-          title={`Mean chunks number across probed attempts. Peak observed: ${summary.maxChunksNumber ?? '—'}.`}
-        >
-          <LineChartIcon className="h-5 w-5 text-purple-500" />
-          <span>Avg chunks number</span>
-          <strong className="text-purple-500">
-            {summary.avgChunksNumber != null ? summary.avgChunksNumber.toFixed(1) : '—'}
-          </strong>
         </div>
       </div>
 
@@ -884,241 +876,244 @@ export function AnalysisChartsPanel({
             </div>
           ) : null}
 
-          {/* RFC & %c Trend by Day with Recharts Brush */}
-          {!chartUi.trend.hidden ? (
+          {/* %c theo Session */}
+          {!chartUi.sessionPercentC.hidden ? (
             <div
-              className={`test-analysis-chart-slot${chartUi.trend.expanded ? ' lg:col-span-2' : ''}`}
-              style={{ order: chartOrder.indexOf('trend') }}
+              className={`test-analysis-chart-slot${chartUi.sessionPercentC.expanded ? ' lg:col-span-2' : ''}`}
+              style={{ order: chartOrder.indexOf('sessionPercentC') }}
             >
               <Panel
-                className={chartPanelClass('trend')}
+                className={chartPanelClass('sessionPercentC')}
                 icon={LineChartIcon}
-                title="RFC & %c Trend by Day"
-                description="Timeline across days: Red = Struggle (RFC %), Green = Success (%c / Avg %x). Drag brush below to scrub/zoom."
-                actions={chartActions('trend')}
+                title="%c theo Session"
+                description="Theo dõi %c (Avg %x) theo từng phiên học (Session) hoặc nhóm câu hỏi với chỉ số màu quang phổ thực tế."
+                actions={chartActions('sessionPercentC')}
                 collapsible={false}
               >
-                <div className={`standalone-chart-wrap${chartUi.trend.expanded ? ' h-[26rem]' : ''}`}>
+                {/* Controls toolbar */}
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2.5 border-b border-slate-100 dark:border-white/10 text-xs">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-slate-500 font-medium">Nhóm:</span>
+                    <button
+                      type="button"
+                      className={`px-2 py-0.5 rounded-md font-semibold transition-all border cursor-pointer ${
+                        sessionGroupMode === 'dynamic' && dynamicChunkSize === 10
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                          : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                      }`}
+                      onClick={() => {
+                        setSessionGroupMode('dynamic')
+                        setDynamicChunkSize(10)
+                      }}
+                    >
+                      Gộp 10 câu (Mặc định)
+                    </button>
+                    {[5, 15, 20].map((size) => (
+                      <button
+                        key={size}
+                        type="button"
+                        className={`px-2 py-0.5 rounded-md font-semibold transition-all border cursor-pointer ${
+                          sessionGroupMode === 'dynamic' && dynamicChunkSize === size
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                            : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                        }`}
+                        onClick={() => {
+                          setSessionGroupMode('dynamic')
+                          setDynamicChunkSize(size)
+                        }}
+                      >
+                        {size} câu
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      className={`px-2 py-0.5 rounded-md font-semibold transition-all border cursor-pointer ${
+                        sessionGroupMode === 'day'
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                          : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                      }`}
+                      onClick={() => setSessionGroupMode('day')}
+                    >
+                      Theo ngày học (D1..DN)
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <button
+                      type="button"
+                      className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                        sessionChartType === 'bar'
+                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                      onClick={() => setSessionChartType('bar')}
+                    >
+                      Bar
+                    </button>
+                    <button
+                      type="button"
+                      className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                        sessionChartType === 'line'
+                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                      onClick={() => setSessionChartType('line')}
+                    >
+                      Line
+                    </button>
+                  </div>
+                </div>
+
+                <div className={`standalone-chart-wrap${chartUi.sessionPercentC.expanded ? ' h-[26rem]' : ''}`}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <RechartsLineChart data={timelineRows} margin={{ top: 36, right: 20, bottom: 8, left: -12 }}>
+                    <ComposedChart
+                      data={sessionPercentCBuckets}
+                      margin={{ top: 36, right: 24, bottom: 8, left: -12 }}
+                    >
                       <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" opacity={0.6} />
-                      <XAxis dataKey="shortLabel" stroke="#64748b" fontSize={12} tickLine={false} interval={0} />
+                      <XAxis
+                        dataKey="shortLabel"
+                        stroke="#64748b"
+                        fontSize={11}
+                        tickLine={false}
+                        interval={0}
+                      />
                       <YAxis
                         domain={[0, 100]}
                         tickFormatter={(value) => `${value}%`}
                         stroke="#64748b"
                         fontSize={11}
                         tickLine={false}
-                        label={{ value: 'Percentage (%)', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                        label={{
+                          value: '%c (%)',
+                          angle: -90,
+                          position: 'insideLeft',
+                          fill: '#64748b',
+                        }}
                       />
                       <Tooltip
-                        cursor={{ stroke: '#6366f1', strokeDasharray: '3 3' }}
+                        cursor={{
+                          fill: 'rgba(255, 255, 255, 0.05)',
+                          stroke: '#6366f1',
+                          strokeDasharray: '3 3',
+                        }}
                         content={({ active, payload }) => {
                           if (!active || !payload?.length) return null
                           const row = payload[0]?.payload
+                          if (!row) return null
                           return (
                             <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-3 text-xs text-slate-700 dark:text-slate-200 shadow-xl">
-                              <div className="mb-1 font-black text-slate-950 dark:text-white">{row.label}</div>
-                              <div>
-                                RFC (Struggle):{' '}
-                                <strong style={{ color: METRIC_HEX.rfc }}>{Number(row.rfc ?? 0).toFixed(1)}%</strong>
+                              <div className="mb-1 font-black text-slate-950 dark:text-white">
+                                {row.label}
                               </div>
-                              <div>
-                                %c (Avg %x):{' '}
-                                <strong style={{ color: METRIC_HEX.percentC }}>
-                                  {Number(row.percentC ?? 0).toFixed(1)}%
-                                </strong>{' '}
-                                <span style={{ color: COLOR_HEX[row.avgXColor as ResultColor] }}>
-                                  ({COLOR_LABELS[row.avgXColor as ResultColor]})
+                              <div className="flex items-center gap-1.5 my-1">
+                                <span>%c:</span>
+                                <strong
+                                  style={{
+                                    color: COLOR_HEX[row.bandColor as ResultColor],
+                                  }}
+                                >
+                                  {Number(row.percentC).toFixed(1)}%
+                                </strong>
+                                <span
+                                  className="px-1.5 py-0.5 rounded text-[10px] font-bold text-white uppercase"
+                                  style={{
+                                    backgroundColor:
+                                      COLOR_HEX[row.bandColor as ResultColor],
+                                  }}
+                                >
+                                  {COLOR_LABELS[row.bandColor as ResultColor]}
                                 </span>
                               </div>
                               <div>
-                                Attempts: <strong>{row.attempts}</strong> · N_total records:{' '}
-                                <strong>{row.nTotal}</strong>
-                              </div>
-                              {row.probedCount > 0 ? (
-                                <div>
-                                  Chunks count: <strong>{row.probedCount}</strong> · Avg chunks number:{' '}
-                                  <strong>{row.avgChunksNumber != null ? row.avgChunksNumber.toFixed(1) : '—'}</strong>
-                                </div>
-                              ) : null}
-                            </div>
-                          )
-                        }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="rfc"
-                        name="RFC (Struggle)"
-                        stroke={METRIC_HEX.rfc}
-                        strokeWidth={3}
-                        dot={{ r: 5, fill: METRIC_HEX.rfc, stroke: '#ffffff', strokeWidth: 2 }}
-                        activeDot={{ r: 7, fill: METRIC_HEX.rfc, stroke: '#0f172a', strokeWidth: 2 }}
-                        isAnimationActive={false}
-                      >
-                        {chartUi.trend.showLabels ? (
-                          <LabelList
-                            dataKey="rfc"
-                            position="top"
-                            offset={10}
-                            formatter={(v: unknown) => `${Number(v).toFixed(0)}%`}
-                            fill={METRIC_HEX.rfc}
-                            className="test-analysis-chart-label"
-                          />
-                        ) : null}
-                      </Line>
-                      <Line
-                        type="monotone"
-                        dataKey="percentC"
-                        name="%c (Avg %x)"
-                        stroke={METRIC_HEX.percentC}
-                        strokeWidth={3}
-                        dot={{ r: 5, fill: METRIC_HEX.percentC, stroke: '#ffffff', strokeWidth: 2 }}
-                        activeDot={{ r: 7, fill: METRIC_HEX.percentC, stroke: '#0f172a', strokeWidth: 2 }}
-                        isAnimationActive={false}
-                      >
-                        {chartUi.trend.showLabels ? (
-                          <LabelList
-                            dataKey="percentC"
-                            position="top"
-                            offset={10}
-                            formatter={(v: unknown) => `${Number(v).toFixed(0)}%`}
-                            fill={METRIC_HEX.percentC}
-                            className="test-analysis-chart-label"
-                          />
-                        ) : null}
-                      </Line>
-                      <Brush
-                        dataKey="shortLabel"
-                        height={24}
-                        stroke="#6366f1"
-                        travellerWidth={10}
-                        startIndex={sessionBrushStart}
-                        endIndex={sessionBrushEnd}
-                        onChange={handleSessionBrushChange}
-                      />
-                    </RechartsLineChart>
-                  </ResponsiveContainer>
-                </div>
-              </Panel>
-            </div>
-          ) : null}
-
-          {/* Metrics & Chunks Depth Combo Chart with Recharts Brush */}
-          {!chartUi.combo.hidden ? (
-            <div
-              className={`test-analysis-chart-slot${chartUi.combo.expanded ? ' lg:col-span-2' : ''}`}
-              style={{ order: chartOrder.indexOf('combo') }}
-            >
-              <Panel
-                className={chartPanelClass('combo')}
-                icon={Activity}
-                title="Metrics & Chunks Depth Combo"
-                description="Dual-axis view: RFC & %c lines on left axis (%) vs Chunks count bar and Avg chunks number on right axis."
-                actions={chartActions('combo')}
-                collapsible={false}
-              >
-                <div className={`standalone-chart-wrap${chartUi.combo.expanded ? ' h-[26rem]' : ''}`}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={timelineRows} margin={{ top: 36, right: 20, bottom: 8, left: -12 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" opacity={0.6} />
-                      <XAxis dataKey="shortLabel" stroke="#64748b" fontSize={12} tickLine={false} interval={0} />
-                      <YAxis
-                        yAxisId="percent"
-                        domain={[0, 100]}
-                        tickFormatter={(value) => `${value}%`}
-                        stroke="#64748b"
-                        fontSize={11}
-                        tickLine={false}
-                        label={{ value: 'RFC / %c (%)', angle: -90, position: 'insideLeft', fill: '#64748b' }}
-                      />
-                      <YAxis
-                        yAxisId="depth"
-                        orientation="right"
-                        stroke="#8b5cf6"
-                        fontSize={11}
-                        tickLine={false}
-                        label={{ value: 'Depth / Count', angle: 90, position: 'insideRight', fill: '#8b5cf6' }}
-                      />
-                      <Tooltip
-                        cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
-                        content={({ active, payload }) => {
-                          if (!active || !payload?.length) return null
-                          const row = payload[0]?.payload
-                          return (
-                            <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-3 text-xs text-slate-700 dark:text-slate-200 shadow-xl">
-                              <div className="mb-1 font-black text-slate-950 dark:text-white">{row.label}</div>
-                              <div>
-                                RFC:{' '}
-                                <strong style={{ color: METRIC_HEX.rfc }}>{Number(row.rfc ?? 0).toFixed(1)}%</strong>
+                                Questions: <strong>{row.questionCount}</strong>
                               </div>
                               <div>
-                                %c:{' '}
-                                <strong style={{ color: METRIC_HEX.percentC }}>
-                                  {Number(row.percentC ?? 0).toFixed(1)}%
-                                </strong>
-                              </div>
-                              <div>
-                                Chunks Count: <strong className="text-sky-500">{row.probedCount}</strong>
-                              </div>
-                              <div>
-                                Avg Chunks Number:{' '}
-                                <strong className="text-purple-500">
-                                  {row.avgChunksNumber != null ? row.avgChunksNumber.toFixed(1) : '—'}
+                                Struggle (RFC):{' '}
+                                <strong style={{ color: METRIC_HEX.rfc }}>
+                                  {Number(row.rfc).toFixed(1)}%
                                 </strong>
                               </div>
                             </div>
                           )
                         }}
                       />
-                      <Bar
-                        yAxisId="depth"
-                        dataKey="probedCount"
-                        name="Chunks Count"
-                        fill="#38bdf8"
-                        opacity={0.7}
-                        radius={[4, 4, 0, 0]}
-                      >
-                        {chartUi.combo.showLabels ? (
-                          <LabelList dataKey="probedCount" position="top" className="test-analysis-chart-label" />
-                        ) : null}
-                      </Bar>
-                      <Line
-                        yAxisId="percent"
-                        type="monotone"
-                        dataKey="rfc"
-                        name="RFC (Struggle)"
-                        stroke={METRIC_HEX.rfc}
-                        strokeWidth={2.5}
-                        dot={{ r: 4, fill: METRIC_HEX.rfc }}
+                      <ReferenceLine
+                        y={50}
+                        stroke="#22c55e"
+                        strokeDasharray="3 3"
+                        label={{
+                          value: '50% Green',
+                          fill: '#22c55e',
+                          fontSize: 10,
+                          position: 'insideTopLeft',
+                        }}
                       />
-                      <Line
-                        yAxisId="percent"
-                        type="monotone"
-                        dataKey="percentC"
-                        name="%c (Avg %x)"
-                        stroke={METRIC_HEX.percentC}
-                        strokeWidth={2.5}
-                        dot={{ r: 4, fill: METRIC_HEX.percentC }}
-                      />
-                      <Line
-                        yAxisId="depth"
-                        type="monotone"
-                        dataKey="avgChunksNumber"
-                        name="Avg Chunks Number"
+                      <ReferenceLine
+                        y={75}
                         stroke="#a855f7"
-                        strokeWidth={2.5}
-                        dot={{ r: 4, fill: '#a855f7' }}
+                        strokeDasharray="3 3"
+                        label={{
+                          value: '75% Mastery',
+                          fill: '#a855f7',
+                          fontSize: 10,
+                          position: 'insideTopLeft',
+                        }}
                       />
-                      <Brush
-                        dataKey="shortLabel"
-                        height={24}
-                        stroke="#8b5cf6"
-                        travellerWidth={10}
-                        startIndex={sessionBrushStart}
-                        endIndex={sessionBrushEnd}
-                        onChange={handleSessionBrushChange}
-                      />
+                      {sessionChartType === 'bar' ? (
+                        <Bar
+                          dataKey="percentC"
+                          name="%c"
+                          radius={[4, 4, 0, 0]}
+                          isAnimationActive={false}
+                        >
+                          {sessionPercentCBuckets.map((b, idx) => (
+                            <Cell key={b.id ?? idx} fill={COLOR_HEX[b.bandColor]} />
+                          ))}
+                          {chartUi.sessionPercentC.showLabels ? (
+                            <LabelList
+                              dataKey="percentC"
+                              position="top"
+                              formatter={(v: unknown) => `${Number(v).toFixed(0)}%`}
+                              className="test-analysis-chart-label font-bold text-xs"
+                            />
+                          ) : null}
+                        </Bar>
+                      ) : (
+                        <Line
+                          type="monotone"
+                          dataKey="percentC"
+                          name="%c"
+                          stroke="#16a34a"
+                          strokeWidth={3}
+                          isAnimationActive={false}
+                          dot={(props: any) => {
+                            const { cx, cy, payload } = props
+                            return (
+                              <circle
+                                key={props.key}
+                                cx={cx}
+                                cy={cy}
+                                r={5}
+                                fill={COLOR_HEX[payload.bandColor as ResultColor]}
+                                stroke="#ffffff"
+                                strokeWidth={2}
+                              />
+                            )
+                          }}
+                          activeDot={{ r: 7, stroke: '#0f172a', strokeWidth: 2 }}
+                        >
+                          {chartUi.sessionPercentC.showLabels ? (
+                            <LabelList
+                              dataKey="percentC"
+                              position="top"
+                              offset={10}
+                              formatter={(v: unknown) => `${Number(v).toFixed(0)}%`}
+                              className="test-analysis-chart-label font-bold text-xs"
+                            />
+                          ) : null}
+                        </Line>
+                      )}
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>

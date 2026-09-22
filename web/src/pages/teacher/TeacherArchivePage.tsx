@@ -5,6 +5,7 @@ import {
   Clock,
   Filter,
   Search,
+  Users,
   Zap,
 } from 'lucide-react'
 import { PageHeader } from '../../components/PageHeader'
@@ -56,6 +57,7 @@ export function TeacherArchivePage() {
   const { classRow, course } = useTeacherClassContext()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [colorFilter, setColorFilter] = useState<'all' | ResultColor | 'probed'>('all')
+  const [learnerFilter, setLearnerFilter] = useState<'all' | string>('all')
   const [searchQuery, setSearchQuery] = useState('')
 
   const archive = useMemo(
@@ -67,6 +69,48 @@ export function TeacherArchivePage() {
   const names = useMemo(() => learnerNameMap(roster), [roster])
   const selected =
     archive.find((d) => d.learningSession.id === selectedId) ?? archive[archive.length - 1] ?? null
+
+  const sessionLearners = useMemo(() => {
+    if (!selected) return []
+    const map = new Map<string, { id: string; name: string; count: number }>()
+    for (const cell of selected.cells) {
+      const existing = map.get(cell.learnerUserId)
+      const name = names.get(cell.learnerUserId) ?? 'Learner'
+      if (existing) {
+        existing.count++
+      } else {
+        map.set(cell.learnerUserId, {
+          id: cell.learnerUserId,
+          name,
+          count: 1,
+        })
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
+  }, [selected, names])
+
+  const selectedLearnerInfo = useMemo(() => {
+    if (!selected || learnerFilter === 'all') return null
+    const user = roster.users.find((u) => u.id === learnerFilter)
+    const name = names.get(learnerFilter) ?? user?.displayName ?? 'Learner'
+    const learnerCells = selected.cells.filter((c) => c.learnerUserId === learnerFilter)
+    const colorBreakdown = Object.fromEntries(SPECTRUM_COLORS.map((col) => [col, 0])) as Record<
+      ResultColor,
+      number
+    >
+    let probedCount = 0
+    for (const c of learnerCells) {
+      if (c.color && c.color in colorBreakdown) colorBreakdown[c.color]++
+      if (c.enteredProbeFlow) probedCount++
+    }
+    return {
+      user,
+      name,
+      totalQuestions: learnerCells.length,
+      probedCount,
+      colorBreakdown,
+    }
+  }, [selected, learnerFilter, roster.users, names])
 
   const dayColorCounts = useMemo(() => {
     const c = Object.fromEntries(SPECTRUM_COLORS.map((col) => [col, 0])) as Record<
@@ -108,6 +152,9 @@ export function TeacherArchivePage() {
     if (!selected) return []
     const query = searchQuery.trim().toLowerCase()
     return selected.cells.filter((cell) => {
+      if (learnerFilter !== 'all' && cell.learnerUserId !== learnerFilter) {
+        return false
+      }
       if (query) {
         const name = (names.get(cell.learnerUserId) ?? '').toLowerCase()
         if (!name.includes(query)) return false
@@ -116,7 +163,7 @@ export function TeacherArchivePage() {
       if (colorFilter === 'probed') return cell.enteredProbeFlow
       return cell.color === colorFilter
     })
-  }, [selected, searchQuery, colorFilter, names])
+  }, [selected, learnerFilter, searchQuery, colorFilter, names])
 
   if (!classRow) {
     return (
@@ -162,6 +209,7 @@ export function TeacherArchivePage() {
                     onClick={() => {
                       setSelectedId(day.learningSession.id)
                       setColorFilter('all')
+                      setLearnerFilter('all')
                       setSearchQuery('')
                     }}
                   >
@@ -344,8 +392,8 @@ export function TeacherArchivePage() {
                   </div>
                 </div>
 
-                {/* Quick Filters: Learner Name Search + Filter Chips */}
-                <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-xl border border-slate-200/80 bg-white shadow-3xs">
+                {/* Quick Filters: Color Chips + Learner Dropdown + Learner Name Search */}
+                <div className="mb-4 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-3 rounded-xl border border-slate-200/80 bg-white shadow-3xs">
                   <div
                     className="flex flex-wrap items-center gap-1.5"
                     role="group"
@@ -424,24 +472,47 @@ export function TeacherArchivePage() {
                     </button>
                   </div>
 
-                  <div className="relative min-w-[200px]">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="Filter by learner name..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-7 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-3xs"
-                    />
-                    {searchQuery && (
-                      <button
-                        type="button"
-                        onClick={() => setSearchQuery('')}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 hover:text-slate-600 cursor-pointer"
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    {/* Dedicated Learner Filter Select */}
+                    <div className="relative min-w-[180px]">
+                      <select
+                        value={learnerFilter}
+                        onChange={(e) => setLearnerFilter(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-3 pr-8 py-1.5 text-xs text-slate-800 font-medium focus:outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-3xs cursor-pointer appearance-none"
+                        aria-label="Filter by learner"
                       >
-                        ✕
-                      </button>
-                    )}
+                        <option value="all">
+                          All Learners (Cả lớp) ({selected.cells.length})
+                        </option>
+                        {sessionLearners.map((l) => (
+                          <option key={l.id} value={l.id}>
+                            {l.name} ({l.count} câu)
+                          </option>
+                        ))}
+                      </select>
+                      <Users className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                    </div>
+
+                    {/* Search Input */}
+                    <div className="relative min-w-[160px]">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Filter by name..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-7 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-3xs"
+                      />
+                      {searchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setSearchQuery('')}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -463,37 +534,93 @@ export function TeacherArchivePage() {
                       onClick={() => {
                         setSearchQuery('')
                         setColorFilter('all')
+                        setLearnerFilter('all')
                       }}
                     >
                       Reset filters
                     </button>
                   </div>
                 ) : (
-                  <div
-                    className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3"
-                    role="list"
-                    aria-label="Result map"
-                  >
-                    {filteredCells.map((cell) => {
-                      const learnerName = names.get(cell.learnerUserId) ?? 'Learner'
-                      const learnerUser = roster.users.find((u) => u.id === cell.learnerUserId)
-                      const pillStyle = cell.color ? COLOR_PILL_STYLES[cell.color] : null
+                  <div>
+                    {/* Single Learner Profile Header when a specific learner is filtered */}
+                    {selectedLearnerInfo && (
+                      <div className="mb-4 rounded-xl border border-indigo-200/80 bg-indigo-50/40 p-4 shadow-3xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <UserAvatar
+                            name={selectedLearnerInfo.name}
+                            avatarUrl={selectedLearnerInfo.user?.avatarUrl}
+                            size="md"
+                          />
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-sm font-bold text-slate-900 tracking-tight m-0">
+                                {selectedLearnerInfo.name}
+                              </h4>
+                              <span className="text-[10px] font-mono text-slate-400">
+                                {selectedLearnerInfo.user?.id.slice(0, 8)}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              <strong>{selectedLearnerInfo.totalQuestions}</strong> questions completed in this session
+                              {selectedLearnerInfo.probedCount > 0 ? (
+                                <span> · <strong className="text-amber-600">{selectedLearnerInfo.probedCount}</strong> probed</span>
+                              ) : null}
+                            </p>
+                          </div>
+                        </div>
 
-                      return (
-                        <div
-                          key={`${cell.sessionQuestionId}-${cell.learnerUserId}`}
-                          className="rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-3xs hover:border-slate-300 hover:shadow-2xs transition-all flex flex-col justify-between gap-3 group"
-                          role="listitem"
-                        >
-                          {/* Top: Question Sequence & Badges */}
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-md">
+                        {/* Learner's color breakdown pills */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {SPECTRUM_COLORS.map((col) => {
+                            const count = selectedLearnerInfo.colorBreakdown[col]
+                            if (count === 0) return null
+                            const pill = COLOR_PILL_STYLES[col]
+                            return (
+                              <span
+                                key={col}
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border ${pill.bg} ${pill.text} ${pill.border}`}
+                              >
+                                <span className={`h-1.5 w-1.5 rounded-full ${pill.dot}`} />
+                                <span>{COLOR_LABELS[col]}:</span>
+                                <strong className="font-mono">{count}</strong>
+                              </span>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Streamlined compact grid */}
+                    <div
+                      className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5"
+                      role="list"
+                      aria-label="Result map"
+                    >
+                      {filteredCells.map((cell) => {
+                        const learnerName = names.get(cell.learnerUserId) ?? 'Learner'
+                        const pillStyle = cell.color ? COLOR_PILL_STYLES[cell.color] : null
+
+                        return (
+                          <div
+                            key={`${cell.sessionQuestionId}-${cell.learnerUserId}`}
+                            className="rounded-lg border border-slate-200/80 bg-white p-2.5 shadow-3xs hover:border-slate-300 hover:shadow-2xs transition-all flex items-center justify-between gap-2"
+                            role="listitem"
+                          >
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="font-mono text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200/80 px-1.5 py-0.5 rounded shrink-0">
                                 Q{cell.sequenceHint}
                               </span>
+                              {learnerFilter === 'all' && (
+                                <span
+                                  className="bg-slate-100 text-slate-700 font-medium text-xs px-2 py-0.5 rounded truncate max-w-[120px]"
+                                  title={learnerName}
+                                >
+                                  {learnerName}
+                                </span>
+                              )}
                               {cell.enteredProbeFlow && (
                                 <span
-                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200"
+                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 shrink-0"
                                   title={`Probe event depth: ${cell.probeEventCount}`}
                                 >
                                   <Zap className="h-2.5 w-2.5" />
@@ -504,35 +631,18 @@ export function TeacherArchivePage() {
 
                             {cell.color && pillStyle ? (
                               <span
-                                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${pillStyle.bg} ${pillStyle.text} border ${pillStyle.border}`}
+                                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold shrink-0 ${pillStyle.bg} ${pillStyle.text} border ${pillStyle.border}`}
                               >
                                 <span className={`h-1.5 w-1.5 rounded-full ${pillStyle.dot}`} />
                                 <span className="capitalize">{COLOR_LABELS[cell.color]}</span>
                               </span>
                             ) : (
-                              <span className="text-xs text-slate-400 italic">No color</span>
+                              <span className="text-xs text-slate-400 italic shrink-0">No color</span>
                             )}
                           </div>
-
-                          {/* Bottom: Learner Identity */}
-                          <div className="flex items-center gap-2.5 pt-2 border-t border-slate-100">
-                            <UserAvatar
-                              name={learnerName}
-                              avatarUrl={learnerUser?.avatarUrl}
-                              size="sm"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <p className="font-bold text-xs text-slate-800 truncate group-hover:text-indigo-600 transition-colors">
-                                {learnerName}
-                              </p>
-                              <p className="text-[10px] text-slate-400 font-mono truncate">
-                                {cell.learnerUserId.slice(0, 8)}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
+                        )
+                      })}
+                    </div>
                   </div>
                 )}
               </div>

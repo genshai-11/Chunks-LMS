@@ -1,21 +1,17 @@
 import { useMemo, useState, useEffect } from 'react'
 import {
   Activity,
-  AlertTriangle,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
   CalendarDays,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Info,
   Search,
-  Target,
   TrendingDown,
   TrendingUp,
   Users,
-  Zap,
 } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import {
@@ -377,9 +373,10 @@ export function ProgressAnalysisView({
     (courseEnd ?? '2026-12-31').toString().slice(0, 10),
   )
   const [sessionId, setSessionId] = useState(learningSessions[0]?.id ?? '')
-  const [selectedLearnerIds, setSelectedLearnerIds] = useState<string[]>(
-    learnerUserId ? [learnerUserId] : [],
-  )
+  const [selectedLearnerIds, setSelectedLearnerIds] = useState<string[]>(() => {
+    if (mode === 'teacher') return []
+    return learnerUserId ? [learnerUserId] : []
+  })
   const [whoOpen, setWhoOpen] = useState(false)
   const [columnsPanelOpen, setColumnsPanelOpen] = useState(false)
   const [deleteSessionIdConfirm, setDeleteSessionIdConfirm] = useState<string | null>(null)
@@ -387,8 +384,12 @@ export function ProgressAnalysisView({
   const [editSessionNumberInput, setEditSessionNumberInput] = useState<string>('')
   
   useEffect(() => {
-    setSelectedLearnerIds(learnerUserId ? [learnerUserId] : [])
-  }, [learnerUserId])
+    if (mode === 'teacher') {
+      setSelectedLearnerIds([])
+    } else {
+      setSelectedLearnerIds(learnerUserId ? [learnerUserId] : [])
+    }
+  }, [learnerUserId, mode])
 
   const [tab, setTab] = useState<
     'overview' | 'charts' | 'sessions' | 'learners' | 'history'
@@ -503,42 +504,6 @@ export function ProgressAnalysisView({
   const rfcTone = trendTone('rfc', rfcDelta)
   const racTone = trendTone('rac', racDelta)
 
-  const additionalMetrics = useMemo(() => {
-    if (!comparison || !metricSettings) return []
-    const primaryKeys: MetricKey[] = ['rfc', 'rac', 'average_performance']
-    return metricSettings.metrics
-      .filter((m) => m.enabled && !primaryKeys.includes(m.key))
-      .map((cfg) => {
-        const obs = pickMetric(comparison.current, cfg.key, metricSettings)
-        const delta = comparison.deltas[cfg.key]
-        return {
-          key: cfg.key,
-          label: cfg.label,
-          definition: cfg.definition,
-          obs,
-          delta,
-        }
-      })
-      .filter(
-        (item): item is {
-          key: MetricKey
-          label: string
-          definition: string
-          obs: MetricObservation
-          delta: number | null | undefined
-        } => item.obs !== null,
-      )
-  }, [comparison, metricSettings])
-
-  const probeStats = useMemo(() => {
-    const probed = windowRecords.filter((r) => r.enteredProbeFlow)
-    const count = probed.length
-    const chunksNumbers = probed.map((r) => probeChunksNumber({ enteredProbeFlow: r.enteredProbeFlow, probeCount: r.probeEventCount }) ?? 0)
-    const totalChunksNumber = chunksNumbers.reduce((sum, value) => sum + value, 0)
-    const avg = count > 0 ? totalChunksNumber / count : 0
-    const max = count > 0 ? Math.max(...chunksNumbers) : 0
-    return { count, avg, max }
-  }, [windowRecords])
 
   /** Metrics available for by-day columns (Admin-enabled ∩ catalog defaults) */
   const dayMetricOptions = useMemo((): MetricKey[] => {
@@ -773,39 +738,6 @@ export function ProgressAnalysisView({
     return filteredHistory.slice(startIdx, endIdx)
   }, [filteredHistory, startIdx, endIdx])
 
-  const trajectoryConfig = useMemo(() => {
-    const percentCVal = rac?.value != null ? rac.value * 100 : null
-    const rfcVal = rfc?.value != null ? rfc.value * 100 : null
-
-    if (percentCVal != null && percentCVal >= 70) {
-      return {
-        title: 'Mastery Trajectory',
-        description: 'Cohort demonstrating strong chunk mastery',
-        stripClass: 'bg-emerald-50/70 border-emerald-200/80 text-emerald-950',
-        badgeClass: 'bg-emerald-100/80 text-emerald-800 border-emerald-300',
-        iconClass: 'bg-emerald-100 text-emerald-700',
-        icon: CheckCircle2,
-      }
-    }
-    if (rfcVal != null && rfcVal >= 30) {
-      return {
-        title: 'Struggle Attention',
-        description: 'High difficulty detected, review recommended',
-        stripClass: 'bg-rose-50/70 border-rose-200/80 text-rose-950',
-        badgeClass: 'bg-rose-100/80 text-rose-800 border-rose-300',
-        iconClass: 'bg-rose-100 text-rose-700',
-        icon: AlertTriangle,
-      }
-    }
-    return {
-      title: 'Steady Trajectory',
-      description: 'Consistent progress across learning sessions',
-      stripClass: 'bg-indigo-50/50 border-indigo-200/80 text-indigo-950',
-      badgeClass: 'bg-indigo-100/80 text-indigo-800 border-indigo-300',
-      iconClass: 'bg-indigo-100 text-indigo-700',
-      icon: Target,
-    }
-  }, [rac, rfc])
 
   const selectedSessionLabel = useMemo(() => {
     const s = orderedSessions.find((x) => x.id === sessionId) ?? orderedSessions[0]
@@ -1160,206 +1092,7 @@ export function ProgressAnalysisView({
             </div>
           </div>
 
-          {/* Cohort Health & Trajectory Insight Badge/Strip */}
-          <div
-            className={`mt-4 p-3.5 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-3xs ${trajectoryConfig.stripClass}`}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-lg ${trajectoryConfig.iconClass}`}>
-                <trajectoryConfig.icon className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase border ${trajectoryConfig.badgeClass}`}
-                  >
-                    {trajectoryConfig.title}
-                  </span>
-                  <span className="text-xs text-slate-700 font-medium">
-                    {trajectoryConfig.description}
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Current %c:{' '}
-                  <strong className="text-slate-800">{rac ? formatMetricValue(rac) : '—'}</strong>
-                  {' · '}
-                  RFC:{' '}
-                  <strong className="text-slate-800">{rfc ? formatMetricValue(rfc) : '—'}</strong>
-                  {racDelta != null && (
-                    <>
-                      {' · '}
-                      <span>Δ %c: </span>
-                      <strong
-                        className={
-                          racTone === 'up'
-                            ? 'text-emerald-600'
-                            : racTone === 'down'
-                              ? 'text-rose-600'
-                              : 'text-slate-700'
-                        }
-                      >
-                        {formatDelta('rac', racDelta)}
-                      </strong>
-                    </>
-                  )}
-                  {rfcDelta != null && (
-                    <>
-                      {' · '}
-                      <span>Δ RFC: </span>
-                      <strong
-                        className={
-                          rfcTone === 'up'
-                            ? 'text-emerald-600'
-                            : rfcTone === 'down'
-                              ? 'text-rose-600'
-                              : 'text-slate-700'
-                        }
-                      >
-                        {formatDelta('rfc', rfcDelta)}
-                      </strong>
-                    </>
-                  )}
-                </p>
-              </div>
-            </div>
-            <div className="text-[11px] font-mono text-slate-500 shrink-0 self-end sm:self-center">
-              Cohort Health: <span className="text-slate-800 font-semibold">{total} samples evaluated</span>
-            </div>
-          </div>
 
-          {/* Streamlined Chunks Number Summary Strip */}
-          <div className="mt-4 rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-3xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-50 text-amber-600 border border-amber-200/60">
-                  <Zap className="h-3.5 w-3.5" />
-                </span>
-                <span className="text-xs font-bold text-slate-900 tracking-tight">Chunks Number Indicators</span>
-                <span className="text-[11px] text-slate-400 font-normal">(from finalized ledger)</span>
-              </div>
-              <span className="text-[11px] text-slate-500">
-                Green (2) entries evaluated: <strong className="text-slate-800 font-semibold">{probeStats.count}</strong> / {total}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
-              {/* Metric 1: chunks count */}
-              <div className="py-2 sm:py-0 sm:px-3 first:pl-0">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
-                    <span>chunks count</span>
-                    <span className="group/tooltip relative inline-block cursor-help text-slate-400 hover:text-slate-600">
-                      <Info className="h-3 w-3" />
-                      <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 rounded-lg bg-slate-900 p-2 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-xl transition-opacity group-hover/tooltip:opacity-100 text-left normal-case">
-                        <strong>chunks count</strong> = number of times the teacher selected Green (2). Values use real observations only.
-                      </span>
-                    </span>
-                  </span>
-                  <span className="text-[11px] font-mono font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60">Green (2)</span>
-                </div>
-                <div className="mt-1.5 flex items-baseline gap-2">
-                  <span className="text-xl font-black font-mono text-slate-900 tracking-tight">
-                    {probeStats.count}
-                  </span>
-                  <span className="text-[11px] text-slate-400 font-mono">sample={total}</span>
-                </div>
-              </div>
-
-              {/* Metric 2: avg chunks number */}
-              <div className="py-2 sm:py-0 sm:px-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
-                    <span>avg chunks number</span>
-                    <span className="group/tooltip relative inline-block cursor-help text-slate-400 hover:text-slate-600">
-                      <Info className="h-3 w-3" />
-                      <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 rounded-lg bg-slate-900 p-2 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-xl transition-opacity group-hover/tooltip:opacity-100 text-left normal-case">
-                        <strong>avg chunks number</strong> = mean chunks number on probed questions. Green opens at 1; each Continue adds 1.
-                      </span>
-                    </span>
-                  </span>
-                  <span className="text-[11px] font-mono font-semibold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200/60">Mean</span>
-                </div>
-                <div className="mt-1.5 flex items-baseline gap-2">
-                  <span className="text-xl font-black font-mono text-slate-900 tracking-tight">
-                    {probeStats.count > 0 ? probeStats.avg.toFixed(1) : '—'}
-                  </span>
-                  <span className="text-[11px] text-slate-400">per probed Q</span>
-                </div>
-              </div>
-
-              {/* Metric 3: max chunks number */}
-              <div className="py-2 sm:py-0 sm:px-3 last:pr-0">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
-                    <span>max chunks number</span>
-                    <span className="group/tooltip relative inline-block cursor-help text-slate-400 hover:text-slate-600">
-                      <Info className="h-3 w-3" />
-                      <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 rounded-lg bg-slate-900 p-2 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-xl transition-opacity group-hover/tooltip:opacity-100 text-left normal-case">
-                        <strong>max chunks number</strong> = maximum observed chunks number on one question.
-                      </span>
-                    </span>
-                  </span>
-                  <span className="text-[11px] font-mono font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/60">Peak</span>
-                </div>
-                <div className="mt-1.5 flex items-baseline gap-2">
-                  <span className="text-xl font-black font-mono text-slate-900 tracking-tight">
-                    {probeStats.count > 0 ? probeStats.max : '—'}
-                  </span>
-                  <span className="text-[11px] text-slate-400">ceiling observed</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Collapsible Additional Indicators */}
-          {additionalMetrics.length > 0 && (
-            <details className="mt-4 rounded-xl border border-slate-200/80 bg-white shadow-3xs overflow-hidden group">
-              <summary className="flex items-center justify-between px-3.5 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50/50 cursor-pointer list-none select-none transition-colors">
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-400 group-open:rotate-90 transition-transform text-xs inline-block">▶</span>
-                  <span>More indicators (Customized by Admin)</span>
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
-                    {additionalMetrics.length}
-                  </span>
-                </div>
-                <span className="text-[11px] text-slate-400 font-normal">Click to expand</span>
-              </summary>
-              <div className="p-3.5 pt-1 border-t border-slate-100 bg-slate-50/30">
-                <div className="stat-grid">
-                  {additionalMetrics.map((item) => {
-                    const valStr = formatMetricValue(item.obs)
-                    const delta = item.delta
-                    const tone =
-                      delta == null || Math.abs(delta) < 0.05
-                        ? ('flat' as const)
-                        : ['purple_mastery_rate', 'awareness_recovery', 'focus_stability'].includes(
-                              item.key,
-                            )
-                          ? delta > 0
-                            ? ('up' as const)
-                            : ('down' as const)
-                          : ('flat' as const)
-
-                    return (
-                      <div key={item.key} className="stat-card" title={item.definition}>
-                        <p className="stat-label">{item.label}</p>
-                        <p className="stat-value">{valStr}</p>
-                        <p className={`analysis-delta is-${tone}`}>
-                          {tone === 'up' ? (
-                            <TrendingUp className="h-3.5 w-3.5" aria-hidden />
-                          ) : tone === 'down' ? (
-                            <TrendingDown className="h-3.5 w-3.5" aria-hidden />
-                          ) : null}
-                          {formatDelta(item.key, delta)}
-                          <span className="analysis-delta-note"> vs prior window</span>
-                        </p>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            </details>
-          )}
 
           {/* ——— Color mix & Recent days snapshot (Streamlined) ——— */}
           <div className="analysis-grid mt-4">

@@ -76,21 +76,17 @@ export interface ImprovGenerateRequest {
 }
 
 // --------------------------------------------------------------------------
-// 1. Expanded Hint Types Catalog
-// --------------------------------------------------------------------------
-
 export const EXPANDED_HINT_TYPES = {
-  // Classic Improv Studio Hint Types
+  // Classic Improv Studio Hint Types (1-2 hints standard)
   KEYWORD: 'Keyword · Cụm phản xạ trọng tâm',
+  ENDING: 'Ending · Cụm phối hợp tự nhiên / Kết quả',
   LOGIC_WORD: 'Từ nối · Logic word',
   FANCY_WORD: 'Ẩn dụ / Cụm gợi hình · Fancy word',
-  ENDING: 'Ending · Kết quả phản xạ',
   INTRO_SETUP: 'Intro / Setup · Mở đầu dẫn dắt',
   PROVERB: 'Tục ngữ / Thành ngữ · Proverb',
   WH_QUESTION: 'Cụm nghi vấn · WH word',
 
-  // Chunks LMS Expanded Cognitive Awareness Trap Hint Types
-  SCALE_CONTRAST: 'Scale Contrast · Tương phản quy mô',
+  // Chunks LMS Awareness Traps (Scale Contrast removed per pedadogical directive)
   PHONETIC_PLOSIVE: 'Phonetic Plosive · Bẫy trượt âm cuối',
   LATENCY_HOLD: 'Latency Hold · Kiềm chế qua khoảng lặng (650ms)',
   SEMANTIC_CLASH: 'Semantic Clash · Xung đột trường nghĩa',
@@ -99,6 +95,22 @@ export const EXPANDED_HINT_TYPES = {
   SYNTACTIC_REDUNDANCY: 'Syntactic Redundancy · Khử lặp từ vựng',
   SPATIAL_VS_ACTION: 'Spatial vs Action · Địa điểm vs Hành động',
 } as const
+
+/**
+ * Standard dynamic session config for Red test:
+ * Default progression: 7 sessions with item counts [2, 3, 4, 2, 3, 4, 5] (Total 23 items).
+ * Hint structure: 1-2 hints per item (hcTotal = 2 or 1), natural collocations, NO Scale Contrast.
+ * Highly configurable before generation.
+ */
+export const DEFAULT_RED_TEST_SESSION_CONFIGS: ImprovSessionConfig[] = [
+  { sessionNumber: 1, hcTotal: 2, itemsCount: 2, hintTypes: [EXPANDED_HINT_TYPES.KEYWORD, EXPANDED_HINT_TYPES.ENDING], targetCvrOhm: 1, cciAmps: 2 },
+  { sessionNumber: 2, hcTotal: 2, itemsCount: 3, hintTypes: [EXPANDED_HINT_TYPES.KEYWORD, EXPANDED_HINT_TYPES.ENDING], targetCvrOhm: 3, cciAmps: 2 },
+  { sessionNumber: 3, hcTotal: 2, itemsCount: 4, hintTypes: [EXPANDED_HINT_TYPES.KEYWORD, EXPANDED_HINT_TYPES.ENDING], targetCvrOhm: 5, cciAmps: 4 },
+  { sessionNumber: 4, hcTotal: 2, itemsCount: 2, hintTypes: [EXPANDED_HINT_TYPES.KEYWORD, EXPANDED_HINT_TYPES.ENDING], targetCvrOhm: 7, cciAmps: 4 },
+  { sessionNumber: 5, hcTotal: 2, itemsCount: 3, hintTypes: [EXPANDED_HINT_TYPES.KEYWORD, EXPANDED_HINT_TYPES.ENDING], targetCvrOhm: 9, cciAmps: 4 },
+  { sessionNumber: 6, hcTotal: 2, itemsCount: 4, hintTypes: [EXPANDED_HINT_TYPES.KEYWORD, EXPANDED_HINT_TYPES.ENDING], targetCvrOhm: 11, cciAmps: 6 },
+  { sessionNumber: 7, hcTotal: 2, itemsCount: 5, hintTypes: [EXPANDED_HINT_TYPES.KEYWORD, EXPANDED_HINT_TYPES.ENDING], targetCvrOhm: 13, cciAmps: 8 },
+]
 
 // --------------------------------------------------------------------------
 // 2. Micro-Batch Planning Algorithm (from chunks-class improvService.ts)

@@ -1,44 +1,67 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Area,
-  AreaChart,
+  Activity,
+  BarChart3,
+  CircleDot,
+  Eye,
+  EyeOff,
+  Gauge,
+  GripVertical,
+  Layers,
+  LineChart as LineChartIcon,
+  Maximize2,
+  Minimize2,
+  PieChart as PieChartIcon,
+  RotateCcw,
+  Target,
+  X,
+  Zap,
+} from 'lucide-react'
+import {
   Bar,
   BarChart,
+  Brush,
   CartesianGrid,
   Cell,
   ComposedChart,
-  Legend,
+  LabelList,
   Line,
-  LineChart,
+  LineChart as RechartsLineChart,
   Pie,
-  PieChart,
+  PieChart as RechartsPieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
-import type { MetricKey } from '../modules/metrics/calculate'
-import type { MetricSettingsState } from '../modules/metrics/settings'
-import { getEnabledMetricKeys } from '../modules/metrics/settings'
-import type { ResultRecord } from '../modules/reporting/progress'
+import { Panel } from './ui'
+import { probeChunksNumber } from '../modules/assessment/probe-metrics'
 import {
-  buildSessionMetricSeries,
-  sessionLabel,
-  toChartRows,
-  type SessionMetricPoint,
-} from '../modules/reporting/session-series'
-import { SPECTRUM_COLORS, type ResultColor } from '../modules/result-lifecycle/types'
+  calculateSpectrumStepBreakdown,
+  colorForAvgPercentX,
+  COLOR_PERCENT_X_VALUES,
+  spectrumRecordsForAttempt,
+} from '../modules/metrics/calculate'
+import type { MetricSettingsState } from '../modules/metrics/settings'
+import type { ResultRecord } from '../modules/reporting/progress'
+import { sessionLabel } from '../modules/reporting/session-series'
+import {
+  COOL_COLORS,
+  SPECTRUM_COLORS,
+  WARM_COLORS,
+  type ResultColor,
+} from '../modules/result-lifecycle/types'
 
 export type AnalysisChartKind = 'line' | 'bar' | 'area' | 'composed' | 'pie'
 
-type SessionOpt = {
+export type SessionOpt = {
   id: string
   startedAt: string
   completedAt: string | null
   sessionNumber?: number | null
 }
 
-type Props = {
+export type Props = {
   ledger: ResultRecord[]
   learningSessions: SessionOpt[]
   courseId: string
@@ -51,137 +74,76 @@ type Props = {
   metricSettings?: MetricSettingsState
 }
 
-const METRIC_COLORS: Partial<Record<MetricKey, string>> = {
-  rfc: '#dc2626',
-  rac: '#16a34a',
-  average_performance: '#4f46e5',
-  purple_mastery_rate: '#7c3aed',
-  clarification_rate: '#0891b2',
-  clarification_depth: '#0d9488',
-  n_count: '#0ea5e9',
-  n_depth_max: '#f97316',
-  n_depth_avg: '#a855f7',
-  awareness_recovery: '#db2777',
-  focus_stability: '#64748b',
+export type ChartKey = 'tube' | 'mix' | 'trend' | 'combo' | 'distribution'
+export type ChartUiState = Record<ChartKey, { showLabels: boolean; expanded: boolean; hidden: boolean }>
+
+const DEFAULT_CHART_UI: ChartUiState = {
+  tube: { showLabels: true, expanded: false, hidden: false },
+  mix: { showLabels: true, expanded: false, hidden: false },
+  trend: { showLabels: true, expanded: false, hidden: false },
+  combo: { showLabels: true, expanded: false, hidden: false },
+  distribution: { showLabels: true, expanded: false, hidden: false },
 }
 
-const FALLBACK_METRICS: MetricKey[] = [
-  'rfc',
-  'rac',
-  'average_performance',
-  'n_count',
-  'n_depth_max',
-  'n_depth_avg',
-]
+const DEFAULT_CHART_ORDER: ChartKey[] = ['tube', 'mix', 'trend', 'combo', 'distribution']
+
+const CHART_NAMES: Record<ChartKey, string> = {
+  tube: 'Record Tube',
+  mix: '7-Color Record Mix',
+  trend: 'RFC & %c Trend',
+  combo: 'Combo & Depth',
+  distribution: 'Color Distribution',
+}
 
 const COLOR_HEX: Record<ResultColor, string> = {
-  red: '#f87171',
+  red: '#ef4444',
   orange: '#f97316',
   yellow: '#facc15',
-  green: '#4ade80',
+  green: '#22c55e',
   blue: '#38bdf8',
-  indigo: '#818cf8',
-  purple: '#c084fc',
+  indigo: '#6366f1',
+  purple: '#a855f7',
 }
 
-function emptyColorCounts(): Record<ResultColor, number> {
-  return Object.fromEntries(SPECTRUM_COLORS.map((color) => [color, 0])) as Record<
-    ResultColor,
-    number
-  >
+const COLOR_LABELS: Record<ResultColor, string> = {
+  red: 'Red',
+  orange: 'Orange',
+  yellow: 'Yellow',
+  green: 'Green',
+  blue: 'Blue',
+  indigo: 'Indigo',
+  purple: 'Purple',
 }
 
-const CHART_KINDS: { id: AnalysisChartKind; label: string }[] = [
-  { id: 'line', label: 'Line' },
-  { id: 'bar', label: 'Bar' },
-  { id: 'area', label: 'Area' },
-  { id: 'composed', label: 'Combo' },
-  { id: 'pie', label: 'Pie' },
-]
-
-const LAYOUTS = [
-  { id: 'multi' as const, label: 'Multi' },
-  { id: 'single' as const, label: 'Single' },
-]
-
-const RADIAN = Math.PI / 180
-const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
-  const radius = innerRadius + (outerRadius - innerRadius) * 0.5
-  const x = cx + radius * Math.cos(-midAngle * RADIAN)
-  const y = cy + radius * Math.sin(-midAngle * RADIAN)
-
-  return percent > 0.08 ? (
-    <text
-      x={x}
-      y={y}
-      fill="#000000"
-      textAnchor="middle"
-      dominantBaseline="central"
-      className="text-[10px] font-black"
-    >
-      {`${(percent * 100).toFixed(0)}%`}
-    </text>
-  ) : null
+const COLOR_GROUPS = {
+  warm: [...WARM_COLORS] as ResultColor[],
+  cool: [...COOL_COLORS] as ResultColor[],
 }
 
-function toSessions(list: SessionOpt[], classId?: string) {
-  return list.map((s) => ({
-    id: s.id,
-    classId: classId ?? '',
-    scheduledSessionId: null as string | null,
-    status: (s.completedAt ? 'completed' : 'open') as 'open' | 'completed',
-    plannedQuestionCount: null as number | null,
-    startedAt: s.startedAt,
-    completedAt: s.completedAt,
-    maxProbeCount: 2,
-    sessionNumber: s.sessionNumber ?? null,
-    ownerUserId: null,
-    lockExpiresAt: null,
-    sessionKind: 'regular' as const,
-    participantLearnerIds: null,
-  }))
+const METRIC_HEX = {
+  rfc: '#ef4444',
+  percentC: '#16a34a',
+  depth: '#8b5cf6',
+  attempts: '#38bdf8',
 }
 
-function colorByDay(
-  points: SessionMetricPoint[],
-  ledger: ResultRecord[],
-  totalDays?: number | null,
-): Array<Record<string, string | number>> {
-  return points.map((p) => {
-    const counts = emptyColorCounts()
-    for (const r of ledger) {
-      if (r.learningSessionId !== p.learningSessionId) continue
-      counts[r.effectiveColor] += 1
-    }
-    return {
-      name: sessionLabel(p.sessionNumber, p.startedAt, totalDays),
-      ...counts,
-      total: SPECTRUM_COLORS.reduce((sum, color) => sum + counts[color], 0),
-    }
-  })
-}
-
-function metricDisplayLabel(name: string): string {
-  return name === 'rac' || name.toUpperCase() === 'RAC' ? '%c' : name
-}
-
-function pctTooltip(value: number | string | undefined, name: string) {
-  const label = metricDisplayLabel(name)
-  if (value == null || value === '') return [String(value), label]
-  const n = typeof value === 'number' ? value : Number(value)
-  if (Number.isNaN(n)) return [String(value), label]
-  if (name.toLowerCase().includes('avg') || name.toLowerCase().includes('score')) {
-    return [n.toFixed(2), label]
-  }
-  if (name.toLowerCase().includes('rfc') || name.toLowerCase().includes('rac') || name.includes('%')) {
-    return [`${n}%`, label]
-  }
-  return [String(n), label]
+function recordLabel(color: ResultColor, index: number, total: number): string {
+  if (index === 1 && color === 'green') return `Record ${index}/${total}: Green primary opens probe flow`
+  if (color === 'blue') return `Record ${index}/${total}: Blue probe Continue`
+  if (color === 'yellow') return `Record ${index}/${total}: Yellow probe Fail`
+  if (color === 'indigo') return `Record ${index}/${total}: Indigo probe Done`
+  return `Record ${index}/${total}: ${COLOR_LABELS[color]} primary`
 }
 
 /**
- * Dynamic multi-chart board for Analysis: line / bar / area / combo / pie,
- * multi-panel layout, core Focus metrics + color stack.
+ * Interactive Live Analysis Workbench:
+ * - Attempt Record Tube Chart (horizontal scroll container with stacked beads from spectrumRecordsForAttempt)
+ * - 7-Color Record Mix by Day (stacked bar chart across all 7 spectrum colors)
+ * - Trend Chart with Brush (scrubbing/zooming across days for RFC & %c)
+ * - Combo Chart with Brush (RFC, %c, Chunks Count, and Probe Depth)
+ * - Result Color Distribution Pie Chart
+ * - Workbench Controls (drag-and-drop reorder, expand/shrink, toggle labels, hide/show, reset layout)
+ * - Filters: Sessions (All vs D1..DN) and Colors (All, Warm, Cool, individual)
  */
 export function AnalysisChartsPanel({
   ledger,
@@ -191,624 +153,1043 @@ export function AnalysisChartsPanel({
   learnerUserId,
   totalDays,
   compact = false,
-  metricSettings,
 }: Props) {
-  const [layout, setLayout] = useState<'multi' | 'single'>('multi')
-  const [chartKind, setChartKind] = useState<AnalysisChartKind>('line')
-  const [metrics, setMetrics] = useState<MetricKey[]>(['rfc', 'rac'])
-  const [selectedDays, setSelectedDays] = useState<string[]>([])
+  const [selectedSessions, setSelectedSessions] = useState<number[]>([])
+  const [selectedColors, setSelectedColors] = useState<ResultColor[]>([...SPECTRUM_COLORS])
+  const [chartUi, setChartUi] = useState<ChartUiState>(DEFAULT_CHART_UI)
+  const [chartOrder, setChartOrder] = useState<ChartKey[]>(DEFAULT_CHART_ORDER)
+  const [draggingChart, setDraggingChart] = useState<ChartKey | null>(null)
+  const [sessionBrushRange, setSessionBrushRange] = useState<{ startIndex?: number; endIndex?: number }>({})
+  const filterCardRef = useRef<HTMLElement | null>(null)
 
-  const availableMetrics = useMemo((): Array<{ key: MetricKey; label: string; color: string }> => {
-    const keys =
-      metricSettings && getEnabledMetricKeys(metricSettings).length > 0
-        ? getEnabledMetricKeys(metricSettings)
-        : FALLBACK_METRICS
-    return keys.map((key) => ({
-      key,
-      label: key === 'rac' ? '%c' : (metricSettings?.metrics.find((m) => m.key === key)?.label ?? key),
-      color: METRIC_COLORS[key] ?? '#64748b',
-    }))
-  }, [metricSettings])
+  useEffect(() => {
+    setSessionBrushRange({})
+  }, [selectedColors, selectedSessions])
 
-  // Drop chart series that Admin disabled
-  const activeMetrics = useMemo(
-    () => metrics.filter((k) => availableMetrics.some((m) => m.key === k)),
-    [metrics, availableMetrics],
-  )
-
-  const points = useMemo(
-    () =>
-      buildSessionMetricSeries({
-        ledger,
-        learningSessions: toSessions(learningSessions, classId),
-        courseId,
-        classId,
-        learnerUserId,
-        metricKeys: availableMetrics.map((m) => m.key),
-      }),
-    [ledger, learningSessions, courseId, classId, learnerUserId, availableMetrics],
-  )
-
-  const filtered = useMemo(() => {
-    if (selectedDays.length === 0) return points
-    return points.filter((p) => selectedDays.includes(p.learningSessionId))
-  }, [points, selectedDays])
-
-  const trendRows = useMemo(
-    () => toChartRows(filtered, activeMetrics),
-    [filtered, activeMetrics],
-  )
-
-  const colorRows = useMemo(
-    () =>
-      colorByDay(
-        filtered,
-        ledger.filter((r) => {
-          if (learnerUserId && r.learnerUserId !== learnerUserId) return false
-          if (classId && r.classId !== classId) return false
-          if (r.courseId !== courseId) return false
-          return true
-        }),
-        totalDays,
-      ),
-    [filtered, ledger, learnerUserId, classId, courseId, totalDays],
-  )
-
-  const colorMixPie = useMemo(() => {
-    const counts = emptyColorCounts()
-    // Scope to selected days when set; otherwise all days that have series points
-    const ids = new Set(
-      (selectedDays.length > 0 ? filtered : points).map((p) => p.learningSessionId),
-    )
-    for (const r of ledger) {
-      if (learnerUserId && r.learnerUserId !== learnerUserId) continue
-      if (classId && r.classId !== classId) continue
-      if (r.courseId !== courseId) continue
-      // Only count results that belong to a day in scope (prevents orphan / wrong totals)
-      if (ids.size > 0 && !ids.has(r.learningSessionId)) continue
-      counts[r.effectiveColor] += 1
+  useEffect(() => {
+    function closeFilters(event: PointerEvent) {
+      const target = event.target as Node | null
+      if (target && filterCardRef.current?.contains(target)) return
+      filterCardRef.current?.querySelectorAll('details[open]').forEach((detail) => detail.removeAttribute('open'))
     }
-    return SPECTRUM_COLORS.map((c) => ({
-      name: c,
-      value: counts[c],
-      fill: COLOR_HEX[c],
-    })).filter((d) => d.value > 0)
-  }, [filtered, points, selectedDays, ledger, learnerUserId, classId, courseId])
+    window.addEventListener('pointerdown', closeFilters)
+    return () => window.removeEventListener('pointerdown', closeFilters)
+  }, [])
 
-  const colorMixTotal = colorMixPie.reduce((s, d) => s + d.value, 0)
+  // Map and sort all finalized attempts matching course, class, and learner filters
+  const attempts = useMemo(() => {
+    const sessionMap = new Map<string, SessionOpt>()
+    for (const s of learningSessions) {
+      sessionMap.set(s.id, s)
+    }
 
-  function toggleMetric(key: MetricKey) {
-    setMetrics((prev) => {
-      if (prev.includes(key)) {
-        if (prev.length === 1) return prev
-        return prev.filter((k) => k !== key)
-      }
-      return [...prev, key]
+    const scoped = ledger.filter((r) => {
+      if (r.courseId !== courseId) return false
+      if (classId && r.classId !== classId) return false
+      if (learnerUserId && r.learnerUserId !== learnerUserId) return false
+      return true
     })
-  }
 
-  function toggleDay(id: string) {
-    setSelectedDays((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    const sorted = [...scoped].sort((a, b) => {
+      const sA = sessionMap.get(a.learningSessionId)
+      const sB = sessionMap.get(b.learningSessionId)
+      const numA = sA?.sessionNumber ?? 0
+      const numB = sB?.sessionNumber ?? 0
+      if (numA !== numB) return numA - numB
+      return new Date(a.finalizedAt).getTime() - new Date(b.finalizedAt).getTime()
+    })
+
+    return sorted.map((r, index) => {
+      const session = sessionMap.get(r.learningSessionId)
+      const sessionNumber = session?.sessionNumber ?? 1
+      const color = r.effectiveColor
+      const enteredProbeFlow = Boolean(r.enteredProbeFlow)
+      const probeEventCount = Math.max(0, r.probeEventCount ?? 0)
+      const probeDepth = probeChunksNumber({ enteredProbeFlow, probeCount: probeEventCount }) ?? 0
+
+      return {
+        id: r.id,
+        index: index + 1,
+        label: `Attempt ${index + 1}`,
+        shortLabel: `A${index + 1}`,
+        session: sessionNumber,
+        sessionId: r.learningSessionId,
+        sessionLabel: sessionLabel(sessionNumber, session?.startedAt, totalDays),
+        shortSessionLabel: `D${sessionNumber}`,
+        color,
+        colorHex: COLOR_HEX[color],
+        enteredProbeFlow,
+        probeEventCount,
+        probeDepth,
+        finalizedAt: r.finalizedAt,
+      }
+    })
+  }, [ledger, learningSessions, courseId, classId, learnerUserId, totalDays])
+
+  const availableSessions = useMemo(() => {
+    const list = Array.from(new Set(attempts.map((a) => a.session))).sort((a, b) => a - b)
+    if (list.length > 0) return list
+    return learningSessions
+      .map((s, idx) => s.sessionNumber ?? idx + 1)
+      .filter((n): n is number => typeof n === 'number')
+      .sort((a, b) => a - b)
+  }, [attempts, learningSessions])
+
+  // Attempts filtered by selected session chips and color chips
+  const chartAttempts = useMemo(() => {
+    const sessionSet = selectedSessions.length ? new Set(selectedSessions) : null
+    const colorSet = new Set<ResultColor>(selectedColors)
+    return attempts.filter((row) => {
+      if (sessionSet && !sessionSet.has(row.session)) return false
+      if (!colorSet.has(row.color)) return false
+      return true
+    })
+  }, [attempts, selectedColors, selectedSessions])
+
+  // Summary KPIs for live scope (RFC, %c, sample size, N_total, probed count, probe depth)
+  const summary = useMemo(() => {
+    const count = chartAttempts.length
+    const probed = chartAttempts.filter((a) => a.enteredProbeFlow)
+    const spectrum = calculateSpectrumStepBreakdown(
+      chartAttempts.map((a) => ({
+        effectiveColor: a.color,
+        enteredProbeFlow: a.enteredProbeFlow,
+        probeEventCount: a.probeEventCount,
+      })),
     )
-  }
 
-  const [cardOrder, setCardOrder] = useState<string[]>([
-    'trendLine',
-    'trendBar',
-    'colorStack',
-    'colorMix',
-    'combo',
-  ])
-  const [expandedCard, setExpandedCard] = useState<string | null>(null)
+    const chunksNumbers = probed.map((a) => Math.max(1, a.probeEventCount + 1))
+    const chunksNumberTotal = chunksNumbers.reduce((s, v) => s + v, 0)
+    const avgChunksNumber = probed.length > 0 ? chunksNumberTotal / probed.length : null
+    const maxChunksNumber = probed.length > 0 ? Math.max(...chunksNumbers) : null
+    const avgXColor = colorForAvgPercentX(spectrum.avgPercentX)
 
-  const cardData: Record<
-    string,
-    {
-      title: string
-      subtitle: string
-      isWide?: boolean
-      render: (height: number) => React.ReactNode
+    return {
+      sampleSize: count,
+      totalRecords: spectrum.totalRecords,
+      warmSteps: spectrum.warmSteps,
+      coolSteps: spectrum.coolSteps,
+      rfc: spectrum.rfc == null ? 0 : spectrum.rfc * 100,
+      percentC: spectrum.avgPercentX ?? 0,
+      legacyRac: spectrum.rac == null ? 0 : spectrum.rac * 100,
+      avgPercentX: spectrum.avgPercentX ?? 0,
+      sumPercentX: spectrum.sumPercentX,
+      avgXColor,
+      probedCount: probed.length,
+      avgChunksNumber,
+      maxChunksNumber,
     }
-  > = {
-    trendLine: {
-      title: 'RFC & %c by day',
-      subtitle: 'Line · lower RFC and higher %c are better',
-      render: (h) => trendChart('line', h),
-    },
-    trendBar: {
-      title: 'Metrics by day',
-      subtitle: 'Bar · multi metric',
-      render: (h) => trendChart('bar', h),
-    },
-    colorStack: {
-      title: 'Color stack by day',
-      subtitle: 'Stacked bar',
-      render: (h) => colorStackChart(h),
-    },
-    colorMix: {
-      title: 'Color mix',
-      subtitle: 'Pie · finalized counts only',
-      render: (h) =>
-        colorMixPie.length === 0 ? (
-          <p className="meta">No colors in scope.</p>
-        ) : (
-          colorPieChart(h)
-        ),
-    },
-    combo: {
-      title: 'Combo · lines + avg bar',
-      subtitle: 'Dual axis when Avg selected',
-      isWide: true,
-      render: (h) => trendChart('composed', h),
-    },
-  }
+  }, [chartAttempts])
 
-  function moveCard(index: number, direction: 'prev' | 'next') {
-    const newOrder = [...cardOrder]
-    const targetIndex = direction === 'prev' ? index - 1 : index + 1
-    if (targetIndex >= 0 && targetIndex < newOrder.length) {
-      const temp = newOrder[index]
-      newOrder[index] = newOrder[targetIndex]
-      newOrder[targetIndex] = temp
-      setCardOrder(newOrder)
+  // Tube rows: each attempt holds its vertical stack of spectrum records
+  const recordTubeRows = useMemo(() => {
+    return chartAttempts.map((attempt) => {
+      const records = spectrumRecordsForAttempt({
+        effectiveColor: attempt.color,
+        enteredProbeFlow: attempt.enteredProbeFlow,
+        probeEventCount: attempt.probeEventCount,
+      }).map((color, idx, all) => ({
+        color,
+        index: idx + 1,
+        label: recordLabel(color, idx + 1, all.length),
+      }))
+
+      return {
+        ...attempt,
+        records,
+      }
+    })
+  }, [chartAttempts])
+
+  // 7-Color record mix rows grouped by session/day
+  const sessionRecordMixRows = useMemo(() => {
+    const map = new Map<
+      number,
+      Record<ResultColor, number> & { session: number; shortLabel: string; label: string; nTotal: number }
+    >()
+
+    for (const s of availableSessions) {
+      const sOpt = learningSessions.find((ls) => ls.sessionNumber === s || (ls.sessionNumber == null && s === 1))
+      map.set(s, {
+        session: s,
+        shortLabel: `D${s}`,
+        label: sessionLabel(s, sOpt?.startedAt, totalDays),
+        nTotal: 0,
+        red: 0,
+        orange: 0,
+        yellow: 0,
+        green: 0,
+        blue: 0,
+        indigo: 0,
+        purple: 0,
+      })
     }
-  }
 
-  if (points.length === 0) {
+    for (const row of recordTubeRows) {
+      if (!map.has(row.session)) {
+        map.set(row.session, {
+          session: row.session,
+          shortLabel: `D${row.session}`,
+          label: row.sessionLabel,
+          nTotal: 0,
+          red: 0,
+          orange: 0,
+          yellow: 0,
+          green: 0,
+          blue: 0,
+          indigo: 0,
+          purple: 0,
+        })
+      }
+      const target = map.get(row.session)!
+      for (const record of row.records) {
+        target[record.color] += 1
+        target.nTotal += 1
+      }
+    }
+
+    return Array.from(map.values())
+      .sort((a, b) => a.session - b.session)
+      .filter((entry) => selectedSessions.length === 0 || selectedSessions.includes(entry.session))
+      .map((entry) => {
+        const sumPercentX = SPECTRUM_COLORS.reduce((s, color) => s + entry[color] * COLOR_PERCENT_X_VALUES[color], 0)
+        const avgPercentX = entry.nTotal > 0 ? sumPercentX / entry.nTotal : 0
+        const avgXColor = colorForAvgPercentX(avgPercentX)
+        return { ...entry, sumPercentX, avgPercentX, avgXColor }
+      })
+  }, [recordTubeRows, availableSessions, learningSessions, totalDays, selectedSessions])
+
+  // Timeline rows across days for Trend & Combo charts
+  const timelineRows = useMemo(() => {
+    const map = new Map<number, typeof chartAttempts>()
+    for (const row of chartAttempts) {
+      if (!map.has(row.session)) map.set(row.session, [])
+      map.get(row.session)!.push(row)
+    }
+
+    const sessionsToInclude = availableSessions.filter(
+      (s) => selectedSessions.length === 0 || selectedSessions.includes(s),
+    )
+
+    return sessionsToInclude.map((session) => {
+      const group = map.get(session) ?? []
+      const sOpt = learningSessions.find((ls) => ls.sessionNumber === session || (ls.sessionNumber == null && session === 1))
+      const label = sessionLabel(session, sOpt?.startedAt, totalDays)
+      const probed = group.filter((a) => a.enteredProbeFlow)
+      const spectrum = calculateSpectrumStepBreakdown(
+        group.map((a) => ({
+          effectiveColor: a.color,
+          enteredProbeFlow: a.enteredProbeFlow,
+          probeEventCount: a.probeEventCount,
+        })),
+      )
+
+      const chunksNumbers = probed.map((a) => Math.max(1, a.probeEventCount + 1))
+      const chunksNumberTotal = chunksNumbers.reduce((s, v) => s + v, 0)
+      const avgChunksNumber = probed.length > 0 ? chunksNumberTotal / probed.length : null
+      const avgPercentX = spectrum.avgPercentX ?? 0
+      const avgXColor = colorForAvgPercentX(spectrum.avgPercentX)
+      const rfc = spectrum.rfc == null ? 0 : Number((spectrum.rfc * 100).toFixed(1))
+
+      return {
+        session,
+        label,
+        shortLabel: `D${session}`,
+        attempts: group.length,
+        nTotal: spectrum.totalRecords,
+        rfc,
+        percentC: Number(avgPercentX.toFixed(1)),
+        avgPercentX,
+        avgXColor,
+        probedCount: probed.length,
+        avgChunksNumber,
+        byColor: spectrum.byColor,
+      }
+    })
+  }, [chartAttempts, availableSessions, selectedSessions, learningSessions, totalDays])
+
+  const maxSessionBrushIndex = Math.max(timelineRows.length - 1, 0)
+  const sessionBrushStart = Math.min(maxSessionBrushIndex, Math.max(0, sessionBrushRange.startIndex ?? 0))
+  const sessionBrushEnd = Math.max(
+    sessionBrushStart,
+    Math.min(maxSessionBrushIndex, sessionBrushRange.endIndex ?? maxSessionBrushIndex),
+  )
+
+  const handleSessionBrushChange = useCallback((range: { startIndex?: number; endIndex?: number } | null) => {
+    if (!range) return
+    setSessionBrushRange(range)
+  }, [])
+
+  // Spectrum pie distribution
+  const colorDistribution = useMemo(() => {
+    const total = Math.max(chartAttempts.length, 1)
+    return SPECTRUM_COLORS.map((color) => {
+      const count = chartAttempts.filter((a) => a.color === color).length
+      return {
+        color,
+        name: COLOR_LABELS[color],
+        count,
+        percent: chartAttempts.length ? Math.round((count / total) * 100) : 0,
+        fill: COLOR_HEX[color],
+      }
+    })
+  }, [chartAttempts])
+
+  const selectedColorGroup = useMemo(() => {
+    const selected = new Set(selectedColors)
+    const isWarm =
+      COLOR_GROUPS.warm.length === selectedColors.length && COLOR_GROUPS.warm.every((color) => selected.has(color))
+    const isCool =
+      COLOR_GROUPS.cool.length === selectedColors.length && COLOR_GROUPS.cool.every((color) => selected.has(color))
+    if (isWarm) return 'warm'
+    if (isCool) return 'cool'
+    return 'custom'
+  }, [selectedColors])
+
+  const toggleSession = useCallback((session: number) => {
+    setSelectedSessions((current) => {
+      if (current.includes(session)) {
+        return current.filter((value) => value !== session)
+      }
+      return [...current, session].sort((a, b) => a - b)
+    })
+  }, [])
+
+  const toggleColor = useCallback((color: ResultColor) => {
+    setSelectedColors((current) => {
+      if (current.includes(color)) {
+        const next = current.filter((value) => value !== color)
+        return next.length === 0 ? [...SPECTRUM_COLORS] : next
+      }
+      return [...current, color]
+    })
+  }, [])
+
+  const selectColorGroup = useCallback((group: 'warm' | 'cool') => {
+    setSelectedColors([...COLOR_GROUPS[group]])
+  }, [])
+
+  const updateChartUi = useCallback((key: ChartKey, patch: Partial<ChartUiState[ChartKey]>) => {
+    setChartUi((current) => ({
+      ...current,
+      [key]: { ...current[key], ...patch },
+    }))
+  }, [])
+
+  const resetChartUi = useCallback(() => {
+    setChartUi(DEFAULT_CHART_UI)
+    setChartOrder(DEFAULT_CHART_ORDER)
+  }, [])
+
+  const moveChartTo = useCallback((key: ChartKey, targetKey: ChartKey) => {
+    setChartOrder((current) => {
+      const index = current.indexOf(key)
+      const nextIndex = current.indexOf(targetKey)
+      if (index < 0 || nextIndex < 0 || index === nextIndex) return current
+      const next = [...current]
+      const [item] = next.splice(index, 1)
+      next.splice(nextIndex, 0, item!)
+      return next
+    })
+  }, [])
+
+  const chartPanelClass = useCallback(
+    (key: ChartKey) => `test-analysis-panel${chartUi[key].expanded ? ' is-expanded' : ''}`,
+    [chartUi],
+  )
+
+  const chartActions = useCallback(
+    (key: ChartKey, labels = true) => (
+      <div className="test-analysis-chart-actions">
+        {labels ? (
+          <button
+            type="button"
+            onClick={() => updateChartUi(key, { showLabels: !chartUi[key].showLabels })}
+            title={chartUi[key].showLabels ? 'Hide labels' : 'Show labels'}
+            aria-label={chartUi[key].showLabels ? 'Hide labels' : 'Show labels'}
+          >
+            {chartUi[key].showLabels ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => updateChartUi(key, { expanded: !chartUi[key].expanded })}
+          title={chartUi[key].expanded ? 'Shrink chart' : 'Expand chart'}
+          aria-label={chartUi[key].expanded ? 'Shrink chart' : 'Expand chart'}
+        >
+          {chartUi[key].expanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+        </button>
+        <button
+          type="button"
+          onClick={() => updateChartUi(key, { hidden: true })}
+          title="Hide chart"
+          aria-label="Hide chart"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    ),
+    [chartUi, updateChartUi],
+  )
+
+  if (attempts.length === 0) {
     return (
-      <div className="empty-state analysis-empty">
-        <p>
-          <strong>No chart data yet</strong>
-        </p>
-        <p className="meta" style={{ textAlign: 'center' }}>
+      <div className="empty-state analysis-empty rounded-2xl border border-white/10 bg-slate-900/50 p-8 text-center">
+        <p className="text-white font-bold text-base">No chart data yet</p>
+        <p className="meta mt-1 text-slate-400 text-xs">
           Finalize Focus / Awareness colors in live days — charts plot Day 1…N.
         </p>
       </div>
     )
   }
 
-  const metricMeta = (key: MetricKey) => availableMetrics.find((m) => m.key === key)
-
-  const trendChart = (kind: AnalysisChartKind, height = 260) => {
-    if (trendRows.length === 0 || activeMetrics.length === 0) {
-      return <p className="meta">Select at least one metric.</p>
-    }
-
-    if (kind === 'pie') {
-      // Color mix only — never mix ratio metrics into a count pie (that caused wrong 69 vs 4-2-1-14)
-      if (colorMixPie.length === 0) {
-        return <p className="meta">No finalized colors in scope (sample=0).</p>
-      }
-      return (
-        <ResponsiveContainer width="100%" height={height}>
-          <PieChart>
-            <Pie
-              data={colorMixPie}
-              dataKey="value"
-              nameKey="name"
-              cx="50%"
-              cy="50%"
-              outerRadius={Math.min(100, height / 2 - 20)}
-              labelLine={false}
-              label={renderCustomizedLabel}
-            >
-              {colorMixPie.map((d) => (
-                <Cell key={d.name} fill={d.fill} />
-              ))}
-            </Pie>
-            <Tooltip
-              formatter={(v, n) => [`${v} results`, String(n)]}
-            />
-            <Legend />
-          </PieChart>
-        </ResponsiveContainer>
-      )
-    }
-
-    if (kind === 'bar') {
-      return (
-        <ResponsiveContainer width="100%" height={height}>
-          <BarChart data={trendRows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-            <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 11 }} />
-            <Tooltip formatter={(v, n) => pctTooltip(v as number, String(n))} />
-            <Legend />
-            {activeMetrics.map((k) => (
-              <Bar
-                key={k}
-                dataKey={k}
-                name={metricMeta(k)?.label ?? k}
-                fill={metricMeta(k)?.color ?? '#64748b'}
-                radius={[4, 4, 0, 0]}
-              />
-            ))}
-          </BarChart>
-        </ResponsiveContainer>
-      )
-    }
-
-    if (kind === 'area') {
-      return (
-        <ResponsiveContainer width="100%" height={height}>
-          <AreaChart data={trendRows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-            <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 11 }} />
-            <Tooltip formatter={(v, n) => pctTooltip(v as number, String(n))} />
-            <Legend />
-            {activeMetrics.map((k) => (
-              <Area
-                key={k}
-                type="monotone"
-                dataKey={k}
-                name={metricMeta(k)?.label ?? k}
-                stroke={metricMeta(k)?.color ?? '#64748b'}
-                fill={metricMeta(k)?.color ?? '#64748b'}
-                fillOpacity={0.12}
-                strokeWidth={2}
-              />
-            ))}
-          </AreaChart>
-        </ResponsiveContainer>
-      )
-    }
-
-    if (kind === 'composed') {
-      const lineKeys = activeMetrics.filter((k) => k === 'rfc' || k === 'rac')
-      const barKeys = activeMetrics.filter((k) => k === 'average_performance')
-      return (
-        <ResponsiveContainer width="100%" height={height}>
-          <ComposedChart data={trendRows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-            <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-            <YAxis yAxisId="left" tick={{ fontSize: 11 }} unit="%" />
-            <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} domain={[0, 3]} />
-            <Tooltip formatter={(v, n) => pctTooltip(v as number, String(n))} />
-            <Legend />
-            {barKeys.map((k) => (
-              <Bar
-                key={k}
-                yAxisId="right"
-                dataKey={k}
-                name={metricMeta(k)?.label ?? k}
-                fill={metricMeta(k)?.color ?? '#4f46e5'}
-                radius={[4, 4, 0, 0]}
-                opacity={0.85}
-              />
-            ))}
-            {lineKeys.map((k) => (
-              <Line
-                key={k}
-                yAxisId="left"
-                type="monotone"
-                dataKey={k}
-                name={metricMeta(k)?.label ?? k}
-                stroke={metricMeta(k)?.color ?? '#64748b'}
-                strokeWidth={2.5}
-                dot
-              />
-            ))}
-            {lineKeys.length === 0 &&
-              activeMetrics.map((k) => (
-                <Line
-                  key={k}
-                  yAxisId="left"
-                  type="monotone"
-                  dataKey={k}
-                  name={metricMeta(k)?.label ?? k}
-                  stroke={metricMeta(k)?.color ?? '#64748b'}
-                  strokeWidth={2}
-                  dot
-                />
-              ))}
-          </ComposedChart>
-        </ResponsiveContainer>
-      )
-    }
-
-    return (
-      <ResponsiveContainer width="100%" height={height}>
-        <LineChart data={trendRows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-          <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-          <YAxis tick={{ fontSize: 11 }} />
-          <Tooltip formatter={(v, n) => pctTooltip(v as number, String(n))} />
-          <Legend />
-          {activeMetrics.map((k) => (
-            <Line
-              key={k}
-              type="monotone"
-              dataKey={k}
-              name={metricMeta(k)?.label ?? k}
-              stroke={metricMeta(k)?.color ?? '#64748b'}
-              strokeWidth={2.5}
-              dot={{ r: 4 }}
-              activeDot={{ r: 6 }}
-            />
-          ))}
-        </LineChart>
-      </ResponsiveContainer>
-    )
-  }
-
-  const colorStackChart = (height = 240) => (
-    <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={colorRows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-        <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-        <Tooltip />
-        <Legend />
-        <Bar dataKey="red" stackId="c" fill={COLOR_HEX.red} name="Red" radius={[0, 0, 0, 0]} />
-        <Bar dataKey="yellow" stackId="c" fill={COLOR_HEX.yellow} name="Orange" />
-        <Bar dataKey="green" stackId="c" fill={COLOR_HEX.green} name="Green" />
-        <Bar dataKey="purple" stackId="c" fill={COLOR_HEX.purple} name="Purple" radius={[4, 4, 0, 0]} />
-      </BarChart>
-    </ResponsiveContainer>
-  )
-
-  const colorPieChart = (height = 240) => (
-    <div>
-      <p className="meta" style={{ textAlign: 'center', marginBottom: 4 }}>
-        sample={colorMixTotal}
-        {colorMixPie.length
-          ? ` · ${colorMixPie.map((d) => `${d.name[0]!.toUpperCase()}${d.value}`).join(' ')}`
-          : ''}
-      </p>
-      <ResponsiveContainer width="100%" height={height - 28}>
-        <PieChart>
-          <Pie
-            data={colorMixPie}
-            dataKey="value"
-            nameKey="name"
-            cx="50%"
-            cy="50%"
-            outerRadius={Math.min(90, (height - 28) / 2 - 20)}
-            labelLine={false}
-            label={renderCustomizedLabel}
-          >
-            {colorMixPie.map((d) => (
-              <Cell key={d.name} fill={d.fill} />
-            ))}
-          </Pie>
-          <Tooltip formatter={(v, n) => [`${v} results`, String(n)]} />
-          <Legend />
-        </PieChart>
-      </ResponsiveContainer>
-    </div>
-  )
-
   return (
-    <div className="analysis-charts">
-      <div className="analysis-charts-toolbar">
-        <div className="analysis-filter-block">
-          <span className="analysis-filter-label">Layout</span>
-          <div className="analysis-chip-row" role="group" aria-label="Chart layout">
-            {LAYOUTS.map((l) => (
-              <button
-                key={l.id}
-                type="button"
-                className={`analysis-chip${layout === l.id ? ' is-active' : ''}`}
-                aria-pressed={layout === l.id}
-                onClick={() => setLayout(l.id)}
-              >
-                {l.label}
-              </button>
-            ))}
-          </div>
+    <div className="test-analysis-page text-left">
+      {/* Live Classroom KPI Stat Grid */}
+      <div className="standalone-analysis-grid mb-4">
+        <div
+          className="standalone-metric-card metric-rfc cursor-default"
+          title={`Struggle (RFC) = Warm records / N_total = ${summary.warmSteps} / ${summary.totalRecords}. Lower is better.`}
+        >
+          <Activity className="h-5 w-5 text-red-500" />
+          <span>Struggle (RFC)</span>
+          <strong className="text-red-500">{summary.rfc.toFixed(1)}%</strong>
         </div>
 
-        {layout === 'single' ? (
-          <div className="analysis-filter-block">
-            <span className="analysis-filter-label">Chart type</span>
-            <div className="analysis-chip-row" role="group" aria-label="Chart type">
-              {CHART_KINDS.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  className={`analysis-chip${chartKind === t.id ? ' is-active' : ''}`}
-                  aria-pressed={chartKind === t.id}
-                  onClick={() => setChartKind(t.id)}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
+        <div
+          className={`standalone-metric-card metric-avg-x is-${summary.avgXColor} cursor-default`}
+          style={{
+            borderColor: `${COLOR_HEX[summary.avgXColor]}55`,
+            boxShadow: `0 0 16px -4px ${COLOR_HEX[summary.avgXColor]}33`,
+          }}
+          title={`Avg %x = sum(%x) / N_total = ${summary.sumPercentX.toFixed(1)}% / ${summary.totalRecords} = ${summary.avgPercentX.toFixed(1)}% (${COLOR_LABELS[summary.avgXColor]} band). Higher is better.`}
+        >
+          <Target className="h-5 w-5" style={{ color: COLOR_HEX[summary.avgXColor] }} />
+          <span>%c (Avg %x)</span>
+          <strong style={{ color: COLOR_HEX[summary.avgXColor] }}>{summary.avgPercentX.toFixed(1)}%</strong>
+        </div>
 
-        <div className="analysis-filter-block analysis-filter-grow">
-          <span className="analysis-filter-label">Metrics on trend (show/hide)</span>
-          <div className="analysis-chip-row">
-            {availableMetrics.map((m) => {
-              const on = activeMetrics.includes(m.key)
-              return (
-                <button
-                  key={m.key}
-                  type="button"
-                  className={`analysis-chip${on ? ' is-active' : ''}`}
-                  style={on ? { borderColor: m.color, color: m.color } : undefined}
-                  aria-pressed={on}
-                  title={metricSettings?.metrics.find((x) => x.key === m.key)?.definition}
-                  onClick={() => toggleMetric(m.key)}
-                >
-                  {m.label}
-                </button>
-              )
-            })}
-          </div>
+        <div
+          className="standalone-metric-card cursor-default"
+          title={`Finalized attempts in current filter: ${summary.sampleSize}.`}
+        >
+          <BarChart3 className="h-5 w-5 text-slate-400" />
+          <span>Sample size</span>
+          <strong>{summary.sampleSize}</strong>
+        </div>
+
+        <div
+          className="standalone-metric-card cursor-default"
+          title={`Total spectrum color records (primary + probe events): ${summary.totalRecords}.`}
+        >
+          <Layers className="h-5 w-5 text-indigo-500" />
+          <span>N_total records</span>
+          <strong>{summary.totalRecords}</strong>
+        </div>
+
+        <div
+          className="standalone-metric-card metric-percent-c cursor-default"
+          title={`Attempts where teacher selected Green (2) and entered probe flow: ${summary.probedCount}.`}
+        >
+          <Zap className="h-5 w-5 text-emerald-500" />
+          <span>Chunks count</span>
+          <strong className="text-emerald-500">{summary.probedCount}</strong>
+        </div>
+
+        <div
+          className="standalone-metric-card cursor-default"
+          title={`Mean chunks number across probed attempts. Peak observed: ${summary.maxChunksNumber ?? '—'}.`}
+        >
+          <LineChartIcon className="h-5 w-5 text-purple-500" />
+          <span>Avg chunks number</span>
+          <strong className="text-purple-500">
+            {summary.avgChunksNumber != null ? summary.avgChunksNumber.toFixed(1) : '—'}
+          </strong>
         </div>
       </div>
 
-      {!compact && points.length > 1 ? (
-        <div className="analysis-charts-days">
-          <span className="analysis-filter-label">Scope</span>
-          <div className="analysis-chip-row">
-            <button
-              type="button"
-              className={`analysis-chip${selectedDays.length === 0 ? ' is-active' : ''}`}
-              onClick={() => setSelectedDays([])}
-            >
-              All Days
-            </button>
-            {points.map((p) => {
-              const on = selectedDays.includes(p.learningSessionId)
-              return (
-                <button
-                  key={p.learningSessionId}
-                  type="button"
-                  className={`analysis-chip${on ? ' is-active' : ''}`}
-                  onClick={() => toggleDay(p.learningSessionId)}
-                >
-                  {sessionLabel(p.sessionNumber, p.startedAt, totalDays)}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      ) : null}
-
-      {layout === 'multi' ? (
-        <div className="analysis-charts-grid">
-          {cardOrder.map((id, index) => {
-            const card = cardData[id]
-            if (!card) return null
-            return (
-              <article
-                key={id}
-                className={`analysis-chart-card${card.isWide ? ' analysis-chart-card-wide' : ''}`}
-              >
-                <header className="analysis-chart-card-head">
-                  <div>
-                    <h3>{card.title}</h3>
-                    <span className="meta">{card.subtitle}</span>
-                  </div>
-                  <div className="analysis-card-actions">
-                    <button
-                      type="button"
-                      disabled={index === 0}
-                      onClick={() => moveCard(index, 'prev')}
-                      className="analysis-action-btn"
-                      title="Move Up/Left"
-                      aria-label="Move up or left"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      disabled={index === cardOrder.length - 1}
-                      onClick={() => moveCard(index, 'next')}
-                      className="analysis-action-btn"
-                      title="Move Down/Right"
-                      aria-label="Move down or right"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setExpandedCard(id)}
-                      className="analysis-action-btn expand-btn"
-                      title="Expand View"
-                      aria-label="Expand chart view"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" />
-                      </svg>
-                    </button>
-                  </div>
-                </header>
-                <div className="analysis-chart-body">{card.render(240)}</div>
-              </article>
-            )
-          })}
-        </div>
-      ) : (
-        <div className="analysis-charts-single">
-          <article className="analysis-chart-card">
-            <header className="analysis-chart-card-head">
-              <div>
-                <h3>
-                  {chartKind === 'pie'
-                    ? 'Color mix (finalized)'
-                    : chartKind === 'composed'
-                      ? 'Combo trend'
-                      : `${chartKind[0]!.toUpperCase()}${chartKind.slice(1)} trend by day`}
-                </h3>
-                <span className="meta">{filtered.length} day(s)</span>
-              </div>
-              <div className="analysis-card-actions">
-                <button
-                  type="button"
-                  onClick={() => setExpandedCard(chartKind === 'pie' ? 'colorMix' : chartKind === 'composed' ? 'combo' : chartKind === 'line' ? 'trendLine' : 'trendBar')}
-                  className="analysis-action-btn expand-btn"
-                  title="Expand View"
-                  aria-label="Expand chart view"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" />
-                  </svg>
-                </button>
-              </div>
-            </header>
-            <div className="analysis-chart-body">{trendChart(chartKind, 320)}</div>
-          </article>
-          {(chartKind === 'bar' || chartKind === 'line') && (
-            <article className="analysis-chart-card">
-              <header className="analysis-chart-card-head">
-                <div>
-                  <h3>Color stack (context)</h3>
-                </div>
-                <div className="analysis-card-actions">
-                  <button
-                    type="button"
-                    onClick={() => setExpandedCard('colorStack')}
-                    className="analysis-action-btn expand-btn"
-                    title="Expand View"
-                    aria-label="Expand chart view"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" />
-                    </svg>
-                  </button>
-                </div>
-              </header>
-              <div className="analysis-chart-body">{colorStackChart(220)}</div>
-            </article>
-          )}
-        </div>
-      )}
-
-      {expandedCard && (
-        <div className="analysis-modal-overlay" onClick={() => setExpandedCard(null)}>
-          <div className="analysis-modal-content" onClick={(e) => e.stopPropagation()}>
-            <header className="analysis-modal-header">
-              <div>
-                <h3>{cardData[expandedCard]?.title || 'Chart View'}</h3>
-                <span className="meta">{cardData[expandedCard]?.subtitle}</span>
-              </div>
-              <button
-                type="button"
-                className="analysis-modal-close"
-                onClick={() => setExpandedCard(null)}
-                aria-label="Close modal"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </header>
-            <div className="analysis-modal-body">
-              {cardData[expandedCard]?.render(420)}
+      {/* Chart Workbench Toolbar & Filters */}
+      <div className="test-analysis-workbench">
+        <aside ref={filterCardRef} className="test-analysis-filter-card" aria-label="Chart filters">
+          <div className="test-analysis-filter-head">
+            <Gauge className="h-4 w-4" />
+            <div>
+              <strong>Filters</strong>
+              <span>
+                {chartAttempts.length}/{attempts.length} attempts
+              </span>
             </div>
           </div>
+
+          <details className="test-analysis-filter-menu">
+            <summary>
+              <span>Days</span>
+              <strong>{selectedSessions.length ? `${selectedSessions.length} selected` : 'All'}</strong>
+            </summary>
+            <div className="test-analysis-filter-popover">
+              <div className="test-analysis-chip-grid">
+                <button
+                  type="button"
+                  className={`test-analysis-chip${selectedSessions.length === 0 ? ' is-active' : ''}`}
+                  onClick={() => setSelectedSessions([])}
+                >
+                  All
+                </button>
+                {availableSessions.map((session) => {
+                  const active = selectedSessions.includes(session)
+                  return (
+                    <button
+                      key={session}
+                      type="button"
+                      className={`test-analysis-chip${active ? ' is-active' : ''}`}
+                      onClick={() => toggleSession(session)}
+                    >
+                      D{session}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </details>
+
+          <details className="test-analysis-filter-menu">
+            <summary>
+              <span>Colors</span>
+              <strong>
+                {selectedColors.length === SPECTRUM_COLORS.length ? 'All' : `${selectedColors.length} selected`}
+              </strong>
+            </summary>
+            <div className="test-analysis-filter-popover">
+              <div className="test-analysis-color-list">
+                <button
+                  type="button"
+                  className={`test-analysis-color-chip${selectedColors.length === SPECTRUM_COLORS.length ? ' is-active' : ''}`}
+                  onClick={() => setSelectedColors([...SPECTRUM_COLORS])}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  className={`test-analysis-color-chip${selectedColorGroup === 'warm' ? ' is-active' : ''}`}
+                  onClick={() => selectColorGroup('warm')}
+                  title="Warm = Red + Orange + Yellow (Struggle/RFC focus)"
+                >
+                  Warm
+                </button>
+                <button
+                  type="button"
+                  className={`test-analysis-color-chip${selectedColorGroup === 'cool' ? ' is-active' : ''}`}
+                  onClick={() => selectColorGroup('cool')}
+                  title="Cool = Green + Blue + Indigo + Purple (Mastery focus)"
+                >
+                  Cool
+                </button>
+                {SPECTRUM_COLORS.map((color) => {
+                  const active = selectedColors.length < SPECTRUM_COLORS.length && selectedColors.includes(color)
+                  return (
+                    <button
+                      key={color}
+                      type="button"
+                      className={`test-analysis-color-chip${active ? ' is-active' : ''}`}
+                      style={
+                        active ? { borderColor: COLOR_HEX[color], background: `${COLOR_HEX[color]}1f` } : undefined
+                      }
+                      onClick={() => toggleColor(color)}
+                    >
+                      <i style={{ background: COLOR_HEX[color] }} />
+                      {COLOR_LABELS[color]}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </details>
+
+          {!compact && (
+            <details className="test-analysis-filter-menu is-wide">
+              <summary>
+                <span>Charts</span>
+                <strong>
+                  {chartOrder.filter((key) => !chartUi[key].hidden).length}/{chartOrder.length}
+                </strong>
+              </summary>
+              <div className="test-analysis-filter-popover">
+                <div className="test-analysis-filter-title is-popover-title">
+                  <span>Order</span>
+                  <button type="button" onClick={resetChartUi} title="Reset chart layout">
+                    <RotateCcw className="h-3 w-3" /> Reset
+                  </button>
+                </div>
+                <div className="test-analysis-chart-order-list">
+                  {chartOrder.map((key, index) => (
+                    <div
+                      key={key}
+                      className={`test-analysis-chart-order-row${chartUi[key].hidden ? ' is-hidden' : ''}${draggingChart === key ? ' is-dragging' : ''}`}
+                      draggable
+                      onDragStart={() => setDraggingChart(key)}
+                      onDragEnd={() => setDraggingChart(null)}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={(event) => {
+                        event.preventDefault()
+                        if (draggingChart) moveChartTo(draggingChart, key)
+                        setDraggingChart(null)
+                      }}
+                    >
+                      <span className="test-analysis-chart-order-grip" aria-hidden>
+                        <GripVertical className="h-3 w-3" />
+                      </span>
+                      <button
+                        type="button"
+                        className="test-analysis-chart-order-name"
+                        onClick={() => updateChartUi(key, { hidden: !chartUi[key].hidden })}
+                        title={chartUi[key].hidden ? 'Show chart' : 'Hide chart'}
+                      >
+                        <span>{index + 1}</span>
+                        <strong>{CHART_NAMES[key]}</strong>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </details>
+          )}
+        </aside>
+
+        {/* Dynamic Chart Stack Ordered by Drag & Drop */}
+        <div className="test-analysis-chart-stack">
+          {/* Question Record Tube Chart */}
+          {!chartUi.tube.hidden ? (
+            <div
+              className={`test-analysis-chart-slot${chartUi.tube.expanded ? ' lg:col-span-2' : ''}`}
+              style={{ order: chartOrder.indexOf('tube') }}
+            >
+              <Panel
+                className={chartPanelClass('tube')}
+                icon={CircleDot}
+                title="Question Record Tube Chart"
+                description="Each attempt is one tube. Records are stacked bottom-up: first primary record at the bottom, probe records stacked upwards."
+                actions={chartActions('tube')}
+                collapsible={false}
+              >
+                <div
+                  className={`standalone-chart-wrap test-analysis-tube-wrap${chartUi.tube.expanded ? ' h-[26rem]' : ''}`}
+                >
+                  <div
+                    className="test-analysis-tube-scroll"
+                    role="img"
+                    aria-label="Question record tube chart showing N_total color records by attempt"
+                  >
+                    {recordTubeRows.length ? (
+                      recordTubeRows.map((row) => (
+                        <div key={row.id} className="test-analysis-tube-col">
+                          <div
+                            className="test-analysis-tube-stack"
+                            title={`${row.label} (${row.sessionLabel}) - N_total ${row.records.length}`}
+                          >
+                            {row.records.map((record) => (
+                              <span
+                                key={`${row.id}-${record.index}`}
+                                className="test-analysis-tube-bead"
+                                style={{ background: COLOR_HEX[record.color] }}
+                                title={`${row.label} (${row.sessionLabel}) - ${record.label}`}
+                                aria-label={`${row.label} ${record.label}`}
+                              />
+                            ))}
+                          </div>
+                          {chartUi.tube.showLabels ? (
+                            <>
+                              <strong>{row.shortLabel}</strong>
+                              <span>{row.records.length}</span>
+                            </>
+                          ) : null}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="test-analysis-empty-chart">No finalized records in the current filter.</div>
+                    )}
+                  </div>
+                </div>
+              </Panel>
+            </div>
+          ) : null}
+
+          {/* 7-Color Record Mix by Day */}
+          {!chartUi.mix.hidden ? (
+            <div
+              className={`test-analysis-chart-slot${chartUi.mix.expanded ? ' lg:col-span-2' : ''}`}
+              style={{ order: chartOrder.indexOf('mix') }}
+            >
+              <Panel
+                className={chartPanelClass('mix')}
+                icon={BarChart3}
+                title="7-Color Record Mix by Day"
+                description="Stacked count of N_total records by session/day across Red, Orange, Yellow, Green, Blue, Indigo, and Purple."
+                actions={chartActions('mix')}
+                collapsible={false}
+              >
+                <div className={`standalone-chart-wrap${chartUi.mix.expanded ? ' h-[26rem]' : ' is-short'}`}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={sessionRecordMixRows} margin={{ top: 36, right: 20, bottom: 8, left: -12 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" opacity={0.6} />
+                      <XAxis dataKey="shortLabel" stroke="#64748b" fontSize={12} tickLine={false} interval={0} />
+                      <YAxis
+                        stroke="#64748b"
+                        fontSize={11}
+                        tickLine={false}
+                        allowDecimals={false}
+                        label={{ value: 'Records', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                      />
+                      <Tooltip
+                        cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
+                        content={({ active, payload }) => {
+                          if (!active || !payload?.length) return null
+                          const row = payload[0]?.payload
+                          return (
+                            <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-3 text-xs text-slate-700 dark:text-slate-200 shadow-xl">
+                              <div className="mb-1 font-black text-slate-950 dark:text-white">
+                                {row.label} - N_total {row.nTotal} - Avg %x:{' '}
+                                <span className="font-bold" style={{ color: COLOR_HEX[row.avgXColor as ResultColor] }}>
+                                  {Number(row.avgPercentX ?? 0).toFixed(1)}%
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                                {SPECTRUM_COLORS.map((color) => (
+                                  <span key={color} style={{ color: COLOR_HEX[color] }}>
+                                    {COLOR_LABELS[color]}: <strong>{row[color]}</strong>
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        }}
+                      />
+                      {SPECTRUM_COLORS.map((color, index) => (
+                        <Bar
+                          key={color}
+                          dataKey={color}
+                          stackId="records"
+                          name={COLOR_LABELS[color]}
+                          fill={COLOR_HEX[color]}
+                          isAnimationActive={false}
+                        >
+                          {chartUi.mix.showLabels && index === SPECTRUM_COLORS.length - 1 ? (
+                            <LabelList dataKey="nTotal" position="top" className="test-analysis-chart-label" />
+                          ) : null}
+                        </Bar>
+                      ))}
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </Panel>
+            </div>
+          ) : null}
+
+          {/* RFC & %c Trend by Day with Recharts Brush */}
+          {!chartUi.trend.hidden ? (
+            <div
+              className={`test-analysis-chart-slot${chartUi.trend.expanded ? ' lg:col-span-2' : ''}`}
+              style={{ order: chartOrder.indexOf('trend') }}
+            >
+              <Panel
+                className={chartPanelClass('trend')}
+                icon={LineChartIcon}
+                title="RFC & %c Trend by Day"
+                description="Timeline across days: Red = Struggle (RFC %), Green = Success (%c / Avg %x). Drag brush below to scrub/zoom."
+                actions={chartActions('trend')}
+                collapsible={false}
+              >
+                <div className={`standalone-chart-wrap${chartUi.trend.expanded ? ' h-[26rem]' : ''}`}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RechartsLineChart data={timelineRows} margin={{ top: 36, right: 20, bottom: 8, left: -12 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" opacity={0.6} />
+                      <XAxis dataKey="shortLabel" stroke="#64748b" fontSize={12} tickLine={false} interval={0} />
+                      <YAxis
+                        domain={[0, 100]}
+                        tickFormatter={(value) => `${value}%`}
+                        stroke="#64748b"
+                        fontSize={11}
+                        tickLine={false}
+                        label={{ value: 'Percentage (%)', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                      />
+                      <Tooltip
+                        cursor={{ stroke: '#6366f1', strokeDasharray: '3 3' }}
+                        content={({ active, payload }) => {
+                          if (!active || !payload?.length) return null
+                          const row = payload[0]?.payload
+                          return (
+                            <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-3 text-xs text-slate-700 dark:text-slate-200 shadow-xl">
+                              <div className="mb-1 font-black text-slate-950 dark:text-white">{row.label}</div>
+                              <div>
+                                RFC (Struggle):{' '}
+                                <strong style={{ color: METRIC_HEX.rfc }}>{Number(row.rfc ?? 0).toFixed(1)}%</strong>
+                              </div>
+                              <div>
+                                %c (Avg %x):{' '}
+                                <strong style={{ color: METRIC_HEX.percentC }}>
+                                  {Number(row.percentC ?? 0).toFixed(1)}%
+                                </strong>{' '}
+                                <span style={{ color: COLOR_HEX[row.avgXColor as ResultColor] }}>
+                                  ({COLOR_LABELS[row.avgXColor as ResultColor]})
+                                </span>
+                              </div>
+                              <div>
+                                Attempts: <strong>{row.attempts}</strong> · N_total records:{' '}
+                                <strong>{row.nTotal}</strong>
+                              </div>
+                              {row.probedCount > 0 ? (
+                                <div>
+                                  Chunks count: <strong>{row.probedCount}</strong> · Avg chunks number:{' '}
+                                  <strong>{row.avgChunksNumber != null ? row.avgChunksNumber.toFixed(1) : '—'}</strong>
+                                </div>
+                              ) : null}
+                            </div>
+                          )
+                        }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="rfc"
+                        name="RFC (Struggle)"
+                        stroke={METRIC_HEX.rfc}
+                        strokeWidth={3}
+                        dot={{ r: 5, fill: METRIC_HEX.rfc, stroke: '#ffffff', strokeWidth: 2 }}
+                        activeDot={{ r: 7, fill: METRIC_HEX.rfc, stroke: '#0f172a', strokeWidth: 2 }}
+                        isAnimationActive={false}
+                      >
+                        {chartUi.trend.showLabels ? (
+                          <LabelList
+                            dataKey="rfc"
+                            position="top"
+                            offset={10}
+                            formatter={(v: unknown) => `${Number(v).toFixed(0)}%`}
+                            fill={METRIC_HEX.rfc}
+                            className="test-analysis-chart-label"
+                          />
+                        ) : null}
+                      </Line>
+                      <Line
+                        type="monotone"
+                        dataKey="percentC"
+                        name="%c (Avg %x)"
+                        stroke={METRIC_HEX.percentC}
+                        strokeWidth={3}
+                        dot={{ r: 5, fill: METRIC_HEX.percentC, stroke: '#ffffff', strokeWidth: 2 }}
+                        activeDot={{ r: 7, fill: METRIC_HEX.percentC, stroke: '#0f172a', strokeWidth: 2 }}
+                        isAnimationActive={false}
+                      >
+                        {chartUi.trend.showLabels ? (
+                          <LabelList
+                            dataKey="percentC"
+                            position="top"
+                            offset={10}
+                            formatter={(v: unknown) => `${Number(v).toFixed(0)}%`}
+                            fill={METRIC_HEX.percentC}
+                            className="test-analysis-chart-label"
+                          />
+                        ) : null}
+                      </Line>
+                      <Brush
+                        dataKey="shortLabel"
+                        height={24}
+                        stroke="#6366f1"
+                        travellerWidth={10}
+                        startIndex={sessionBrushStart}
+                        endIndex={sessionBrushEnd}
+                        onChange={handleSessionBrushChange}
+                      />
+                    </RechartsLineChart>
+                  </ResponsiveContainer>
+                </div>
+              </Panel>
+            </div>
+          ) : null}
+
+          {/* Metrics & Chunks Depth Combo Chart with Recharts Brush */}
+          {!chartUi.combo.hidden ? (
+            <div
+              className={`test-analysis-chart-slot${chartUi.combo.expanded ? ' lg:col-span-2' : ''}`}
+              style={{ order: chartOrder.indexOf('combo') }}
+            >
+              <Panel
+                className={chartPanelClass('combo')}
+                icon={Activity}
+                title="Metrics & Chunks Depth Combo"
+                description="Dual-axis view: RFC & %c lines on left axis (%) vs Chunks count bar and Avg chunks number on right axis."
+                actions={chartActions('combo')}
+                collapsible={false}
+              >
+                <div className={`standalone-chart-wrap${chartUi.combo.expanded ? ' h-[26rem]' : ''}`}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={timelineRows} margin={{ top: 36, right: 20, bottom: 8, left: -12 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" opacity={0.6} />
+                      <XAxis dataKey="shortLabel" stroke="#64748b" fontSize={12} tickLine={false} interval={0} />
+                      <YAxis
+                        yAxisId="percent"
+                        domain={[0, 100]}
+                        tickFormatter={(value) => `${value}%`}
+                        stroke="#64748b"
+                        fontSize={11}
+                        tickLine={false}
+                        label={{ value: 'RFC / %c (%)', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                      />
+                      <YAxis
+                        yAxisId="depth"
+                        orientation="right"
+                        stroke="#8b5cf6"
+                        fontSize={11}
+                        tickLine={false}
+                        label={{ value: 'Depth / Count', angle: 90, position: 'insideRight', fill: '#8b5cf6' }}
+                      />
+                      <Tooltip
+                        cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
+                        content={({ active, payload }) => {
+                          if (!active || !payload?.length) return null
+                          const row = payload[0]?.payload
+                          return (
+                            <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-3 text-xs text-slate-700 dark:text-slate-200 shadow-xl">
+                              <div className="mb-1 font-black text-slate-950 dark:text-white">{row.label}</div>
+                              <div>
+                                RFC:{' '}
+                                <strong style={{ color: METRIC_HEX.rfc }}>{Number(row.rfc ?? 0).toFixed(1)}%</strong>
+                              </div>
+                              <div>
+                                %c:{' '}
+                                <strong style={{ color: METRIC_HEX.percentC }}>
+                                  {Number(row.percentC ?? 0).toFixed(1)}%
+                                </strong>
+                              </div>
+                              <div>
+                                Chunks Count: <strong className="text-sky-500">{row.probedCount}</strong>
+                              </div>
+                              <div>
+                                Avg Chunks Number:{' '}
+                                <strong className="text-purple-500">
+                                  {row.avgChunksNumber != null ? row.avgChunksNumber.toFixed(1) : '—'}
+                                </strong>
+                              </div>
+                            </div>
+                          )
+                        }}
+                      />
+                      <Bar
+                        yAxisId="depth"
+                        dataKey="probedCount"
+                        name="Chunks Count"
+                        fill="#38bdf8"
+                        opacity={0.7}
+                        radius={[4, 4, 0, 0]}
+                      >
+                        {chartUi.combo.showLabels ? (
+                          <LabelList dataKey="probedCount" position="top" className="test-analysis-chart-label" />
+                        ) : null}
+                      </Bar>
+                      <Line
+                        yAxisId="percent"
+                        type="monotone"
+                        dataKey="rfc"
+                        name="RFC (Struggle)"
+                        stroke={METRIC_HEX.rfc}
+                        strokeWidth={2.5}
+                        dot={{ r: 4, fill: METRIC_HEX.rfc }}
+                      />
+                      <Line
+                        yAxisId="percent"
+                        type="monotone"
+                        dataKey="percentC"
+                        name="%c (Avg %x)"
+                        stroke={METRIC_HEX.percentC}
+                        strokeWidth={2.5}
+                        dot={{ r: 4, fill: METRIC_HEX.percentC }}
+                      />
+                      <Line
+                        yAxisId="depth"
+                        type="monotone"
+                        dataKey="avgChunksNumber"
+                        name="Avg Chunks Number"
+                        stroke="#a855f7"
+                        strokeWidth={2.5}
+                        dot={{ r: 4, fill: '#a855f7' }}
+                      />
+                      <Brush
+                        dataKey="shortLabel"
+                        height={24}
+                        stroke="#8b5cf6"
+                        travellerWidth={10}
+                        startIndex={sessionBrushStart}
+                        endIndex={sessionBrushEnd}
+                        onChange={handleSessionBrushChange}
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+              </Panel>
+            </div>
+          ) : null}
+
+          {/* Result Color Distribution Pie Chart */}
+          {!chartUi.distribution.hidden ? (
+            <div
+              className={`test-analysis-chart-slot${chartUi.distribution.expanded ? ' lg:col-span-2' : ''}`}
+              style={{ order: chartOrder.indexOf('distribution') }}
+            >
+              <Panel
+                className={chartPanelClass('distribution')}
+                icon={PieChartIcon}
+                title="Result Color Distribution"
+                description="Distribution of finalized effective results across the 7-color spectrum."
+                actions={chartActions('distribution')}
+                collapsible={false}
+              >
+                <div className={`standalone-chart-wrap${chartUi.distribution.expanded ? ' h-[26rem]' : ''}`}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RechartsPieChart>
+                      <Tooltip
+                        content={({ active, payload }) => {
+                          if (!active || !payload?.length) return null
+                          const row = payload[0]?.payload
+                          return (
+                            <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-3 text-xs text-slate-700 dark:text-slate-200 shadow-xl">
+                              <div className="font-black" style={{ color: row.fill }}>
+                                {row.name}
+                              </div>
+                              <div>
+                                Attempts: <strong>{row.count}</strong>
+                              </div>
+                              <div>
+                                Share: <strong>{row.percent}%</strong>
+                              </div>
+                            </div>
+                          )
+                        }}
+                      />
+                      <Pie
+                        data={colorDistribution}
+                        dataKey="count"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius="45%"
+                        outerRadius="78%"
+                        paddingAngle={2}
+                        label={
+                          chartUi.distribution.showLabels
+                            ? ({ payload }: any) => (payload?.percent ? `${payload.percent}%` : '')
+                            : false
+                        }
+                        isAnimationActive={false}
+                      >
+                        {colorDistribution.map((entry) => (
+                          <Cell key={entry.color} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
+                </div>
+              </Panel>
+            </div>
+          ) : null}
         </div>
-      )}
+      </div>
     </div>
   )
 }

@@ -1,14 +1,23 @@
 import { useMemo, useState, useEffect } from 'react'
 import {
   Activity,
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   CalendarDays,
+  CheckCircle2,
+  ChevronLeft,
   ChevronRight,
   Info,
+  Search,
+  Target,
   TrendingDown,
   TrendingUp,
   Users,
+  Zap,
 } from 'lucide-react'
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import {
   buildCourseProgressReport,
   buildLearnerProgressReport,
@@ -27,10 +36,20 @@ import {
   type SessionMetricPoint,
 } from '../modules/reporting/session-series'
 import type { DomainUser } from '../modules/roster/types'
-import { COLOR_SCORE, SPECTRUM_COLORS, type ResultColor } from '../modules/result-lifecycle/types'
+import {
+  COLOR_SCORE,
+  COOL_COLORS,
+  SPECTRUM_COLORS,
+  WARM_COLORS,
+  type ResultColor,
+} from '../modules/result-lifecycle/types'
 import type { MetricSettingsState } from '../modules/metrics/settings'
 import { getEnabledMetricKeys } from '../modules/metrics/settings'
-import type { MetricKey, MetricObservation } from '../modules/metrics/calculate'
+import {
+  spectrumRecordsForAttempt,
+  type MetricKey,
+  type MetricObservation,
+} from '../modules/metrics/calculate'
 import { AnalysisChartsPanel } from './AnalysisChartsPanel'
 import { UserAvatar } from './UserAvatar'
 import { probeChunksNumber } from '../modules/assessment/probe-metrics'
@@ -91,8 +110,194 @@ function colorCounts(records: ResultRecord[]): Record<ResultColor, number> {
   return c
 }
 
+const COLOR_HEX: Record<ResultColor, string> = {
+  red: '#ef4444',
+  orange: '#f97316',
+  yellow: '#facc15',
+  green: '#22c55e',
+  blue: '#38bdf8',
+  indigo: '#6366f1',
+  purple: '#a855f7',
+}
+
+const COLOR_LABELS: Record<ResultColor, string> = {
+  red: 'Red',
+  orange: 'Orange',
+  yellow: 'Yellow',
+  green: 'Green',
+  blue: 'Blue',
+  indigo: 'Indigo',
+  purple: 'Purple',
+}
+
+function MiniSpectrumBar({
+  counts,
+  total,
+  className = 'w-24 h-2.5',
+}: {
+  counts: Record<ResultColor, number>
+  total: number
+  className?: string
+}) {
+  if (total === 0) {
+    return <div className={`${className} bg-white/5 rounded-full`} />
+  }
+
+  const title = SPECTRUM_COLORS.map(
+    (c) => `${COLOR_LABELS[c]}: ${counts[c]} (${pct(counts[c], total)}%)`,
+  ).join(' · ')
+
+  return (
+    <div
+      className={`flex overflow-hidden rounded-full bg-slate-900 border border-white/10 ${className}`}
+      title={title}
+    >
+      {SPECTRUM_COLORS.map((c) => {
+        const count = counts[c]
+        if (count === 0) return null
+        const percentage = (count / total) * 100
+        return (
+          <div
+            key={c}
+            style={{
+              width: `${percentage}%`,
+              backgroundColor: COLOR_HEX[c],
+            }}
+            className="h-full transition-all"
+          />
+        )
+      })}
+    </div>
+  )
+}
+
+function ProbePathwayView({ record }: { record: ResultRecord }) {
+  const steps = useMemo(() => {
+    return spectrumRecordsForAttempt({
+      effectiveColor: record.effectiveColor,
+      enteredProbeFlow: record.enteredProbeFlow,
+      probeEventCount: record.probeEventCount,
+    })
+  }, [record.effectiveColor, record.enteredProbeFlow, record.probeEventCount])
+
+  if (!record.enteredProbeFlow || steps.length <= 1) {
+    return (
+      <span className={`capture-dot ${record.effectiveColor}`}>
+        {COLOR_LABELS[record.effectiveColor]}
+      </span>
+    )
+  }
+
+  const condensed: { color: ResultColor; count: number }[] = []
+  for (const c of steps) {
+    if (condensed.length > 0 && condensed[condensed.length - 1].color === c) {
+      condensed[condensed.length - 1].count += 1
+    } else {
+      condensed.push({ color: c, count: 1 })
+    }
+  }
+
+  const tooltip = `Probe sequence: ${steps.map((s) => COLOR_LABELS[s]).join(' → ')} (Depth: ${record.probeEventCount + 1})`
+
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap" title={tooltip}>
+      {condensed.map((item, idx) => (
+        <div key={idx} className="flex items-center gap-1.5">
+          {idx > 0 && <span className="text-slate-500 text-xs">→</span>}
+          <span
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wide"
+            style={{
+              backgroundColor: `${COLOR_HEX[item.color]}1a`,
+              color: COLOR_HEX[item.color],
+              border: `1px solid ${COLOR_HEX[item.color]}40`,
+            }}
+          >
+            <span
+              className="inline-block h-1.5 w-1.5 rounded-full"
+              style={{ backgroundColor: COLOR_HEX[item.color] }}
+            />
+            <span>
+              {COLOR_LABELS[item.color]}
+              {item.count > 1 ? ` (x${item.count})` : ''}
+            </span>
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function getSessionStatusBadge(metrics: Partial<Record<MetricKey, number | null>>) {
+  const rfc = metrics.rfc
+  const rac = metrics.rac
+  if (rac == null || rfc == null) {
+    return {
+      label: 'Pending',
+      className: 'bg-slate-800 text-slate-400 border border-white/5',
+    }
+  }
+  // Mastery: %c >= 75% & RFC < 20%
+  if (rac >= 0.75 && rfc < 0.20) {
+    return {
+      label: 'Mastery',
+      className: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
+    }
+  }
+  // Needs Attention: RFC >= 30%
+  if (rfc >= 0.30) {
+    return {
+      label: 'Needs Attention',
+      className: 'bg-rose-500/15 text-rose-300 border border-rose-500/30',
+    }
+  }
+  // Steady: %c >= 50%
+  if (rac >= 0.50) {
+    return {
+      label: 'Steady',
+      className: 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30',
+    }
+  }
+  // Developing
+  return {
+    label: 'Developing',
+    className: 'bg-amber-500/15 text-amber-300 border border-amber-500/30',
+  }
+}
+
+function getLearnerStatus(
+  rac: number | null | undefined,
+  rfc: number | null | undefined,
+  count: number,
+) {
+  if (count === 0) {
+    return {
+      label: 'No Data',
+      className: 'bg-slate-800 text-slate-400 border border-white/5',
+    }
+  }
+  const percentC = rac != null ? rac * 100 : null
+  const rfcVal = rfc != null ? rfc * 100 : null
+
+  if (percentC != null && percentC >= 75 && (rfcVal == null || rfcVal < 20)) {
+    return {
+      label: 'High Mastery',
+      className: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
+    }
+  }
+  if (rfcVal != null && rfcVal >= 30) {
+    return {
+      label: 'Needs Focus',
+      className: 'bg-rose-500/15 text-rose-300 border border-rose-500/30',
+    }
+  }
+  return {
+    label: 'Steady',
+    className: 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30',
+  }
+}
+
 function resultColorLabel(color: ResultColor): string {
-  return color
+  return COLOR_LABELS[color] ?? color
 }
 
 function pct(n: number, total: number): number {
@@ -283,12 +488,12 @@ export function ProgressAnalysisView({
   const maxBar = Math.max(1, ...Object.values(counts))
 
   const pieData = useMemo(() => {
-    return [
-      { name: 'Red', value: counts.red, color: '#ef4444' },
-      { name: 'Orange', value: counts.yellow, color: '#f97316' },
-      { name: 'Green', value: counts.green, color: '#22c55e' },
-      { name: 'Purple', value: counts.purple, color: '#a855f7' },
-    ].filter((d) => d.value > 0)
+    return SPECTRUM_COLORS.map((color) => ({
+      name: COLOR_LABELS[color],
+      colorKey: color,
+      value: counts[color],
+      color: COLOR_HEX[color],
+    })).filter((d) => d.value > 0)
   }, [counts])
 
   const rfc = comparison ? pickMetric(comparison.current, 'rfc', metricSettings) : null
@@ -415,9 +620,193 @@ export function ProgressAnalysisView({
     })
   }
 
-  const recent = [...windowRecords]
-    .sort((a, b) => b.finalizedAt.localeCompare(a.finalizedAt))
-    .slice(0, 20)
+  const sessionColorMap = useMemo(() => {
+    const map = new Map<string, { counts: Record<ResultColor, number>; total: number }>()
+    const targetLedger = selectedLearnerIds.length > 0
+      ? scopedLedger.filter((r) => selectedLearnerIds.includes(r.learnerUserId))
+      : scopedLedger
+
+    for (const r of targetLedger) {
+      let entry = map.get(r.learningSessionId)
+      if (!entry) {
+        entry = {
+          counts: { red: 0, orange: 0, yellow: 0, green: 0, blue: 0, indigo: 0, purple: 0 },
+          total: 0,
+        }
+        map.set(r.learningSessionId, entry)
+      }
+      entry.counts[r.effectiveColor] += 1
+      entry.total += 1
+    }
+    return map
+  }, [scopedLedger, selectedLearnerIds])
+
+  const sessionDeltaMap = useMemo(() => {
+    const map = new Map<string, { dRfc: number | null; dRac: number | null }>()
+    sessionSeries.forEach((p, i) => {
+      map.set(p.learningSessionId, {
+        dRfc: sessionRfcDelta(sessionSeries, i),
+        dRac: sessionRacDelta(sessionSeries, i),
+      })
+    })
+    return map
+  }, [sessionSeries])
+
+  const learnerColorMap = useMemo(() => {
+    const map = new Map<string, { counts: Record<ResultColor, number>; total: number }>()
+    for (const r of scopedLedger) {
+      let entry = map.get(r.learnerUserId)
+      if (!entry) {
+        entry = {
+          counts: { red: 0, orange: 0, yellow: 0, green: 0, blue: 0, indigo: 0, purple: 0 },
+          total: 0,
+        }
+        map.set(r.learnerUserId, entry)
+      }
+      entry.counts[r.effectiveColor] += 1
+      entry.total += 1
+    }
+    return map
+  }, [scopedLedger])
+
+  type SessionSortField = 'day' | 'sample' | 'rfc' | 'rac'
+  type SortDirection = 'asc' | 'desc'
+  const [sessionSortField, setSessionSortField] = useState<SessionSortField>('day')
+  const [sessionSortDir, setSessionSortDir] = useState<SortDirection>('asc')
+
+  const handleSessionSort = (field: SessionSortField) => {
+    if (sessionSortField === field) {
+      setSessionSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSessionSortField(field)
+      setSessionSortDir(field === 'day' ? 'asc' : 'desc')
+    }
+  }
+
+  const renderSortIcon = (field: SessionSortField) => {
+    if (sessionSortField !== field) {
+      return <ArrowUpDown className="h-3 w-3 text-slate-500 shrink-0 opacity-60" />
+    }
+    return sessionSortDir === 'asc' ? (
+      <ArrowUp className="h-3 w-3 text-indigo-400 shrink-0" />
+    ) : (
+      <ArrowDown className="h-3 w-3 text-indigo-400 shrink-0" />
+    )
+  }
+
+  const sortedSessionSeries = useMemo(() => {
+    return [...sessionSeries].sort((a, b) => {
+      let diff = 0
+      if (sessionSortField === 'day') {
+        diff = (a.sessionNumber ?? 0) - (b.sessionNumber ?? 0)
+      } else if (sessionSortField === 'sample') {
+        diff = a.attemptCount - b.attemptCount
+      } else if (sessionSortField === 'rfc') {
+        const aVal = a.metrics.rfc ?? -1
+        const bVal = b.metrics.rfc ?? -1
+        diff = aVal - bVal
+      } else if (sessionSortField === 'rac') {
+        const aVal = a.metrics.rac ?? -1
+        const bVal = b.metrics.rac ?? -1
+        diff = aVal - bVal
+      }
+      return sessionSortDir === 'asc' ? diff : -diff
+    })
+  }, [sessionSeries, sessionSortField, sessionSortDir])
+
+  type HistoryFilter = 'all' | 'warm' | 'cool' | 'probed'
+  const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('all')
+  const [historySearch, setHistorySearch] = useState('')
+  const [pageSize, setPageSize] = useState<number>(25)
+  const [currentPage, setCurrentPage] = useState<number>(1)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [historyFilter, historySearch, pageSize])
+
+  const filteredHistory = useMemo(() => {
+    const sorted = [...windowRecords].sort((a, b) => b.finalizedAt.localeCompare(a.finalizedAt))
+    return sorted.filter((r) => {
+      if (historyFilter === 'warm' && !WARM_COLORS.includes(r.effectiveColor)) {
+        return false
+      }
+      if (historyFilter === 'cool' && !COOL_COLORS.includes(r.effectiveColor)) {
+        return false
+      }
+      if (historyFilter === 'probed' && !r.enteredProbeFlow) {
+        return false
+      }
+      if (historySearch.trim()) {
+        const q = historySearch.toLowerCase().trim()
+        const u = users.find((user) => user.id === r.learnerUserId)
+        const name = (u?.displayName ?? r.learnerUserId).toLowerCase()
+        if (!name.includes(q)) {
+          return false
+        }
+      }
+      return true
+    })
+  }, [windowRecords, historyFilter, historySearch, users])
+
+  const historyFilterCounts = useMemo(() => {
+    let warm = 0
+    let cool = 0
+    let probed = 0
+    for (const r of windowRecords) {
+      if (WARM_COLORS.includes(r.effectiveColor)) warm++
+      if (COOL_COLORS.includes(r.effectiveColor)) cool++
+      if (r.enteredProbeFlow) probed++
+    }
+    return {
+      all: windowRecords.length,
+      warm,
+      cool,
+      probed,
+    }
+  }, [windowRecords])
+
+  const totalHistory = filteredHistory.length
+  const totalPages = Math.max(1, Math.ceil(totalHistory / pageSize))
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages)
+  const startIdx = (safeCurrentPage - 1) * pageSize
+  const endIdx = Math.min(startIdx + pageSize, totalHistory)
+  const paginatedHistory = useMemo(() => {
+    return filteredHistory.slice(startIdx, endIdx)
+  }, [filteredHistory, startIdx, endIdx])
+
+  const trajectoryConfig = useMemo(() => {
+    const percentCVal = rac?.value != null ? rac.value * 100 : null
+    const rfcVal = rfc?.value != null ? rfc.value * 100 : null
+
+    if (percentCVal != null && percentCVal >= 70) {
+      return {
+        title: 'Mastery Trajectory',
+        description: 'Cohort demonstrating strong chunk mastery',
+        stripClass: 'bg-emerald-950/20 border-emerald-500/20',
+        badgeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+        iconClass: 'bg-emerald-500/10 text-emerald-400',
+        icon: CheckCircle2,
+      }
+    }
+    if (rfcVal != null && rfcVal >= 30) {
+      return {
+        title: 'Struggle Attention',
+        description: 'High difficulty detected, review recommended',
+        stripClass: 'bg-rose-950/20 border-rose-500/20',
+        badgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
+        iconClass: 'bg-rose-500/10 text-rose-400',
+        icon: AlertTriangle,
+      }
+    }
+    return {
+      title: 'Steady Trajectory',
+      description: 'Consistent progress across learning sessions',
+      stripClass: 'bg-indigo-950/20 border-indigo-500/20',
+      badgeClass: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
+      iconClass: 'bg-indigo-500/10 text-indigo-400',
+      icon: Target,
+    }
+  }, [rac, rfc])
 
   const selectedSessionLabel = useMemo(() => {
     const s = orderedSessions.find((x) => x.id === sessionId) ?? orderedSessions[0]
@@ -772,60 +1161,159 @@ export function ProgressAnalysisView({
             </div>
           </div>
 
-          <div className="analysis-additional-section" style={{ marginTop: 24, marginBottom: 24 }}>
-            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
-              Chunks Number metrics (from finalized ledger)
-            </h3>
-            <div className="stat-grid" style={{ marginBottom: 24 }}>
-              <div
-                className="stat-card"
-                title="Number of finalized attempts where teacher selected Green (2) and entered probe"
-              >
-                <p className="stat-label flex items-center gap-1">
-                  <span>chunks count</span>
-                  <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
-                    <Info className="h-3.5 w-3.5" />
-                    <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
-                      <strong>chunks count</strong> = number of times the teacher selected Green (2). Values use real observations only.
-                    </span>
-                  </span>
-                </p>
-                <p className="stat-value">{probeStats.count}</p>
-                <p className="meta">Green (2) entries · sample={total}</p>
+          {/* Cohort Health & Trajectory Insight Badge/Strip */}
+          <div
+            className={`mt-4 p-3.5 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${trajectoryConfig.stripClass}`}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg ${trajectoryConfig.iconClass}`}>
+                <trajectoryConfig.icon className="h-5 w-5" />
               </div>
-              <div
-                className="stat-card"
-                title="Mean chunks number among probed attempts"
-              >
-                <p className="stat-label flex items-center gap-1">
-                  <span>avg chunks number</span>
-                  <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
-                    <Info className="h-3.5 w-3.5" />
-                    <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
-                      <strong>avg chunks number</strong> = mean chunks number on probed questions. Green opens at 1; each Continue adds 1. Example: Green + Continue ×8 + Done → chunks number 9.
-                    </span>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase border ${trajectoryConfig.badgeClass}`}
+                  >
+                    {trajectoryConfig.title}
                   </span>
+                  <span className="text-xs text-slate-300 font-medium">
+                    {trajectoryConfig.description}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Current %c:{' '}
+                  <strong className="text-slate-200">{rac ? formatMetricValue(rac) : '—'}</strong>
+                  {' · '}
+                  RFC:{' '}
+                  <strong className="text-slate-200">{rfc ? formatMetricValue(rfc) : '—'}</strong>
+                  {racDelta != null && (
+                    <>
+                      {' · '}
+                      <span>Δ %c: </span>
+                      <strong
+                        className={
+                          racTone === 'up'
+                            ? 'text-emerald-400'
+                            : racTone === 'down'
+                              ? 'text-rose-400'
+                              : 'text-slate-300'
+                        }
+                      >
+                        {formatDelta('rac', racDelta)}
+                      </strong>
+                    </>
+                  )}
+                  {rfcDelta != null && (
+                    <>
+                      {' · '}
+                      <span>Δ RFC: </span>
+                      <strong
+                        className={
+                          rfcTone === 'up'
+                            ? 'text-emerald-400'
+                            : rfcTone === 'down'
+                              ? 'text-rose-400'
+                              : 'text-slate-300'
+                        }
+                      >
+                        {formatDelta('rfc', rfcDelta)}
+                      </strong>
+                    </>
+                  )}
                 </p>
-                <p className="stat-value">
-                  {probeStats.count > 0 ? probeStats.avg.toFixed(1) : '—'}
-                </p>
-                <p className="meta">Mean chunks number on probed Qs</p>
               </div>
-              <div
-                className="stat-card"
-                title="Max chunks number among probed attempts (observed peak, not session ceiling)"
-              >
-                <p className="stat-label flex items-center gap-1">
-                  <span>max chunks number</span>
-                  <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
-                    <Info className="h-3.5 w-3.5" />
-                    <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
-                      <strong>max chunks number</strong> = maximum observed chunks number on one question (not session ceiling). Green opens at 1; each Continue adds 1. Example: Green + Continue ×8 + Done → chunks number 9.
+            </div>
+            <div className="text-[11px] font-mono text-slate-400 shrink-0 self-end sm:self-center">
+              Cohort Health: <span className="text-white font-semibold">{total} samples evaluated</span>
+            </div>
+          </div>
+
+          {/* Bento-style layout for Chunks Number metrics */}
+          <div className="my-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                <Zap className="h-3.5 w-3.5 text-amber-400" />
+                <span>Chunks Number Metrics</span>
+                <span className="text-[10px] text-slate-500 font-normal lowercase">(from finalized ledger)</span>
+              </h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {/* Card 1: Chunks Count */}
+              <div className="p-4 rounded-xl bg-slate-900/60 border border-white/10 hover:border-indigo-500/30 transition-all flex flex-col justify-between group">
+                <div className="flex items-start justify-between">
+                  <span className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+                    <span>chunks count</span>
+                    <span className="group/tooltip relative inline-block cursor-help text-slate-500 hover:text-slate-300">
+                      <Info className="h-3.5 w-3.5" />
+                      <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-60 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover/tooltip:opacity-100 border border-white/10 text-left normal-case">
+                        <strong>chunks count</strong> = number of times the teacher selected Green (2). Values use real observations only.
+                      </span>
                     </span>
                   </span>
-                </p>
-                <p className="stat-value">{probeStats.count > 0 ? probeStats.max : '—'}</p>
-                <p className="meta">Peak observed chunks number</p>
+                  <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 group-hover:scale-105 transition-transform">
+                    <Target className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <div className="text-2xl font-black text-white font-mono tracking-tight">
+                    {probeStats.count}
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Green (2) entries · sample={total}
+                  </p>
+                </div>
+              </div>
+
+              {/* Card 2: Avg Chunks Number */}
+              <div className="p-4 rounded-xl bg-slate-900/60 border border-white/10 hover:border-indigo-500/30 transition-all flex flex-col justify-between group">
+                <div className="flex items-start justify-between">
+                  <span className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+                    <span>avg chunks number</span>
+                    <span className="group/tooltip relative inline-block cursor-help text-slate-500 hover:text-slate-300">
+                      <Info className="h-3.5 w-3.5" />
+                      <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-60 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover/tooltip:opacity-100 border border-white/10 text-left normal-case">
+                        <strong>avg chunks number</strong> = mean chunks number on probed questions. Green opens at 1; each Continue adds 1. Example: Green + Continue ×8 + Done → chunks number 9.
+                      </span>
+                    </span>
+                  </span>
+                  <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400 group-hover:scale-105 transition-transform">
+                    <TrendingUp className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <div className="text-2xl font-black text-white font-mono tracking-tight">
+                    {probeStats.count > 0 ? probeStats.avg.toFixed(1) : '—'}
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Mean chunks number on probed Qs
+                  </p>
+                </div>
+              </div>
+
+              {/* Card 3: Max Chunks Number */}
+              <div className="p-4 rounded-xl bg-slate-900/60 border border-white/10 hover:border-indigo-500/30 transition-all flex flex-col justify-between group">
+                <div className="flex items-start justify-between">
+                  <span className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+                    <span>max chunks number</span>
+                    <span className="group/tooltip relative inline-block cursor-help text-slate-500 hover:text-slate-300">
+                      <Info className="h-3.5 w-3.5" />
+                      <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-60 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover/tooltip:opacity-100 border border-white/10 text-left normal-case">
+                        <strong>max chunks number</strong> = maximum observed chunks number on one question (not session ceiling). Green opens at 1; each Continue adds 1. Example: Green + Continue ×8 + Done → chunks number 9.
+                      </span>
+                    </span>
+                  </span>
+                  <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400 group-hover:scale-105 transition-transform">
+                    <Zap className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <div className="text-2xl font-black text-white font-mono tracking-tight">
+                    {probeStats.count > 0 ? probeStats.max : '—'}
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Peak observed chunks number
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -906,6 +1394,29 @@ export function ProgressAnalysisView({
                       <div className="flex-shrink-0" style={{ width: 140, height: 140 }}>
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
+                            <Tooltip
+                              content={({ active, payload }) => {
+                                if (active && payload && payload.length) {
+                                  const item = payload[0].payload
+                                  const p = pct(item.value, total)
+                                  return (
+                                    <div className="rounded-lg border border-white/10 bg-slate-950 p-2 text-xs shadow-xl pointer-events-none z-50">
+                                      <div className="flex items-center gap-1.5 font-semibold text-white">
+                                        <span
+                                          className="inline-block h-2 w-2 rounded-full"
+                                          style={{ backgroundColor: item.color }}
+                                        />
+                                        <span>{item.name}</span>
+                                      </div>
+                                      <p className="mt-1 text-slate-300 font-mono text-[11px]">
+                                        {item.value} {item.value === 1 ? 'record' : 'records'} · {p}%
+                                      </p>
+                                    </div>
+                                  )
+                                }
+                                return null
+                              }}
+                            />
                             <Pie
                               data={pieData}
                               cx="50%"
@@ -915,8 +1426,8 @@ export function ProgressAnalysisView({
                               paddingAngle={3}
                               dataKey="value"
                             >
-                              {pieData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              {pieData.map((entry) => (
+                                <Cell key={`cell-${entry.colorKey}`} fill={entry.color} />
                               ))}
                             </Pie>
                           </PieChart>
@@ -939,6 +1450,10 @@ export function ProgressAnalysisView({
                       const globalIdx = sessionSeries.length - arr.length + idx
                       const dRfc = sessionRfcDelta(sessionSeries, globalIdx)
                       const tone = trendTone('rfc', dRfc)
+                      const sessionData = sessionColorMap.get(p.learningSessionId) ?? {
+                        counts: colorCounts([]),
+                        total: p.attemptCount,
+                      }
                       return (
                         <li key={p.learningSessionId}>
                           <button
@@ -953,6 +1468,11 @@ export function ProgressAnalysisView({
                             <span className="analysis-session-mini-day">
                               {sessionLabel(p.sessionNumber, p.startedAt, totalDays)}
                             </span>
+                            <MiniSpectrumBar
+                              counts={sessionData.counts}
+                              total={sessionData.total}
+                              className="w-16 sm:w-20 h-2 shrink-0"
+                            />
                             <span className="analysis-session-mini-rfc">
                               RFC{' '}
                               {p.metrics.rfc != null
@@ -1063,26 +1583,63 @@ export function ProgressAnalysisView({
               <table aria-label="Progress by day">
                 <thead>
                   <tr>
-                    <th scope="col">Day</th>
-                    <th scope="col" title="Finalized results that day (sample size, not chunks number)">
-                      sample
+                    <th
+                      scope="col"
+                      className="cursor-pointer hover:text-white select-none transition-colors"
+                      onClick={() => handleSessionSort('day')}
+                      title="Sort by Day number"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Day</span>
+                        {renderSortIcon('day')}
+                      </div>
+                    </th>
+                    <th scope="col" title="Session progress status based on %c and RFC">
+                      Status
+                    </th>
+                    <th
+                      scope="col"
+                      className="cursor-pointer hover:text-white select-none transition-colors"
+                      onClick={() => handleSessionSort('sample')}
+                      title="Sort by finalized results sample size (not chunks number)"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>sample</span>
+                        {renderSortIcon('sample')}
+                      </div>
+                    </th>
+                    <th scope="col" title="7-color spectrum composition for this session">
+                      Spectrum Breakdown
                     </th>
                     {visibleDayColumns.map((key) => (
                       <th
                         key={key}
                         scope="col"
+                        className={
+                          key === 'rfc' || key === 'rac'
+                            ? 'cursor-pointer hover:text-white select-none transition-colors'
+                            : ''
+                        }
+                        onClick={
+                          key === 'rfc' || key === 'rac'
+                            ? () => handleSessionSort(key)
+                            : undefined
+                        }
                         title={metricSettings?.metrics.find((m) => m.key === key)?.definition}
                       >
-                        {metricLabel(key)}
+                        <div className="flex items-center gap-1.5">
+                          <span>{metricLabel(key)}</span>
+                          {(key === 'rfc' || key === 'rac') && renderSortIcon(key)}
+                        </div>
                       </th>
                     ))}
                     {visibleDayColumns.includes('rfc') ? (
-                      <th scope="col" title="RFC change vs previous day (percentage points)">
+                      <th scope="col" title="RFC change vs previous day in course sequence (percentage points)">
                         Δ RFC
                       </th>
                     ) : null}
                     {visibleDayColumns.includes('rac') ? (
-                      <th scope="col" title="%c change vs previous day (percentage points)">
+                      <th scope="col" title="%c change vs previous day in course sequence (percentage points)">
                         Δ %c
                       </th>
                     ) : null}
@@ -1090,11 +1647,17 @@ export function ProgressAnalysisView({
                   </tr>
                 </thead>
                 <tbody>
-                  {sessionSeries.map((p, i) => {
-                    const dRfc = sessionRfcDelta(sessionSeries, i)
-                    const dRac = sessionRacDelta(sessionSeries, i)
+                  {sortedSessionSeries.map((p) => {
+                    const deltas = sessionDeltaMap.get(p.learningSessionId)
+                    const dRfc = deltas?.dRfc ?? null
+                    const dRac = deltas?.dRac ?? null
                     const rfcT = trendTone('rfc', dRfc)
                     const racT = trendTone('rac', dRac)
+                    const statusBadge = getSessionStatusBadge(p.metrics)
+                    const sessionData = sessionColorMap.get(p.learningSessionId) ?? {
+                      counts: colorCounts([]),
+                      total: p.attemptCount,
+                    }
                     return (
                       <tr key={p.learningSessionId}>
                         <th scope="row">
@@ -1108,7 +1671,34 @@ export function ProgressAnalysisView({
                             </small>
                           </span>
                         </th>
+                        <td>
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${statusBadge.className}`}
+                          >
+                            {statusBadge.label}
+                          </span>
+                        </td>
                         <td className="font-mono text-xs tabular-nums">{p.attemptCount}</td>
+                        <td>
+                          <div className="flex items-center gap-2">
+                            <MiniSpectrumBar
+                              counts={sessionData.counts}
+                              total={sessionData.total}
+                              className="w-24 h-2.5 shrink-0"
+                            />
+                            <span className="font-mono text-[10px] text-slate-400">
+                              {sessionData.total > 0
+                                ? `${pct(
+                                    sessionData.counts.purple +
+                                      sessionData.counts.indigo +
+                                      sessionData.counts.blue +
+                                      sessionData.counts.green,
+                                    sessionData.total,
+                                  )}% cool`
+                                : ''}
+                            </span>
+                          </div>
+                        </td>
                         {visibleDayColumns.map((key) => (
                           <td key={key} className="font-mono text-xs tabular-nums">
                             {formatDayMetric(key, p.metrics[key])}
@@ -1181,8 +1771,14 @@ export function ProgressAnalysisView({
               <thead>
                 <tr>
                   <th scope="col">Learner</th>
-                  <th scope="col" title="Finalized sample size">
+                  <th scope="col" title="Learner trajectory status based on %c and RFC">
+                    Status
+                  </th>
+                  <th scope="col" title="Finalized sample size (not chunks number)">
                     sample
+                  </th>
+                  <th scope="col" title="7-color learning spectrum composition">
+                    Spectrum Profile
                   </th>
                   <th scope="col">RFC</th>
                   <th scope="col">Δ RFC</th>
@@ -1199,6 +1795,11 @@ export function ProgressAnalysisView({
                   const rAvg = row.comparison.current.find((m) => m.key === 'average_performance')
                   const dRfc = row.comparison.deltas.rfc
                   const tone = trendTone('rfc', dRfc)
+                  const learnerData = learnerColorMap.get(row.learnerUserId) ?? {
+                    counts: colorCounts([]),
+                    total: row.attemptCount,
+                  }
+                  const statusBadge = getLearnerStatus(rRac?.value, rRfc?.value, row.attemptCount)
                   return (
                     <tr key={row.learnerUserId}>
                       <td>
@@ -1211,13 +1812,46 @@ export function ProgressAnalysisView({
                           <span>{user?.displayName ?? row.learnerUserId}</span>
                         </span>
                       </td>
-                      <td>{row.attemptCount}</td>
-                      <td>{rRfc ? formatMetricValue(rRfc) : '—'}</td>
+                      <td>
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${statusBadge.className}`}
+                        >
+                          {statusBadge.label}
+                        </span>
+                      </td>
+                      <td className="font-mono text-xs tabular-nums">{row.attemptCount}</td>
+                      <td>
+                        <div className="flex items-center gap-2">
+                          <MiniSpectrumBar
+                            counts={learnerData.counts}
+                            total={row.attemptCount}
+                            className="w-24 h-2.5 shrink-0"
+                          />
+                          <span className="font-mono text-[10px] text-slate-400">
+                            {row.attemptCount > 0
+                              ? `${pct(
+                                  learnerData.counts.purple +
+                                    learnerData.counts.indigo +
+                                    learnerData.counts.blue +
+                                    learnerData.counts.green,
+                                  row.attemptCount,
+                                )}% cool`
+                              : ''}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="font-mono text-xs tabular-nums">
+                        {rRfc ? formatMetricValue(rRfc) : '—'}
+                      </td>
                       <td>
                         <span className={`analysis-delta is-${tone}`}>{formatPp(dRfc)}</span>
                       </td>
-                      <td>{rRac ? formatMetricValue(rRac) : '—'}</td>
-                      <td>{rAvg ? formatMetricValue(rAvg) : '—'}</td>
+                      <td className="font-mono text-xs tabular-nums">
+                        {rRac ? formatMetricValue(rRac) : '—'}
+                      </td>
+                      <td className="font-mono text-xs tabular-nums">
+                        {rAvg ? formatMetricValue(rAvg) : '—'}
+                      </td>
                       <td>
                         <button
                           type="button"
@@ -1239,35 +1873,130 @@ export function ProgressAnalysisView({
         </div>
       )}
 
-      {/* ——— Recent results ——— */}
+      {/* ——— Results / History tab ——— */}
       {tab === 'history' && (
         <div className="analysis-tab-body">
+          {/* Quick Filter Toolbar */}
+          <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-xl border border-white/5 bg-white/[0.02]">
+            <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Result filters">
+              <button
+                type="button"
+                className={`analysis-chip${historyFilter === 'all' ? ' is-active' : ''}`}
+                onClick={() => setHistoryFilter('all')}
+              >
+                All ({historyFilterCounts.all})
+              </button>
+              <button
+                type="button"
+                className={`analysis-chip${historyFilter === 'warm' ? ' is-active' : ''}`}
+                onClick={() => setHistoryFilter('warm')}
+              >
+                <span className="text-red-400 mr-1">🔴</span>
+                Struggle (Warm) ({historyFilterCounts.warm})
+              </button>
+              <button
+                type="button"
+                className={`analysis-chip${historyFilter === 'cool' ? ' is-active' : ''}`}
+                onClick={() => setHistoryFilter('cool')}
+              >
+                <span className="text-emerald-400 mr-1">🟢</span>
+                Mastery (Cool) ({historyFilterCounts.cool})
+              </button>
+              <button
+                type="button"
+                className={`analysis-chip${historyFilter === 'probed' ? ' is-active' : ''}`}
+                onClick={() => setHistoryFilter('probed')}
+              >
+                <span className="text-indigo-400 mr-1">🔍</span>
+                Probed Only ({historyFilterCounts.probed})
+              </button>
+            </div>
+
+            <div className="relative min-w-[200px]">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Filter by learner name..."
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+                className="w-full bg-slate-900 border border-white/10 rounded-lg pl-8 pr-7 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
+              />
+              {historySearch && (
+                <button
+                  type="button"
+                  onClick={() => setHistorySearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+
           <div className="table-wrap">
-            {recent.length === 0 ? (
+            {totalHistory === 0 ? (
               <p className="empty-state">Nothing in this filter.</p>
             ) : (
-              <table aria-label="Recent observations">
+              <table aria-label="Assessment results ledger">
                 <thead>
                   <tr>
                     <th scope="col">When</th>
+                    <th scope="col">Session</th>
                     {mode === 'teacher' && !focusLearnerId ? (
                       <th scope="col">Learner</th>
                     ) : null}
-                    <th scope="col">Color</th>
+                    <th scope="col">Probe Flow Pathway</th>
+                    <th scope="col">Final Color</th>
                     <th scope="col">Score</th>
+                    <th scope="col" title="Chunks number on question">Chunks #</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {recent.map((r) => {
+                  {paginatedHistory.map((r) => {
                     const user = users.find((u) => u.id === r.learnerUserId)
+                    const session = orderedSessions.find((s) => s.id === r.learningSessionId)
+                    const sessionNum =
+                      session?.sessionNumber ??
+                      (session ? orderedSessions.findIndex((x) => x.id === session.id) + 1 : null)
+                    const cNumber = r.enteredProbeFlow
+                      ? probeChunksNumber({ enteredProbeFlow: r.enteredProbeFlow, probeCount: r.probeEventCount }) ?? 1
+                      : 1
+
                     return (
                       <tr key={r.id}>
-                        <td>{new Date(r.finalizedAt).toLocaleString()}</td>
+                        <td>
+                          <div className="flex flex-col">
+                            <span className="text-xs text-slate-200 whitespace-nowrap">
+                              {new Date(r.finalizedAt).toLocaleDateString([], {
+                                month: 'short',
+                                day: 'numeric',
+                              })}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {new Date(r.finalizedAt).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                          </div>
+                        </td>
+                        <td>
+                          {sessionNum != null ? (
+                            <span
+                              className="inline-flex items-center font-mono text-xs px-2 py-0.5 rounded bg-slate-800 border border-white/10 text-slate-300"
+                              title={session?.startedAt ? new Date(session.startedAt).toLocaleDateString() : undefined}
+                            >
+                              D{sessionNum}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500 font-mono text-xs">—</span>
+                          )}
+                        </td>
                         {mode === 'teacher' && !focusLearnerId ? (
                           <td>
                             <button
                               type="button"
-                              className="ghost cell-with-avatar"
+                              className="ghost cell-with-avatar text-left"
                               onClick={() => {
                                 setSelectedLearnerIds([r.learnerUserId])
                                 setTab('overview')
@@ -1278,21 +2007,89 @@ export function ProgressAnalysisView({
                                 avatarUrl={user?.avatarUrl}
                                 size="sm"
                               />
-                              <span>{user?.displayName ?? r.learnerUserId.slice(0, 8)}</span>
+                              <span className="truncate max-w-[120px] font-medium text-slate-200 hover:text-white">
+                                {user?.displayName ?? r.learnerUserId.slice(0, 8)}
+                              </span>
                             </button>
                           </td>
                         ) : null}
+                        <td>
+                          <ProbePathwayView record={r} />
+                        </td>
                         <td>
                           <span className={`capture-dot ${r.effectiveColor}`}>
                             {resultColorLabel(r.effectiveColor)}
                           </span>
                         </td>
-                        <td>{COLOR_SCORE[r.effectiveColor]}</td>
+                        <td className="font-mono text-xs tabular-nums text-slate-300">
+                          {COLOR_SCORE[r.effectiveColor]}
+                        </td>
+                        <td className="font-mono text-xs tabular-nums text-slate-300">
+                          {r.enteredProbeFlow ? (
+                            <span className="font-bold text-amber-400">{cNumber}</span>
+                          ) : (
+                            <span className="text-slate-500">1</span>
+                          )}
+                        </td>
                       </tr>
                     )
                   })}
                 </tbody>
               </table>
+            )}
+          </div>
+
+          {/* Pagination controls */}
+          <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400 px-1">
+            <div className="flex items-center gap-2">
+              <span>
+                Showing <strong className="text-white">{totalHistory === 0 ? 0 : startIdx + 1}</strong> -{' '}
+                <strong className="text-white">{endIdx}</strong> of{' '}
+                <strong className="text-white">{totalHistory}</strong> results
+              </span>
+              {totalHistory > 0 && (
+                <div className="flex items-center gap-1.5 ml-3 border-l border-white/10 pl-3">
+                  <span>Rows per page:</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    className="bg-slate-900 border border-white/10 rounded px-2 py-0.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={safeCurrentPage <= 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className="px-2.5 py-1 rounded-lg border border-white/10 bg-slate-900 text-xs font-medium text-slate-200 hover:text-white hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                  <span>Prev</span>
+                </button>
+
+                <span className="font-mono text-xs px-2 text-slate-300">
+                  Page <strong className="text-white">{safeCurrentPage}</strong> of{' '}
+                  <strong className="text-white">{totalPages}</strong>
+                </span>
+
+                <button
+                  type="button"
+                  disabled={safeCurrentPage >= totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className="px-2.5 py-1 rounded-lg border border-white/10 bg-slate-900 text-xs font-medium text-slate-200 hover:text-white hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  <span>Next</span>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
             )}
           </div>
         </div>

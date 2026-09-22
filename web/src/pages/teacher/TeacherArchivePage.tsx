@@ -1,18 +1,62 @@
 import { useMemo, useState } from 'react'
-import { Archive, CalendarDays } from 'lucide-react'
+import {
+  Archive,
+  CalendarDays,
+  Clock,
+  Filter,
+  Search,
+  Zap,
+} from 'lucide-react'
 import { PageHeader } from '../../components/PageHeader'
 import { EmptyState, Panel } from '../../components/ui'
+import { UserAvatar } from '../../components/UserAvatar'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import { buildSessionArchive, learnerNameMap } from '../../modules/ops/session-archive'
+import { SPECTRUM_COLORS, type ResultColor } from '../../modules/result-lifecycle/types'
 import { useAppState } from '../../state/useAppState'
 
+const COLOR_HEX: Record<ResultColor, string> = {
+  red: '#ef4444',
+  orange: '#f97316',
+  yellow: '#facc15',
+  green: '#22c55e',
+  blue: '#38bdf8',
+  indigo: '#6366f1',
+  purple: '#a855f7',
+}
+
+const COLOR_LABELS: Record<ResultColor, string> = {
+  red: 'Red',
+  orange: 'Orange',
+  yellow: 'Yellow',
+  green: 'Green',
+  blue: 'Blue',
+  indigo: 'Indigo',
+  purple: 'Purple',
+}
+
+const COLOR_PILL_STYLES: Record<
+  ResultColor,
+  { bg: string; text: string; border: string; dot: string }
+> = {
+  red: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', dot: 'bg-red-500' },
+  orange: { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200', dot: 'bg-orange-500' },
+  yellow: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', dot: 'bg-amber-500' },
+  green: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-500' },
+  blue: { bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200', dot: 'bg-sky-500' },
+  indigo: { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', dot: 'bg-indigo-500' },
+  purple: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', dot: 'bg-purple-500' },
+}
+
 /**
- * Completed learning days for the active class — read-only color heatmap.
+ * Completed learning days for the active class — read-only color heatmap and archive.
  */
 export function TeacherArchivePage() {
   const { roster, scheduling, ledger } = useAppState()
   const { classRow, course } = useTeacherClassContext()
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [colorFilter, setColorFilter] = useState<'all' | ResultColor | 'probed'>('all')
+  const [searchQuery, setSearchQuery] = useState('')
 
   const archive = useMemo(
     () =>
@@ -23,6 +67,56 @@ export function TeacherArchivePage() {
   const names = useMemo(() => learnerNameMap(roster), [roster])
   const selected =
     archive.find((d) => d.learningSession.id === selectedId) ?? archive[archive.length - 1] ?? null
+
+  const dayColorCounts = useMemo(() => {
+    const c = Object.fromEntries(SPECTRUM_COLORS.map((col) => [col, 0])) as Record<
+      ResultColor,
+      number
+    >
+    if (!selected) return c
+    for (const cell of selected.cells) {
+      if (cell.color && cell.color in c) {
+        c[cell.color]++
+      }
+    }
+    return c
+  }, [selected])
+
+  const filterCounts = useMemo(() => {
+    if (!selected) {
+      return { all: 0, red: 0, yellow: 0, green: 0, purple: 0, probed: 0 }
+    }
+    const counts = {
+      all: selected.cells.length,
+      red: 0,
+      yellow: 0,
+      green: 0,
+      purple: 0,
+      probed: 0,
+    }
+    for (const cell of selected.cells) {
+      if (cell.enteredProbeFlow) counts.probed++
+      if (cell.color === 'red') counts.red++
+      if (cell.color === 'yellow') counts.yellow++
+      if (cell.color === 'green') counts.green++
+      if (cell.color === 'purple') counts.purple++
+    }
+    return counts
+  }, [selected])
+
+  const filteredCells = useMemo(() => {
+    if (!selected) return []
+    const query = searchQuery.trim().toLowerCase()
+    return selected.cells.filter((cell) => {
+      if (query) {
+        const name = (names.get(cell.learnerUserId) ?? '').toLowerCase()
+        if (!name.includes(query)) return false
+      }
+      if (colorFilter === 'all') return true
+      if (colorFilter === 'probed') return cell.enteredProbeFlow
+      return cell.color === colorFilter
+    })
+  }, [selected, searchQuery, colorFilter, names])
 
   if (!classRow) {
     return (
@@ -39,7 +133,7 @@ export function TeacherArchivePage() {
         icon={Archive}
         kicker={course?.code ?? 'Class'}
         title="Session archive"
-        subtitle={`${classRow.name} — completed days and result map (read-only)`}
+        subtitle={`${classRow.name} — completed days, observation heatmap, and probe flow archive`}
       />
 
       {archive.length === 0 ? (
@@ -50,40 +144,77 @@ export function TeacherArchivePage() {
         />
       ) : (
         <div className="archive-layout">
-          <Panel icon={CalendarDays} title="Learning days" description="Select a day.">
-            <ul className="person-list">
+          {/* Left panel: Learning days list */}
+          <Panel icon={CalendarDays} title="Learning days" description="Select a completed day.">
+            <div className="flex flex-col gap-2">
               {archive.map((day) => {
                 const active = selected?.learningSession.id === day.learningSession.id
+                const isCompleted = day.learningSession.status === 'completed'
                 return (
-                  <li key={day.learningSession.id}>
-                    <button
-                      type="button"
-                      className={`archive-day-btn${active ? ' is-active' : ''}`}
-                      onClick={() => setSelectedId(day.learningSession.id)}
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <strong className="text-sm font-bold text-slate-800">{day.dayLabel}</strong>
-                        <span className={`badge text-[9px] px-2 py-0.5 rounded-full font-semibold uppercase ${day.learningSession.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-amber-50 text-amber-700 border border-amber-100'}`}>
-                          {day.learningSession.status}
-                        </span>
-                      </div>
-                      <span className="text-[11px] text-slate-500 font-medium">
+                  <button
+                    key={day.learningSession.id}
+                    type="button"
+                    className={`w-full text-left rounded-xl border p-3.5 transition-all cursor-pointer flex flex-col gap-1.5 shadow-3xs ${
+                      active
+                        ? 'border-indigo-600 bg-indigo-50/20 text-indigo-950 ring-2 ring-indigo-600/10'
+                        : 'border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/60 text-slate-800'
+                    }`}
+                    onClick={() => {
+                      setSelectedId(day.learningSession.id)
+                      setColorFilter('all')
+                      setSearchQuery('')
+                    }}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-sm font-bold text-slate-900 tracking-tight">
+                        {day.dayLabel}
+                      </span>
+                      <span
+                        className={`text-[9px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider border ${
+                          isCompleted
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-amber-50 text-amber-700 border-amber-200'
+                        }`}
+                      >
+                        {day.learningSession.status}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-slate-500">
+                      <span className="font-medium text-slate-700">
                         {day.resultCount} finalized results
                       </span>
-                      <span className="text-[10px] text-slate-400 font-mono mt-0.5">
-                        {new Date(day.learningSession.startedAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} · {new Date(day.learningSession.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      <span className="text-[11px] text-slate-400">
+                        {day.attendancePresent}/{day.attendanceTotal} present
                       </span>
-                    </button>
-                  </li>
+                    </div>
+
+                    <div className="text-[10px] text-slate-400 font-mono mt-0.5 flex items-center gap-1">
+                      <Clock className="h-3 w-3 text-slate-400 shrink-0" />
+                      <span className="truncate">
+                        {new Date(day.learningSession.startedAt).toLocaleDateString([], {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}{' '}
+                        ·{' '}
+                        {new Date(day.learningSession.startedAt).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                  </button>
                 )
               })}
-            </ul>
+            </div>
           </Panel>
 
+          {/* Right panel: Day detail, summary bar, quick filters, and interactive heatmap */}
           <Panel
             icon={Archive}
             title={selected ? selected.dayLabel : 'Day detail'}
-            description="Read-only heatmap of finalized colors."
+            description="Read-only heatmap of finalized colors and probe pathways."
           >
             {!selected || selected.cells.length === 0 ? (
               <EmptyState
@@ -92,28 +223,318 @@ export function TeacherArchivePage() {
                 description="This day has no finalized observations yet."
               />
             ) : (
-              <div className="archive-heat" role="list" aria-label="Result map">
-                {selected.cells.map((cell) => (
-                  <div
-                    key={`${cell.sessionQuestionId}-${cell.learnerUserId}`}
-                    className={`archive-heat-cell is-${cell.color ?? 'empty'}`}
-                    role="listitem"
-                    title={`Q${cell.sequenceHint} · ${names.get(cell.learnerUserId) ?? 'Learner'} · ${
-                      cell.color ?? 'none'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="archive-heat-q">Q{cell.sequenceHint}</span>
-                      <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: cell.color === 'red' ? '#ef4444' : cell.color === 'yellow' ? '#f97316' : cell.color === 'green' ? '#22c55e' : cell.color === 'purple' ? '#a855f7' : '#cbd5e1' }} />
+              <div>
+                {/* Day Overview Summary Strip */}
+                <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-3xs mb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 mb-3 border-b border-slate-100">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-base font-bold text-slate-900 tracking-tight m-0">
+                          {selected.dayLabel}
+                        </h3>
+                        <span className="text-xs text-slate-300">·</span>
+                        <span className="text-xs font-medium text-slate-500">
+                          {new Date(selected.learningSession.startedAt).toLocaleDateString([], {
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })}
+                        </span>
+                        <span
+                          className={`text-[9px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider border ${
+                            selected.learningSession.status === 'completed'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}
+                        >
+                          {selected.learningSession.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Started at{' '}
+                        {new Date(selected.learningSession.startedAt).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </p>
                     </div>
-                    <span className="archive-heat-name">
-                      {names.get(cell.learnerUserId) ?? 'Learner'}
-                    </span>
-                    <span className="archive-heat-color" style={{ color: cell.color === 'red' ? '#ef4444' : cell.color === 'yellow' ? '#ca8a04' : cell.color === 'green' ? '#16a34a' : cell.color === 'purple' ? '#9333ea' : '#64748b' }}>
-                      {cell.color ?? 'empty'}
-                    </span>
+
+                    <div className="flex items-center gap-4 text-xs">
+                      <div className="text-right">
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">
+                          Finalized
+                        </span>
+                        <strong className="text-slate-900 text-sm font-mono">
+                          {selected.resultCount}
+                        </strong>
+                      </div>
+                      <div className="text-right border-l border-slate-100 pl-4">
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">
+                          Attendance
+                        </span>
+                        <strong className="text-slate-900 text-sm font-mono">
+                          {selected.attendancePresent}/{selected.attendanceTotal}
+                        </strong>
+                      </div>
+                      <div className="text-right border-l border-slate-100 pl-4">
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">
+                          Probed
+                        </span>
+                        <strong className="text-amber-600 text-sm font-mono">
+                          {filterCounts.probed}
+                        </strong>
+                      </div>
+                    </div>
                   </div>
-                ))}
+
+                  {/* 7-Color breakdown segmented bar */}
+                  <div>
+                    <div className="h-2 w-full flex overflow-hidden rounded-full bg-slate-100 border border-slate-200/80 mb-2.5">
+                      {SPECTRUM_COLORS.map((col) => {
+                        const count = dayColorCounts[col]
+                        if (count === 0) return null
+                        const pctVal = (count / selected.cells.length) * 100
+                        return (
+                          <div
+                            key={col}
+                            style={{ width: `${pctVal}%`, backgroundColor: COLOR_HEX[col] }}
+                            className="h-full transition-all"
+                            title={`${COLOR_LABELS[col]}: ${count} (${Math.round(pctVal)}%)`}
+                          />
+                        )
+                      })}
+                    </div>
+
+                    {/* Quick 7-color breakdown pill bar */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {SPECTRUM_COLORS.map((col) => {
+                        const count = dayColorCounts[col]
+                        const isFilterActive = colorFilter === col
+                        return (
+                          <button
+                            key={col}
+                            type="button"
+                            onClick={() => setColorFilter(isFilterActive ? 'all' : col)}
+                            className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold transition-all cursor-pointer border ${
+                              isFilterActive
+                                ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                                : count > 0
+                                  ? 'bg-slate-50 text-slate-700 border-slate-200/80 hover:bg-slate-100'
+                                  : 'bg-slate-50/40 text-slate-400 border-slate-200/40 opacity-50'
+                            }`}
+                            title={`Filter by ${COLOR_LABELS[col]}`}
+                          >
+                            <span
+                              className="h-1.5 w-1.5 rounded-full shrink-0"
+                              style={{ backgroundColor: COLOR_HEX[col] }}
+                            />
+                            <span>{COLOR_LABELS[col]}</span>
+                            <span
+                              className={`font-mono text-[10px] ${
+                                isFilterActive ? 'text-slate-300' : 'text-slate-500'
+                              }`}
+                            >
+                              {count}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Filters: Learner Name Search + Filter Chips */}
+                <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-xl border border-slate-200/80 bg-white shadow-3xs">
+                  <div
+                    className="flex flex-wrap items-center gap-1.5"
+                    role="group"
+                    aria-label="Question filters"
+                  >
+                    <button
+                      type="button"
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+                        colorFilter === 'all'
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                      onClick={() => setColorFilter('all')}
+                    >
+                      All ({filterCounts.all})
+                    </button>
+                    <button
+                      type="button"
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+                        colorFilter === 'red'
+                          ? 'bg-red-600 text-white border-red-600 shadow-xs'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                      onClick={() => setColorFilter(colorFilter === 'red' ? 'all' : 'red')}
+                    >
+                      <span className="mr-1">🔴</span>
+                      Red ({filterCounts.red})
+                    </button>
+                    <button
+                      type="button"
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+                        colorFilter === 'yellow'
+                          ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                      onClick={() => setColorFilter(colorFilter === 'yellow' ? 'all' : 'yellow')}
+                    >
+                      <span className="mr-1">🟡</span>
+                      Yellow ({filterCounts.yellow})
+                    </button>
+                    <button
+                      type="button"
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+                        colorFilter === 'green'
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                      onClick={() => setColorFilter(colorFilter === 'green' ? 'all' : 'green')}
+                    >
+                      <span className="mr-1">🟢</span>
+                      Green ({filterCounts.green})
+                    </button>
+                    <button
+                      type="button"
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+                        colorFilter === 'purple'
+                          ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                      onClick={() => setColorFilter(colorFilter === 'purple' ? 'all' : 'purple')}
+                    >
+                      <span className="mr-1">🟣</span>
+                      Purple ({filterCounts.purple})
+                    </button>
+                    <button
+                      type="button"
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+                        colorFilter === 'probed'
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                      onClick={() => setColorFilter(colorFilter === 'probed' ? 'all' : 'probed')}
+                    >
+                      <span className="mr-1">🔍</span>
+                      Probed Only ({filterCounts.probed})
+                    </button>
+                  </div>
+
+                  <div className="relative min-w-[200px]">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Filter by learner name..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-7 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-3xs"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Heatmap / Question Cards */}
+                {filteredCells.length === 0 ? (
+                  <div className="rounded-xl border border-slate-200/80 bg-white p-8 text-center shadow-3xs">
+                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-400 mb-3">
+                      <Filter className="h-5 w-5" />
+                    </div>
+                    <h4 className="text-sm font-bold text-slate-800 mb-1">
+                      No matching observations found
+                    </h4>
+                    <p className="text-xs text-slate-500 mb-4 max-w-sm mx-auto">
+                      No observations match your current search query or color filter.
+                    </p>
+                    <button
+                      type="button"
+                      className="btn secondary text-xs px-3 py-1.5"
+                      onClick={() => {
+                        setSearchQuery('')
+                        setColorFilter('all')
+                      }}
+                    >
+                      Reset filters
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3"
+                    role="list"
+                    aria-label="Result map"
+                  >
+                    {filteredCells.map((cell) => {
+                      const learnerName = names.get(cell.learnerUserId) ?? 'Learner'
+                      const learnerUser = roster.users.find((u) => u.id === cell.learnerUserId)
+                      const pillStyle = cell.color ? COLOR_PILL_STYLES[cell.color] : null
+
+                      return (
+                        <div
+                          key={`${cell.sessionQuestionId}-${cell.learnerUserId}`}
+                          className="rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-3xs hover:border-slate-300 hover:shadow-2xs transition-all flex flex-col justify-between gap-3 group"
+                          role="listitem"
+                        >
+                          {/* Top: Question Sequence & Badges */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-md">
+                                Q{cell.sequenceHint}
+                              </span>
+                              {cell.enteredProbeFlow && (
+                                <span
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200"
+                                  title={`Probe event depth: ${cell.probeEventCount}`}
+                                >
+                                  <Zap className="h-2.5 w-2.5" />
+                                  <span>Probe x{cell.probeEventCount}</span>
+                                </span>
+                              )}
+                            </div>
+
+                            {cell.color && pillStyle ? (
+                              <span
+                                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${pillStyle.bg} ${pillStyle.text} border ${pillStyle.border}`}
+                              >
+                                <span className={`h-1.5 w-1.5 rounded-full ${pillStyle.dot}`} />
+                                <span className="capitalize">{COLOR_LABELS[cell.color]}</span>
+                              </span>
+                            ) : (
+                              <span className="text-xs text-slate-400 italic">No color</span>
+                            )}
+                          </div>
+
+                          {/* Bottom: Learner Identity */}
+                          <div className="flex items-center gap-2.5 pt-2 border-t border-slate-100">
+                            <UserAvatar
+                              name={learnerName}
+                              avatarUrl={learnerUser?.avatarUrl}
+                              size="sm"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="font-bold text-xs text-slate-800 truncate group-hover:text-indigo-600 transition-colors">
+                                {learnerName}
+                              </p>
+                              <p className="text-[10px] text-slate-400 font-mono truncate">
+                                {cell.learnerUserId.slice(0, 8)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </Panel>

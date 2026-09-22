@@ -140,7 +140,7 @@ function MiniSpectrumBar({
   className?: string
 }) {
   if (total === 0) {
-    return <div className={`${className} bg-white/5 rounded-full`} />
+    return <div className={`${className} bg-slate-100 rounded-full border border-slate-200/60`} />
   }
 
   const title = SPECTRUM_COLORS.map(
@@ -149,7 +149,7 @@ function MiniSpectrumBar({
 
   return (
     <div
-      className={`flex overflow-hidden rounded-full bg-slate-900 border border-white/10 ${className}`}
+      className={`flex overflow-hidden rounded-full bg-slate-100 border border-slate-200/80 ${className}`}
       title={title}
     >
       {SPECTRUM_COLORS.map((c) => {
@@ -233,34 +233,34 @@ function getSessionStatusBadge(metrics: Partial<Record<MetricKey, number | null>
   if (rac == null || rfc == null) {
     return {
       label: 'Pending',
-      className: 'bg-slate-800 text-slate-400 border border-white/5',
+      className: 'bg-slate-100 text-slate-600 border border-slate-200',
     }
   }
   // Mastery: %c >= 75% & RFC < 20%
   if (rac >= 0.75 && rfc < 0.20) {
     return {
       label: 'Mastery',
-      className: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
+      className: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
     }
   }
   // Needs Attention: RFC >= 30%
   if (rfc >= 0.30) {
     return {
       label: 'Needs Attention',
-      className: 'bg-rose-500/15 text-rose-300 border border-rose-500/30',
+      className: 'bg-rose-50 text-rose-700 border border-rose-200',
     }
   }
   // Steady: %c >= 50%
   if (rac >= 0.50) {
     return {
       label: 'Steady',
-      className: 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30',
+      className: 'bg-indigo-50 text-indigo-700 border border-indigo-200',
     }
   }
   // Developing
   return {
     label: 'Developing',
-    className: 'bg-amber-500/15 text-amber-300 border border-amber-500/30',
+    className: 'bg-amber-50 text-amber-700 border border-amber-200',
   }
 }
 
@@ -272,7 +272,7 @@ function getLearnerStatus(
   if (count === 0) {
     return {
       label: 'No Data',
-      className: 'bg-slate-800 text-slate-400 border border-white/5',
+      className: 'bg-slate-100 text-slate-600 border border-slate-200',
     }
   }
   const percentC = rac != null ? rac * 100 : null
@@ -281,18 +281,18 @@ function getLearnerStatus(
   if (percentC != null && percentC >= 75 && (rfcVal == null || rfcVal < 20)) {
     return {
       label: 'High Mastery',
-      className: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
+      className: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
     }
   }
   if (rfcVal != null && rfcVal >= 30) {
     return {
       label: 'Needs Focus',
-      className: 'bg-rose-500/15 text-rose-300 border border-rose-500/30',
+      className: 'bg-rose-50 text-rose-700 border border-rose-200',
     }
   }
   return {
     label: 'Steady',
-    className: 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30',
+    className: 'bg-indigo-50 text-indigo-700 border border-indigo-200',
   }
 }
 
@@ -485,7 +485,6 @@ export function ProgressAnalysisView({
 
   const counts = colorCounts(windowRecords)
   const total = windowRecords.length
-  const maxBar = Math.max(1, ...Object.values(counts))
 
   const pieData = useMemo(() => {
     return SPECTRUM_COLORS.map((color) => ({
@@ -782,9 +781,9 @@ export function ProgressAnalysisView({
       return {
         title: 'Mastery Trajectory',
         description: 'Cohort demonstrating strong chunk mastery',
-        stripClass: 'bg-emerald-950/20 border-emerald-500/20',
-        badgeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-        iconClass: 'bg-emerald-500/10 text-emerald-400',
+        stripClass: 'bg-emerald-50/70 border-emerald-200/80 text-emerald-950',
+        badgeClass: 'bg-emerald-100/80 text-emerald-800 border-emerald-300',
+        iconClass: 'bg-emerald-100 text-emerald-700',
         icon: CheckCircle2,
       }
     }
@@ -792,18 +791,18 @@ export function ProgressAnalysisView({
       return {
         title: 'Struggle Attention',
         description: 'High difficulty detected, review recommended',
-        stripClass: 'bg-rose-950/20 border-rose-500/20',
-        badgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
-        iconClass: 'bg-rose-500/10 text-rose-400',
+        stripClass: 'bg-rose-50/70 border-rose-200/80 text-rose-950',
+        badgeClass: 'bg-rose-100/80 text-rose-800 border-rose-300',
+        iconClass: 'bg-rose-100 text-rose-700',
         icon: AlertTriangle,
       }
     }
     return {
       title: 'Steady Trajectory',
       description: 'Consistent progress across learning sessions',
-      stripClass: 'bg-indigo-950/20 border-indigo-500/20',
-      badgeClass: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
-      iconClass: 'bg-indigo-500/10 text-indigo-400',
+      stripClass: 'bg-indigo-50/50 border-indigo-200/80 text-indigo-950',
+      badgeClass: 'bg-indigo-100/80 text-indigo-800 border-indigo-300',
+      iconClass: 'bg-indigo-100 text-indigo-700',
       icon: Target,
     }
   }, [rac, rfc])
@@ -876,7 +875,7 @@ export function ProgressAnalysisView({
               <div className="relative">
                 <button
                   type="button"
-                  className="analysis-select flex items-center justify-between gap-2 text-left w-full min-w-[140px] px-3 py-1.5 rounded-lg border border-white/10 bg-slate-900 text-xs text-white cursor-pointer"
+                  className="analysis-select flex items-center justify-between gap-2 text-left w-full min-w-[140px] px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-800 cursor-pointer shadow-3xs hover:border-slate-300 transition-colors"
                   onClick={() => setWhoOpen((o) => !o)}
                 >
                   <span className="truncate">
@@ -891,11 +890,11 @@ export function ProgressAnalysisView({
                 {whoOpen && (
                   <>
                     <div className="fixed inset-0 z-30" onClick={() => setWhoOpen(false)} />
-                    <div className="absolute left-0 mt-1 z-40 w-56 rounded-xl border border-white/10 bg-slate-900 p-2 shadow-2xl">
-                      <div className="flex items-center justify-between border-b border-white/5 pb-1.5 mb-1.5 px-2">
+                    <div className="absolute left-0 mt-1 z-40 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-1.5 mb-1.5 px-2">
                         <button
                           type="button"
-                          className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold border-0 bg-transparent cursor-pointer"
+                          className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold border-0 bg-transparent cursor-pointer"
                           onClick={() => {
                             setSelectedLearnerIds([])
                             setWhoOpen(false)
@@ -905,7 +904,7 @@ export function ProgressAnalysisView({
                         </button>
                         <button
                           type="button"
-                          className="text-[10px] text-slate-400 hover:text-white font-semibold border-0 bg-transparent cursor-pointer"
+                          className="text-[10px] text-slate-500 hover:text-slate-800 font-semibold border-0 bg-transparent cursor-pointer"
                           onClick={() => setWhoOpen(false)}
                         >
                           Done
@@ -917,12 +916,12 @@ export function ProgressAnalysisView({
                           return (
                             <label
                               key={u.id}
-                              className="flex items-center gap-2 px-2 py-1 hover:bg-white/5 rounded-lg cursor-pointer text-xs text-slate-300 hover:text-white"
+                              className="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 rounded-lg cursor-pointer text-xs text-slate-700 hover:text-slate-900 transition-colors"
                             >
                               <input
                                 type="checkbox"
                                 checked={checked}
-                                className="rounded bg-slate-950 border-white/10 text-indigo-500 cursor-pointer"
+                                className="rounded border-slate-300 text-indigo-600 cursor-pointer"
                                 onChange={() => {
                                   setSelectedLearnerIds((prev) => {
                                     const next = prev.includes(u.id)
@@ -1016,7 +1015,7 @@ export function ProgressAnalysisView({
 
       {/* Focused learner strip */}
       {selectedLearnerIds.length > 1 ? (
-        <div className="analysis-person-strip flex items-center justify-between gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-xl">
+        <div className="analysis-person-strip flex items-center justify-between gap-3 p-3 bg-slate-50 border border-slate-200/80 rounded-xl">
           <div className="flex items-center gap-3">
             <div className="flex -space-x-2 overflow-hidden py-1">
               {selectedLearnerIds.slice(0, 3).map((id) => {
@@ -1027,21 +1026,21 @@ export function ProgressAnalysisView({
                     name={u?.displayName ?? ''}
                     avatarUrl={u?.avatarUrl}
                     size="sm"
-                    className="ring-2 ring-slate-950"
+                    className="ring-2 ring-white"
                   />
                 )
               })}
               {selectedLearnerIds.length > 3 && (
-                <div className="flex items-center justify-center h-8 w-8 rounded-full bg-slate-800 text-[10px] font-bold text-white ring-2 ring-slate-950">
+                <div className="flex items-center justify-center h-8 w-8 rounded-full bg-slate-200 text-[10px] font-bold text-slate-700 ring-2 ring-white">
                   +{selectedLearnerIds.length - 3}
                 </div>
               )}
             </div>
             <div className="analysis-person-copy">
-              <p className="analysis-person-name text-sm font-bold text-white">
+              <p className="analysis-person-name text-sm font-bold text-slate-900">
                 {selectedLearnerIds.length} Learners Selected
               </p>
-              <p className="meta text-xs text-slate-400">
+              <p className="meta text-xs text-slate-500">
                 {selectedLearnerIds
                   .map((id) => learners.find((x) => x.id === id)?.displayName)
                   .filter(Boolean)
@@ -1105,9 +1104,9 @@ export function ProgressAnalysisView({
               <p className="stat-label flex items-center gap-1">
                 <Activity className="h-3.5 w-3.5" aria-hidden />
                 <span>Struggle (RFC)</span>
-                <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
+                <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-600">
                   <Info className="h-3.5 w-3.5" />
-                  <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
+                  <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-900 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 border border-slate-800 text-left normal-case">
                     <strong>Struggle (RFC)</strong> = (Red + Orange) ÷ finalized sample. Lower RFC is better. Source: assessment ledger only (no mock).
                   </span>
                 </span>
@@ -1126,9 +1125,9 @@ export function ProgressAnalysisView({
             <div className={`stat-card analysis-kpi-rac${racTone === 'up' ? ' is-good' : racTone === 'down' ? ' is-warn' : ''}`}>
               <p className="stat-label flex items-center gap-1">
                 <span>Success (%c)</span>
-                <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
+                <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-600">
                   <Info className="h-3.5 w-3.5" />
-                  <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
+                  <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-900 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 border border-slate-800 text-left normal-case">
                     <strong>Success (%c)</strong> = Avg %x: mean normalized 7-color spectrum factor over N_total (Red 0%, Orange 17%, Yellow 34%, Green 50%, Blue 67%, Indigo 84%, Purple 100%). Higher %c is better. (Legacy RAC = cool records / N_total).
                   </span>
                 </span>
@@ -1147,9 +1146,9 @@ export function ProgressAnalysisView({
             <div className="stat-card">
               <p className="stat-label flex items-center gap-1">
                 <span>Results</span>
-                <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
+                <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-600">
                   <Info className="h-3.5 w-3.5" />
-                  <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
+                  <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-900 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 border border-slate-800 text-left normal-case">
                     <strong>Finalized Results</strong> = total finalized attempts in the window (sample size). Each question contributes 1 primary result; probe steps generate additional observations in N_total.
                   </span>
                 </span>
@@ -1163,7 +1162,7 @@ export function ProgressAnalysisView({
 
           {/* Cohort Health & Trajectory Insight Badge/Strip */}
           <div
-            className={`mt-4 p-3.5 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${trajectoryConfig.stripClass}`}
+            className={`mt-4 p-3.5 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-3xs ${trajectoryConfig.stripClass}`}
           >
             <div className="flex items-center gap-3">
               <div className={`p-2 rounded-lg ${trajectoryConfig.iconClass}`}>
@@ -1176,16 +1175,16 @@ export function ProgressAnalysisView({
                   >
                     {trajectoryConfig.title}
                   </span>
-                  <span className="text-xs text-slate-300 font-medium">
+                  <span className="text-xs text-slate-700 font-medium">
                     {trajectoryConfig.description}
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400 mt-0.5">
+                <p className="text-[11px] text-slate-500 mt-0.5">
                   Current %c:{' '}
-                  <strong className="text-slate-200">{rac ? formatMetricValue(rac) : '—'}</strong>
+                  <strong className="text-slate-800">{rac ? formatMetricValue(rac) : '—'}</strong>
                   {' · '}
                   RFC:{' '}
-                  <strong className="text-slate-200">{rfc ? formatMetricValue(rfc) : '—'}</strong>
+                  <strong className="text-slate-800">{rfc ? formatMetricValue(rfc) : '—'}</strong>
                   {racDelta != null && (
                     <>
                       {' · '}
@@ -1193,10 +1192,10 @@ export function ProgressAnalysisView({
                       <strong
                         className={
                           racTone === 'up'
-                            ? 'text-emerald-400'
+                            ? 'text-emerald-600'
                             : racTone === 'down'
-                              ? 'text-rose-400'
-                              : 'text-slate-300'
+                              ? 'text-rose-600'
+                              : 'text-slate-700'
                         }
                       >
                         {formatDelta('rac', racDelta)}
@@ -1210,10 +1209,10 @@ export function ProgressAnalysisView({
                       <strong
                         className={
                           rfcTone === 'up'
-                            ? 'text-emerald-400'
+                            ? 'text-emerald-600'
                             : rfcTone === 'down'
-                              ? 'text-rose-400'
-                              : 'text-slate-300'
+                              ? 'text-rose-600'
+                              : 'text-slate-700'
                         }
                       >
                         {formatDelta('rfc', rfcDelta)}
@@ -1223,229 +1222,280 @@ export function ProgressAnalysisView({
                 </p>
               </div>
             </div>
-            <div className="text-[11px] font-mono text-slate-400 shrink-0 self-end sm:self-center">
-              Cohort Health: <span className="text-white font-semibold">{total} samples evaluated</span>
+            <div className="text-[11px] font-mono text-slate-500 shrink-0 self-end sm:self-center">
+              Cohort Health: <span className="text-slate-800 font-semibold">{total} samples evaluated</span>
             </div>
           </div>
 
-          {/* Bento-style layout for Chunks Number metrics */}
-          <div className="my-6">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                <Zap className="h-3.5 w-3.5 text-amber-400" />
-                <span>Chunks Number Metrics</span>
-                <span className="text-[10px] text-slate-500 font-normal lowercase">(from finalized ledger)</span>
-              </h3>
+          {/* Streamlined Chunks Number Summary Strip */}
+          <div className="mt-4 rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-3xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-50 text-amber-600 border border-amber-200/60">
+                  <Zap className="h-3.5 w-3.5" />
+                </span>
+                <span className="text-xs font-bold text-slate-900 tracking-tight">Chunks Number Indicators</span>
+                <span className="text-[11px] text-slate-400 font-normal">(from finalized ledger)</span>
+              </div>
+              <span className="text-[11px] text-slate-500">
+                Green (2) entries evaluated: <strong className="text-slate-800 font-semibold">{probeStats.count}</strong> / {total}
+              </span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {/* Card 1: Chunks Count */}
-              <div className="p-4 rounded-xl bg-slate-900/60 border border-white/10 hover:border-indigo-500/30 transition-all flex flex-col justify-between group">
-                <div className="flex items-start justify-between">
-                  <span className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+              {/* Metric 1: chunks count */}
+              <div className="py-2 sm:py-0 sm:px-3 first:pl-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
                     <span>chunks count</span>
-                    <span className="group/tooltip relative inline-block cursor-help text-slate-500 hover:text-slate-300">
-                      <Info className="h-3.5 w-3.5" />
-                      <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-60 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover/tooltip:opacity-100 border border-white/10 text-left normal-case">
+                    <span className="group/tooltip relative inline-block cursor-help text-slate-400 hover:text-slate-600">
+                      <Info className="h-3 w-3" />
+                      <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 rounded-lg bg-slate-900 p-2 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-xl transition-opacity group-hover/tooltip:opacity-100 text-left normal-case">
                         <strong>chunks count</strong> = number of times the teacher selected Green (2). Values use real observations only.
                       </span>
                     </span>
                   </span>
-                  <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 group-hover:scale-105 transition-transform">
-                    <Target className="h-4 w-4" />
-                  </div>
+                  <span className="text-[11px] font-mono font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60">Green (2)</span>
                 </div>
-                <div className="mt-3">
-                  <div className="text-2xl font-black text-white font-mono tracking-tight">
+                <div className="mt-1.5 flex items-baseline gap-2">
+                  <span className="text-xl font-black font-mono text-slate-900 tracking-tight">
                     {probeStats.count}
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Green (2) entries · sample={total}
-                  </p>
+                  </span>
+                  <span className="text-[11px] text-slate-400 font-mono">sample={total}</span>
                 </div>
               </div>
 
-              {/* Card 2: Avg Chunks Number */}
-              <div className="p-4 rounded-xl bg-slate-900/60 border border-white/10 hover:border-indigo-500/30 transition-all flex flex-col justify-between group">
-                <div className="flex items-start justify-between">
-                  <span className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+              {/* Metric 2: avg chunks number */}
+              <div className="py-2 sm:py-0 sm:px-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
                     <span>avg chunks number</span>
-                    <span className="group/tooltip relative inline-block cursor-help text-slate-500 hover:text-slate-300">
-                      <Info className="h-3.5 w-3.5" />
-                      <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-60 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover/tooltip:opacity-100 border border-white/10 text-left normal-case">
-                        <strong>avg chunks number</strong> = mean chunks number on probed questions. Green opens at 1; each Continue adds 1. Example: Green + Continue ×8 + Done → chunks number 9.
+                    <span className="group/tooltip relative inline-block cursor-help text-slate-400 hover:text-slate-600">
+                      <Info className="h-3 w-3" />
+                      <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 rounded-lg bg-slate-900 p-2 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-xl transition-opacity group-hover/tooltip:opacity-100 text-left normal-case">
+                        <strong>avg chunks number</strong> = mean chunks number on probed questions. Green opens at 1; each Continue adds 1.
                       </span>
                     </span>
                   </span>
-                  <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400 group-hover:scale-105 transition-transform">
-                    <TrendingUp className="h-4 w-4" />
-                  </div>
+                  <span className="text-[11px] font-mono font-semibold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200/60">Mean</span>
                 </div>
-                <div className="mt-3">
-                  <div className="text-2xl font-black text-white font-mono tracking-tight">
+                <div className="mt-1.5 flex items-baseline gap-2">
+                  <span className="text-xl font-black font-mono text-slate-900 tracking-tight">
                     {probeStats.count > 0 ? probeStats.avg.toFixed(1) : '—'}
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Mean chunks number on probed Qs
-                  </p>
+                  </span>
+                  <span className="text-[11px] text-slate-400">per probed Q</span>
                 </div>
               </div>
 
-              {/* Card 3: Max Chunks Number */}
-              <div className="p-4 rounded-xl bg-slate-900/60 border border-white/10 hover:border-indigo-500/30 transition-all flex flex-col justify-between group">
-                <div className="flex items-start justify-between">
-                  <span className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+              {/* Metric 3: max chunks number */}
+              <div className="py-2 sm:py-0 sm:px-3 last:pr-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
                     <span>max chunks number</span>
-                    <span className="group/tooltip relative inline-block cursor-help text-slate-500 hover:text-slate-300">
-                      <Info className="h-3.5 w-3.5" />
-                      <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-60 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover/tooltip:opacity-100 border border-white/10 text-left normal-case">
-                        <strong>max chunks number</strong> = maximum observed chunks number on one question (not session ceiling). Green opens at 1; each Continue adds 1. Example: Green + Continue ×8 + Done → chunks number 9.
+                    <span className="group/tooltip relative inline-block cursor-help text-slate-400 hover:text-slate-600">
+                      <Info className="h-3 w-3" />
+                      <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 rounded-lg bg-slate-900 p-2 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-xl transition-opacity group-hover/tooltip:opacity-100 text-left normal-case">
+                        <strong>max chunks number</strong> = maximum observed chunks number on one question.
                       </span>
                     </span>
                   </span>
-                  <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400 group-hover:scale-105 transition-transform">
-                    <Zap className="h-4 w-4" />
-                  </div>
+                  <span className="text-[11px] font-mono font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/60">Peak</span>
                 </div>
-                <div className="mt-3">
-                  <div className="text-2xl font-black text-white font-mono tracking-tight">
+                <div className="mt-1.5 flex items-baseline gap-2">
+                  <span className="text-xl font-black font-mono text-slate-900 tracking-tight">
                     {probeStats.count > 0 ? probeStats.max : '—'}
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Peak observed chunks number
-                  </p>
+                  </span>
+                  <span className="text-[11px] text-slate-400">ceiling observed</span>
                 </div>
               </div>
             </div>
           </div>
 
+          {/* Collapsible Additional Indicators */}
           {additionalMetrics.length > 0 && (
-            <div className="analysis-additional-section" style={{ marginTop: 24, marginBottom: 24 }}>
-              <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
-                Additional Indicators (Customized by Admin)
-              </h3>
-              <div className="stat-grid" style={{ marginBottom: 24 }}>
-                {additionalMetrics.map((item) => {
-                  const valStr = formatMetricValue(item.obs)
-                  const delta = item.delta
-                  const tone =
-                    delta == null || Math.abs(delta) < 0.05
-                      ? ('flat' as const)
-                      : ['purple_mastery_rate', 'awareness_recovery', 'focus_stability'].includes(
-                            item.key,
-                          )
-                        ? delta > 0
-                          ? ('up' as const)
-                          : ('down' as const)
-                        : ('flat' as const)
+            <details className="mt-4 rounded-xl border border-slate-200/80 bg-white shadow-3xs overflow-hidden group">
+              <summary className="flex items-center justify-between px-3.5 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50/50 cursor-pointer list-none select-none transition-colors">
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-400 group-open:rotate-90 transition-transform text-xs inline-block">▶</span>
+                  <span>More indicators (Customized by Admin)</span>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                    {additionalMetrics.length}
+                  </span>
+                </div>
+                <span className="text-[11px] text-slate-400 font-normal">Click to expand</span>
+              </summary>
+              <div className="p-3.5 pt-1 border-t border-slate-100 bg-slate-50/30">
+                <div className="stat-grid">
+                  {additionalMetrics.map((item) => {
+                    const valStr = formatMetricValue(item.obs)
+                    const delta = item.delta
+                    const tone =
+                      delta == null || Math.abs(delta) < 0.05
+                        ? ('flat' as const)
+                        : ['purple_mastery_rate', 'awareness_recovery', 'focus_stability'].includes(
+                              item.key,
+                            )
+                          ? delta > 0
+                            ? ('up' as const)
+                            : ('down' as const)
+                          : ('flat' as const)
 
-                  return (
-                    <div key={item.key} className="stat-card" title={item.definition}>
-                      <p className="stat-label">{item.label}</p>
-                      <p className="stat-value">{valStr}</p>
-                      <p className={`analysis-delta is-${tone}`}>
-                        {tone === 'up' ? (
-                          <TrendingUp className="h-3.5 w-3.5" aria-hidden />
-                        ) : tone === 'down' ? (
-                          <TrendingDown className="h-3.5 w-3.5" aria-hidden />
-                        ) : null}
-                        {formatDelta(item.key, delta)}
-                        <span className="analysis-delta-note"> vs prior window</span>
-                      </p>
-                    </div>
-                  )
-                })}
+                    return (
+                      <div key={item.key} className="stat-card" title={item.definition}>
+                        <p className="stat-label">{item.label}</p>
+                        <p className="stat-value">{valStr}</p>
+                        <p className={`analysis-delta is-${tone}`}>
+                          {tone === 'up' ? (
+                            <TrendingUp className="h-3.5 w-3.5" aria-hidden />
+                          ) : tone === 'down' ? (
+                            <TrendingDown className="h-3.5 w-3.5" aria-hidden />
+                          ) : null}
+                          {formatDelta(item.key, delta)}
+                          <span className="analysis-delta-note"> vs prior window</span>
+                        </p>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
+            </details>
           )}
 
-          <div className="analysis-grid">
+          {/* ——— Color mix & Recent days snapshot (Streamlined) ——— */}
+          <div className="analysis-grid mt-4">
+            {/* Color Mix Panel */}
             <div className="panel">
               <div className="panel-body-inner">
-                <p className="panel-title mb-2">Color mix</p>
-                <p className="meta" style={{ marginTop: 0 }}>
-                  Finalized results in current filter · sample={total}
-                  {total > 0
-                    ? ` · R${counts.red} O${counts.orange} Y${counts.yellow} G${counts.green} B${counts.blue} I${counts.indigo} P${counts.purple}`
-                    : ''}
+                <div className="flex items-center justify-between mb-2">
+                  <p className="panel-title m-0">Color mix</p>
+                  <span className="text-xs text-slate-500 font-medium">
+                    sample={total}
+                  </span>
+                </div>
+                <p className="meta mb-3" style={{ marginTop: 0 }}>
+                  7-color spectrum distribution across finalized results
                 </p>
+
                 {total === 0 ? (
                   <p className="meta">No data in this filter.</p>
                 ) : (
-                  <div className="flex flex-col sm:flex-row gap-6 items-center w-full">
-                    <div className="dist-bars flex-1 w-full">
+                  <div>
+                    {/* Continuous segmented spectrum bar */}
+                    <div className="h-3 w-full flex overflow-hidden rounded-full bg-slate-100 border border-slate-200/80 mb-4">
                       {SPECTRUM_COLORS.map((color) => {
                         const n = counts[color]
-                        const p = pct(n, total)
-                        const width = `${Math.max(n ? 8 : 0, (n / Math.max(maxBar, 1)) * 100)}%`
+                        if (n === 0) return null
+                        const percentage = (n / total) * 100
                         return (
-                          <div key={color} className="dist-row">
-                            <span className={`capture-dot ${color}`}>{resultColorLabel(color)}</span>
-                            <div className="dist-track">
-                              <div className={`dist-fill dist-${color}`} style={{ width }} />
-                            </div>
-                            <span className="dist-count">
-                              {n} · {p}%
-                            </span>
-                          </div>
+                          <div
+                            key={color}
+                            style={{
+                              width: `${percentage}%`,
+                              backgroundColor: COLOR_HEX[color],
+                            }}
+                            className="h-full transition-all"
+                            title={`${COLOR_LABELS[color]}: ${n} (${pct(n, total)}%)`}
+                          />
                         )
                       })}
                     </div>
-                    {pieData.length > 0 && (
-                      <div className="flex-shrink-0" style={{ width: 140, height: 140 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Tooltip
-                              content={({ active, payload }) => {
-                                if (active && payload && payload.length) {
-                                  const item = payload[0].payload
-                                  const p = pct(item.value, total)
-                                  return (
-                                    <div className="rounded-lg border border-white/10 bg-slate-950 p-2 text-xs shadow-xl pointer-events-none z-50">
-                                      <div className="flex items-center gap-1.5 font-semibold text-white">
-                                        <span
-                                          className="inline-block h-2 w-2 rounded-full"
-                                          style={{ backgroundColor: item.color }}
-                                        />
-                                        <span>{item.name}</span>
-                                      </div>
-                                      <p className="mt-1 text-slate-300 font-mono text-[11px]">
-                                        {item.value} {item.value === 1 ? 'record' : 'records'} · {p}%
-                                      </p>
-                                    </div>
-                                  )
-                                }
-                                return null
-                              }}
-                            />
-                            <Pie
-                              data={pieData}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={30}
-                              outerRadius={55}
-                              paddingAngle={3}
-                              dataKey="value"
+
+                    <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+                      {/* Compact color pills grid */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 flex-1 w-full">
+                        {SPECTRUM_COLORS.map((color) => {
+                          const n = counts[color]
+                          const p = pct(n, total)
+                          return (
+                            <div
+                              key={color}
+                              className="flex items-center justify-between px-2 py-1 rounded-lg bg-slate-50 border border-slate-200/60 text-xs"
                             >
-                              {pieData.map((entry) => (
-                                <Cell key={`cell-${entry.colorKey}`} fill={entry.color} />
-                              ))}
-                            </Pie>
-                          </PieChart>
-                        </ResponsiveContainer>
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  className="h-2 w-2 rounded-full shrink-0"
+                                  style={{ backgroundColor: COLOR_HEX[color] }}
+                                />
+                                <span className="font-medium text-slate-700">
+                                  {COLOR_LABELS[color]}
+                                </span>
+                              </div>
+                              <span className="font-mono text-[11px] font-semibold text-slate-500">
+                                {n} <span className="text-slate-400 font-normal">({p}%)</span>
+                              </span>
+                            </div>
+                          )
+                        })}
                       </div>
-                    )}
+
+                      {/* Donut Chart */}
+                      {pieData.length > 0 && (
+                        <div className="flex-shrink-0" style={{ width: 130, height: 130 }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (active && payload && payload.length) {
+                                    const item = payload[0].payload
+                                    const p = pct(item.value, total)
+                                    return (
+                                      <div className="rounded-xl border border-slate-200 bg-white p-2.5 text-xs shadow-lg pointer-events-none z-50">
+                                        <div className="flex items-center gap-1.5 font-semibold text-slate-800">
+                                          <span
+                                            className="inline-block h-2 w-2 rounded-full"
+                                            style={{ backgroundColor: item.color }}
+                                          />
+                                          <span>{item.name}</span>
+                                        </div>
+                                        <p className="mt-1 text-slate-600 font-mono text-[11px]">
+                                          {item.value} {item.value === 1 ? 'record' : 'records'} · {p}%
+                                        </p>
+                                      </div>
+                                    )
+                                  }
+                                  return null
+                                }}
+                              />
+                              <Pie
+                                data={pieData}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={28}
+                                outerRadius={50}
+                                paddingAngle={3}
+                                dataKey="value"
+                              >
+                                {pieData.map((entry) => (
+                                  <Cell key={`cell-${entry.colorKey}`} fill={entry.color} />
+                                ))}
+                              </Pie>
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
             </div>
 
+            {/* Recent Days Snapshot Panel */}
             <div className="panel">
               <div className="panel-body-inner">
-                <p className="panel-title mb-2">Recent days snapshot</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="panel-title m-0">Recent days snapshot</p>
+                  <span className="text-xs text-slate-500 font-medium">
+                    Last {Math.min(5, sessionSeries.length)} days
+                  </span>
+                </div>
+                <p className="meta mb-3" style={{ marginTop: 0 }}>
+                  Quick session performance and RFC trajectory
+                </p>
+
                 {sessionSeries.length === 0 ? (
                   <p className="meta">No per-day series yet.</p>
                 ) : (
-                  <ul className="analysis-session-mini">
+                  <ul className="flex flex-col gap-1.5 list-none m-0 p-0">
                     {sessionSeries.slice(-5).map((p, idx, arr) => {
                       const globalIdx = sessionSeries.length - arr.length + idx
                       const dRfc = sessionRfcDelta(sessionSeries, globalIdx)
@@ -1458,51 +1508,54 @@ export function ProgressAnalysisView({
                         <li key={p.learningSessionId}>
                           <button
                             type="button"
-                            className="analysis-session-mini-row"
+                            className="flex w-full items-center justify-between gap-3 px-3 py-2 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50/80 transition-all text-slate-800 shadow-3xs cursor-pointer group"
                             onClick={() => {
                               setKind('session')
                               setSessionId(p.learningSessionId)
                               setTab('overview')
                             }}
                           >
-                            <span className="analysis-session-mini-day">
+                            <span className="font-bold text-xs text-slate-800 flex items-center gap-1.5">
+                              <CalendarDays className="h-3.5 w-3.5 text-slate-400 group-hover:text-indigo-600 transition-colors" />
                               {sessionLabel(p.sessionNumber, p.startedAt, totalDays)}
                             </span>
-                            <MiniSpectrumBar
-                              counts={sessionData.counts}
-                              total={sessionData.total}
-                              className="w-16 sm:w-20 h-2 shrink-0"
-                            />
-                            <span className="analysis-session-mini-rfc">
-                              RFC{' '}
-                              {p.metrics.rfc != null
-                                ? `${(p.metrics.rfc * 100).toFixed(0)}%`
-                                : '—'}
-                            </span>
-                            <span className={`analysis-delta is-${tone}`}>
-                              {formatPp(dRfc)}
-                            </span>
-                            <ChevronRight className="h-4 w-4 text-slate-400" aria-hidden />
+                            <div className="flex items-center gap-2.5">
+                              <MiniSpectrumBar
+                                counts={sessionData.counts}
+                                total={sessionData.total}
+                                className="w-16 sm:w-20 h-2 shrink-0"
+                              />
+                              <span className="font-mono text-xs font-semibold text-slate-700 w-14 text-right">
+                                RFC {p.metrics.rfc != null ? `${(p.metrics.rfc * 100).toFixed(0)}%` : '—'}
+                              </span>
+                              <span className={`analysis-delta is-${tone} text-xs shrink-0 w-16 text-right`}>
+                                {formatPp(dRfc)}
+                              </span>
+                              <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-slate-600 transition-colors" aria-hidden />
+                            </div>
                           </button>
                         </li>
                       )
                     })}
                   </ul>
                 )}
-                <div className="analysis-link-row">
+
+                <div className="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2">
                   <button
                     type="button"
-                    className="ghost analysis-link-btn"
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer border-0 bg-transparent p-0"
                     onClick={() => setTab('sessions')}
                   >
-                    Full day-by-day →
+                    <span>Full day-by-day</span>
+                    <ChevronRight className="h-3 w-3" />
                   </button>
                   <button
                     type="button"
-                    className="ghost analysis-link-btn"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border border-indigo-200 bg-indigo-50/70 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-colors cursor-pointer shadow-3xs"
                     onClick={() => setTab('charts')}
                   >
-                    Open charts →
+                    <Activity className="h-3.5 w-3.5" />
+                    <span>Open charts workbench →</span>
                   </button>
                 </div>
               </div>
@@ -1533,14 +1586,14 @@ export function ProgressAnalysisView({
       {/* ——— By day (session series + Δ RFC) ——— */}
       {tab === 'sessions' && (
         <div className="analysis-tab-body">
-          <div className="analysis-columns-selector mb-3 border border-white/5 bg-white/[0.02] rounded-xl p-3">
+          <div className="analysis-columns-selector mb-3 border border-slate-200/80 bg-white rounded-xl p-3 shadow-3xs">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                <CalendarDays className="h-3.5 w-3.5 text-indigo-400" />
+              <span className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                <CalendarDays className="h-3.5 w-3.5 text-indigo-600" />
                 <span>Table Columns ({visibleDayColumns.length} active)</span>
-                <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-200">
+                <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-600">
                   <Info className="h-3.5 w-3.5" />
-                  <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-950 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-2xl transition-opacity group-hover:opacity-100 border border-white/10 text-left normal-case">
+                  <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-900 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 border border-slate-800 text-left normal-case">
                     Each row is one live day from the <strong>finalized ledger</strong> (no mock).
                     <br />
                     <strong>RFC</strong> = (Red+Orange) / sample. <strong>Δ RFC</strong> = change vs previous day (negative pp = improvement).
@@ -1549,7 +1602,7 @@ export function ProgressAnalysisView({
               </span>
               <button
                 type="button"
-                className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold border-0 bg-transparent cursor-pointer flex items-center gap-0.5"
+                className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold border-0 bg-transparent cursor-pointer flex items-center gap-0.5"
                 onClick={() => setColumnsPanelOpen(!columnsPanelOpen)}
               >
                 {columnsPanelOpen ? 'Hide columns config' : 'Show columns config'}
@@ -1557,7 +1610,7 @@ export function ProgressAnalysisView({
               </button>
             </div>
             {columnsPanelOpen && (
-              <div className="mt-2.5 pt-2.5 border-t border-white/5 flex flex-wrap gap-1.5">
+              <div className="mt-2.5 pt-2.5 border-t border-slate-100 flex flex-wrap gap-1.5">
                 {dayMetricOptions.map((key) => {
                   const on = visibleDayColumns.includes(key)
                   return (
@@ -1585,7 +1638,7 @@ export function ProgressAnalysisView({
                   <tr>
                     <th
                       scope="col"
-                      className="cursor-pointer hover:text-white select-none transition-colors"
+                      className="cursor-pointer hover:text-slate-900 select-none transition-colors"
                       onClick={() => handleSessionSort('day')}
                       title="Sort by Day number"
                     >
@@ -1599,7 +1652,7 @@ export function ProgressAnalysisView({
                     </th>
                     <th
                       scope="col"
-                      className="cursor-pointer hover:text-white select-none transition-colors"
+                      className="cursor-pointer hover:text-slate-900 select-none transition-colors"
                       onClick={() => handleSessionSort('sample')}
                       title="Sort by finalized results sample size (not chunks number)"
                     >
@@ -1617,7 +1670,7 @@ export function ProgressAnalysisView({
                         scope="col"
                         className={
                           key === 'rfc' || key === 'rac'
-                            ? 'cursor-pointer hover:text-white select-none transition-colors'
+                            ? 'cursor-pointer hover:text-slate-900 select-none transition-colors'
                             : ''
                         }
                         onClick={
@@ -1686,7 +1739,7 @@ export function ProgressAnalysisView({
                               total={sessionData.total}
                               className="w-24 h-2.5 shrink-0"
                             />
-                            <span className="font-mono text-[10px] text-slate-400">
+                            <span className="font-mono text-[10px] text-slate-500">
                               {sessionData.total > 0
                                 ? `${pct(
                                     sessionData.counts.purple +
@@ -1730,7 +1783,7 @@ export function ProgressAnalysisView({
                              {mode === 'teacher' && onEditSessionNumber && (
                               <button
                                 type="button"
-                                className="ghost text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 px-2 py-1 rounded"
+                                className="ghost text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-2 py-1 rounded"
                                 onClick={() => {
                                   setEditSessionId(p.learningSessionId)
                                   setEditSessionNumberInput(String(p.sessionNumber ?? ''))
@@ -1742,7 +1795,7 @@ export function ProgressAnalysisView({
                             {mode === 'teacher' && onDeleteSession && (
                               <button
                                 type="button"
-                                className="ghost text-red-400 hover:text-red-300 hover:bg-red-500/10 px-2 py-1 rounded"
+                                className="ghost text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded"
                                 onClick={() => setDeleteSessionIdConfirm(p.learningSessionId)}
                               >
                                 Delete
@@ -1877,7 +1930,7 @@ export function ProgressAnalysisView({
       {tab === 'history' && (
         <div className="analysis-tab-body">
           {/* Quick Filter Toolbar */}
-          <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-xl border border-white/5 bg-white/[0.02]">
+          <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-xl border border-slate-200/80 bg-white shadow-3xs">
             <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Result filters">
               <button
                 type="button"
@@ -1891,7 +1944,7 @@ export function ProgressAnalysisView({
                 className={`analysis-chip${historyFilter === 'warm' ? ' is-active' : ''}`}
                 onClick={() => setHistoryFilter('warm')}
               >
-                <span className="text-red-400 mr-1">🔴</span>
+                <span className="text-red-500 mr-1">🔴</span>
                 Struggle (Warm) ({historyFilterCounts.warm})
               </button>
               <button
@@ -1899,7 +1952,7 @@ export function ProgressAnalysisView({
                 className={`analysis-chip${historyFilter === 'cool' ? ' is-active' : ''}`}
                 onClick={() => setHistoryFilter('cool')}
               >
-                <span className="text-emerald-400 mr-1">🟢</span>
+                <span className="text-emerald-500 mr-1">🟢</span>
                 Mastery (Cool) ({historyFilterCounts.cool})
               </button>
               <button
@@ -1907,7 +1960,7 @@ export function ProgressAnalysisView({
                 className={`analysis-chip${historyFilter === 'probed' ? ' is-active' : ''}`}
                 onClick={() => setHistoryFilter('probed')}
               >
-                <span className="text-indigo-400 mr-1">🔍</span>
+                <span className="text-indigo-600 mr-1">🔍</span>
                 Probed Only ({historyFilterCounts.probed})
               </button>
             </div>
@@ -1919,13 +1972,13 @@ export function ProgressAnalysisView({
                 placeholder="Filter by learner name..."
                 value={historySearch}
                 onChange={(e) => setHistorySearch(e.target.value)}
-                className="w-full bg-slate-900 border border-white/10 rounded-lg pl-8 pr-7 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
+                className="w-full bg-white border border-slate-200 rounded-lg pl-8 pr-7 py-1 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition-colors shadow-3xs"
               />
               {historySearch && (
                 <button
                   type="button"
                   onClick={() => setHistorySearch('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 hover:text-white"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 hover:text-slate-600"
                 >
                   ✕
                 </button>
@@ -1966,7 +2019,7 @@ export function ProgressAnalysisView({
                       <tr key={r.id}>
                         <td>
                           <div className="flex flex-col">
-                            <span className="text-xs text-slate-200 whitespace-nowrap">
+                            <span className="text-xs text-slate-700 font-medium whitespace-nowrap">
                               {new Date(r.finalizedAt).toLocaleDateString([], {
                                 month: 'short',
                                 day: 'numeric',
@@ -1983,13 +2036,13 @@ export function ProgressAnalysisView({
                         <td>
                           {sessionNum != null ? (
                             <span
-                              className="inline-flex items-center font-mono text-xs px-2 py-0.5 rounded bg-slate-800 border border-white/10 text-slate-300"
+                              className="inline-flex items-center font-mono text-xs px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-700"
                               title={session?.startedAt ? new Date(session.startedAt).toLocaleDateString() : undefined}
                             >
                               D{sessionNum}
                             </span>
                           ) : (
-                            <span className="text-slate-500 font-mono text-xs">—</span>
+                            <span className="text-slate-400 font-mono text-xs">—</span>
                           )}
                         </td>
                         {mode === 'teacher' && !focusLearnerId ? (
@@ -2007,7 +2060,7 @@ export function ProgressAnalysisView({
                                 avatarUrl={user?.avatarUrl}
                                 size="sm"
                               />
-                              <span className="truncate max-w-[120px] font-medium text-slate-200 hover:text-white">
+                              <span className="truncate max-w-[120px] font-semibold text-slate-800 hover:text-indigo-600 transition-colors">
                                 {user?.displayName ?? r.learnerUserId.slice(0, 8)}
                               </span>
                             </button>
@@ -2021,14 +2074,14 @@ export function ProgressAnalysisView({
                             {resultColorLabel(r.effectiveColor)}
                           </span>
                         </td>
-                        <td className="font-mono text-xs tabular-nums text-slate-300">
+                        <td className="font-mono text-xs tabular-nums text-slate-600">
                           {COLOR_SCORE[r.effectiveColor]}
                         </td>
-                        <td className="font-mono text-xs tabular-nums text-slate-300">
+                        <td className="font-mono text-xs tabular-nums text-slate-600">
                           {r.enteredProbeFlow ? (
-                            <span className="font-bold text-amber-400">{cNumber}</span>
+                            <span className="font-bold text-amber-600">{cNumber}</span>
                           ) : (
-                            <span className="text-slate-500">1</span>
+                            <span className="text-slate-400">1</span>
                           )}
                         </td>
                       </tr>
@@ -2040,20 +2093,20 @@ export function ProgressAnalysisView({
           </div>
 
           {/* Pagination controls */}
-          <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400 px-1">
+          <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 px-1">
             <div className="flex items-center gap-2">
               <span>
-                Showing <strong className="text-white">{totalHistory === 0 ? 0 : startIdx + 1}</strong> -{' '}
-                <strong className="text-white">{endIdx}</strong> of{' '}
-                <strong className="text-white">{totalHistory}</strong> results
+                Showing <strong className="text-slate-800">{totalHistory === 0 ? 0 : startIdx + 1}</strong> -{' '}
+                <strong className="text-slate-800">{endIdx}</strong> of{' '}
+                <strong className="text-slate-800">{totalHistory}</strong> results
               </span>
               {totalHistory > 0 && (
-                <div className="flex items-center gap-1.5 ml-3 border-l border-white/10 pl-3">
+                <div className="flex items-center gap-1.5 ml-3 border-l border-slate-200 pl-3">
                   <span>Rows per page:</span>
                   <select
                     value={pageSize}
                     onChange={(e) => setPageSize(Number(e.target.value))}
-                    className="bg-slate-900 border border-white/10 rounded px-2 py-0.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                    className="bg-white border border-slate-200 rounded px-2 py-0.5 text-xs text-slate-700 focus:outline-none focus:border-indigo-500 shadow-3xs"
                   >
                     <option value={25}>25</option>
                     <option value={50}>50</option>
@@ -2069,22 +2122,22 @@ export function ProgressAnalysisView({
                   type="button"
                   disabled={safeCurrentPage <= 1}
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  className="px-2.5 py-1 rounded-lg border border-white/10 bg-slate-900 text-xs font-medium text-slate-200 hover:text-white hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-colors flex items-center gap-1 cursor-pointer"
+                  className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none transition-colors flex items-center gap-1 cursor-pointer shadow-3xs"
                 >
                   <ChevronLeft className="h-3.5 w-3.5" />
                   <span>Prev</span>
                 </button>
 
-                <span className="font-mono text-xs px-2 text-slate-300">
-                  Page <strong className="text-white">{safeCurrentPage}</strong> of{' '}
-                  <strong className="text-white">{totalPages}</strong>
+                <span className="font-mono text-xs px-2 text-slate-600">
+                  Page <strong className="text-slate-800">{safeCurrentPage}</strong> of{' '}
+                  <strong className="text-slate-800">{totalPages}</strong>
                 </span>
 
                 <button
                   type="button"
                   disabled={safeCurrentPage >= totalPages}
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  className="px-2.5 py-1 rounded-lg border border-white/10 bg-slate-900 text-xs font-medium text-slate-200 hover:text-white hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-colors flex items-center gap-1 cursor-pointer"
+                  className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none transition-colors flex items-center gap-1 cursor-pointer shadow-3xs"
                 >
                   <span>Next</span>
                   <ChevronRight className="h-3.5 w-3.5" />
@@ -2099,9 +2152,9 @@ export function ProgressAnalysisView({
       {deleteSessionIdConfirm && (
         <div className="observe-modal-container">
           <div className="observe-modal-backdrop" onClick={() => setDeleteSessionIdConfirm(null)} />
-          <div className="observe-modal-card text-left max-w-md p-6 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl relative z-50">
-            <h3 className="text-lg font-bold text-white mb-2">Delete Live Session?</h3>
-            <p className="text-sm text-slate-300 mb-6">
+          <div className="observe-modal-card text-left max-w-md p-6 bg-white border border-slate-200 rounded-2xl shadow-xl relative z-50">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Delete Live Session?</h3>
+            <p className="text-sm text-slate-600 mb-6">
               Are you sure you want to delete this live session? All question captures and attendance for this session will be permanently deleted from the database.
             </p>
             <div className="flex justify-end gap-3">
@@ -2114,7 +2167,7 @@ export function ProgressAnalysisView({
               </button>
               <button
                 type="button"
-                className="btn primary bg-red-600 hover:bg-red-500 text-white px-4 py-2 text-xs font-semibold rounded-lg shadow-lg hover:shadow-red-500/20"
+                className="btn primary bg-red-600 hover:bg-red-500 text-white px-4 py-2 text-xs font-semibold rounded-lg shadow-md hover:shadow-red-500/20"
                 onClick={() => {
                   if (onDeleteSession) onDeleteSession(deleteSessionIdConfirm)
                   setDeleteSessionIdConfirm(null)
@@ -2131,9 +2184,9 @@ export function ProgressAnalysisView({
       {editSessionId && (
         <div className="observe-modal-container">
           <div className="observe-modal-backdrop" onClick={() => setEditSessionId(null)} />
-          <div className="observe-modal-card text-left max-w-sm p-6 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl relative z-50">
-            <h3 className="text-lg font-bold text-white mb-2">Edit Session Day</h3>
-            <p className="text-xs text-slate-400 mb-4">
+          <div className="observe-modal-card text-left max-w-sm p-6 bg-white border border-slate-200 rounded-2xl shadow-xl relative z-50">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Edit Session Day</h3>
+            <p className="text-xs text-slate-500 mb-4">
               Enter the correct day number sequence for this session record.
             </p>
             <div className="mb-6">
@@ -2141,7 +2194,7 @@ export function ProgressAnalysisView({
                 type="number"
                 min="1"
                 required
-                className="w-full text-center bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-2xl font-black text-white focus:outline-none focus:border-indigo-500 font-mono tracking-wider"
+                className="w-full text-center bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-2xl font-black text-slate-900 focus:outline-none focus:border-indigo-500 font-mono tracking-wider"
                 value={editSessionNumberInput}
                 onChange={(e) => setEditSessionNumberInput(e.target.value)}
                 placeholder="Day Number"
@@ -2157,7 +2210,7 @@ export function ProgressAnalysisView({
               </button>
               <button
                 type="button"
-                className="btn primary bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 text-xs font-semibold rounded-lg shadow-lg"
+                className="btn primary bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 text-xs font-semibold rounded-lg shadow-md"
                 onClick={() => {
                   const newNum = parseInt(editSessionNumberInput, 10)
                   if (!isNaN(newNum) && newNum > 0) {

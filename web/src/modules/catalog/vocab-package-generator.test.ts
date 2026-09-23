@@ -7,6 +7,12 @@ import {
   fetchFirestoreLessonChunks,
   generatePackageStructure,
   persistDraftPackage,
+  calculateCvr,
+  calculateCpd,
+  calculateCciFromCpd,
+  GREEN_TEST_SESSION_LANGUAGES_7X3,
+  RED_TEST_SESSION_LANGUAGES_7X3,
+  RED_TEST_HINT_PROGRESSION_7X3,
   type FirestoreLessonChunk,
 } from '../../../../supabase/functions/live-test-generation/vocab-package-generator'
 
@@ -349,5 +355,233 @@ describe('Dynamic Green & Red Test Package Generator', () => {
     expect(inserted.test_package_versions).toHaveLength(1)
     expect(inserted.test_sections).toHaveLength(3)
     expect(inserted.test_items).toHaveLength(21)
+  })
+
+  it('generates 7x3 Mini Green Test with exactly 21 questions across 7 sessions, TL=1.0, and 12V CPD target', () => {
+    const pkg = generatePackageStructure({
+      testType: 'GREEN',
+      lessonId: 'level_a_day_1',
+      chunks: mockChunks,
+      targetQuestions: 21,
+      sessionLayout: '7x3',
+      sessionLanguages: GREEN_TEST_SESSION_LANGUAGES_7X3,
+      targetCpd: 12,
+      packageCode: 'G01-21Q-ECOMMERCE-1',
+    })
+
+    expect(pkg.testType).toBe('GREEN')
+    expect(pkg.packageCode).toBe('G01-21Q-ECOMMERCE-1')
+    expect(pkg.totalItems).toBe(21)
+    expect(pkg.sessionLayout).toBe('7x3')
+    expect(pkg.targetCpd).toBe(12)
+    expect(pkg.sections).toHaveLength(7) // 7 sessions
+
+    // Section languages preset: EN-VI-EN (S1-3 EN, S4-6 VI, S7 EN)
+    expect(pkg.sessionLanguages).toEqual(GREEN_TEST_SESSION_LANGUAGES_7X3)
+
+    for (let sIdx = 0; sIdx < pkg.sections.length; sIdx++) {
+      const section = pkg.sections[sIdx]
+      expect(section.items).toHaveLength(3) // 3 questions per session
+      expect(section.sessionLanguage).toBe(GREEN_TEST_SESSION_LANGUAGES_7X3[sIdx])
+
+      for (const item of section.items) {
+        expect(item.tl).toBe(1.0)
+        expect(item.chunkIds).toHaveLength(1)
+        expect(item.spokenScriptVi).toBeNull()
+        expect(item.spokenScriptEn).toBeNull()
+        expect(item.cvrBreakdown).toBeDefined()
+        expect(item.cvrBreakdown!.tl).toBe(1.0)
+        expect(item.cvrBreakdown!.tc).toBe(section.targetCvrOhm)
+        expect(item.cvrBreakdown!.cpd).toBe(12)
+        expect(item.cvrBreakdown!.cvr * item.cvrBreakdown!.cci).toBeCloseTo(12, 1)
+      }
+    }
+
+    // CVR progression across 7 sessions
+    expect(pkg.sections[0].targetCvrOhm).toBeLessThanOrEqual(pkg.sections[6].targetCvrOhm)
+  })
+
+  it('generates 7x3 Mini Red Test with exact hint progression [2, 3, 4, 2, 3, 4, 4], 650ms SSML breaks, and 56V CPD', () => {
+    const pkg = generatePackageStructure({
+      testType: 'RED',
+      lessonId: 'level_a_day_1',
+      chunks: mockChunks,
+      targetQuestions: 21,
+      sessionLayout: '7x3',
+      sessionLanguages: RED_TEST_SESSION_LANGUAGES_7X3,
+      targetCpd: 56,
+      lexicalComplexity: 1.15,
+      packageCode: 'R01-21Q-ECOMMERCE-56V-1',
+    })
+
+    expect(pkg.testType).toBe('RED')
+    expect(pkg.packageCode).toBe('R01-21Q-ECOMMERCE-56V-1')
+    expect(pkg.totalItems).toBe(21)
+    expect(pkg.sessionLayout).toBe('7x3')
+    expect(pkg.targetCpd).toBe(56)
+    expect(pkg.sections).toHaveLength(7) // 7 sessions
+
+    // Section languages preset: VI-EN-EN (S1-3 VI, S4-6 EN, S7 EN)
+    expect(pkg.sessionLanguages).toEqual(RED_TEST_SESSION_LANGUAGES_7X3)
+
+    const expectedHints = [2, 3, 4, 2, 3, 4, 4]
+    expect(RED_TEST_HINT_PROGRESSION_7X3).toEqual(expectedHints)
+
+    for (let sIdx = 0; sIdx < pkg.sections.length; sIdx++) {
+      const section = pkg.sections[sIdx]
+      const expectedHintCount = expectedHints[sIdx]
+
+      expect(section.items).toHaveLength(3) // 3 questions per session
+      expect(section.sessionLanguage).toBe(RED_TEST_SESSION_LANGUAGES_7X3[sIdx])
+
+      for (const item of section.items) {
+        // Exact hint count verification
+        expect(item.chunkIds).toHaveLength(expectedHintCount)
+        expect(item.tc).toBe(expectedHintCount)
+        expect(item.promptEn.split(' / ')).toHaveLength(expectedHintCount)
+        expect(item.promptVi.split(' / ')).toHaveLength(expectedHintCount)
+
+        // Latency and CVR breakdown
+        expect(item.tl).toBeGreaterThanOrEqual(2.0)
+        expect(item.tl).toBeLessThanOrEqual(3.0)
+        expect(item.cvrBreakdown).toBeDefined()
+        expect(item.cvrBreakdown!.tc).toBe(expectedHintCount)
+        expect(item.cvrBreakdown!.lc).toBe(1.15)
+        expect(item.cvrBreakdown!.tl).toBe(item.tl)
+        expect(item.cvrBreakdown!.cvr).toBe(Number((expectedHintCount * 1.15 * item.tl).toFixed(1)))
+
+        // SSML spoken scripts with 650ms break between hints
+        expect(item.spokenScriptEn).toContain('<speak>')
+        expect(item.spokenScriptEn).toContain('</speak>')
+        expect(item.spokenScriptVi).toContain('<speak>')
+        expect(item.spokenScriptVi).toContain('</speak>')
+
+        const breakCountEn = (item.spokenScriptEn!.match(/<break time="650ms"\/>/g) || []).length
+        const breakCountVi = (item.spokenScriptVi!.match(/<break time="650ms"\/>/g) || []).length
+        expect(breakCountEn).toBe(expectedHintCount - 1)
+        expect(breakCountVi).toBe(expectedHintCount - 1)
+      }
+    }
+  })
+
+  it('persists 7x3 draft package to database with 7 test_sections, session_layout metadata, and cvr_breakdown', async () => {
+    const pkg = generatePackageStructure({
+      testType: 'RED',
+      lessonId: 'level_a_day_1',
+      chunks: mockChunks,
+      targetQuestions: 21,
+      sessionLayout: '7x3',
+      sessionLanguages: RED_TEST_SESSION_LANGUAGES_7X3,
+      targetCpd: 56,
+      lexicalComplexity: 1.15,
+      packageCode: 'R01-21Q-PERSIST',
+    })
+
+    const inserted: Record<string, any[]> = {
+      test_packages: [],
+      test_package_versions: [],
+      test_sections: [],
+      test_items: [],
+    }
+
+    const mockAdmin: any = {
+      from: (table: string) => ({
+        select: () => ({
+          order: () => ({
+            limit: () => ({
+              maybeSingle: async () => ({ data: { id: 'org-123' }, error: null }),
+            }),
+          }),
+          eq: () => ({
+            limit: () => ({
+              maybeSingle: async () => ({ data: { organization_id: 'org-123' }, error: null }),
+            }),
+          }),
+        }),
+        insert: (rows: any) => {
+          const rowArr = Array.isArray(rows) ? rows : [rows]
+          const withIds = rowArr.map((r) => ({ id: `uuid-${Math.random()}`, ...r }))
+          inserted[table].push(...withIds)
+          return {
+            select: () => ({
+              single: async () => ({ data: withIds[0], error: null }),
+            }),
+            then: (cb: any) => cb({ error: null }),
+          }
+        },
+      }),
+    }
+
+    const receipt = await persistDraftPackage(pkg, 'user-actor-1', mockAdmin)
+    expect(receipt.packageId).toBeDefined()
+    expect(receipt.packageVersionId).toBeDefined()
+    expect(receipt.itemsCount).toBe(21)
+    expect(inserted.test_packages).toHaveLength(1)
+    expect(inserted.test_package_versions).toHaveLength(1)
+    expect(inserted.test_package_versions[0].source_metadata.sessionLayout).toBe('7x3')
+    expect(inserted.test_package_versions[0].source_metadata.sessionLanguages).toEqual(RED_TEST_SESSION_LANGUAGES_7X3)
+    expect(inserted.test_sections).toHaveLength(7) // 7 sections for 7x3
+    expect(inserted.test_items).toHaveLength(21)
+
+    // Verify sections have sessionLanguage stored in metadata
+    for (let i = 0; i < 7; i++) {
+      expect(inserted.test_sections[i].metadata.sessionLanguage).toBe(RED_TEST_SESSION_LANGUAGES_7X3[i])
+    }
+
+    // Verify items have cvr_breakdown stored
+    for (const item of inserted.test_items) {
+      expect(item.cvr_breakdown).toBeDefined()
+      expect(item.cvr_breakdown.cvr).toBeDefined()
+      expect(item.cvr_breakdown.cpd).toBeDefined()
+    }
+  })
+})
+
+describe('Cognitive Physics & Math Calculations', () => {
+  it('calculates CVR correctly as TC * LC * TL', () => {
+    // Green baseline: TC=1, LC=1.0, TL=1.0 -> 1.0 Ohm
+    expect(calculateCvr(1, 1.0, 1.0)).toBe(1.0)
+    // Green eCommerce: TC=1, LC=1.2, TL=1.0 -> 1.2 Ohm
+    expect(calculateCvr(1, 1.2, 1.0)).toBe(1.2)
+    // Red 2 hints: TC=2, LC=1.15, TL=2.5 -> 5.8 Ohm (rounded to 1 decimal)
+    expect(calculateCvr(2, 1.15, 2.5)).toBe(5.8)
+    // Red 4 hints: TC=4, LC=1.15, TL=2.0 -> 9.2 Ohm
+    expect(calculateCvr(4, 1.15, 2.0)).toBe(9.2)
+  })
+
+  it('calculates CPD correctly as CVR * CCI', () => {
+    // Green Focus: 3.0 Ohm * 4 Amps = 12.0 Volts
+    expect(calculateCpd(3.0, 4)).toBe(12.0)
+    // Red Awareness: 7.0 Ohm * 8 Amps = 56.0 Volts
+    expect(calculateCpd(7.0, 8)).toBe(56.0)
+    // Intermediate: 5.8 Ohm * 10 Amps = 58.0 Volts
+    expect(calculateCpd(5.8, 10)).toBe(58.0)
+  })
+
+  it('calculates CCI dynamically from target CPD and measured CVR', () => {
+    // Target 12V CPD
+    expect(calculateCciFromCpd(12, 2.0)).toBe(6) // 12 / 2 = 6 Amps
+    expect(calculateCciFromCpd(12, 3.0)).toBe(4) // 12 / 3 = 4 Amps
+    expect(calculateCciFromCpd(12, 4.0)).toBe(3) // 12 / 4 = 3 Amps
+    expect(calculateCciFromCpd(12, 6.0)).toBe(2) // 12 / 6 = 2 Amps
+
+    // Target 56V CPD
+    expect(calculateCciFromCpd(56, 7.0)).toBe(8) // 56 / 7 = 8 Amps
+    expect(calculateCciFromCpd(56, 9.2)).toBe(6) // 56 / 9.2 = 6.08 -> 6 Amps
+
+    // Safety edge case
+    expect(calculateCciFromCpd(12, 0)).toBe(1)
+  })
+
+  it('provides standard 7x3 presets for language and hints', () => {
+    expect(GREEN_TEST_SESSION_LANGUAGES_7X3).toEqual([
+      'en', 'en', 'en', 'vi', 'vi', 'vi', 'en',
+    ])
+    expect(RED_TEST_SESSION_LANGUAGES_7X3).toEqual([
+      'vi', 'vi', 'vi', 'en', 'en', 'en', 'en',
+    ])
+    expect(RED_TEST_HINT_PROGRESSION_7X3).toEqual([
+      2, 3, 4, 2, 3, 4, 4,
+    ])
   })
 })

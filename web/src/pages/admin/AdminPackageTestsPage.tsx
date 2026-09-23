@@ -49,6 +49,8 @@ import {
   listFirestoreLessons,
   listTtsModels,
   playGoogleCloudTts,
+  GREEN_TEST_SESSION_LANGUAGES_7X3,
+  RED_TEST_SESSION_LANGUAGES_7X3,
   type FirestoreChunk,
   type FirestoreLesson,
 } from '../../modules/catalog/live-test-generation'
@@ -95,6 +97,7 @@ export function AdminPackageTestsPage() {
   const [aiQuestionCount, setAiQuestionCount] = useState<21 | 42 | 49>(42)
   const [aiTopic, setAiTopic] = useState('topic12')
   const [aiTargetVoltage, setAiTargetVoltage] = useState(56)
+  const [aiSessionLayout, setAiSessionLayout] = useState<'7x3' | '3x7'>('7x3')
   const [customPackageCode, setCustomPackageCode] = useState('')
   const [customTitle, setCustomTitle] = useState('')
   const [allowCustomCode, setAllowCustomCode] = useState(false)
@@ -122,6 +125,7 @@ export function AdminPackageTestsPage() {
 
   // Audio Studio Modal
   const [audioStudioPackage, setAudioStudioPackage] = useState<PackageSummary | null>(null)
+  const [sessionLanguages, setSessionLanguages] = useState<Array<'vi' | 'en'>>([])
   const [ttsLanguage, setTtsLanguage] = useState<'vi' | 'en'>('en')
   const [ttsVoiceId, setTtsVoiceId] = useState('google/en-US-Neural2-F')
   const [ttsModels, setTtsModels] = useState<Array<{ id: string; provider: string; label: string }>>([])
@@ -312,6 +316,29 @@ export function AdminPackageTestsPage() {
       })
   }, [ttsLanguage])
 
+  // Sync per-session audio languages when Audio Studio opens
+  useEffect(() => {
+    if (!audioStudioPackage) {
+      setSessionLanguages([])
+      return
+    }
+    const secCount = audioStudioPackage.sections.length || 7
+    const metaLangs = (audioStudioPackage.pkg.sourceMetadata as any)?.sessionLanguages
+    if (Array.isArray(metaLangs) && metaLangs.length >= secCount) {
+      setSessionLanguages(metaLangs)
+      return
+    }
+    if (audioStudioPackage.testType === 'green') {
+      setSessionLanguages(
+        Array.from({ length: secCount }, (_, i) => GREEN_TEST_SESSION_LANGUAGES_7X3[i] ?? (i < 3 ? 'en' : i < 6 ? 'vi' : 'en')),
+      )
+    } else {
+      setSessionLanguages(
+        Array.from({ length: secCount }, (_, i) => RED_TEST_SESSION_LANGUAGES_7X3[i] ?? (i < 3 ? 'vi' : 'en')),
+      )
+    }
+  }, [audioStudioPackage])
+
   // Filtered packages
   const filteredSummaries = useMemo(() => {
     return packageSummaries.filter((summary) => {
@@ -342,6 +369,7 @@ export function AdminPackageTestsPage() {
         testType: aiTestType,
         lessonId: selectedLessonId,
         targetQuestions: aiQuestionCount,
+        sessionLayout: aiQuestionCount === 21 ? aiSessionLayout : undefined,
         targetCpd: aiTargetVoltage,
         packageCode: activePackageCode,
         title: activeTitle,
@@ -488,14 +516,21 @@ export function AdminPackageTestsPage() {
     let done = 0
     try {
       for (const item of pkg.items) {
-        const lang = item.spokenScriptEn ? 'en' : 'vi'
-        const script = item.spokenScriptEn || item.promptEn || item.spokenScriptVi || item.promptVi || ''
+        const secIdx = pkg.sections.findIndex((s) => s.id === item.sectionId)
+        const lang: 'vi' | 'en' =
+          secIdx >= 0 && sessionLanguages[secIdx] ? sessionLanguages[secIdx] : ttsLanguage
+        const isEn = lang === 'en'
+        // Ensure Neural2 voice is selected according to language
+        const voice = isEn ? 'google/en-US-Neural2-F' : 'google/vi-VN-Neural2-A'
+        const script = isEn
+          ? item.spokenScriptEn || item.promptEn || item.spokenScriptVi || item.promptVi || ''
+          : item.spokenScriptVi || item.promptVi || item.spokenScriptEn || item.promptEn || ''
         await generateNarration({
           packageVersionId: pkg.version.id,
           target: 'test_item',
           testItemId: item.id,
           language: lang,
-          voiceId: ttsVoiceId,
+          voiceId: voice,
           textOverride: script,
         })
         done++
@@ -931,6 +966,32 @@ export function AdminPackageTestsPage() {
                         </button>
                       ))}
                     </div>
+                    {aiQuestionCount === 21 && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setAiSessionLayout('7x3')}
+                          className={`flex-1 py-1.5 px-2 text-[11px] font-bold rounded-lg border transition-all ${
+                            aiSessionLayout === '7x3'
+                              ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                              : 'border-slate-200 text-slate-600 bg-white hover:border-slate-300'
+                          }`}
+                        >
+                          7×3 (Mini Test · 7 Sessions)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAiSessionLayout('3x7')}
+                          className={`flex-1 py-1.5 px-2 text-[11px] font-bold rounded-lg border transition-all ${
+                            aiSessionLayout === '3x7'
+                              ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                              : 'border-slate-200 text-slate-600 bg-white hover:border-slate-300'
+                          }`}
+                        >
+                          3×7 (Standard · 3 Sessions)
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -1441,6 +1502,122 @@ export function AdminPackageTestsPage() {
                       </button>
                     </div>
                   </div>
+                </div>
+              </div>
+
+              {/* Per-Session TTS Language Configuration */}
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <span className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Per-Session Language Presets
+                    </span>
+                    <p className="text-[11px] text-slate-500">
+                      Configure custom audio synthesis language per session (uses Neural2 voices automatically).
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const count = audioStudioPackage.sections.length || 7
+                        setSessionLanguages(
+                          Array.from({ length: count }, (_, i) => GREEN_TEST_SESSION_LANGUAGES_7X3[i] ?? (i < 3 ? 'en' : i < 6 ? 'vi' : 'en')),
+                        )
+                      }}
+                      className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-colors"
+                    >
+                      Green Preset (EN-VI-EN)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const count = audioStudioPackage.sections.length || 7
+                        setSessionLanguages(
+                          Array.from({ length: count }, (_, i) => RED_TEST_SESSION_LANGUAGES_7X3[i] ?? (i < 3 ? 'vi' : 'en')),
+                        )
+                      }}
+                      className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-rose-300 bg-rose-50 text-rose-800 hover:bg-rose-100 transition-colors"
+                    >
+                      Red Preset (VI-EN-EN)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const count = audioStudioPackage.sections.length || 7
+                        setSessionLanguages(Array(count).fill('en'))
+                      }}
+                      className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 transition-colors"
+                    >
+                      All EN
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const count = audioStudioPackage.sections.length || 7
+                        setSessionLanguages(Array(count).fill('vi'))
+                      }}
+                      className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 transition-colors"
+                    >
+                      All VI
+                    </button>
+                  </div>
+                </div>
+
+                {/* Session by Session Language Badges / Toggles */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 pt-1">
+                  {(audioStudioPackage.sections.length > 0
+                    ? audioStudioPackage.sections
+                    : Array.from({ length: 7 }, (_, i) => ({ id: `s-${i + 1}`, sectionOrder: i + 1, title: `Session ${i + 1}` }))
+                  ).map((sec, idx) => {
+                    const currentLang = sessionLanguages[idx] ?? (audioStudioPackage.testType === 'red' ? (idx < 3 ? 'vi' : 'en') : (idx < 3 ? 'en' : idx < 6 ? 'vi' : 'en'))
+                    return (
+                      <div
+                        key={sec.id ?? idx}
+                        className={`p-2 rounded-xl border flex flex-col items-center justify-between gap-1 text-center transition-all ${
+                          currentLang === 'vi'
+                            ? 'bg-amber-50/80 border-amber-200'
+                            : 'bg-blue-50/80 border-blue-200'
+                        }`}
+                      >
+                        <span className="text-[10px] font-bold text-slate-600">
+                          S{sec.sectionOrder ?? idx + 1}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = [...sessionLanguages]
+                              next[idx] = 'en'
+                              setSessionLanguages(next)
+                            }}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-all ${
+                              currentLang === 'en'
+                                ? 'bg-blue-600 text-white shadow-xs'
+                                : 'bg-white/80 text-slate-500 hover:text-slate-800'
+                            }`}
+                          >
+                            EN
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = [...sessionLanguages]
+                              next[idx] = 'vi'
+                              setSessionLanguages(next)
+                            }}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-all ${
+                              currentLang === 'vi'
+                                ? 'bg-amber-600 text-white shadow-xs'
+                                : 'bg-white/80 text-slate-500 hover:text-slate-800'
+                            }`}
+                          >
+                            VI
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
 

@@ -1,0 +1,1181 @@
+{
+  "packageCode": "R01-21Q-Ecommerce-56V-1",
+  "title": "R01-21Q-Ecommerce: E-commerce Market Dynamics & Consumer Reflexes (Awareness 56V)",
+  "slug": "r01-21q-ecommerce-56v-1",
+  "description": "Red Mini Test (7x3 - 21 Questions) with multi-word cognitive collocations, SSML 650ms breaks, target 56V CPD, and per-session TTS presets from Improv Set 05.",
+  "versionLabel": "v1",
+  "testType": "RED",
+  "targetQuestions": 21,
+  "sessionLayout": "7x3",
+  "targetCpd": 56,
+  "sessionLanguages": [
+    "vi",
+    "vi",
+    "vi",
+    "en",
+    "en",
+    "en",
+    "en"
+  ],
+  "lifecycleNarration": {
+    "package_start": {
+      "vi": "Chào mừng em đến với bài kiểm tra Red Test eCommerce & Retail (Awareness & Traps). Lắng nghe khoảng lặng giữa các cụm từ bẫy và phản xạ dứt khoát.",
+      "en": "Welcome to the Red Test eCommerce & Retail assessment. Pay close attention to pauses between cognitive traps and respond with conviction."
+    },
+    "part_intro": {
+      "1": {
+        "vi": "Bắt đầu Phần 1: Bẫy 2-3 cụm từ phản xạ thị trường và săn deal nhanh.",
+        "en": "Starting Part 1: Rapid 2-3 hint consumer and deal-hunting traps."
+      },
+      "2": {
+        "vi": "Bắt đầu Phần 2: Xử lý chuỗi liên kết và cấu trúc bán lẻ đa cụm từ.",
+        "en": "Starting Part 2: Multi-chunk retail chain logic and structural shifts."
+      },
+      "3": {
+        "vi": "Bắt đầu Phần 3: Thử thách ẩn dụ chuyên sâu và áp lực nhận thức đỉnh cao.",
+        "en": "Starting Part 3: Advanced idiomatic metaphors and peak cognitive recovery."
+      }
+    },
+    "package_end": {
+      "vi": "Chúc mừng em đã hoàn thành bài kiểm tra Red Test eCommerce 21Q! Em đã vượt qua các bẫy nhận thức thương mại điện tử rất xuất sắc.",
+      "en": "Congratulations on completing the 21Q eCommerce Red Test! Exceptional awareness and trap recovery reflexes."
+    }
+  },
+  "sections": [
+    {
+      "sectionOrder": 1,
+      "part": 1,
+      "title": "Session 1 • 2 Hints (Awareness Trap)",
+      "targetCvrOhm": 4.6,
+      "cciAmpe": 12,
+      "cpd": 55.2,
+      "hintCount": 2,
+      "sessionLanguage": "vi",
+      "voiceModel": "google/vi-VN-Neural2-A",
+      "introTextVi": "Session 1: Mức kháng trở 4.6 Ohm, cường độ 12 Ampe. Bẫy nhận thức 2 cụm từ. Chuẩn bị.",
+      "introTextEn": "Session 1: Resistance 4.6 Ohm, current 12 Amps. 2-hint cognitive trap. Get ready.",
+      "items": [
+        {
+          "itemOrder": 1,
+          "globalItemNumber": 1,
+          "sourceItemId": "set05_s1_i01",
+          "chunkIds": [
+            "h_set05_s1_i1_1",
+            "h_set05_s1_i1_2"
+          ],
+          "termVi": "Ngành thương mại điện tử + cạnh tranh khốc liệt",
+          "termEn": "e-commerce industry + fiercely competitive",
+          "promptVi": "Ngành thương mại điện tử / cạnh tranh khốc liệt",
+          "promptEn": "e-commerce industry / fiercely competitive",
+          "spokenScriptVi": "<speak><s>Ngành thương mại điện tử</s> <break time=\"650ms\"/> <s>cạnh tranh khốc liệt</s></speak>",
+          "spokenScriptEn": "<speak><s>e-commerce industry</s> <break time=\"650ms\"/> <s>fiercely competitive</s></speak>",
+          "tc": 2,
+          "lc": 1.15,
+          "tl": 2,
+          "measuredCvr": 4.6,
+          "cvrBreakdown": {
+            "tc": 2,
+            "lc": 1.15,
+            "tl": 2,
+            "cvr": 4.6,
+            "cci": 12,
+            "cpd": 55.2
+          },
+          "hints": [
+            {
+              "id": "h_set05_s1_i1_1",
+              "text": "Ngành thương mại điện tử",
+              "translation": "e-commerce industry",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s1_i1_2",
+              "text": "cạnh tranh khốc liệt",
+              "translation": "fiercely competitive",
+              "typeFunction": "Tính từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 2,
+          "globalItemNumber": 2,
+          "sourceItemId": "set05_s1_i02",
+          "chunkIds": [
+            "h_set05_s1_i2_1",
+            "h_set05_s1_i2_2"
+          ],
+          "termVi": "Săn sale nửa đêm + thức trắng đêm",
+          "termEn": "midnight deal hunting + stay up late",
+          "promptVi": "Săn sale nửa đêm / thức trắng đêm",
+          "promptEn": "midnight deal hunting / stay up late",
+          "spokenScriptVi": "<speak><s>Săn sale nửa đêm</s> <break time=\"650ms\"/> <s>thức trắng đêm</s></speak>",
+          "spokenScriptEn": "<speak><s>midnight deal hunting</s> <break time=\"650ms\"/> <s>stay up late</s></speak>",
+          "tc": 2,
+          "lc": 1.15,
+          "tl": 2,
+          "measuredCvr": 4.6,
+          "cvrBreakdown": {
+            "tc": 2,
+            "lc": 1.15,
+            "tl": 2,
+            "cvr": 4.6,
+            "cci": 12,
+            "cpd": 55.2
+          },
+          "hints": [
+            {
+              "id": "h_set05_s1_i2_1",
+              "text": "Săn sale nửa đêm",
+              "translation": "midnight deal hunting",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s1_i2_2",
+              "text": "thức trắng đêm",
+              "translation": "stay up late",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 3,
+          "globalItemNumber": 3,
+          "sourceItemId": "set05_s1_i03",
+          "chunkIds": [
+            "h_set05_s1_i3_1",
+            "h_set05_s1_i3_2"
+          ],
+          "termVi": "Ví điện tử + liên kết ngân hàng",
+          "termEn": "digital wallet + linked to bank",
+          "promptVi": "Ví điện tử / liên kết ngân hàng",
+          "promptEn": "digital wallet / linked to bank",
+          "spokenScriptVi": "<speak><s>Ví điện tử</s> <break time=\"650ms\"/> <s>liên kết ngân hàng</s></speak>",
+          "spokenScriptEn": "<speak><s>digital wallet</s> <break time=\"650ms\"/> <s>linked to bank</s></speak>",
+          "tc": 2,
+          "lc": 1.15,
+          "tl": 2,
+          "measuredCvr": 4.6,
+          "cvrBreakdown": {
+            "tc": 2,
+            "lc": 1.15,
+            "tl": 2,
+            "cvr": 4.6,
+            "cci": 12,
+            "cpd": 55.2
+          },
+          "hints": [
+            {
+              "id": "h_set05_s1_i3_1",
+              "text": "Ví điện tử",
+              "translation": "digital wallet",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s1_i3_2",
+              "text": "liên kết ngân hàng",
+              "translation": "linked to bank",
+              "typeFunction": "Tính từ · Ending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sectionOrder": 2,
+      "part": 1,
+      "title": "Session 2 • 3 Hints (Awareness Trap)",
+      "targetCvrOhm": 7.6,
+      "cciAmpe": 7,
+      "cpd": 53.2,
+      "hintCount": 3,
+      "sessionLanguage": "vi",
+      "voiceModel": "google/vi-VN-Neural2-A",
+      "introTextVi": "Session 2: Mức kháng trở 7.6 Ohm, cường độ 7 Ampe. Bẫy nhận thức 3 cụm từ. Chuẩn bị.",
+      "introTextEn": "Session 2: Resistance 7.6 Ohm, current 7 Amps. 3-hint cognitive trap. Get ready.",
+      "items": [
+        {
+          "itemOrder": 1,
+          "globalItemNumber": 4,
+          "sourceItemId": "set05_s2_i01",
+          "chunkIds": [
+            "h_set05_s2_i1_1",
+            "h_set05_s2_i1_2",
+            "h_set05_s2_i1_3"
+          ],
+          "termVi": "Thị trường thương mại điện tử + tuy nhiên vậy + bão hòa nhanh",
+          "termEn": "e-commerce landscape + however now + saturates quickly",
+          "promptVi": "Thị trường thương mại điện tử / tuy nhiên vậy / bão hòa nhanh",
+          "promptEn": "e-commerce landscape / however now / saturates quickly",
+          "spokenScriptVi": "<speak><s>Thị trường thương mại điện tử</s> <break time=\"650ms\"/> <s>tuy nhiên vậy</s> <break time=\"650ms\"/> <s>bão hòa nhanh</s></speak>",
+          "spokenScriptEn": "<speak><s>e-commerce landscape</s> <break time=\"650ms\"/> <s>however now</s> <break time=\"650ms\"/> <s>saturates quickly</s></speak>",
+          "tc": 3,
+          "lc": 1.15,
+          "tl": 2.2,
+          "measuredCvr": 7.6,
+          "cvrBreakdown": {
+            "tc": 3,
+            "lc": 1.15,
+            "tl": 2.2,
+            "cvr": 7.6,
+            "cci": 7,
+            "cpd": 53.2
+          },
+          "hints": [
+            {
+              "id": "h_set05_s2_i1_1",
+              "text": "Thị trường thương mại điện tử",
+              "translation": "e-commerce landscape",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s2_i1_2",
+              "text": "tuy nhiên vậy",
+              "translation": "however now",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s2_i1_3",
+              "text": "bão hòa nhanh",
+              "translation": "saturates quickly",
+              "typeFunction": "Tính từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 2,
+          "globalItemNumber": 5,
+          "sourceItemId": "set05_s2_i02",
+          "chunkIds": [
+            "h_set05_s2_i2_1",
+            "h_set05_s2_i2_2",
+            "h_set05_s2_i2_3"
+          ],
+          "termVi": "Chiến dịch săn sale + trước đó trước + quảng bá rầm rộ",
+          "termEn": "flash sale drive + before that + hyped up",
+          "promptVi": "Chiến dịch săn sale / trước đó trước / quảng bá rầm rộ",
+          "promptEn": "flash sale drive / before that / hyped up",
+          "spokenScriptVi": "<speak><s>Chiến dịch săn sale</s> <break time=\"650ms\"/> <s>trước đó trước</s> <break time=\"650ms\"/> <s>quảng bá rầm rộ</s></speak>",
+          "spokenScriptEn": "<speak><s>flash sale drive</s> <break time=\"650ms\"/> <s>before that</s> <break time=\"650ms\"/> <s>hyped up</s></speak>",
+          "tc": 3,
+          "lc": 1.15,
+          "tl": 2.2,
+          "measuredCvr": 7.6,
+          "cvrBreakdown": {
+            "tc": 3,
+            "lc": 1.15,
+            "tl": 2.2,
+            "cvr": 7.6,
+            "cci": 7,
+            "cpd": 53.2
+          },
+          "hints": [
+            {
+              "id": "h_set05_s2_i2_1",
+              "text": "Chiến dịch săn sale",
+              "translation": "flash sale drive",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s2_i2_2",
+              "text": "trước đó trước",
+              "translation": "before that",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s2_i2_3",
+              "text": "quảng bá rầm rộ",
+              "translation": "hyped up",
+              "typeFunction": "Tính từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 3,
+          "globalItemNumber": 6,
+          "sourceItemId": "set05_s2_i03",
+          "chunkIds": [
+            "h_set05_s2_i3_1",
+            "h_set05_s2_i3_2",
+            "h_set05_s2_i3_3"
+          ],
+          "termVi": "Thanh toán ví điện tử + đồng thời cùng lúc + nhận mã hoàn tiền",
+          "termEn": "e-wallet checkout + meanwhile now + get cashback",
+          "promptVi": "Thanh toán ví điện tử / đồng thời cùng lúc / nhận mã hoàn tiền",
+          "promptEn": "e-wallet checkout / meanwhile now / get cashback",
+          "spokenScriptVi": "<speak><s>Thanh toán ví điện tử</s> <break time=\"650ms\"/> <s>đồng thời cùng lúc</s> <break time=\"650ms\"/> <s>nhận mã hoàn tiền</s></speak>",
+          "spokenScriptEn": "<speak><s>e-wallet checkout</s> <break time=\"650ms\"/> <s>meanwhile now</s> <break time=\"650ms\"/> <s>get cashback</s></speak>",
+          "tc": 3,
+          "lc": 1.15,
+          "tl": 2.2,
+          "measuredCvr": 7.6,
+          "cvrBreakdown": {
+            "tc": 3,
+            "lc": 1.15,
+            "tl": 2.2,
+            "cvr": 7.6,
+            "cci": 7,
+            "cpd": 53.2
+          },
+          "hints": [
+            {
+              "id": "h_set05_s2_i3_1",
+              "text": "Thanh toán ví điện tử",
+              "translation": "e-wallet checkout",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s2_i3_2",
+              "text": "đồng thời cùng lúc",
+              "translation": "meanwhile now",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s2_i3_3",
+              "text": "nhận mã hoàn tiền",
+              "translation": "get cashback",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sectionOrder": 3,
+      "part": 2,
+      "title": "Session 3 • 4 Hints (Awareness Trap)",
+      "targetCvrOhm": 10.6,
+      "cciAmpe": 5,
+      "cpd": 53,
+      "hintCount": 4,
+      "sessionLanguage": "vi",
+      "voiceModel": "google/vi-VN-Neural2-A",
+      "introTextVi": "Session 3: Mức kháng trở 10.6 Ohm, cường độ 5 Ampe. Bẫy nhận thức 4 cụm từ. Chuẩn bị.",
+      "introTextEn": "Session 3: Resistance 10.6 Ohm, current 5 Amps. 4-hint cognitive trap. Get ready.",
+      "items": [
+        {
+          "itemOrder": 1,
+          "globalItemNumber": 7,
+          "sourceItemId": "set05_s3_i01",
+          "chunkIds": [
+            "h_set05_s3_i1_1",
+            "h_set05_s3_i1_2",
+            "h_set05_s3_i1_3",
+            "h_set05_s3_i1_4"
+          ],
+          "termVi": "Ngành thương mại điện tử + trong khi đó + miếng bánh màu mỡ + ai cũng muốn chia phần",
+          "termEn": "e-commerce arena + while now + lucrative pie + everyone wants slice",
+          "promptVi": "Ngành thương mại điện tử / trong khi đó / miếng bánh màu mỡ / ai cũng muốn chia phần",
+          "promptEn": "e-commerce arena / while now / lucrative pie / everyone wants slice",
+          "spokenScriptVi": "<speak><s>Ngành thương mại điện tử</s> <break time=\"650ms\"/> <s>trong khi đó</s> <break time=\"650ms\"/> <s>miếng bánh màu mỡ</s> <break time=\"650ms\"/> <s>ai cũng muốn chia phần</s></speak>",
+          "spokenScriptEn": "<speak><s>e-commerce arena</s> <break time=\"650ms\"/> <s>while now</s> <break time=\"650ms\"/> <s>lucrative pie</s> <break time=\"650ms\"/> <s>everyone wants slice</s></speak>",
+          "tc": 4,
+          "lc": 1.15,
+          "tl": 2.3,
+          "measuredCvr": 10.6,
+          "cvrBreakdown": {
+            "tc": 4,
+            "lc": 1.15,
+            "tl": 2.3,
+            "cvr": 10.6,
+            "cci": 5,
+            "cpd": 53
+          },
+          "hints": [
+            {
+              "id": "h_set05_s3_i1_1",
+              "text": "Ngành thương mại điện tử",
+              "translation": "e-commerce arena",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s3_i1_2",
+              "text": "trong khi đó",
+              "translation": "while now",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s3_i1_3",
+              "text": "miếng bánh màu mỡ",
+              "translation": "lucrative pie",
+              "typeFunction": "Ẩn dụ · Fancy word"
+            },
+            {
+              "id": "h_set05_s3_i1_4",
+              "text": "ai cũng muốn chia phần",
+              "translation": "everyone wants slice",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 2,
+          "globalItemNumber": 8,
+          "sourceItemId": "set05_s3_i02",
+          "chunkIds": [
+            "h_set05_s3_i2_1",
+            "h_set05_s3_i2_2",
+            "h_set05_s3_i2_3",
+            "h_set05_s3_i2_4"
+          ],
+          "termVi": "Bất cứ khi nào + nếu không thì + cơn bão săn sale + sẽ làm sập hệ thống",
+          "termEn": "When now + otherwise now + shopping frenzy + crash servers",
+          "promptVi": "Bất cứ khi nào / nếu không thì / cơn bão săn sale / sẽ làm sập hệ thống",
+          "promptEn": "When now / otherwise now / shopping frenzy / crash servers",
+          "spokenScriptVi": "<speak><s>Bất cứ khi nào</s> <break time=\"650ms\"/> <s>nếu không thì</s> <break time=\"650ms\"/> <s>cơn bão săn sale</s> <break time=\"650ms\"/> <s>sẽ làm sập hệ thống</s></speak>",
+          "spokenScriptEn": "<speak><s>When now</s> <break time=\"650ms\"/> <s>otherwise now</s> <break time=\"650ms\"/> <s>shopping frenzy</s> <break time=\"650ms\"/> <s>crash servers</s></speak>",
+          "tc": 4,
+          "lc": 1.15,
+          "tl": 2.3,
+          "measuredCvr": 10.6,
+          "cvrBreakdown": {
+            "tc": 4,
+            "lc": 1.15,
+            "tl": 2.3,
+            "cvr": 10.6,
+            "cci": 5,
+            "cpd": 53
+          },
+          "hints": [
+            {
+              "id": "h_set05_s3_i2_1",
+              "text": "Bất cứ khi nào",
+              "translation": "When now",
+              "typeFunction": "Cụm nghi vấn · WH word"
+            },
+            {
+              "id": "h_set05_s3_i2_2",
+              "text": "nếu không thì",
+              "translation": "otherwise now",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s3_i2_3",
+              "text": "cơn bão săn sale",
+              "translation": "shopping frenzy",
+              "typeFunction": "Ẩn dụ · Fancy word"
+            },
+            {
+              "id": "h_set05_s3_i2_4",
+              "text": "sẽ làm sập hệ thống",
+              "translation": "crash servers",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 3,
+          "globalItemNumber": 9,
+          "sourceItemId": "set05_s3_i03",
+          "chunkIds": [
+            "h_set05_s3_i3_1",
+            "h_set05_s3_i3_2",
+            "h_set05_s3_i3_3",
+            "h_set05_s3_i3_4"
+          ],
+          "termVi": "Ví điện tử liên kết + tuy nhiên vậy + thỏi nam châm hút khách + tăng độ gắn kết",
+          "termEn": "linked e-wallet + however now + customer magnet + boost retention",
+          "promptVi": "Ví điện tử liên kết / tuy nhiên vậy / thỏi nam châm hút khách / tăng độ gắn kết",
+          "promptEn": "linked e-wallet / however now / customer magnet / boost retention",
+          "spokenScriptVi": "<speak><s>Ví điện tử liên kết</s> <break time=\"650ms\"/> <s>tuy nhiên vậy</s> <break time=\"650ms\"/> <s>thỏi nam châm hút khách</s> <break time=\"650ms\"/> <s>tăng độ gắn kết</s></speak>",
+          "spokenScriptEn": "<speak><s>linked e-wallet</s> <break time=\"650ms\"/> <s>however now</s> <break time=\"650ms\"/> <s>customer magnet</s> <break time=\"650ms\"/> <s>boost retention</s></speak>",
+          "tc": 4,
+          "lc": 1.15,
+          "tl": 2.3,
+          "measuredCvr": 10.6,
+          "cvrBreakdown": {
+            "tc": 4,
+            "lc": 1.15,
+            "tl": 2.3,
+            "cvr": 10.6,
+            "cci": 5,
+            "cpd": 53
+          },
+          "hints": [
+            {
+              "id": "h_set05_s3_i3_1",
+              "text": "Ví điện tử liên kết",
+              "translation": "linked e-wallet",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s3_i3_2",
+              "text": "tuy nhiên vậy",
+              "translation": "however now",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s3_i3_3",
+              "text": "thỏi nam châm hút khách",
+              "translation": "customer magnet",
+              "typeFunction": "Ẩn dụ · Fancy word"
+            },
+            {
+              "id": "h_set05_s3_i3_4",
+              "text": "tăng độ gắn kết",
+              "translation": "boost retention",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sectionOrder": 4,
+      "part": 2,
+      "title": "Session 4 • 2 Hints (Awareness Trap)",
+      "targetCvrOhm": 5.8,
+      "cciAmpe": 10,
+      "cpd": 58,
+      "hintCount": 2,
+      "sessionLanguage": "en",
+      "voiceModel": "google/en-US-Neural2-F",
+      "introTextVi": "Session 4: Mức kháng trở 5.8 Ohm, cường độ 10 Ampe. Bẫy nhận thức 2 cụm từ. Chuẩn bị.",
+      "introTextEn": "Session 4: Resistance 5.8 Ohm, current 10 Amps. 2-hint cognitive trap. Get ready.",
+      "items": [
+        {
+          "itemOrder": 1,
+          "globalItemNumber": 10,
+          "sourceItemId": "set05_s1_i04",
+          "chunkIds": [
+            "h_set05_s1_i4_1",
+            "h_set05_s1_i4_2"
+          ],
+          "termVi": "Trò chơi đốt tiền + kiệt quệ tài chính",
+          "termEn": "cash-burning game + financially drained",
+          "promptVi": "Trò chơi đốt tiền / kiệt quệ tài chính",
+          "promptEn": "cash-burning game / financially drained",
+          "spokenScriptVi": "<speak><s>Trò chơi đốt tiền</s> <break time=\"650ms\"/> <s>kiệt quệ tài chính</s></speak>",
+          "spokenScriptEn": "<speak><s>cash-burning game</s> <break time=\"650ms\"/> <s>financially drained</s></speak>",
+          "tc": 2,
+          "lc": 1.15,
+          "tl": 2.5,
+          "measuredCvr": 5.8,
+          "cvrBreakdown": {
+            "tc": 2,
+            "lc": 1.15,
+            "tl": 2.5,
+            "cvr": 5.8,
+            "cci": 10,
+            "cpd": 58
+          },
+          "hints": [
+            {
+              "id": "h_set05_s1_i4_1",
+              "text": "Trò chơi đốt tiền",
+              "translation": "cash-burning game",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s1_i4_2",
+              "text": "kiệt quệ tài chính",
+              "translation": "financially drained",
+              "typeFunction": "Tính từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 2,
+          "globalItemNumber": 11,
+          "sourceItemId": "set05_s1_i05",
+          "chunkIds": [
+            "h_set05_s1_i5_1",
+            "h_set05_s1_i5_2"
+          ],
+          "termVi": "Mức giá cạnh tranh + thu hút khách mua",
+          "termEn": "competitive pricing + draw customers",
+          "promptVi": "Mức giá cạnh tranh / thu hút khách mua",
+          "promptEn": "competitive pricing / draw customers",
+          "spokenScriptVi": "<speak><s>Mức giá cạnh tranh</s> <break time=\"650ms\"/> <s>thu hút khách mua</s></speak>",
+          "spokenScriptEn": "<speak><s>competitive pricing</s> <break time=\"650ms\"/> <s>draw customers</s></speak>",
+          "tc": 2,
+          "lc": 1.15,
+          "tl": 2.5,
+          "measuredCvr": 5.8,
+          "cvrBreakdown": {
+            "tc": 2,
+            "lc": 1.15,
+            "tl": 2.5,
+            "cvr": 5.8,
+            "cci": 10,
+            "cpd": 58
+          },
+          "hints": [
+            {
+              "id": "h_set05_s1_i5_1",
+              "text": "Mức giá cạnh tranh",
+              "translation": "competitive pricing",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s1_i5_2",
+              "text": "thu hút khách mua",
+              "translation": "draw customers",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 3,
+          "globalItemNumber": 12,
+          "sourceItemId": "set05_s1_i06",
+          "chunkIds": [
+            "h_set05_s1_i6_1",
+            "h_set05_s1_i6_2"
+          ],
+          "termVi": "Người tiêu dùng tùy hứng + chốt đơn nhanh",
+          "termEn": "impulsive spender + buy on impulse",
+          "promptVi": "Người tiêu dùng tùy hứng / chốt đơn nhanh",
+          "promptEn": "impulsive spender / buy on impulse",
+          "spokenScriptVi": "<speak><s>Người tiêu dùng tùy hứng</s> <break time=\"650ms\"/> <s>chốt đơn nhanh</s></speak>",
+          "spokenScriptEn": "<speak><s>impulsive spender</s> <break time=\"650ms\"/> <s>buy on impulse</s></speak>",
+          "tc": 2,
+          "lc": 1.15,
+          "tl": 2.5,
+          "measuredCvr": 5.8,
+          "cvrBreakdown": {
+            "tc": 2,
+            "lc": 1.15,
+            "tl": 2.5,
+            "cvr": 5.8,
+            "cci": 10,
+            "cpd": 58
+          },
+          "hints": [
+            {
+              "id": "h_set05_s1_i6_1",
+              "text": "Người tiêu dùng tùy hứng",
+              "translation": "impulsive spender",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s1_i6_2",
+              "text": "chốt đơn nhanh",
+              "translation": "buy on impulse",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sectionOrder": 5,
+      "part": 3,
+      "title": "Session 5 • 3 Hints (Awareness Trap)",
+      "targetCvrOhm": 9.3,
+      "cciAmpe": 6,
+      "cpd": 55.8,
+      "hintCount": 3,
+      "sessionLanguage": "en",
+      "voiceModel": "google/en-US-Neural2-F",
+      "introTextVi": "Session 5: Mức kháng trở 9.3 Ohm, cường độ 6 Ampe. Bẫy nhận thức 3 cụm từ. Chuẩn bị.",
+      "introTextEn": "Session 5: Resistance 9.3 Ohm, current 6 Amps. 3-hint cognitive trap. Get ready.",
+      "items": [
+        {
+          "itemOrder": 1,
+          "globalItemNumber": 13,
+          "sourceItemId": "set05_s2_i04",
+          "chunkIds": [
+            "h_set05_s2_i4_1",
+            "h_set05_s2_i4_2",
+            "h_set05_s2_i4_3"
+          ],
+          "termVi": "Chiêu trò đốt tiền + do đó cho nên + không bền lâu dài",
+          "termEn": "cash burning tactics + therefore now + unsustainable now",
+          "promptVi": "Chiêu trò đốt tiền / do đó cho nên / không bền lâu dài",
+          "promptEn": "cash burning tactics / therefore now / unsustainable now",
+          "spokenScriptVi": "<speak><s>Chiêu trò đốt tiền</s> <break time=\"650ms\"/> <s>do đó cho nên</s> <break time=\"650ms\"/> <s>không bền lâu dài</s></speak>",
+          "spokenScriptEn": "<speak><s>cash burning tactics</s> <break time=\"650ms\"/> <s>therefore now</s> <break time=\"650ms\"/> <s>unsustainable now</s></speak>",
+          "tc": 3,
+          "lc": 1.15,
+          "tl": 2.7,
+          "measuredCvr": 9.3,
+          "cvrBreakdown": {
+            "tc": 3,
+            "lc": 1.15,
+            "tl": 2.7,
+            "cvr": 9.3,
+            "cci": 6,
+            "cpd": 55.8
+          },
+          "hints": [
+            {
+              "id": "h_set05_s2_i4_1",
+              "text": "Chiêu trò đốt tiền",
+              "translation": "cash burning tactics",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s2_i4_2",
+              "text": "do đó cho nên",
+              "translation": "therefore now",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s2_i4_3",
+              "text": "không bền lâu dài",
+              "translation": "unsustainable now",
+              "typeFunction": "Tính từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 2,
+          "globalItemNumber": 14,
+          "sourceItemId": "set05_s2_i05",
+          "chunkIds": [
+            "h_set05_s2_i5_1",
+            "h_set05_s2_i5_2",
+            "h_set05_s2_i5_3"
+          ],
+          "termVi": "Chiến lược giá cạnh tranh + nếu không thì + mất thị phần",
+          "termEn": "competitive pricing + otherwise now + lose market share",
+          "promptVi": "Chiến lược giá cạnh tranh / nếu không thì / mất thị phần",
+          "promptEn": "competitive pricing / otherwise now / lose market share",
+          "spokenScriptVi": "<speak><s>Chiến lược giá cạnh tranh</s> <break time=\"650ms\"/> <s>nếu không thì</s> <break time=\"650ms\"/> <s>mất thị phần</s></speak>",
+          "spokenScriptEn": "<speak><s>competitive pricing</s> <break time=\"650ms\"/> <s>otherwise now</s> <break time=\"650ms\"/> <s>lose market share</s></speak>",
+          "tc": 3,
+          "lc": 1.15,
+          "tl": 2.7,
+          "measuredCvr": 9.3,
+          "cvrBreakdown": {
+            "tc": 3,
+            "lc": 1.15,
+            "tl": 2.7,
+            "cvr": 9.3,
+            "cci": 6,
+            "cpd": 55.8
+          },
+          "hints": [
+            {
+              "id": "h_set05_s2_i5_1",
+              "text": "Chiến lược giá cạnh tranh",
+              "translation": "competitive pricing",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s2_i5_2",
+              "text": "nếu không thì",
+              "translation": "otherwise now",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s2_i5_3",
+              "text": "mất thị phần",
+              "translation": "lose market share",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 3,
+          "globalItemNumber": 15,
+          "sourceItemId": "set05_s2_i06",
+          "chunkIds": [
+            "h_set05_s2_i6_1",
+            "h_set05_s2_i6_2",
+            "h_set05_s2_i6_3"
+          ],
+          "termVi": "Khách mua sắm tùy hứng + hơn thế nữa + thích quà tặng kèm",
+          "termEn": "impulsive shoppers + in addition + love freebies",
+          "promptVi": "Khách mua sắm tùy hứng / hơn thế nữa / thích quà tặng kèm",
+          "promptEn": "impulsive shoppers / in addition / love freebies",
+          "spokenScriptVi": "<speak><s>Khách mua sắm tùy hứng</s> <break time=\"650ms\"/> <s>hơn thế nữa</s> <break time=\"650ms\"/> <s>thích quà tặng kèm</s></speak>",
+          "spokenScriptEn": "<speak><s>impulsive shoppers</s> <break time=\"650ms\"/> <s>in addition</s> <break time=\"650ms\"/> <s>love freebies</s></speak>",
+          "tc": 3,
+          "lc": 1.15,
+          "tl": 2.7,
+          "measuredCvr": 9.3,
+          "cvrBreakdown": {
+            "tc": 3,
+            "lc": 1.15,
+            "tl": 2.7,
+            "cvr": 9.3,
+            "cci": 6,
+            "cpd": 55.8
+          },
+          "hints": [
+            {
+              "id": "h_set05_s2_i6_1",
+              "text": "Khách mua sắm tùy hứng",
+              "translation": "impulsive shoppers",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s2_i6_2",
+              "text": "hơn thế nữa",
+              "translation": "in addition",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s2_i6_3",
+              "text": "thích quà tặng kèm",
+              "translation": "love freebies",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sectionOrder": 6,
+      "part": 3,
+      "title": "Session 6 • 4 Hints (Awareness Trap)",
+      "targetCvrOhm": 12.9,
+      "cciAmpe": 4,
+      "cpd": 51.6,
+      "hintCount": 4,
+      "sessionLanguage": "en",
+      "voiceModel": "google/en-US-Neural2-F",
+      "introTextVi": "Session 6: Mức kháng trở 12.9 Ohm, cường độ 4 Ampe. Bẫy nhận thức 4 cụm từ. Chuẩn bị.",
+      "introTextEn": "Session 6: Resistance 12.9 Ohm, current 4 Amps. 4-hint cognitive trap. Get ready.",
+      "items": [
+        {
+          "itemOrder": 1,
+          "globalItemNumber": 16,
+          "sourceItemId": "set05_s3_i04",
+          "chunkIds": [
+            "h_set05_s3_i4_1",
+            "h_set05_s3_i4_2",
+            "h_set05_s3_i4_3",
+            "h_set05_s3_i4_4"
+          ],
+          "termVi": "Trò chơi đốt tiền + do đó cho nên + hố sâu không đáy + nuốt trọn nguồn vốn",
+          "termEn": "cash-burning war + therefore now + bottomless pit + swallow capital",
+          "promptVi": "Trò chơi đốt tiền / do đó cho nên / hố sâu không đáy / nuốt trọn nguồn vốn",
+          "promptEn": "cash-burning war / therefore now / bottomless pit / swallow capital",
+          "spokenScriptVi": "<speak><s>Trò chơi đốt tiền</s> <break time=\"650ms\"/> <s>do đó cho nên</s> <break time=\"650ms\"/> <s>hố sâu không đáy</s> <break time=\"650ms\"/> <s>nuốt trọn nguồn vốn</s></speak>",
+          "spokenScriptEn": "<speak><s>cash-burning war</s> <break time=\"650ms\"/> <s>therefore now</s> <break time=\"650ms\"/> <s>bottomless pit</s> <break time=\"650ms\"/> <s>swallow capital</s></speak>",
+          "tc": 4,
+          "lc": 1.15,
+          "tl": 2.8,
+          "measuredCvr": 12.9,
+          "cvrBreakdown": {
+            "tc": 4,
+            "lc": 1.15,
+            "tl": 2.8,
+            "cvr": 12.9,
+            "cci": 4,
+            "cpd": 51.6
+          },
+          "hints": [
+            {
+              "id": "h_set05_s3_i4_1",
+              "text": "Trò chơi đốt tiền",
+              "translation": "cash-burning war",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s3_i4_2",
+              "text": "do đó cho nên",
+              "translation": "therefore now",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s3_i4_3",
+              "text": "hố sâu không đáy",
+              "translation": "bottomless pit",
+              "typeFunction": "Ẩn dụ · Fancy word"
+            },
+            {
+              "id": "h_set05_s3_i4_4",
+              "text": "nuốt trọn nguồn vốn",
+              "translation": "swallow capital",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 2,
+          "globalItemNumber": 17,
+          "sourceItemId": "set05_s3_i05",
+          "chunkIds": [
+            "h_set05_s3_i5_1",
+            "h_set05_s3_i5_2",
+            "h_set05_s3_i5_3",
+            "h_set05_s3_i5_4"
+          ],
+          "termVi": "Giá cả cạnh tranh + mặc dù vậy + con dao hai lưỡi + bào mòn lợi nhuận",
+          "termEn": "aggressive price cuts + although now + double-edged blade + erode profit margins",
+          "promptVi": "Giá cả cạnh tranh / mặc dù vậy / con dao hai lưỡi / bào mòn lợi nhuận",
+          "promptEn": "aggressive price cuts / although now / double-edged blade / erode profit margins",
+          "spokenScriptVi": "<speak><s>Giá cả cạnh tranh</s> <break time=\"650ms\"/> <s>mặc dù vậy</s> <break time=\"650ms\"/> <s>con dao hai lưỡi</s> <break time=\"650ms\"/> <s>bào mòn lợi nhuận</s></speak>",
+          "spokenScriptEn": "<speak><s>aggressive price cuts</s> <break time=\"650ms\"/> <s>although now</s> <break time=\"650ms\"/> <s>double-edged blade</s> <break time=\"650ms\"/> <s>erode profit margins</s></speak>",
+          "tc": 4,
+          "lc": 1.15,
+          "tl": 2.8,
+          "measuredCvr": 12.9,
+          "cvrBreakdown": {
+            "tc": 4,
+            "lc": 1.15,
+            "tl": 2.8,
+            "cvr": 12.9,
+            "cci": 4,
+            "cpd": 51.6
+          },
+          "hints": [
+            {
+              "id": "h_set05_s3_i5_1",
+              "text": "Giá cả cạnh tranh",
+              "translation": "aggressive price cuts",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s3_i5_2",
+              "text": "mặc dù vậy",
+              "translation": "although now",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s3_i5_3",
+              "text": "con dao hai lưỡi",
+              "translation": "double-edged blade",
+              "typeFunction": "Ẩn dụ · Fancy word"
+            },
+            {
+              "id": "h_set05_s3_i5_4",
+              "text": "bào mòn lợi nhuận",
+              "translation": "erode profit margins",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 3,
+          "globalItemNumber": 18,
+          "sourceItemId": "set05_s3_i06",
+          "chunkIds": [
+            "h_set05_s3_i6_1",
+            "h_set05_s3_i6_2",
+            "h_set05_s3_i6_3",
+            "h_set05_s3_i6_4"
+          ],
+          "termVi": "Lý do vì sao + hơn thế nữa + con nghiện mua sắm + vung tay quá trán",
+          "termEn": "Why now + moreover now + shopaholic instinct + overspend wildly",
+          "promptVi": "Lý do vì sao / hơn thế nữa / con nghiện mua sắm / vung tay quá trán",
+          "promptEn": "Why now / moreover now / shopaholic instinct / overspend wildly",
+          "spokenScriptVi": "<speak><s>Lý do vì sao</s> <break time=\"650ms\"/> <s>hơn thế nữa</s> <break time=\"650ms\"/> <s>con nghiện mua sắm</s> <break time=\"650ms\"/> <s>vung tay quá trán</s></speak>",
+          "spokenScriptEn": "<speak><s>Why now</s> <break time=\"650ms\"/> <s>moreover now</s> <break time=\"650ms\"/> <s>shopaholic instinct</s> <break time=\"650ms\"/> <s>overspend wildly</s></speak>",
+          "tc": 4,
+          "lc": 1.15,
+          "tl": 2.8,
+          "measuredCvr": 12.9,
+          "cvrBreakdown": {
+            "tc": 4,
+            "lc": 1.15,
+            "tl": 2.8,
+            "cvr": 12.9,
+            "cci": 4,
+            "cpd": 51.6
+          },
+          "hints": [
+            {
+              "id": "h_set05_s3_i6_1",
+              "text": "Lý do vì sao",
+              "translation": "Why now",
+              "typeFunction": "Cụm nghi vấn · WH word"
+            },
+            {
+              "id": "h_set05_s3_i6_2",
+              "text": "hơn thế nữa",
+              "translation": "moreover now",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s3_i6_3",
+              "text": "con nghiện mua sắm",
+              "translation": "shopaholic instinct",
+              "typeFunction": "Ẩn dụ · Fancy word"
+            },
+            {
+              "id": "h_set05_s3_i6_4",
+              "text": "vung tay quá trán",
+              "translation": "overspend wildly",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sectionOrder": 7,
+      "part": 3,
+      "title": "Session 7 • 4 Hints (Awareness Trap)",
+      "targetCvrOhm": 13.8,
+      "cciAmpe": 4,
+      "cpd": 55.2,
+      "hintCount": 4,
+      "sessionLanguage": "en",
+      "voiceModel": "google/en-US-Neural2-F",
+      "introTextVi": "Session 7: Mức kháng trở 13.8 Ohm, cường độ 4 Ampe. Bẫy nhận thức 4 cụm từ. Chuẩn bị.",
+      "introTextEn": "Session 7: Resistance 13.8 Ohm, current 4 Amps. 4-hint cognitive trap. Get ready.",
+      "items": [
+        {
+          "itemOrder": 1,
+          "globalItemNumber": 19,
+          "sourceItemId": "set05_s3_i07",
+          "chunkIds": [
+            "h_set05_s3_i7_1",
+            "h_set05_s3_i7_2",
+            "h_set05_s3_i7_3",
+            "h_set05_s3_i7_4"
+          ],
+          "termVi": "Đi lượn lờ ngắm đồ + sau đó liền + mồi câu hấp dẫn + khiến chốt đơn ngay",
+          "termEn": "window shopping stroll + then now + sweet bait + trigger instant buy",
+          "promptVi": "Đi lượn lờ ngắm đồ / sau đó liền / mồi câu hấp dẫn / khiến chốt đơn ngay",
+          "promptEn": "window shopping stroll / then now / sweet bait / trigger instant buy",
+          "spokenScriptVi": "<speak><s>Đi lượn lờ ngắm đồ</s> <break time=\"650ms\"/> <s>sau đó liền</s> <break time=\"650ms\"/> <s>mồi câu hấp dẫn</s> <break time=\"650ms\"/> <s>khiến chốt đơn ngay</s></speak>",
+          "spokenScriptEn": "<speak><s>window shopping stroll</s> <break time=\"650ms\"/> <s>then now</s> <break time=\"650ms\"/> <s>sweet bait</s> <break time=\"650ms\"/> <s>trigger instant buy</s></speak>",
+          "tc": 4,
+          "lc": 1.15,
+          "tl": 3,
+          "measuredCvr": 13.8,
+          "cvrBreakdown": {
+            "tc": 4,
+            "lc": 1.15,
+            "tl": 3,
+            "cvr": 13.8,
+            "cci": 4,
+            "cpd": 55.2
+          },
+          "hints": [
+            {
+              "id": "h_set05_s3_i7_1",
+              "text": "Đi lượn lờ ngắm đồ",
+              "translation": "window shopping stroll",
+              "typeFunction": "Động từ · Keyword"
+            },
+            {
+              "id": "h_set05_s3_i7_2",
+              "text": "sau đó liền",
+              "translation": "then now",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s3_i7_3",
+              "text": "mồi câu hấp dẫn",
+              "translation": "sweet bait",
+              "typeFunction": "Ẩn dụ · Fancy word"
+            },
+            {
+              "id": "h_set05_s3_i7_4",
+              "text": "khiến chốt đơn ngay",
+              "translation": "trigger instant buy",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 2,
+          "globalItemNumber": 20,
+          "sourceItemId": "set05_s3_i08",
+          "chunkIds": [
+            "h_set05_s3_i8_1",
+            "h_set05_s3_i8_2",
+            "h_set05_s3_i8_3",
+            "h_set05_s3_i8_4"
+          ],
+          "termVi": "Giỏ hàng đầy ắp + thay vào đó + nỗi sợ bỏ lỡ + thúc giục thanh toán",
+          "termEn": "stuffed cart + instead of that + FOMO fever + rush to checkout",
+          "promptVi": "Giỏ hàng đầy ắp / thay vào đó / nỗi sợ bỏ lỡ / thúc giục thanh toán",
+          "promptEn": "stuffed cart / instead of that / FOMO fever / rush to checkout",
+          "spokenScriptVi": "<speak><s>Giỏ hàng đầy ắp</s> <break time=\"650ms\"/> <s>thay vào đó</s> <break time=\"650ms\"/> <s>nỗi sợ bỏ lỡ</s> <break time=\"650ms\"/> <s>thúc giục thanh toán</s></speak>",
+          "spokenScriptEn": "<speak><s>stuffed cart</s> <break time=\"650ms\"/> <s>instead of that</s> <break time=\"650ms\"/> <s>FOMO fever</s> <break time=\"650ms\"/> <s>rush to checkout</s></speak>",
+          "tc": 4,
+          "lc": 1.15,
+          "tl": 3,
+          "measuredCvr": 13.8,
+          "cvrBreakdown": {
+            "tc": 4,
+            "lc": 1.15,
+            "tl": 3,
+            "cvr": 13.8,
+            "cci": 4,
+            "cpd": 55.2
+          },
+          "hints": [
+            {
+              "id": "h_set05_s3_i8_1",
+              "text": "Giỏ hàng đầy ắp",
+              "translation": "stuffed cart",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s3_i8_2",
+              "text": "thay vào đó",
+              "translation": "instead of that",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s3_i8_3",
+              "text": "nỗi sợ bỏ lỡ",
+              "translation": "FOMO fever",
+              "typeFunction": "Ẩn dụ · Fancy word"
+            },
+            {
+              "id": "h_set05_s3_i8_4",
+              "text": "thúc giục thanh toán",
+              "translation": "rush to checkout",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 3,
+          "globalItemNumber": 21,
+          "sourceItemId": "set05_s3_i09",
+          "chunkIds": [
+            "h_set05_s3_i9_1",
+            "h_set05_s3_i9_2",
+            "h_set05_s3_i9_3",
+            "h_set05_s3_i9_4"
+          ],
+          "termVi": "Bao lâu + nếu không cẩn thận + rò rỉ dữ liệu + mất hết uy tín",
+          "termEn": "How long + if now + data leak breach + lose trust entirely",
+          "promptVi": "Bao lâu / nếu không cẩn thận / rò rỉ dữ liệu / mất hết uy tín",
+          "promptEn": "How long / if now / data leak breach / lose trust entirely",
+          "spokenScriptVi": "<speak><s>Bao lâu</s> <break time=\"650ms\"/> <s>nếu không cẩn thận</s> <break time=\"650ms\"/> <s>rò rỉ dữ liệu</s> <break time=\"650ms\"/> <s>mất hết uy tín</s></speak>",
+          "spokenScriptEn": "<speak><s>How long</s> <break time=\"650ms\"/> <s>if now</s> <break time=\"650ms\"/> <s>data leak breach</s> <break time=\"650ms\"/> <s>lose trust entirely</s></speak>",
+          "tc": 4,
+          "lc": 1.15,
+          "tl": 3,
+          "measuredCvr": 13.8,
+          "cvrBreakdown": {
+            "tc": 4,
+            "lc": 1.15,
+            "tl": 3,
+            "cvr": 13.8,
+            "cci": 4,
+            "cpd": 55.2
+          },
+          "hints": [
+            {
+              "id": "h_set05_s3_i9_1",
+              "text": "Bao lâu",
+              "translation": "How long",
+              "typeFunction": "Cụm nghi vấn · WH word"
+            },
+            {
+              "id": "h_set05_s3_i9_2",
+              "text": "nếu không cẩn thận",
+              "translation": "if now",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s3_i9_3",
+              "text": "rò rỉ dữ liệu",
+              "translation": "data leak breach",
+              "typeFunction": "Ẩn dụ · Fancy word"
+            },
+            {
+              "id": "h_set05_s3_i9_4",
+              "text": "mất hết uy tín",
+              "translation": "lose trust entirely",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "totalItems": 21
+}

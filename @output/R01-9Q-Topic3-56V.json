@@ -1,0 +1,302 @@
+{
+  "packageCode": "R01-9Q-Topic3-56V",
+  "title": "R01-9Q-Topic3: Day 3 - Lesson 2 What you'd like to do? (Awareness 56V - Multi-Type Traps)",
+  "testType": "RED",
+  "archetype": "Awareness & Traps (Khả năng nhận biết bẫy, kiềm chế xung động phản xạ sai & phục hồi lỗi)",
+  "topicNumber": 3,
+  "lessonId": "level_a_day_3",
+  "lessonTitle": "Day 3 - Lesson 2 What you'd like to do?",
+  "targetCpdVoltage": 56,
+  "totalSessions": 3,
+  "totalQuestions": 9,
+  "itemsPerSession": 3,
+  "sentenceStructureRule": "Ghép đa cụm từ với cấu trúc từ và loại bẫy (Hint Types) HOÀN TOÀN KHÁC NHAU cho từng câu. Khoảng ngắt SSML 650ms giữa 2 cụm để đo thời gian kiềm chế phản xạ.",
+  "audioFlow": {
+    "packageStart": {
+      "vi": "Chào mừng bạn đến với Red Test R01-9Q-Topic3-56V. Bài kiểm tra thử thách khả năng nhận biết bẫy và kiềm chế xung động qua các cấu trúc từ vựng đa dạng và khoảng trễ 650ms.",
+      "en": "Welcome to Red Test R01-9Q-Topic3-56V. This assessment tests your trap detection and inhibitory control across diverse lexical architectures with 650ms semantic latency."
+    },
+    "packageEnd": {
+      "vi": "Hoàn thành xuất sắc bài kiểm tra Red Test 56V. Hệ số xử lý các loại bẫy nhận thức đa dạng của bạn đang được trích xuất.",
+      "en": "Outstanding effort completing Red Test 56V. Your multi-trap detection and latency recovery metrics are now being compiled."
+    }
+  },
+  "sessions": [
+    {
+      "sessionOrder": 1,
+      "title": "Session 1: Awareness Challenge (Trap Level 1: Acoustic & Latency Modulation)",
+      "targetCvrOhm": 5,
+      "cciAmps": 8,
+      "cpdVoltage": 40,
+      "itemsCount": 3,
+      "items": [
+        {
+          "itemOrder": 1,
+          "sessionOrder": 1,
+          "trapType": "Scale Contrast Trap (Đơn thể siêu to vs Cụm từ màu sắc nhỏ)",
+          "termVi": "Con voi ; Mèo mun",
+          "termEn": "Elephant ; Black cat",
+          "term1": {
+            "en": "Elephant",
+            "vi": "Con voi"
+          },
+          "term2": {
+            "en": "Black cat",
+            "vi": "Mèo mun"
+          },
+          "promptVi": "[Scale Contrast Trap (Đơn thể siêu to vs Cụm từ màu sắc nhỏ)] Điều chỉnh trường năng lượng: Chuyển đổi dứt khoát từ danh từ thực thể lớn sang cụm miêu tả nhỏ sau khoảng ngắt 650ms.",
+          "promptEn": "[Scale Contrast Trap (Đơn thể siêu to vs Cụm từ màu sắc nhỏ)] Scale contrast: Shift vocal energy decisively from the massive entity chunk to the descriptive minor chunk across the 650ms gap.",
+          "spokenScriptVi": "<speak><s>Con voi</s> <break time=\"650ms\"/> <s>Mèo mun</s></speak>",
+          "spokenScriptEn": "<speak><s>Elephant</s> <break time=\"650ms\"/> <s>Black cat</s></speak>",
+          "hasSsml": true,
+          "ssmlGap": "650ms",
+          "tc": 3,
+          "lc": 2,
+          "tl": 2,
+          "measuredCvrOhm": 5,
+          "cognitiveLoadDescription": "Multi-term cognitive trap with 650ms latency gap (TL=2.0, Type: Scale Contrast Trap (Đơn thể siêu to vs Cụm từ màu sắc nhỏ))"
+        },
+        {
+          "itemOrder": 2,
+          "sessionOrder": 1,
+          "trapType": "Phonetic Terminal Plosive Trap (Bẫy trượt âm cuối /g/ vs /t/)",
+          "termVi": "Chó mực ; Mèo mun",
+          "termEn": "Black dog ; Black cat",
+          "term1": {
+            "en": "Black dog",
+            "vi": "Chó mực"
+          },
+          "term2": {
+            "en": "Black cat",
+            "vi": "Mèo mun"
+          },
+          "promptVi": "[Phonetic Terminal Plosive Trap (Bẫy trượt âm cuối /g/ vs /t/)] Bật rõ âm đuôi /g/ ở vế đầu và /t/ ở vế sau; tuyệt đối không để quán tính lặp từ \"Black\" làm nuốt phụ âm cuối.",
+          "promptEn": "[Phonetic Terminal Plosive Trap (Bẫy trượt âm cuối /g/ vs /t/)] Articulate terminal /g/ and /t/ plosives distinctly; prevent the repetitive \"Black\" modifier from swallowing final stops.",
+          "spokenScriptVi": "<speak><s>Chó mực</s> <break time=\"650ms\"/> <s>Mèo mun</s></speak>",
+          "spokenScriptEn": "<speak><s>Black dog</s> <break time=\"650ms\"/> <s>Black cat</s></speak>",
+          "hasSsml": true,
+          "ssmlGap": "650ms",
+          "tc": 3,
+          "lc": 2,
+          "tl": 2,
+          "measuredCvrOhm": 5,
+          "cognitiveLoadDescription": "Multi-term cognitive trap with 650ms latency gap (TL=2.0, Type: Phonetic Terminal Plosive Trap (Bẫy trượt âm cuối /g/ vs /t/))"
+        },
+        {
+          "itemOrder": 3,
+          "sessionOrder": 1,
+          "trapType": "Acoustic Latency Hold (Kiềm chế phản xạ sớm qua khoảng lặng)",
+          "termVi": "Con khỉ ; Gà và vịt",
+          "termEn": "Monkey ; Chicken & duck",
+          "term1": {
+            "en": "Monkey",
+            "vi": "Con khỉ"
+          },
+          "term2": {
+            "en": "Chicken & duck",
+            "vi": "Gà và vịt"
+          },
+          "promptVi": "[Acoustic Latency Hold (Kiềm chế phản xạ sớm qua khoảng lặng)] Giữ vững sự điềm tĩnh qua khoảng lặng 650ms; không được vội vàng phát âm cụm liên từ trước khi khoảng ngắt chấm dứt.",
+          "promptEn": "[Acoustic Latency Hold (Kiềm chế phản xạ sớm qua khoảng lặng)] Hold through the 650ms acoustic silence; resist premature vocalization of the coordinate conjunction chunk.",
+          "spokenScriptVi": "<speak><s>Con khỉ</s> <break time=\"650ms\"/> <s>Gà và vịt</s></speak>",
+          "spokenScriptEn": "<speak><s>Monkey</s> <break time=\"650ms\"/> <s>Chicken & duck</s></speak>",
+          "hasSsml": true,
+          "ssmlGap": "650ms",
+          "tc": 3,
+          "lc": 2,
+          "tl": 2,
+          "measuredCvrOhm": 5,
+          "cognitiveLoadDescription": "Multi-term cognitive trap with 650ms latency gap (TL=2.0, Type: Acoustic Latency Hold (Kiềm chế phản xạ sớm qua khoảng lặng))"
+        }
+      ],
+      "sessionIntroScript": {
+        "vi": "Chào mừng bạn đến với phiên bẫy nhận thức 1. CVR điện trở đạt 5 Ohm, dòng kích thích 8 Ampe. Mỗi câu hỏi chứa một cấu trúc bẫy nhận thức hoàn toàn khác biệt.",
+        "en": "Welcome to Awareness Session 1. Cognitive resistance is 5 Ohms with 8 Amps drive. Each prompt presents an entirely distinct cognitive trap architecture."
+      }
+    },
+    {
+      "sessionOrder": 2,
+      "title": "Session 2: Awareness Challenge (Trap Level 2: Semantic Inversion & Coordinate Stress)",
+      "targetCvrOhm": 7,
+      "cciAmps": 8,
+      "cpdVoltage": 56,
+      "itemsCount": 3,
+      "items": [
+        {
+          "itemOrder": 4,
+          "sessionOrder": 2,
+          "trapType": "Cognitive Semantic Clash (Đối đầu khái niệm dã thú quen thuộc)",
+          "termVi": "Con sư tử ; Con cọp",
+          "termEn": "Lion ; Tiger",
+          "term1": {
+            "en": "Lion",
+            "vi": "Con sư tử"
+          },
+          "term2": {
+            "en": "Tiger",
+            "vi": "Con cọp"
+          },
+          "promptVi": "[Cognitive Semantic Clash (Đối đầu khái niệm dã thú quen thuộc)] Tách bạch rõ ràng hai dã thú tương đồng; tránh xu hướng ghép tắt hay đảo vị trí của chuỗi thuật ngữ.",
+          "promptEn": "[Cognitive Semantic Clash (Đối đầu khái niệm dã thú quen thuộc)] Maintain strict mental boundaries between opposing predator archetypes; resist swapping their designated sequential order.",
+          "spokenScriptVi": "<speak><s>Con sư tử</s> <break time=\"650ms\"/> <s>Con cọp</s></speak>",
+          "spokenScriptEn": "<speak><s>Lion</s> <break time=\"650ms\"/> <s>Tiger</s></speak>",
+          "hasSsml": true,
+          "ssmlGap": "650ms",
+          "tc": 4,
+          "lc": 2,
+          "tl": 2,
+          "measuredCvrOhm": 7,
+          "cognitiveLoadDescription": "Multi-term cognitive trap with 650ms latency gap (TL=2.0, Type: Cognitive Semantic Clash (Đối đầu khái niệm dã thú quen thuộc))"
+        },
+        {
+          "itemOrder": 5,
+          "sessionOrder": 2,
+          "trapType": "Structural Coordination Trap (Cặp vật nuôi kép vs Đơn thú âm xát)",
+          "termVi": "Chó và mèo ; Con rắn",
+          "termEn": "Dog & cat ; Snake",
+          "term1": {
+            "en": "Dog & cat",
+            "vi": "Chó và mèo"
+          },
+          "term2": {
+            "en": "Snake",
+            "vi": "Con rắn"
+          },
+          "promptVi": "[Structural Coordination Trap (Cặp vật nuôi kép vs Đơn thú âm xát)] Xử lý trơn tru liên từ \"&\" ở vế trước, sau đó bật âm xát /s/ sắc nét ở vế sau mà không bị ngắc ngứ.",
+          "promptEn": "[Structural Coordination Trap (Cặp vật nuôi kép vs Đơn thú âm xát)] Smoothly navigate the coordinate \"&\" in the opening phrase, then deliver a sharp initial sibilant on the closing term.",
+          "spokenScriptVi": "<speak><s>Chó và mèo</s> <break time=\"650ms\"/> <s>Con rắn</s></speak>",
+          "spokenScriptEn": "<speak><s>Dog & cat</s> <break time=\"650ms\"/> <s>Snake</s></speak>",
+          "hasSsml": true,
+          "ssmlGap": "650ms",
+          "tc": 4,
+          "lc": 2,
+          "tl": 2,
+          "measuredCvrOhm": 7,
+          "cognitiveLoadDescription": "Multi-term cognitive trap with 650ms latency gap (TL=2.0, Type: Structural Coordination Trap (Cặp vật nuôi kép vs Đơn thú âm xát))"
+        },
+        {
+          "itemOrder": 6,
+          "sessionOrder": 2,
+          "trapType": "Familiarity Suppression Trap (Ức chế quán tính khẩu ngữ)",
+          "termVi": "Con bò ; Gà và vịt",
+          "termEn": "Cow ; Chicken & duck",
+          "term1": {
+            "en": "Cow",
+            "vi": "Con bò"
+          },
+          "term2": {
+            "en": "Chicken & duck",
+            "vi": "Gà và vịt"
+          },
+          "promptVi": "[Familiarity Suppression Trap (Ức chế quán tính khẩu ngữ)] Ức chế thói quen liên tưởng thành ngữ dân gian; phát âm chuẩn xác từng âm vị theo đúng chuỗi tín hiệu.",
+          "promptEn": "[Familiarity Suppression Trap (Ức chế quán tính khẩu ngữ)] Suppress colloquial associative priming; vocalize each chunk according to exact acoustic boundaries.",
+          "spokenScriptVi": "<speak><s>Con bò</s> <break time=\"650ms\"/> <s>Gà và vịt</s></speak>",
+          "spokenScriptEn": "<speak><s>Cow</s> <break time=\"650ms\"/> <s>Chicken & duck</s></speak>",
+          "hasSsml": true,
+          "ssmlGap": "650ms",
+          "tc": 4,
+          "lc": 2,
+          "tl": 2,
+          "measuredCvrOhm": 7,
+          "cognitiveLoadDescription": "Multi-term cognitive trap with 650ms latency gap (TL=2.0, Type: Familiarity Suppression Trap (Ức chế quán tính khẩu ngữ))"
+        }
+      ],
+      "sessionIntroScript": {
+        "vi": "Chào mừng bạn đến với phiên bẫy nhận thức 2. CVR điện trở đạt 7 Ohm, dòng kích thích 8 Ampe. Mỗi câu hỏi chứa một cấu trúc bẫy nhận thức hoàn toàn khác biệt.",
+        "en": "Welcome to Awareness Session 2. Cognitive resistance is 7 Ohms with 8 Amps drive. Each prompt presents an entirely distinct cognitive trap architecture."
+      }
+    },
+    {
+      "sessionOrder": 3,
+      "title": "Session 3: Awareness Challenge (Trap Level 3: Syllabic Differential & Peak Resistance)",
+      "targetCvrOhm": 8,
+      "cciAmps": 8,
+      "cpdVoltage": 64,
+      "itemsCount": 3,
+      "items": [
+        {
+          "itemOrder": 7,
+          "sessionOrder": 3,
+          "trapType": "Syllabic Rhythm Differential (Đơn âm tiết xát sang Ba âm tiết trọng âm)",
+          "termVi": "Con rắn ; Con voi",
+          "termEn": "Snake ; Elephant",
+          "term1": {
+            "en": "Snake",
+            "vi": "Con rắn"
+          },
+          "term2": {
+            "en": "Elephant",
+            "vi": "Con voi"
+          },
+          "promptVi": "[Syllabic Rhythm Differential (Đơn âm tiết xát sang Ba âm tiết trọng âm)] Chuyển đổi nhịp thở từ đơn âm tiết ngắn sang đa âm tiết ba nhịp (el-e-phant) ngay sau độ trễ 650ms.",
+          "promptEn": "[Syllabic Rhythm Differential (Đơn âm tiết xát sang Ba âm tiết trọng âm)] Transition breath control rapidly from the monosyllabic sibilant to the tri-syllabic stress pattern after the pause.",
+          "spokenScriptVi": "<speak><s>Con rắn</s> <break time=\"650ms\"/> <s>Con voi</s></speak>",
+          "spokenScriptEn": "<speak><s>Snake</s> <break time=\"650ms\"/> <s>Elephant</s></speak>",
+          "hasSsml": true,
+          "ssmlGap": "650ms",
+          "tc": 4,
+          "lc": 2,
+          "tl": 2,
+          "measuredCvrOhm": 8,
+          "cognitiveLoadDescription": "Multi-term cognitive trap with 650ms latency gap (TL=2.0, Type: Syllabic Rhythm Differential (Đơn âm tiết xát sang Ba âm tiết trọng âm))"
+        },
+        {
+          "itemOrder": 8,
+          "sessionOrder": 3,
+          "trapType": "Categorical Shift Resistance (Chuyển vùng nhận thức gia đình sang hoang dã)",
+          "termVi": "Chó mực ; Con sư tử",
+          "termEn": "Black dog ; Lion",
+          "term1": {
+            "en": "Black dog",
+            "vi": "Chó mực"
+          },
+          "term2": {
+            "en": "Lion",
+            "vi": "Con sư tử"
+          },
+          "promptVi": "[Categorical Shift Resistance (Chuyển vùng nhận thức gia đình sang hoang dã)] Chuyển dịch tức thì từ trường thú cưng gia đình sang biểu tượng hoang dã; giữ trọng âm đều ở cả hai vế.",
+          "promptEn": "[Categorical Shift Resistance (Chuyển vùng nhận thức gia đình sang hoang dã)] Shift immediately from domestic pet attributes to wild predator terminology; maintain balanced lexical stress.",
+          "spokenScriptVi": "<speak><s>Chó mực</s> <break time=\"650ms\"/> <s>Con sư tử</s></speak>",
+          "spokenScriptEn": "<speak><s>Black dog</s> <break time=\"650ms\"/> <s>Lion</s></speak>",
+          "hasSsml": true,
+          "ssmlGap": "650ms",
+          "tc": 4,
+          "lc": 2,
+          "tl": 2,
+          "measuredCvrOhm": 8,
+          "cognitiveLoadDescription": "Multi-term cognitive trap with 650ms latency gap (TL=2.0, Type: Categorical Shift Resistance (Chuyển vùng nhận thức gia đình sang hoang dã))"
+        },
+        {
+          "itemOrder": 9,
+          "sessionOrder": 3,
+          "trapType": "Peak Cognitive Voltage Challenge (Thử thách điện thế nhận thức 56V)",
+          "termVi": "Con cọp ; Con khỉ",
+          "termEn": "Tiger ; Monkey",
+          "term1": {
+            "en": "Tiger",
+            "vi": "Con cọp"
+          },
+          "term2": {
+            "en": "Monkey",
+            "vi": "Con khỉ"
+          },
+          "promptVi": "[Peak Cognitive Voltage Challenge (Thử thách điện thế nhận thức 56V)] Tại mức điện áp thử thách cao nhất (56V), kiểm soát hoàn toàn phản xạ kiềm chế và phát âm chuẩn xác cả hai vế.",
+          "promptEn": "[Peak Cognitive Voltage Challenge (Thử thách điện thế nhận thức 56V)] At peak 56V cognitive challenge, control respiratory tension and articulate the full paired sequence without hesitation.",
+          "spokenScriptVi": "<speak><s>Con cọp</s> <break time=\"650ms\"/> <s>Con khỉ</s></speak>",
+          "spokenScriptEn": "<speak><s>Tiger</s> <break time=\"650ms\"/> <s>Monkey</s></speak>",
+          "hasSsml": true,
+          "ssmlGap": "650ms",
+          "tc": 4,
+          "lc": 2,
+          "tl": 2,
+          "measuredCvrOhm": 8,
+          "cognitiveLoadDescription": "Multi-term cognitive trap with 650ms latency gap (TL=2.0, Type: Peak Cognitive Voltage Challenge (Thử thách điện thế nhận thức 56V))"
+        }
+      ],
+      "sessionIntroScript": {
+        "vi": "Chào mừng bạn đến với phiên bẫy nhận thức 3. CVR điện trở đạt 8 Ohm, dòng kích thích 8 Ampe. Mỗi câu hỏi chứa một cấu trúc bẫy nhận thức hoàn toàn khác biệt.",
+        "en": "Welcome to Awareness Session 3. Cognitive resistance is 8 Ohms with 8 Amps drive. Each prompt presents an entirely distinct cognitive trap architecture."
+      }
+    }
+  ]
+}

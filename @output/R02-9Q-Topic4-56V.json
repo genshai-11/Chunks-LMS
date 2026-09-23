@@ -1,0 +1,302 @@
+{
+  "packageCode": "R02-9Q-Topic4-56V",
+  "title": "R02-9Q-Topic4: Day 4 - Lesson 3 I'm a hitchhiker (Awareness 56V - Multi-Type Traps)",
+  "testType": "RED",
+  "archetype": "Awareness & Traps (Khả năng nhận biết bẫy, kiềm chế xung động phản xạ sai & phục hồi lỗi)",
+  "topicNumber": 4,
+  "lessonId": "level_a_day_4",
+  "lessonTitle": "Day 4 - Lesson 3 I'm a hitchhiker",
+  "targetCpdVoltage": 56,
+  "totalSessions": 3,
+  "totalQuestions": 9,
+  "itemsPerSession": 3,
+  "sentenceStructureRule": "Ghép đa cụm từ với cấu trúc từ và loại bẫy (Hint Types) HOÀN TOÀN KHÁC NHAU cho từng câu. Khoảng ngắt SSML 650ms giữa 2 cụm để đo thời gian kiềm chế phản xạ.",
+  "audioFlow": {
+    "packageStart": {
+      "vi": "Chào mừng bạn đến với Red Test R02-9Q-Topic4-56V. Bài kiểm tra thử thách khả năng nhận biết bẫy và kiềm chế xung động qua các cấu trúc từ vựng đa dạng và khoảng trễ 650ms.",
+      "en": "Welcome to Red Test R02-9Q-Topic4-56V. This assessment tests your trap detection and inhibitory control across diverse lexical architectures with 650ms semantic latency."
+    },
+    "packageEnd": {
+      "vi": "Hoàn thành xuất sắc bài kiểm tra Red Test 56V. Hệ số xử lý các loại bẫy nhận thức đa dạng của bạn đang được trích xuất.",
+      "en": "Outstanding effort completing Red Test 56V. Your multi-trap detection and latency recovery metrics are now being compiled."
+    }
+  },
+  "sessions": [
+    {
+      "sessionOrder": 1,
+      "title": "Session 1: Awareness Challenge (Trap Level 1: Facility-Action & Spatial Switching)",
+      "targetCvrOhm": 5,
+      "cciAmps": 8,
+      "cpdVoltage": 40,
+      "itemsCount": 3,
+      "items": [
+        {
+          "itemOrder": 1,
+          "sessionOrder": 1,
+          "trapType": "Spatial Facility vs Transactional Verb Phrase (Địa điểm vs Hành động)",
+          "termVi": "Sân bay ; Đặt 2 vé",
+          "termEn": "Airport ; Book 2 tickets",
+          "term1": {
+            "en": "Airport",
+            "vi": "Sân bay"
+          },
+          "term2": {
+            "en": "Book 2 tickets",
+            "vi": "Đặt 2 vé"
+          },
+          "promptVi": "[Spatial Facility vs Transactional Verb Phrase (Địa điểm vs Hành động)] Chuyển đổi tư duy tức thì từ thực thể không gian công cộng sang hành động giao dịch có định lượng.",
+          "promptEn": "[Spatial Facility vs Transactional Verb Phrase (Địa điểm vs Hành động)] Transition mental focus immediately from a spatial infrastructure noun to a quantified transactional action phrase.",
+          "spokenScriptVi": "<speak><s>Sân bay</s> <break time=\"650ms\"/> <s>Đặt 2 vé</s></speak>",
+          "spokenScriptEn": "<speak><s>Airport</s> <break time=\"650ms\"/> <s>Book 2 tickets</s></speak>",
+          "hasSsml": true,
+          "ssmlGap": "650ms",
+          "tc": 3,
+          "lc": 2,
+          "tl": 2,
+          "measuredCvrOhm": 5,
+          "cognitiveLoadDescription": "Multi-term cognitive trap with 650ms latency gap (TL=2.0, Type: Spatial Facility vs Transactional Verb Phrase (Địa điểm vs Hành động))"
+        },
+        {
+          "itemOrder": 2,
+          "sessionOrder": 1,
+          "trapType": "Commercial Duality Shift (Tài chính công vụ vs Dịch vụ kép)",
+          "termVi": "Ngân hàng ; Nhà hàng & khách sạn",
+          "termEn": "Bank ; Restaurant & hotel",
+          "term1": {
+            "en": "Bank",
+            "vi": "Ngân hàng"
+          },
+          "term2": {
+            "en": "Restaurant & hotel",
+            "vi": "Nhà hàng & khách sạn"
+          },
+          "promptVi": "[Commercial Duality Shift (Tài chính công vụ vs Dịch vụ kép)] Xử lý sự biến đổi nhịp điệu từ danh từ đơn sắc sang cụm liên từ dịch vụ phức hợp không nuốt từ.",
+          "promptEn": "[Commercial Duality Shift (Tài chính công vụ vs Dịch vụ kép)] Handle the tempo expansion from a single financial noun to a compound hospitality coordinate without clipping.",
+          "spokenScriptVi": "<speak><s>Ngân hàng</s> <break time=\"650ms\"/> <s>Nhà hàng & khách sạn</s></speak>",
+          "spokenScriptEn": "<speak><s>Bank</s> <break time=\"650ms\"/> <s>Restaurant & hotel</s></speak>",
+          "hasSsml": true,
+          "ssmlGap": "650ms",
+          "tc": 3,
+          "lc": 2,
+          "tl": 2,
+          "measuredCvrOhm": 5,
+          "cognitiveLoadDescription": "Multi-term cognitive trap with 650ms latency gap (TL=2.0, Type: Commercial Duality Shift (Tài chính công vụ vs Dịch vụ kép))"
+        },
+        {
+          "itemOrder": 3,
+          "sessionOrder": 1,
+          "trapType": "Temporal Anchor to Sequential Transition (Mốc thời gian kép vs Từ nối)",
+          "termVi": "Vào chủ nhật và vào tháng năm ; Sau đó",
+          "termEn": "On Sunday and in May ; Then / after that",
+          "term1": {
+            "en": "On Sunday and in May",
+            "vi": "Vào chủ nhật và vào tháng năm"
+          },
+          "term2": {
+            "en": "Then / after that",
+            "vi": "Sau đó"
+          },
+          "promptVi": "[Temporal Anchor to Sequential Transition (Mốc thời gian kép vs Từ nối)] Lắng nghe điểm kết thúc của cấu trúc giới từ kép; phát âm dứt khoát từ nối chuyển đoạn sau khoảng ngắt 650ms.",
+          "promptEn": "[Temporal Anchor to Sequential Transition (Mốc thời gian kép vs Từ nối)] Detect the boundary of the dual prepositional phrase; articulate the transitional discourse marker crisply after 650ms.",
+          "spokenScriptVi": "<speak><s>Vào chủ nhật và vào tháng năm</s> <break time=\"650ms\"/> <s>Sau đó</s></speak>",
+          "spokenScriptEn": "<speak><s>On Sunday and in May</s> <break time=\"650ms\"/> <s>Then / after that</s></speak>",
+          "hasSsml": true,
+          "ssmlGap": "650ms",
+          "tc": 3,
+          "lc": 2,
+          "tl": 2,
+          "measuredCvrOhm": 5,
+          "cognitiveLoadDescription": "Multi-term cognitive trap with 650ms latency gap (TL=2.0, Type: Temporal Anchor to Sequential Transition (Mốc thời gian kép vs Từ nối))"
+        }
+      ],
+      "sessionIntroScript": {
+        "vi": "Chào mừng bạn đến với phiên bẫy nhận thức 1. CVR điện trở đạt 5 Ohm, dòng kích thích 8 Ampe. Mỗi câu hỏi chứa một cấu trúc bẫy nhận thức hoàn toàn khác biệt.",
+        "en": "Welcome to Awareness Session 1. Cognitive resistance is 5 Ohms with 8 Amps drive. Each prompt presents an entirely distinct cognitive trap architecture."
+      }
+    },
+    {
+      "sessionOrder": 2,
+      "title": "Session 2: Awareness Challenge (Trap Level 2: Syntactic Redundancy & Generation Shift)",
+      "targetCvrOhm": 7,
+      "cciAmps": 8,
+      "cpdVoltage": 56,
+      "itemsCount": 3,
+      "items": [
+        {
+          "itemOrder": 4,
+          "sessionOrder": 2,
+          "trapType": "Lexical Redundancy Suppression (Khử lặp từ vựng quán tính)",
+          "termVi": "Nhà thờ ; Đi nhà thờ",
+          "termEn": "Church ; Go to the church",
+          "term1": {
+            "en": "Church",
+            "vi": "Nhà thờ"
+          },
+          "term2": {
+            "en": "Go to the church",
+            "vi": "Đi nhà thờ"
+          },
+          "promptVi": "[Lexical Redundancy Suppression (Khử lặp từ vựng quán tính)] Tránh vấp âm do hiện tượng lặp từ \"church\"; nhấn mạnh động từ hành động \"Go to\" ở vế thứ hai.",
+          "promptEn": "[Lexical Redundancy Suppression (Khử lặp từ vựng quán tính)] Prevent lexical stuttering caused by the repeated root \"church\"; emphasize the kinetic vector \"Go to\" in the second chunk.",
+          "spokenScriptVi": "<speak><s>Nhà thờ</s> <break time=\"650ms\"/> <s>Đi nhà thờ</s></speak>",
+          "spokenScriptEn": "<speak><s>Church</s> <break time=\"650ms\"/> <s>Go to the church</s></speak>",
+          "hasSsml": true,
+          "ssmlGap": "650ms",
+          "tc": 4,
+          "lc": 2,
+          "tl": 2,
+          "measuredCvrOhm": 7,
+          "cognitiveLoadDescription": "Multi-term cognitive trap with 650ms latency gap (TL=2.0, Type: Lexical Redundancy Suppression (Khử lặp từ vựng quán tính))"
+        },
+        {
+          "itemOrder": 5,
+          "sessionOrder": 2,
+          "trapType": "Generational Kinship Balance (Đối xứng nhịp điệu họ hàng hai thế hệ)",
+          "termVi": "Anh tôi và chị tôi ; Ông tôi và bà tôi",
+          "termEn": "My brother and my sister ; My grandpa and my grandma",
+          "term1": {
+            "en": "My brother and my sister",
+            "vi": "Anh tôi và chị tôi"
+          },
+          "term2": {
+            "en": "My grandpa and my grandma",
+            "vi": "Ông tôi và bà tôi"
+          },
+          "promptVi": "[Generational Kinship Balance (Đối xứng nhịp điệu họ hàng hai thế hệ)] Duy trì nhịp điệu song song cân bằng giữa hai cụm liên từ dài; kiểm soát hơi thở không để hụt hơi ở vế sau.",
+          "promptEn": "[Generational Kinship Balance (Đối xứng nhịp điệu họ hàng hai thế hệ)] Maintain rhythmic symmetry across both extended kinship pairs; stabilize airflow to prevent trailing off.",
+          "spokenScriptVi": "<speak><s>Anh tôi và chị tôi</s> <break time=\"650ms\"/> <s>Ông tôi và bà tôi</s></speak>",
+          "spokenScriptEn": "<speak><s>My brother and my sister</s> <break time=\"650ms\"/> <s>My grandpa and my grandma</s></speak>",
+          "hasSsml": true,
+          "ssmlGap": "650ms",
+          "tc": 4,
+          "lc": 2,
+          "tl": 2,
+          "measuredCvrOhm": 7,
+          "cognitiveLoadDescription": "Multi-term cognitive trap with 650ms latency gap (TL=2.0, Type: Generational Kinship Balance (Đối xứng nhịp điệu họ hàng hai thế hệ))"
+        },
+        {
+          "itemOrder": 6,
+          "sessionOrder": 2,
+          "trapType": "Operational Divergence (Hành động có đối tượng sang Cơ sở tài chính)",
+          "termVi": "Đặt 2 vé ; Ngân hàng",
+          "termEn": "Book 2 tickets ; Bank",
+          "term1": {
+            "en": "Book 2 tickets",
+            "vi": "Đặt 2 vé"
+          },
+          "term2": {
+            "en": "Bank",
+            "vi": "Ngân hàng"
+          },
+          "promptVi": "[Operational Divergence (Hành động có đối tượng sang Cơ sở tài chính)] Dừng phản xạ liên kết logic thông thường; chuyển đổi dứt khoát từ đặt vé sang địa điểm ngân hàng độc lập.",
+          "promptEn": "[Operational Divergence (Hành động có đối tượng sang Cơ sở tài chính)] Sever habitual narrative continuity; shift decisively from ticket booking to the independent banking institution.",
+          "spokenScriptVi": "<speak><s>Đặt 2 vé</s> <break time=\"650ms\"/> <s>Ngân hàng</s></speak>",
+          "spokenScriptEn": "<speak><s>Book 2 tickets</s> <break time=\"650ms\"/> <s>Bank</s></speak>",
+          "hasSsml": true,
+          "ssmlGap": "650ms",
+          "tc": 4,
+          "lc": 2,
+          "tl": 2,
+          "measuredCvrOhm": 7,
+          "cognitiveLoadDescription": "Multi-term cognitive trap with 650ms latency gap (TL=2.0, Type: Operational Divergence (Hành động có đối tượng sang Cơ sở tài chính))"
+        }
+      ],
+      "sessionIntroScript": {
+        "vi": "Chào mừng bạn đến với phiên bẫy nhận thức 2. CVR điện trở đạt 7 Ohm, dòng kích thích 8 Ampe. Mỗi câu hỏi chứa một cấu trúc bẫy nhận thức hoàn toàn khác biệt.",
+        "en": "Welcome to Awareness Session 2. Cognitive resistance is 7 Ohms with 8 Amps drive. Each prompt presents an entirely distinct cognitive trap architecture."
+      }
+    },
+    {
+      "sessionOrder": 3,
+      "title": "Session 3: Awareness Challenge (Trap Level 3: Discourse Bridge & High Voltage Climax)",
+      "targetCvrOhm": 8,
+      "cciAmps": 8,
+      "cpdVoltage": 64,
+      "itemsCount": 3,
+      "items": [
+        {
+          "itemOrder": 7,
+          "sessionOrder": 3,
+          "trapType": "Discourse Marker to Religious Action (Chuyển tiếp hành động tâm linh)",
+          "termVi": "Sau đó ; Đi nhà thờ",
+          "termEn": "Then / after that ; Go to the church",
+          "term1": {
+            "en": "Then / after that",
+            "vi": "Sau đó"
+          },
+          "term2": {
+            "en": "Go to the church",
+            "vi": "Đi nhà thờ"
+          },
+          "promptVi": "[Discourse Marker to Religious Action (Chuyển tiếp hành động tâm linh)] Nối kết mượt mà từ trạng từ chuyển đoạn sang cụm động từ mà không để độ trễ nhận thức kéo dài quá 650ms.",
+          "promptEn": "[Discourse Marker to Religious Action (Chuyển tiếp hành động tâm linh)] Seamlessly link the transitional adverbial to the directed action chunk without exceeding the 650ms threshold.",
+          "spokenScriptVi": "<speak><s>Sau đó</s> <break time=\"650ms\"/> <s>Đi nhà thờ</s></speak>",
+          "spokenScriptEn": "<speak><s>Then / after that</s> <break time=\"650ms\"/> <s>Go to the church</s></speak>",
+          "hasSsml": true,
+          "ssmlGap": "650ms",
+          "tc": 4,
+          "lc": 2,
+          "tl": 2,
+          "measuredCvrOhm": 8,
+          "cognitiveLoadDescription": "Multi-term cognitive trap with 650ms latency gap (TL=2.0, Type: Discourse Marker to Religious Action (Chuyển tiếp hành động tâm linh))"
+        },
+        {
+          "itemOrder": 8,
+          "sessionOrder": 3,
+          "trapType": "Logistics Spatial Contrast (Khu nghỉ dưỡng sang Ga hàng không)",
+          "termVi": "Nhà hàng & khách sạn ; Sân bay",
+          "termEn": "Restaurant & hotel ; Airport",
+          "term1": {
+            "en": "Restaurant & hotel",
+            "vi": "Nhà hàng & khách sạn"
+          },
+          "term2": {
+            "en": "Airport",
+            "vi": "Sân bay"
+          },
+          "promptVi": "[Logistics Spatial Contrast (Khu nghỉ dưỡng sang Ga hàng không)] Phân định rõ ranh giới hai điểm đến du lịch; phát âm nguyên âm đôi /eə/ chuẩn xác trong \"Airport\".",
+          "promptEn": "[Logistics Spatial Contrast (Khu nghỉ dưỡng sang Ga hàng không)] Differentiate between the accommodation domain and terminal departure; articulate the diphthong in \"Airport\" with precision.",
+          "spokenScriptVi": "<speak><s>Nhà hàng & khách sạn</s> <break time=\"650ms\"/> <s>Sân bay</s></speak>",
+          "spokenScriptEn": "<speak><s>Restaurant & hotel</s> <break time=\"650ms\"/> <s>Airport</s></speak>",
+          "hasSsml": true,
+          "ssmlGap": "650ms",
+          "tc": 4,
+          "lc": 2,
+          "tl": 2,
+          "measuredCvrOhm": 8,
+          "cognitiveLoadDescription": "Multi-term cognitive trap with 650ms latency gap (TL=2.0, Type: Logistics Spatial Contrast (Khu nghỉ dưỡng sang Ga hàng không))"
+        },
+        {
+          "itemOrder": 9,
+          "sessionOrder": 3,
+          "trapType": "Complex Chrono-Social Climax (Đỉnh cao tải nhận thức Thời gian - Xã hội)",
+          "termVi": "Vào chủ nhật và vào tháng năm ; Anh tôi và chị tôi",
+          "termEn": "On Sunday and in May ; My brother and my sister",
+          "term1": {
+            "en": "On Sunday and in May",
+            "vi": "Vào chủ nhật và vào tháng năm"
+          },
+          "term2": {
+            "en": "My brother and my sister",
+            "vi": "Anh tôi và chị tôi"
+          },
+          "promptVi": "[Complex Chrono-Social Climax (Đỉnh cao tải nhận thức Thời gian - Xã hội)] Tại đỉnh tải 56V, phát âm toàn vẹn chuỗi thời gian dài và chuỗi thành viên gia đình với độ chính xác tuyệt đối.",
+          "promptEn": "[Complex Chrono-Social Climax (Đỉnh cao tải nhận thức Thời gian - Xã hội)] At peak 56V load, articulate the extended temporal sequence followed by the familial coordinate with absolute fidelity.",
+          "spokenScriptVi": "<speak><s>Vào chủ nhật và vào tháng năm</s> <break time=\"650ms\"/> <s>Anh tôi và chị tôi</s></speak>",
+          "spokenScriptEn": "<speak><s>On Sunday and in May</s> <break time=\"650ms\"/> <s>My brother and my sister</s></speak>",
+          "hasSsml": true,
+          "ssmlGap": "650ms",
+          "tc": 4,
+          "lc": 2,
+          "tl": 2,
+          "measuredCvrOhm": 8,
+          "cognitiveLoadDescription": "Multi-term cognitive trap with 650ms latency gap (TL=2.0, Type: Complex Chrono-Social Climax (Đỉnh cao tải nhận thức Thời gian - Xã hội))"
+        }
+      ],
+      "sessionIntroScript": {
+        "vi": "Chào mừng bạn đến với phiên bẫy nhận thức 3. CVR điện trở đạt 8 Ohm, dòng kích thích 8 Ampe. Mỗi câu hỏi chứa một cấu trúc bẫy nhận thức hoàn toàn khác biệt.",
+        "en": "Welcome to Awareness Session 3. Cognitive resistance is 8 Ohms with 8 Amps drive. Each prompt presents an entirely distinct cognitive trap architecture."
+      }
+    }
+  ]
+}

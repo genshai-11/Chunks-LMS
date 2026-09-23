@@ -7,6 +7,7 @@ export type TestPackage = {
   organizationId: string
   title: string
   slug: string
+  description?: string | null
   createdByUserId: string | null
   sourceMetadata: Record<string, unknown>
   archivedAt: string | null
@@ -220,4 +221,40 @@ export function buildSectionQuestionPlan(input: {
       externalRef: `${liveTestExternalRef(testItem.id)}:v${input.version.id}`,
     })),
   }
+}
+
+export function detectPackageTestType(pkg: {
+  title?: string | null
+  slug?: string | null
+  sourceMetadata?: Record<string, any> | null
+  source_metadata?: Record<string, any> | null
+}): 'green' | 'red' {
+  const meta = pkg.sourceMetadata ?? pkg.source_metadata
+  const metadataType = meta?.testType ?? meta?.test_type
+  if (typeof metadataType === 'string') {
+    const lower = metadataType.toLowerCase()
+    if (lower === 'red') return 'red'
+    if (lower === 'green') return 'green'
+  }
+
+  const title = (pkg.title || '').trim().toUpperCase()
+  const slug = (pkg.slug || '').trim().toLowerCase()
+
+  // Red test detection:
+  // - Starts with 'R' (e.g. R4-31V-0826, R01-42Q-56V)
+  // - Contains word boundary pattern for R + digits
+  // - Contains 'RED' or 'AWARENESS'
+  // - Slug starts with 'r' or contains 'red'
+  if (
+    title.startsWith('R') ||
+    /\bR\d+/i.test(title) ||
+    title.includes('RED') ||
+    title.includes('AWARENESS') ||
+    slug.startsWith('r') ||
+    slug.includes('red')
+  ) {
+    return 'red'
+  }
+
+  return 'green'
 }

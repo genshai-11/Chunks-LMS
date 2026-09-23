@@ -77,4 +77,33 @@ describe('spoken test scripts', () => {
     )
     expect(resolved?.variant.id).toBe('approved-old')
   })
+
+  it('resolves package flow narration targets: package_start, part_intro, and package_end', () => {
+    const record = (id: string, target: any, part?: number) =>
+      ({
+        variant: {
+          id,
+          narrationTarget: target,
+          providerMetadata: part ? { part } : {},
+          sourceTextHash: 'hash-1',
+          approvalStatus: 'approved',
+        },
+        audio: null,
+        job: null,
+      }) as any
+
+    const records = [
+      record('start-1', 'package_start'),
+      record('part-1', 'part_intro', 1),
+      record('part-2', 'part_intro', 2),
+      record('part-3', 'part_intro', 3),
+      record('end-1', 'package_end'),
+    ]
+
+    expect(resolveNarrationRecord(records, 'package:start', 'hash-1')?.variant.id).toBe('start-1')
+    expect(resolveNarrationRecord(records, 'part:1', 'hash-1')?.variant.id).toBe('part-1')
+    expect(resolveNarrationRecord(records, 'part:2', 'hash-1')?.variant.id).toBe('part-2')
+    expect(resolveNarrationRecord(records, 'part:3', 'hash-1')?.variant.id).toBe('part-3')
+    expect(resolveNarrationRecord(records, 'package:end', 'hash-1')?.variant.id).toBe('end-1')
+  })
 })

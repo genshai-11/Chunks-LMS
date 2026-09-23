@@ -1,0 +1,230 @@
+{
+  "packageCode": "G01-9Q-Topic1-Day1Lesson0Orientation",
+  "title": "G01-9Q-Topic1: Day 1 - Lesson 0 Orientation (Focus 12V - Complete Sentences)",
+  "testType": "GREEN",
+  "archetype": "Focus (Đo lường độ tập trung & nhịp điệu khi đọc hoàn chỉnh 1 câu)",
+  "topicNumber": 1,
+  "lessonId": "level_a_day_1",
+  "lessonTitle": "Day 1 - Lesson 0 Orientation",
+  "targetCpdVoltage": 12,
+  "totalSessions": 3,
+  "totalQuestions": 9,
+  "itemsPerSession": 3,
+  "sentenceStructureRule": "Hoàn thiện 1 câu hoàn chỉnh song ngữ. Tăng dần độ dài và độ phức tạp theo CVR (A2 -> B1 -> B2/C1). Không dùng SSML bẫy.",
+  "audioFlow": {
+    "packageStart": {
+      "vi": "Chào mừng bạn đến với bài kiểm tra Green Test G01-9Q-Topic1-Day1Lesson0Orientation. Bạn sẽ lắng nghe và hoàn thiện các câu trọn vẹn để đo lường chỉ số Focus và nhịp điệu phát âm.",
+      "en": "Welcome to Green Test G01-9Q-Topic1-Day1Lesson0Orientation. You will listen and vocalize complete sentences to measure your Focus index and fluent sentence pacing."
+    },
+    "packageEnd": {
+      "vi": "Chúc mừng bạn đã hoàn thành trọn vẹn bài kiểm tra Green Test. Toàn bộ dữ liệu phản xạ câu hoàn chỉnh đã được lưu trữ thành công.",
+      "en": "Congratulations on completing the Green Test assessment. All complete-sentence fluency and latency data have been successfully recorded."
+    }
+  },
+  "sessions": [
+    {
+      "sessionOrder": 1,
+      "title": "Session 1: Focus Sprint (A2 (Everyday Simple Sentence))",
+      "targetCvrOhm": 2,
+      "cciAmps": 4,
+      "cpdVoltage": 8,
+      "itemsCount": 3,
+      "items": [
+        {
+          "itemOrder": 1,
+          "sessionOrder": 1,
+          "termVi": "Cái bàn",
+          "termEn": "Table",
+          "promptVi": "Chiếc bàn gỗ nhỏ được đặt ngay ngắn ở góc phòng khách.",
+          "promptEn": "The small wooden table is placed neatly in the corner of the living room.",
+          "spokenScriptVi": "Chiếc bàn gỗ nhỏ được đặt ngay ngắn ở góc phòng khách.",
+          "spokenScriptEn": "The small wooden table is placed neatly in the corner of the living room.",
+          "hasSsml": false,
+          "ssmlGap": null,
+          "tc": 2,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvrOhm": 2,
+          "sentenceLevel": "A2 (Everyday Simple Sentence)",
+          "cognitiveLoadDescription": "Complete sentence recall with continuous rhythm (TL=1.0, Level: A2 (Everyday Simple Sentence))"
+        },
+        {
+          "itemOrder": 2,
+          "sessionOrder": 1,
+          "termVi": "Cái ly",
+          "termEn": "Cup",
+          "promptVi": "Tôi cầm chiếc ly nước trên tay và nhìn ra ngoài cửa sổ.",
+          "promptEn": "I hold the water cup in my hand and look out the window.",
+          "spokenScriptVi": "Tôi cầm chiếc ly nước trên tay và nhìn ra ngoài cửa sổ.",
+          "spokenScriptEn": "I hold the water cup in my hand and look out the window.",
+          "hasSsml": false,
+          "ssmlGap": null,
+          "tc": 2,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvrOhm": 2,
+          "sentenceLevel": "A2 (Everyday Simple Sentence)",
+          "cognitiveLoadDescription": "Complete sentence recall with continuous rhythm (TL=1.0, Level: A2 (Everyday Simple Sentence))"
+        },
+        {
+          "itemOrder": 3,
+          "sessionOrder": 1,
+          "termVi": "Cà phê",
+          "termEn": "Coffee",
+          "promptVi": "Mùi hương cà phê thơm lừng buổi sáng lan tỏa khắp căn phòng.",
+          "promptEn": "The rich aroma of morning coffee spreads throughout the entire room.",
+          "spokenScriptVi": "Mùi hương cà phê thơm lừng buổi sáng lan tỏa khắp căn phòng.",
+          "spokenScriptEn": "The rich aroma of morning coffee spreads throughout the entire room.",
+          "hasSsml": false,
+          "ssmlGap": null,
+          "tc": 2,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvrOhm": 2,
+          "sentenceLevel": "A2 (Everyday Simple Sentence)",
+          "cognitiveLoadDescription": "Complete sentence recall with continuous rhythm (TL=1.0, Level: A2 (Everyday Simple Sentence))"
+        }
+      ],
+      "sessionIntroScript": {
+        "vi": "Chào mừng bạn đến với phiên 1. Mỗi câu hỏi là một câu hoàn chỉnh theo cấp độ A2 (Everyday Simple Sentence). Hãy đọc liền mạch và dứt khoát không ngập ngừng.",
+        "en": "Welcome to Session 1. Each prompt is a complete sentence at A2 (Everyday Simple Sentence). Articulate the entire sentence with continuous, decisive rhythm."
+      }
+    },
+    {
+      "sessionOrder": 2,
+      "title": "Session 2: Focus Sprint (B1 (Compound Sentence & Rhythm))",
+      "targetCvrOhm": 3,
+      "cciAmps": 4,
+      "cpdVoltage": 12,
+      "itemsCount": 3,
+      "items": [
+        {
+          "itemOrder": 4,
+          "sessionOrder": 2,
+          "termVi": "Cà phê đen",
+          "termEn": "Black coffee",
+          "promptVi": "Anh ấy thường thưởng thức một tách cà phê đen đậm đà trước khi bắt đầu công việc mỗi sáng.",
+          "promptEn": "He often enjoys a rich cup of black coffee before starting his daily work in the morning.",
+          "spokenScriptVi": "Anh ấy thường thưởng thức một tách cà phê đen đậm đà trước khi bắt đầu công việc mỗi sáng.",
+          "spokenScriptEn": "He often enjoys a rich cup of black coffee before starting his daily work in the morning.",
+          "hasSsml": false,
+          "ssmlGap": null,
+          "tc": 3,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvrOhm": 3,
+          "sentenceLevel": "B1 (Compound Sentence & Rhythm)",
+          "cognitiveLoadDescription": "Complete sentence recall with continuous rhythm (TL=1.0, Level: B1 (Compound Sentence & Rhythm))"
+        },
+        {
+          "itemOrder": 5,
+          "sessionOrder": 2,
+          "termVi": "Bàn nhựa",
+          "termEn": "Plastic table",
+          "promptVi": "Chúng tôi ngồi quanh chiếc bàn nhựa ngoài hiên để cùng nhau trò chuyện rôm rả.",
+          "promptEn": "We sat around the plastic table on the porch to enjoy lively conversations together.",
+          "spokenScriptVi": "Chúng tôi ngồi quanh chiếc bàn nhựa ngoài hiên để cùng nhau trò chuyện rôm rả.",
+          "spokenScriptEn": "We sat around the plastic table on the porch to enjoy lively conversations together.",
+          "hasSsml": false,
+          "ssmlGap": null,
+          "tc": 3,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvrOhm": 3,
+          "sentenceLevel": "B1 (Compound Sentence & Rhythm)",
+          "cognitiveLoadDescription": "Complete sentence recall with continuous rhythm (TL=1.0, Level: B1 (Compound Sentence & Rhythm))"
+        },
+        {
+          "itemOrder": 6,
+          "sessionOrder": 2,
+          "termVi": "Phải",
+          "termEn": "Have to",
+          "promptVi": "Tất cả học viên phải tập trung chú ý và nhắc lại câu thật dứt khoát theo nhịp điệu.",
+          "promptEn": "All learners have to pay close attention and repeat the sentence decisively with the rhythm.",
+          "spokenScriptVi": "Tất cả học viên phải tập trung chú ý và nhắc lại câu thật dứt khoát theo nhịp điệu.",
+          "spokenScriptEn": "All learners have to pay close attention and repeat the sentence decisively with the rhythm.",
+          "hasSsml": false,
+          "ssmlGap": null,
+          "tc": 3,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvrOhm": 3,
+          "sentenceLevel": "B1 (Compound Sentence & Rhythm)",
+          "cognitiveLoadDescription": "Complete sentence recall with continuous rhythm (TL=1.0, Level: B1 (Compound Sentence & Rhythm))"
+        }
+      ],
+      "sessionIntroScript": {
+        "vi": "Chào mừng bạn đến với phiên 2. Mỗi câu hỏi là một câu hoàn chỉnh theo cấp độ B1 (Compound Sentence & Rhythm). Hãy đọc liền mạch và dứt khoát không ngập ngừng.",
+        "en": "Welcome to Session 2. Each prompt is a complete sentence at B1 (Compound Sentence & Rhythm). Articulate the entire sentence with continuous, decisive rhythm."
+      }
+    },
+    {
+      "sessionOrder": 3,
+      "title": "Session 3: Focus Sprint (B2/C1 (Complex Sentence & Sustained Fluidity))",
+      "targetCvrOhm": 4,
+      "cciAmps": 4,
+      "cpdVoltage": 16,
+      "itemsCount": 3,
+      "items": [
+        {
+          "itemOrder": 7,
+          "sessionOrder": 3,
+          "termVi": "Ly bự",
+          "termEn": "Big cup",
+          "promptVi": "Mặc dù lịch trình làm việc rất bận rộn, cô ấy vẫn kịp chuẩn bị một ly bự trà thảo mộc để duy trì sự tỉnh táo suốt cả ngày.",
+          "promptEn": "Despite having a very demanding schedule, she still prepared a big cup of herbal tea to sustain her alertness throughout the day.",
+          "spokenScriptVi": "Mặc dù lịch trình làm việc rất bận rộn, cô ấy vẫn kịp chuẩn bị một ly bự trà thảo mộc để duy trì sự tỉnh táo suốt cả ngày.",
+          "spokenScriptEn": "Despite having a very demanding schedule, she still prepared a big cup of herbal tea to sustain her alertness throughout the day.",
+          "hasSsml": false,
+          "ssmlGap": null,
+          "tc": 4,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvrOhm": 4,
+          "sentenceLevel": "B2/C1 (Complex Sentence & Sustained Fluidity)",
+          "cognitiveLoadDescription": "Complete sentence recall with continuous rhythm (TL=1.0, Level: B2/C1 (Complex Sentence & Sustained Fluidity))"
+        },
+        {
+          "itemOrder": 8,
+          "sessionOrder": 3,
+          "termVi": "Cà phê tuyệt vời của tôi",
+          "termEn": "My amazing coffee",
+          "promptVi": "Sau nhiều lần cải tiến công thức rang xay đặc biệt, đây thực sự là ly cà phê tuyệt vời của tôi mang đậm hương vị nguyên bản.",
+          "promptEn": "Following numerous refinements to the distinctive roasting formula, this is genuinely my amazing coffee boasting authentic rich flavor.",
+          "spokenScriptVi": "Sau nhiều lần cải tiến công thức rang xay đặc biệt, đây thực sự là ly cà phê tuyệt vời của tôi mang đậm hương vị nguyên bản.",
+          "spokenScriptEn": "Following numerous refinements to the distinctive roasting formula, this is genuinely my amazing coffee boasting authentic rich flavor.",
+          "hasSsml": false,
+          "ssmlGap": null,
+          "tc": 4,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvrOhm": 4,
+          "sentenceLevel": "B2/C1 (Complex Sentence & Sustained Fluidity)",
+          "cognitiveLoadDescription": "Complete sentence recall with continuous rhythm (TL=1.0, Level: B2/C1 (Complex Sentence & Sustained Fluidity))"
+        },
+        {
+          "itemOrder": 9,
+          "sessionOrder": 3,
+          "termVi": "Tập trung nhịp điệu",
+          "termEn": "Rhythm focus",
+          "promptVi": "Khi đối mặt với áp lực thời gian cao, người học cần duy trì sự tập trung tuyệt đối để phát âm toàn bộ câu mà không ngắt quãng.",
+          "promptEn": "When confronted with intense time pressure, learners must maintain absolute focus to articulate the entire sentence without hesitation.",
+          "spokenScriptVi": "Khi đối mặt với áp lực thời gian cao, người học cần duy trì sự tập trung tuyệt đối để phát âm toàn bộ câu mà không ngắt quãng.",
+          "spokenScriptEn": "When confronted with intense time pressure, learners must maintain absolute focus to articulate the entire sentence without hesitation.",
+          "hasSsml": false,
+          "ssmlGap": null,
+          "tc": 4,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvrOhm": 4,
+          "sentenceLevel": "B2/C1 (Complex Sentence & Sustained Fluidity)",
+          "cognitiveLoadDescription": "Complete sentence recall with continuous rhythm (TL=1.0, Level: B2/C1 (Complex Sentence & Sustained Fluidity))"
+        }
+      ],
+      "sessionIntroScript": {
+        "vi": "Chào mừng bạn đến với phiên 3. Mỗi câu hỏi là một câu hoàn chỉnh theo cấp độ B2/C1 (Complex Sentence & Sustained Fluidity). Hãy đọc liền mạch và dứt khoát không ngập ngừng.",
+        "en": "Welcome to Session 3. Each prompt is a complete sentence at B2/C1 (Complex Sentence & Sustained Fluidity). Articulate the entire sentence with continuous, decisive rhythm."
+      }
+    }
+  ]
+}

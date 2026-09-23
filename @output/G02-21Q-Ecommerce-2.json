@@ -1,0 +1,1202 @@
+{
+  "packageCode": "G02-21Q-Ecommerce-2",
+  "title": "G02-21Q-Ecommerce: E-commerce Market Dynamics & Shopping Reflex (Focus 12V)",
+  "slug": "g02-21q-ecommerce-2",
+  "description": "Green Mini Test (7x3 - 21 Questions) for fluent focus, complete sentences, TL=1.0, target 12V CPD, and per-session TTS presets from Improv Set 05.",
+  "versionLabel": "v1",
+  "testType": "GREEN",
+  "targetQuestions": 21,
+  "sessionLayout": "7x3",
+  "targetCpd": 12,
+  "sessionLanguages": [
+    "en",
+    "en",
+    "en",
+    "vi",
+    "vi",
+    "vi",
+    "en"
+  ],
+  "lifecycleNarration": {
+    "package_start": {
+      "vi": "Chào mừng em đến với bài kiểm tra Green Test eCommerce (Focus). Lắng nghe trọn vẹn và phát âm câu hoàn chỉnh với nhịp điệu tự nhiên.",
+      "en": "Welcome to the Green Test eCommerce assessment. Listen attentively and articulate each complete sentence with natural flow."
+    },
+    "part_intro": {
+      "1": {
+        "vi": "Bắt đầu Phần 1: Phản xạ câu đơn giản về thị trường thương mại điện tử cơ bản.",
+        "en": "Starting Part 1: Basic eCommerce sentence rhythms and core retail vocabulary."
+      },
+      "2": {
+        "vi": "Bắt đầu Phần 2: Mở rộng câu ghép và cấu trúc hành vi người tiêu dùng trực tuyến.",
+        "en": "Starting Part 2: Compound sentence expansion and consumer behavior patterns."
+      },
+      "3": {
+        "vi": "Bắt đầu Phần 3: Thử thách tập trung câu phức hợp và chiến lược bán lẻ hiện đại.",
+        "en": "Starting Part 3: Complex sentence integration and high-level retail strategy."
+      }
+    },
+    "package_end": {
+      "vi": "Chúc mừng em đã hoàn thành toàn bộ bài kiểm tra Green Test eCommerce 21Q. Em đã thể hiện sự tập trung và ngữ điệu rất xuất sắc!",
+      "en": "Congratulations on completing the 21Q eCommerce Green Test. Outstanding focus and fluency sustained throughout!"
+    }
+  },
+  "sections": [
+    {
+      "sectionOrder": 1,
+      "part": 1,
+      "title": "Session 1 • 2Ω (Focus Sentence)",
+      "targetCvrOhm": 2,
+      "cciAmpe": 6,
+      "cpd": 12,
+      "hintCount": 1,
+      "sessionLanguage": "en",
+      "voiceModel": "google/en-US-Neural2-F",
+      "introTextVi": "Session 1: Mức kháng trở 2 Ohm, cường độ 6 Ampe. Mục tiêu 12V CPD. Phát âm câu trôi chảy.",
+      "introTextEn": "Session 1: Resistance 2 Ohm, current 6 Amps. Target 12V CPD. Speak fluently.",
+      "items": [
+        {
+          "itemOrder": 1,
+          "globalItemNumber": 1,
+          "sourceItemId": "set05_s1_i13",
+          "chunkIds": [
+            "h_set05_s1_i13_1",
+            "h_set05_s1_i13_2"
+          ],
+          "termVi": "Phí giao hàng miễn phí hoàn toàn",
+          "termEn": "shipping fee zero cost",
+          "promptVi": "Phí giao hàng miễn phí hoàn toàn.",
+          "promptEn": "Shipping fee zero cost.",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 2,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 2,
+          "cvrBreakdown": {
+            "tc": 2,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 2,
+            "cci": 6,
+            "cpd": 12
+          },
+          "hints": [
+            {
+              "id": "h_set05_s1_i13_1",
+              "text": "Phí giao hàng",
+              "translation": "shipping fee",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s1_i13_2",
+              "text": "miễn phí hoàn toàn",
+              "translation": "zero cost",
+              "typeFunction": "Tính từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 2,
+          "globalItemNumber": 2,
+          "sourceItemId": "set05_s1_i14",
+          "chunkIds": [
+            "h_set05_s1_i14_1",
+            "h_set05_s1_i14_2"
+          ],
+          "termVi": "Giao hàng tận cửa nhanh như chớp",
+          "termEn": "doorstep delivery express fast",
+          "promptVi": "Giao hàng tận cửa nhanh như chớp.",
+          "promptEn": "Doorstep delivery express fast.",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 2,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 2,
+          "cvrBreakdown": {
+            "tc": 2,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 2,
+            "cci": 6,
+            "cpd": 12
+          },
+          "hints": [
+            {
+              "id": "h_set05_s1_i14_1",
+              "text": "Giao hàng tận cửa",
+              "translation": "doorstep delivery",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s1_i14_2",
+              "text": "nhanh như chớp",
+              "translation": "express fast",
+              "typeFunction": "Tính từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 3,
+          "globalItemNumber": 3,
+          "sourceItemId": "set05_s1_i15",
+          "chunkIds": [
+            "h_set05_s1_i15_1",
+            "h_set05_s1_i15_2"
+          ],
+          "termVi": "Khách hàng thân thiết tích lũy điểm",
+          "termEn": "loyal shopper earn reward points",
+          "promptVi": "Khách hàng thân thiết tích lũy điểm.",
+          "promptEn": "Loyal shopper earn reward points.",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 2,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 2,
+          "cvrBreakdown": {
+            "tc": 2,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 2,
+            "cci": 6,
+            "cpd": 12
+          },
+          "hints": [
+            {
+              "id": "h_set05_s1_i15_1",
+              "text": "Khách hàng thân thiết",
+              "translation": "loyal shopper",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s1_i15_2",
+              "text": "tích lũy điểm",
+              "translation": "earn reward points",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sectionOrder": 2,
+      "part": 1,
+      "title": "Session 2 • 2Ω (Focus Sentence)",
+      "targetCvrOhm": 2,
+      "cciAmpe": 6,
+      "cpd": 12,
+      "hintCount": 1,
+      "sessionLanguage": "en",
+      "voiceModel": "google/en-US-Neural2-F",
+      "introTextVi": "Session 2: Mức kháng trở 2 Ohm, cường độ 6 Ampe. Mục tiêu 12V CPD. Phát âm câu trôi chảy.",
+      "introTextEn": "Session 2: Resistance 2 Ohm, current 6 Amps. Target 12V CPD. Speak fluently.",
+      "items": [
+        {
+          "itemOrder": 1,
+          "globalItemNumber": 4,
+          "sourceItemId": "set05_s1_i16",
+          "chunkIds": [
+            "h_set05_s1_i16_1",
+            "h_set05_s1_i16_2"
+          ],
+          "termVi": "Kênh bán sỉ chiết khấu cao",
+          "termEn": "wholesale channel high discount",
+          "promptVi": "Kênh bán sỉ chiết khấu cao.",
+          "promptEn": "Wholesale channel high discount.",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 2,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 2,
+          "cvrBreakdown": {
+            "tc": 2,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 2,
+            "cci": 6,
+            "cpd": 12
+          },
+          "hints": [
+            {
+              "id": "h_set05_s1_i16_1",
+              "text": "Kênh bán sỉ",
+              "translation": "wholesale channel",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s1_i16_2",
+              "text": "chiết khấu cao",
+              "translation": "high discount",
+              "typeFunction": "Tính từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 2,
+          "globalItemNumber": 5,
+          "sourceItemId": "set05_s1_i17",
+          "chunkIds": [
+            "h_set05_s1_i17_1",
+            "h_set05_s1_i17_2"
+          ],
+          "termVi": "Cửa hàng bán lẻ đông đúc",
+          "termEn": "retail outlet packed with shoppers",
+          "promptVi": "Cửa hàng bán lẻ đông đúc.",
+          "promptEn": "Retail outlet packed with shoppers.",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 2,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 2,
+          "cvrBreakdown": {
+            "tc": 2,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 2,
+            "cci": 6,
+            "cpd": 12
+          },
+          "hints": [
+            {
+              "id": "h_set05_s1_i17_1",
+              "text": "Cửa hàng bán lẻ",
+              "translation": "retail outlet",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s1_i17_2",
+              "text": "đông đúc",
+              "translation": "packed with shoppers",
+              "typeFunction": "Tính từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 3,
+          "globalItemNumber": 6,
+          "sourceItemId": "set05_s1_i18",
+          "chunkIds": [
+            "h_set05_s1_i18_1",
+            "h_set05_s1_i18_2"
+          ],
+          "termVi": "Chính sách đổi trả linh hoạt",
+          "termEn": "return policy hassle-free",
+          "promptVi": "Chính sách đổi trả linh hoạt.",
+          "promptEn": "Return policy hassle-free.",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 2,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 2,
+          "cvrBreakdown": {
+            "tc": 2,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 2,
+            "cci": 6,
+            "cpd": 12
+          },
+          "hints": [
+            {
+              "id": "h_set05_s1_i18_1",
+              "text": "Chính sách đổi trả",
+              "translation": "return policy",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s1_i18_2",
+              "text": "linh hoạt",
+              "translation": "hassle-free",
+              "typeFunction": "Tính từ · Ending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sectionOrder": 3,
+      "part": 2,
+      "title": "Session 3 • 3Ω (Focus Sentence)",
+      "targetCvrOhm": 3,
+      "cciAmpe": 4,
+      "cpd": 12,
+      "hintCount": 1,
+      "sessionLanguage": "en",
+      "voiceModel": "google/en-US-Neural2-F",
+      "introTextVi": "Session 3: Mức kháng trở 3 Ohm, cường độ 4 Ampe. Mục tiêu 12V CPD. Phát âm câu trôi chảy.",
+      "introTextEn": "Session 3: Resistance 3 Ohm, current 4 Amps. Target 12V CPD. Speak fluently.",
+      "items": [
+        {
+          "itemOrder": 1,
+          "globalItemNumber": 7,
+          "sourceItemId": "set05_s2_i13",
+          "chunkIds": [
+            "h_set05_s2_i13_1",
+            "h_set05_s2_i13_2",
+            "h_set05_s2_i13_3"
+          ],
+          "termVi": "Dịch vụ giao hỏa tốc tiếp theo mở rộng toàn quốc",
+          "termEn": "instant delivery next expand nationwide",
+          "promptVi": "Dịch vụ giao hỏa tốc tiếp theo mở rộng toàn quốc.",
+          "promptEn": "Instant delivery next expand nationwide.",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 3,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 3,
+          "cvrBreakdown": {
+            "tc": 3,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 3,
+            "cci": 4,
+            "cpd": 12
+          },
+          "hints": [
+            {
+              "id": "h_set05_s2_i13_1",
+              "text": "Dịch vụ giao hỏa tốc",
+              "translation": "instant delivery",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s2_i13_2",
+              "text": "tiếp theo",
+              "translation": "next",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s2_i13_3",
+              "text": "mở rộng toàn quốc",
+              "translation": "expand nationwide",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 2,
+          "globalItemNumber": 8,
+          "sourceItemId": "set05_s2_i14",
+          "chunkIds": [
+            "h_set05_s2_i14_1",
+            "h_set05_s2_i14_2",
+            "h_set05_s2_i14_3"
+          ],
+          "termVi": "Chương trình tri ân nói cách khác giữ chân người mua",
+          "termEn": "loyalty rewards in other words retain customer base",
+          "promptVi": "Chương trình tri ân nói cách khác giữ chân người mua.",
+          "promptEn": "Loyalty rewards in other words retain customer base.",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 3,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 3,
+          "cvrBreakdown": {
+            "tc": 3,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 3,
+            "cci": 4,
+            "cpd": 12
+          },
+          "hints": [
+            {
+              "id": "h_set05_s2_i14_1",
+              "text": "Chương trình tri ân",
+              "translation": "loyalty rewards",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s2_i14_2",
+              "text": "nói cách khác",
+              "translation": "in other words",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s2_i14_3",
+              "text": "giữ chân người mua",
+              "translation": "retain customer base",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 3,
+          "globalItemNumber": 9,
+          "sourceItemId": "set05_s2_i15",
+          "chunkIds": [
+            "h_set05_s2_i15_1",
+            "h_set05_s2_i15_2",
+            "h_set05_s2_i15_3"
+          ],
+          "termVi": "Nhà phân phối bán sỉ trái lại ưu tiên số lượng",
+          "termEn": "wholesale distributor in contrast prioritize volume",
+          "promptVi": "Nhà phân phối bán sỉ trái lại ưu tiên số lượng.",
+          "promptEn": "Wholesale distributor in contrast prioritize volume.",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 3,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 3,
+          "cvrBreakdown": {
+            "tc": 3,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 3,
+            "cci": 4,
+            "cpd": 12
+          },
+          "hints": [
+            {
+              "id": "h_set05_s2_i15_1",
+              "text": "Nhà phân phối bán sỉ",
+              "translation": "wholesale distributor",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s2_i15_2",
+              "text": "trái lại",
+              "translation": "in contrast",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s2_i15_3",
+              "text": "ưu tiên số lượng",
+              "translation": "prioritize volume",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sectionOrder": 4,
+      "part": 2,
+      "title": "Session 4 • 3Ω (Focus Sentence)",
+      "targetCvrOhm": 3,
+      "cciAmpe": 4,
+      "cpd": 12,
+      "hintCount": 1,
+      "sessionLanguage": "vi",
+      "voiceModel": "google/vi-VN-Neural2-A",
+      "introTextVi": "Session 4: Mức kháng trở 3 Ohm, cường độ 4 Ampe. Mục tiêu 12V CPD. Phát âm câu trôi chảy.",
+      "introTextEn": "Session 4: Resistance 3 Ohm, current 4 Amps. Target 12V CPD. Speak fluently.",
+      "items": [
+        {
+          "itemOrder": 1,
+          "globalItemNumber": 10,
+          "sourceItemId": "set05_s2_i16",
+          "chunkIds": [
+            "h_set05_s2_i16_1",
+            "h_set05_s2_i16_2",
+            "h_set05_s2_i16_3"
+          ],
+          "termVi": "Hệ thống chuỗi bán lẻ cho nên phủ sóng khắp nơi",
+          "termEn": "retail store chain so that omnipresent",
+          "promptVi": "Hệ thống chuỗi bán lẻ cho nên phủ sóng khắp nơi.",
+          "promptEn": "Retail store chain so that omnipresent.",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 3,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 3,
+          "cvrBreakdown": {
+            "tc": 3,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 3,
+            "cci": 4,
+            "cpd": 12
+          },
+          "hints": [
+            {
+              "id": "h_set05_s2_i16_1",
+              "text": "Hệ thống chuỗi bán lẻ",
+              "translation": "retail store chain",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s2_i16_2",
+              "text": "cho nên",
+              "translation": "so that",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s2_i16_3",
+              "text": "phủ sóng khắp nơi",
+              "translation": "omnipresent",
+              "typeFunction": "Tính từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 2,
+          "globalItemNumber": 11,
+          "sourceItemId": "set05_s2_i17",
+          "chunkIds": [
+            "h_set05_s2_i17_1",
+            "h_set05_s2_i17_2",
+            "h_set05_s2_i17_3"
+          ],
+          "termVi": "Thủ tục đổi trả hàng thay vào đó giải quyết qua app",
+          "termEn": "product returns instead processed via app",
+          "promptVi": "Thủ tục đổi trả hàng thay vào đó giải quyết qua app.",
+          "promptEn": "Product returns instead processed via app.",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 3,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 3,
+          "cvrBreakdown": {
+            "tc": 3,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 3,
+            "cci": 4,
+            "cpd": 12
+          },
+          "hints": [
+            {
+              "id": "h_set05_s2_i17_1",
+              "text": "Thủ tục đổi trả hàng",
+              "translation": "product returns",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s2_i17_2",
+              "text": "thay vào đó",
+              "translation": "instead",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s2_i17_3",
+              "text": "giải quyết qua app",
+              "translation": "processed via app",
+              "typeFunction": "Tính từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 3,
+          "globalItemNumber": 12,
+          "sourceItemId": "set05_s2_i18",
+          "chunkIds": [
+            "h_set05_s2_i18_1",
+            "h_set05_s2_i18_2",
+            "h_set05_s2_i18_3"
+          ],
+          "termVi": "Bộ sưu tập thời trang dù vậy bán chạy như tôm tươi",
+          "termEn": "fashion collection nevertheless sell like hotcakes",
+          "promptVi": "Bộ sưu tập thời trang dù vậy bán chạy như tôm tươi.",
+          "promptEn": "Fashion collection nevertheless sell like hotcakes.",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 3,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 3,
+          "cvrBreakdown": {
+            "tc": 3,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 3,
+            "cci": 4,
+            "cpd": 12
+          },
+          "hints": [
+            {
+              "id": "h_set05_s2_i18_1",
+              "text": "Bộ sưu tập thời trang",
+              "translation": "fashion collection",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s2_i18_2",
+              "text": "dù vậy",
+              "translation": "nevertheless",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s2_i18_3",
+              "text": "bán chạy như tôm tươi",
+              "translation": "sell like hotcakes",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sectionOrder": 5,
+      "part": 3,
+      "title": "Session 5 • 4Ω (Focus Sentence)",
+      "targetCvrOhm": 4,
+      "cciAmpe": 3,
+      "cpd": 12,
+      "hintCount": 1,
+      "sessionLanguage": "vi",
+      "voiceModel": "google/vi-VN-Neural2-A",
+      "introTextVi": "Session 5: Mức kháng trở 4 Ohm, cường độ 3 Ampe. Mục tiêu 12V CPD. Phát âm câu trôi chảy.",
+      "introTextEn": "Session 5: Resistance 4 Ohm, current 3 Amps. Target 12V CPD. Speak fluently.",
+      "items": [
+        {
+          "itemOrder": 1,
+          "globalItemNumber": 13,
+          "sourceItemId": "set05_s3_i13",
+          "chunkIds": [
+            "h_set05_s3_i13_1",
+            "h_set05_s3_i13_2",
+            "h_set05_s3_i13_3",
+            "h_set05_s3_i13_4"
+          ],
+          "termVi": "Giao hàng hỏa tốc tiếp theo vũ khí sát thương đánh bạt đối thủ",
+          "termEn": "superfast delivery next killer feature crush competition",
+          "promptVi": "Giao hàng hỏa tốc tiếp theo vũ khí sát thương đánh bạt đối thủ.",
+          "promptEn": "Superfast delivery next killer feature crush competition.",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 4,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 4,
+          "cvrBreakdown": {
+            "tc": 4,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 4,
+            "cci": 3,
+            "cpd": 12
+          },
+          "hints": [
+            {
+              "id": "h_set05_s3_i13_1",
+              "text": "Giao hàng hỏa tốc",
+              "translation": "superfast delivery",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s3_i13_2",
+              "text": "tiếp theo",
+              "translation": "next",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s3_i13_3",
+              "text": "vũ khí sát thương",
+              "translation": "killer feature",
+              "typeFunction": "Ẩn dụ · Fancy word"
+            },
+            {
+              "id": "h_set05_s3_i13_4",
+              "text": "đánh bạt đối thủ",
+              "translation": "crush competition",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 2,
+          "globalItemNumber": 14,
+          "sourceItemId": "set05_s3_i14",
+          "chunkIds": [
+            "h_set05_s3_i14_1",
+            "h_set05_s3_i14_2",
+            "h_set05_s3_i14_3",
+            "h_set05_s3_i14_4"
+          ],
+          "termVi": "Ở đâu đồng thời vùng đất hứa thương mại nông thôn",
+          "termEn": "Where meanwhile promised land rural e-commerce",
+          "promptVi": "Ở đâu đồng thời vùng đất hứa thương mại nông thôn.",
+          "promptEn": "Where meanwhile promised land rural e-commerce.",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 4,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 4,
+          "cvrBreakdown": {
+            "tc": 4,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 4,
+            "cci": 3,
+            "cpd": 12
+          },
+          "hints": [
+            {
+              "id": "h_set05_s3_i14_1",
+              "text": "Ở đâu",
+              "translation": "Where",
+              "typeFunction": "Cụm nghi vấn · WH word"
+            },
+            {
+              "id": "h_set05_s3_i14_2",
+              "text": "đồng thời",
+              "translation": "meanwhile",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s3_i14_3",
+              "text": "vùng đất hứa",
+              "translation": "promised land",
+              "typeFunction": "Ẩn dụ · Fancy word"
+            },
+            {
+              "id": "h_set05_s3_i14_4",
+              "text": "thương mại nông thôn",
+              "translation": "rural e-commerce",
+              "typeFunction": "Danh từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 3,
+          "globalItemNumber": 15,
+          "sourceItemId": "set05_s3_i15",
+          "chunkIds": [
+            "h_set05_s3_i15_1",
+            "h_set05_s3_i15_2",
+            "h_set05_s3_i15_3",
+            "h_set05_s3_i15_4"
+          ],
+          "termVi": "Tin hay không tùy bởi thế cơn sốt mua sắm bùng nổ mạnh mẽ",
+          "termEn": "believe it or not for that reason buying tsunami erupt violently",
+          "promptVi": "Tin hay không tùy bởi thế cơn sốt mua sắm bùng nổ mạnh mẽ.",
+          "promptEn": "Believe it or not for that reason buying tsunami erupt violently.",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 4,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 4,
+          "cvrBreakdown": {
+            "tc": 4,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 4,
+            "cci": 3,
+            "cpd": 12
+          },
+          "hints": [
+            {
+              "id": "h_set05_s3_i15_1",
+              "text": "Tin hay không tùy",
+              "translation": "believe it or not",
+              "typeFunction": "Cụm chêm · Keyword"
+            },
+            {
+              "id": "h_set05_s3_i15_2",
+              "text": "bởi thế",
+              "translation": "for that reason",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s3_i15_3",
+              "text": "cơn sốt mua sắm",
+              "translation": "buying tsunami",
+              "typeFunction": "Ẩn dụ · Fancy word"
+            },
+            {
+              "id": "h_set05_s3_i15_4",
+              "text": "bùng nổ mạnh mẽ",
+              "translation": "erupt violently",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sectionOrder": 6,
+      "part": 3,
+      "title": "Session 6 • 4Ω (Focus Sentence)",
+      "targetCvrOhm": 4,
+      "cciAmpe": 3,
+      "cpd": 12,
+      "hintCount": 1,
+      "sessionLanguage": "vi",
+      "voiceModel": "google/vi-VN-Neural2-A",
+      "introTextVi": "Session 6: Mức kháng trở 4 Ohm, cường độ 3 Ampe. Mục tiêu 12V CPD. Phát âm câu trôi chảy.",
+      "introTextEn": "Session 6: Resistance 4 Ohm, current 3 Amps. Target 12V CPD. Speak fluently.",
+      "items": [
+        {
+          "itemOrder": 1,
+          "globalItemNumber": 16,
+          "sourceItemId": "set05_s3_i16",
+          "chunkIds": [
+            "h_set05_s3_i16_1",
+            "h_set05_s3_i16_2",
+            "h_set05_s3_i16_3",
+            "h_set05_s3_i16_4"
+          ],
+          "termVi": "Mảng thời trang trẻ dẫu vậy vòng quay chóng mặt đào thải cực nhanh",
+          "termEn": "youth fashion sector even so dizzying churn weed out swiftly",
+          "promptVi": "Mảng thời trang trẻ dẫu vậy vòng quay chóng mặt đào thải cực nhanh.",
+          "promptEn": "Youth fashion sector even so dizzying churn weed out swiftly.",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 4,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 4,
+          "cvrBreakdown": {
+            "tc": 4,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 4,
+            "cci": 3,
+            "cpd": 12
+          },
+          "hints": [
+            {
+              "id": "h_set05_s3_i16_1",
+              "text": "Mảng thời trang trẻ",
+              "translation": "youth fashion sector",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s3_i16_2",
+              "text": "dẫu vậy",
+              "translation": "even so",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s3_i16_3",
+              "text": "vòng quay chóng mặt",
+              "translation": "dizzying churn",
+              "typeFunction": "Ẩn dụ · Fancy word"
+            },
+            {
+              "id": "h_set05_s3_i16_4",
+              "text": "đào thải cực nhanh",
+              "translation": "weed out swiftly",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 2,
+          "globalItemNumber": 17,
+          "sourceItemId": "set05_s3_i17",
+          "chunkIds": [
+            "h_set05_s3_i17_1",
+            "h_set05_s3_i17_2",
+            "h_set05_s3_i17_3",
+            "h_set05_s3_i17_4"
+          ],
+          "termVi": "Hàng tồn kho chất đống sau cùng cục nợ đè nặng phải đại hạ giá",
+          "termEn": "backlog inventory eventually albatross stone slash prices deep",
+          "promptVi": "Hàng tồn kho chất đống sau cùng cục nợ đè nặng phải đại hạ giá.",
+          "promptEn": "Backlog inventory eventually albatross stone slash prices deep.",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 4,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 4,
+          "cvrBreakdown": {
+            "tc": 4,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 4,
+            "cci": 3,
+            "cpd": 12
+          },
+          "hints": [
+            {
+              "id": "h_set05_s3_i17_1",
+              "text": "Hàng tồn kho chất đống",
+              "translation": "backlog inventory",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s3_i17_2",
+              "text": "sau cùng",
+              "translation": "eventually",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s3_i17_3",
+              "text": "cục nợ đè nặng",
+              "translation": "albatross stone",
+              "typeFunction": "Ẩn dụ · Fancy word"
+            },
+            {
+              "id": "h_set05_s3_i17_4",
+              "text": "phải đại hạ giá",
+              "translation": "slash prices deep",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 3,
+          "globalItemNumber": 18,
+          "sourceItemId": "set05_s3_i18",
+          "chunkIds": [
+            "h_set05_s3_i18_1",
+            "h_set05_s3_i18_2",
+            "h_set05_s3_i18_3",
+            "h_set05_s3_i18_4"
+          ],
+          "termVi": "Hoa hồng bán hàng cao ngoài ra miếng mồi béo bở hút ngàn streamer",
+          "termEn": "juicy affiliate cut besides fat bait draw streamers",
+          "promptVi": "Hoa hồng bán hàng cao ngoài ra miếng mồi béo bở hút ngàn streamer.",
+          "promptEn": "Juicy affiliate cut besides fat bait draw streamers.",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 4,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 4,
+          "cvrBreakdown": {
+            "tc": 4,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 4,
+            "cci": 3,
+            "cpd": 12
+          },
+          "hints": [
+            {
+              "id": "h_set05_s3_i18_1",
+              "text": "Hoa hồng bán hàng cao",
+              "translation": "juicy affiliate cut",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s3_i18_2",
+              "text": "ngoài ra",
+              "translation": "besides",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s3_i18_3",
+              "text": "miếng mồi béo bở",
+              "translation": "fat bait",
+              "typeFunction": "Ẩn dụ · Fancy word"
+            },
+            {
+              "id": "h_set05_s3_i18_4",
+              "text": "hút ngàn streamer",
+              "translation": "draw streamers",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sectionOrder": 7,
+      "part": 3,
+      "title": "Session 7 • 6Ω (Focus Sentence)",
+      "targetCvrOhm": 6,
+      "cciAmpe": 2,
+      "cpd": 12,
+      "hintCount": 1,
+      "sessionLanguage": "en",
+      "voiceModel": "google/en-US-Neural2-F",
+      "introTextVi": "Session 7: Mức kháng trở 6 Ohm, cường độ 2 Ampe. Mục tiêu 12V CPD. Phát âm câu trôi chảy.",
+      "introTextEn": "Session 7: Resistance 6 Ohm, current 2 Amps. Target 12V CPD. Speak fluently.",
+      "items": [
+        {
+          "itemOrder": 1,
+          "globalItemNumber": 19,
+          "sourceItemId": "set05_s4_i13",
+          "chunkIds": [
+            "h_set05_s4_i13_1",
+            "h_set05_s4_i13_2",
+            "h_set05_s4_i13_3",
+            "h_set05_s4_i13_4",
+            "h_set05_s4_i13_5"
+          ],
+          "termVi": "Hóa ra chính sách đổi trả 7 ngày tiếp theo chiếc phao bảo hiểm giúp khách an tâm",
+          "termEn": "Turned out 7-day return guarantee next comforting cushion put minds at ease",
+          "promptVi": "Hóa ra chính sách đổi trả 7 ngày tiếp theo chiếc phao bảo hiểm giúp khách an tâm.",
+          "promptEn": "Turned out 7-day return guarantee next comforting cushion put minds at ease.",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 6,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 6,
+          "cvrBreakdown": {
+            "tc": 6,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 6,
+            "cci": 2,
+            "cpd": 12
+          },
+          "hints": [
+            {
+              "id": "h_set05_s4_i13_1",
+              "text": "Hóa ra",
+              "translation": "Turned out",
+              "typeFunction": "Cụm mào đầu · Intro"
+            },
+            {
+              "id": "h_set05_s4_i13_2",
+              "text": "chính sách đổi trả 7 ngày",
+              "translation": "7-day return guarantee",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s4_i13_3",
+              "text": "tiếp theo",
+              "translation": "next",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s4_i13_4",
+              "text": "chiếc phao bảo hiểm",
+              "translation": "comforting cushion",
+              "typeFunction": "Ẩn dụ · Fancy word"
+            },
+            {
+              "id": "h_set05_s4_i13_5",
+              "text": "giúp khách an tâm",
+              "translation": "put minds at ease",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 2,
+          "globalItemNumber": 20,
+          "sourceItemId": "set05_s4_i14",
+          "chunkIds": [
+            "h_set05_s4_i14_1",
+            "h_set05_s4_i14_2",
+            "h_set05_s4_i14_3",
+            "h_set05_s4_i14_4",
+            "h_set05_s4_i14_5"
+          ],
+          "termVi": "Nhớ kỹ nè hoa hồng tiếp thị liên kết bởi vì đòn bẩy tăng trưởng cực kỳ hiệu quả",
+          "termEn": "Mark my words affiliate commissions because turbocharged growth insanely potent",
+          "promptVi": "Nhớ kỹ nè hoa hồng tiếp thị liên kết bởi vì đòn bẩy tăng trưởng cực kỳ hiệu quả.",
+          "promptEn": "Mark my words affiliate commissions because turbocharged growth insanely potent.",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 6,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 6,
+          "cvrBreakdown": {
+            "tc": 6,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 6,
+            "cci": 2,
+            "cpd": 12
+          },
+          "hints": [
+            {
+              "id": "h_set05_s4_i14_1",
+              "text": "Nhớ kỹ nè",
+              "translation": "Mark my words",
+              "typeFunction": "Cụm mào đầu · Intro"
+            },
+            {
+              "id": "h_set05_s4_i14_2",
+              "text": "hoa hồng tiếp thị liên kết",
+              "translation": "affiliate commissions",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s4_i14_3",
+              "text": "bởi vì",
+              "translation": "because",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s4_i14_4",
+              "text": "đòn bẩy tăng trưởng",
+              "translation": "turbocharged growth",
+              "typeFunction": "Ẩn dụ · Fancy word"
+            },
+            {
+              "id": "h_set05_s4_i14_5",
+              "text": "cực kỳ hiệu quả",
+              "translation": "insanely potent",
+              "typeFunction": "Tính từ · Ending"
+            }
+          ]
+        },
+        {
+          "itemOrder": 3,
+          "globalItemNumber": 21,
+          "sourceItemId": "set05_s4_i15",
+          "chunkIds": [
+            "h_set05_s4_i15_1",
+            "h_set05_s4_i15_2",
+            "h_set05_s4_i15_3",
+            "h_set05_s4_i15_4",
+            "h_set05_s4_i15_5"
+          ],
+          "termVi": "Nghe nè đánh giá 1 sao ngoài ra vết nhọ thương hiệu phải xử lý khéo léo",
+          "termEn": "Listen closely one-star review strike besides stain on reputation defuse diplomatically",
+          "promptVi": "Nghe nè đánh giá 1 sao ngoài ra vết nhọ thương hiệu phải xử lý khéo léo.",
+          "promptEn": "Listen closely one-star review strike besides stain on reputation defuse diplomatically.",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 6,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 6,
+          "cvrBreakdown": {
+            "tc": 6,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 6,
+            "cci": 2,
+            "cpd": 12
+          },
+          "hints": [
+            {
+              "id": "h_set05_s4_i15_1",
+              "text": "Nghe nè",
+              "translation": "Listen closely",
+              "typeFunction": "Cụm mào đầu · Intro"
+            },
+            {
+              "id": "h_set05_s4_i15_2",
+              "text": "đánh giá 1 sao",
+              "translation": "one-star review strike",
+              "typeFunction": "Danh từ · Keyword"
+            },
+            {
+              "id": "h_set05_s4_i15_3",
+              "text": "ngoài ra",
+              "translation": "besides",
+              "typeFunction": "Từ nối · Logic word"
+            },
+            {
+              "id": "h_set05_s4_i15_4",
+              "text": "vết nhọ thương hiệu",
+              "translation": "stain on reputation",
+              "typeFunction": "Ẩn dụ · Fancy word"
+            },
+            {
+              "id": "h_set05_s4_i15_5",
+              "text": "phải xử lý khéo léo",
+              "translation": "defuse diplomatically",
+              "typeFunction": "Động từ · Ending"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "totalItems": 21
+}

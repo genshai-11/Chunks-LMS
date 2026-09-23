@@ -129,15 +129,60 @@ export async function fetchFirestoreLessonChunks(
   return chunks;
 }
 
+export const GREEN_TEST_SESSION_LANGUAGES_7X3: Array<"vi" | "en"> = [
+  "en",
+  "en",
+  "en",
+  "vi",
+  "vi",
+  "vi",
+  "en",
+];
+export const RED_TEST_SESSION_LANGUAGES_7X3: Array<"vi" | "en"> = [
+  "vi",
+  "vi",
+  "vi",
+  "en",
+  "en",
+  "en",
+  "en",
+];
+export const RED_TEST_HINT_PROGRESSION_7X3 = [2, 3, 4, 2, 3, 4, 4];
+
+export type CvrBreakdown = {
+  tc: number; // Term/Chunk Complexity (1 for Green, 2-4 hints for Red)
+  lc: number; // Lexical/Length Complexity (1.0 basic, 1.1-1.2 compound/eCommerce)
+  tl: number; // Time Latency (1.0 for continuous Green, 2.0-3.0 for Red with 650ms pauses)
+  cvr: number; // Cognitive Voltage Resistance in Ohms (TC * LC * TL)
+  cci: number; // Cognitive Current Index in Amps
+  cpd: number; // Cognitive Power Dissipation in Volts (CVR * CCI)
+};
+
+export function calculateCvr(tc: number, lc: number, tl: number): number {
+  return Number((tc * lc * tl).toFixed(1));
+}
+
+export function calculateCpd(cvr: number, cci: number): number {
+  return Number((cvr * cci).toFixed(1));
+}
+
+export function calculateCciFromCpd(targetCpd: number, cvr: number): number {
+  if (cvr <= 0) return 1;
+  return Math.max(1, Math.round(targetCpd / cvr));
+}
+
 export type GeneratePackageStructureInput = {
   testType: "GREEN" | "RED" | "green" | "red";
   lessonId: string;
   chunks: FirestoreLessonChunk[];
   targetQuestions?: 21 | 42 | 49 | number;
+  sessionLayout?: "7x3" | "3x7" | "6x7" | "7x7" | string;
+  sessionLanguages?: Array<"vi" | "en">;
   targetCpd?: number;
   packageCode?: string;
   title?: string;
   versionLabel?: string;
+  lexicalComplexity?: number;
 };
 
 export type GeneratedPackageStructure = {
@@ -149,6 +194,8 @@ export type GeneratedPackageStructure = {
   testType: "GREEN" | "RED";
   targetQuestions: number;
   targetCpd: number;
+  sessionLayout?: string;
+  sessionLanguages?: Array<"vi" | "en">;
   lifecycleNarration: {
     package_start: { vi: string; en: string };
     part_intro: {
@@ -165,6 +212,8 @@ export type GeneratedPackageStructure = {
     targetCvrOhm: number;
     cciAmpe: number;
     cpd: number;
+    sessionLanguage?: "vi" | "en";
+    hintCount?: number;
     introTextVi: string;
     introTextEn: string;
     items: Array<{
@@ -181,6 +230,7 @@ export type GeneratedPackageStructure = {
       lc: number;
       tl: number;
       measuredCvr: number;
+      cvrBreakdown?: CvrBreakdown;
     }>;
   }>;
   totalItems: number;
@@ -222,8 +272,15 @@ export function generatePackageStructure(
         },
       ];
 
-  const numSessions = targetQuestions === 21 ? 3 : targetQuestions === 49 ? 7 : 6;
-  const itemsPerSession = 7;
+  const is7x3 = targetQuestions === 21 && input.sessionLayout === "7x3";
+  const numSessions = is7x3
+    ? 7
+    : targetQuestions === 21
+      ? (input.sessionLayout === "7x3" ? 7 : 3)
+      : targetQuestions === 49
+        ? 7
+        : 6;
+  const itemsPerSession = is7x3 ? 3 : targetQuestions === 21 && numSessions === 7 ? 3 : 7;
   const targetCpd = Number(input.targetCpd ?? (isRed ? 56 : 12));
 
   const packageCode = input.packageCode
@@ -240,31 +297,37 @@ export function generatePackageStructure(
   const description = `${testType} Test generated from lesson ${input.lessonId} (${targetQuestions}Q - ${targetCpd}V)`;
 
   // Determine Part mapping for each session
-  // 21Q: 3 sessions -> Part 1 = S1, Part 2 = S2, Part 3 = S3
-  // 42Q: 6 sessions -> Part 1 = S1-S2, Part 2 = S3-S4, Part 3 = S5-S6
-  // 49Q: 7 sessions -> Part 1 = S1-S2, Part 2 = S3-S4, Part 3 = S5-S7
   function getPartForSession(s: number): 1 | 2 | 3 {
     if (numSessions === 3) {
       return s as 1 | 2 | 3;
+    }
+    if (numSessions === 7) {
+      if (s <= 2) return 1;
+      if (s <= 4) return 2;
+      return 3;
     }
     if (s <= 2) return 1;
     if (s <= 4) return 2;
     return 3;
   }
 
+  const defaultSessionLanguages: Array<"vi" | "en"> = isRed
+    ? (numSessions === 7 ? RED_TEST_SESSION_LANGUAGES_7X3 : ["vi", "vi", "vi", "en", "en", "en"])
+    : (numSessions === 7 ? GREEN_TEST_SESSION_LANGUAGES_7X3 : ["en", "en", "en", "vi", "vi", "en"]);
+  const activeSessionLanguages = input.sessionLanguages && input.sessionLanguages.length >= numSessions
+    ? input.sessionLanguages
+    : defaultSessionLanguages;
+
   // Pre-define Green test CVR bands and CCI progressions
-  // Session 1-2: CVR 1-3 Ohm (A2/B1 everyday simple sentence)
-  // Session 3-4: CVR 5-7 Ohm (B1/B2 compound sentence)
-  // Session 5-7: CVR 9-13 Ohm (B2/C1 complex sentence, advanced collocation)
   const greenCvrProgression: Record<number, number[]> = {
     3: [2, 6, 11],
     6: [1, 3, 5, 7, 9, 13],
-    7: [1, 3, 5, 7, 9, 11, 13],
+    7: [2, 2, 3, 3, 4, 4, 6],
   };
   const greenCciProgression: Record<number, number[]> = {
     3: [2, 4, 6],
     6: [2, 2, 4, 4, 6, 6],
-    7: [2, 2, 4, 4, 6, 6, 8],
+    7: [6, 6, 4, 4, 3, 3, 2],
   };
 
   const sections: GeneratedPackageStructure["sections"] = [];
@@ -273,28 +336,47 @@ export function generatePackageStructure(
 
   for (let s = 1; s <= numSessions; s++) {
     const part = getPartForSession(s);
+    const sessionLang = activeSessionLanguages[s - 1] ?? (isRed ? "vi" : "en");
 
     let sessionCvr: number;
     let sessionCci: number;
     let sessionCpd: number;
+    let sessionHintCount: number;
 
     if (!isRed) {
-      // Green Test
-      sessionCvr = greenCvrProgression[numSessions][s - 1] ?? 3;
-      sessionCci = greenCciProgression[numSessions][s - 1] ?? 2;
-      sessionCpd = sessionCvr * sessionCci;
+      // Green Test: Continuous focus, TL = 1.0, Target 12V CPD (CPD = CVR * CCI)
+      sessionHintCount = 1;
+      if (numSessions === 7) {
+        const baseCvrCurve = greenCvrProgression[7];
+        const baseCciCurve = greenCciProgression[7];
+        if (targetCpd === 12) {
+          sessionCvr = baseCvrCurve[s - 1] ?? 3;
+          sessionCci = baseCciCurve[s - 1] ?? 4;
+          sessionCpd = calculateCpd(sessionCvr, sessionCci);
+        } else {
+          const scale = targetCpd / 12;
+          sessionCvr = Number(((baseCvrCurve[s - 1] ?? 3) * scale).toFixed(1));
+          sessionCci = calculateCciFromCpd(targetCpd, sessionCvr);
+          sessionCpd = calculateCpd(sessionCvr, sessionCci);
+        }
+      } else {
+        sessionCvr = greenCvrProgression[numSessions]?.[s - 1] ?? 3;
+        sessionCci = greenCciProgression[numSessions]?.[s - 1] ?? 2;
+        sessionCpd = calculateCpd(sessionCvr, sessionCci);
+      }
     } else {
-      // Red Test
-      // Scale TL in [2.0, 3.0]
+      // Red Test: Cognitive traps, exact hint progression [2, 3, 4, 2, 3, 4, 4] for 7 sessions
+      sessionHintCount = numSessions === 7
+        ? RED_TEST_HINT_PROGRESSION_7X3[s - 1] ?? 2
+        : (s <= 3 ? 2 : 3);
+      const tc = sessionHintCount;
+      const lc = Number((input.lexicalComplexity ?? 1.15).toFixed(2));
       const tl = Number(
         (2.0 + ((s - 1) / Math.max(numSessions - 1, 1)) * 1.0).toFixed(1),
       );
-      // Combine 2 chunks in sessions 1-3, 3 chunks in sessions 4+
-      const tc = s <= 3 ? 2 : 3;
-      const lc = 1.0;
-      sessionCvr = Number((tc * lc * tl).toFixed(1));
-      sessionCci = Math.max(1, Math.round(targetCpd / sessionCvr));
-      sessionCpd = Number((sessionCvr * sessionCci).toFixed(1));
+      sessionCvr = calculateCvr(tc, lc, tl);
+      sessionCci = calculateCciFromCpd(targetCpd, sessionCvr);
+      sessionCpd = calculateCpd(sessionCvr, sessionCci);
     }
 
     const sessionTitle = `Session ${s}`;
@@ -313,17 +395,26 @@ export function generatePackageStructure(
 
       if (!isRed) {
         // GREEN TEST (Focus)
-        // 1 chunk per item
+        // 1 chunk / complete sentence per item, TL = 1.0
         const chunk = chunks[itemIndex % chunks.length];
-        const tc = sessionCvr;
         const lc = 1.0;
         const tl = 1.0;
-        const measuredCvr = tc * lc * tl;
+        const tc = sessionCvr;
+        const measuredCvr = calculateCvr(tc, lc, tl);
 
         const termVi = chunk.vietnamese;
         const termEn = chunk.english;
         const promptVi = chunk.vietnamese;
         const promptEn = chunk.english;
+
+        const cvrBreakdown: CvrBreakdown = {
+          tc,
+          lc,
+          tl,
+          cvr: measuredCvr,
+          cci: sessionCci,
+          cpd: sessionCpd,
+        };
 
         const item = {
           itemOrder: i,
@@ -339,6 +430,7 @@ export function generatePackageStructure(
           lc,
           tl,
           measuredCvr,
+          cvrBreakdown,
         };
         items.push(item);
 
@@ -358,8 +450,8 @@ export function generatePackageStructure(
         });
       } else {
         // RED TEST (Awareness & Traps)
-        // Combine 2-3 chunks per item
-        const combineCount = s <= 3 ? 2 : 3;
+        // Hints count according to session hint structure
+        const combineCount = sessionHintCount;
         const selectedChunks: FirestoreLessonChunk[] = [];
         for (let c = 0; c < combineCount; c++) {
           const cIdx = (itemIndex * combineCount + c) % chunks.length;
@@ -380,8 +472,17 @@ export function generatePackageStructure(
           (2.0 + ((s - 1) / Math.max(numSessions - 1, 1)) * 1.0).toFixed(1),
         );
         const tc = combineCount;
-        const lc = 1.0;
-        const measuredCvr = Number((tc * lc * tl).toFixed(1));
+        const lc = Number((input.lexicalComplexity ?? 1.15).toFixed(2));
+        const measuredCvr = calculateCvr(tc, lc, tl);
+
+        const cvrBreakdown: CvrBreakdown = {
+          tc,
+          lc,
+          tl,
+          cvr: measuredCvr,
+          cci: sessionCci,
+          cpd: sessionCpd,
+        };
 
         const item = {
           itemOrder: i,
@@ -397,6 +498,7 @@ export function generatePackageStructure(
           lc,
           tl,
           measuredCvr,
+          cvrBreakdown,
         };
         items.push(item);
 
@@ -424,6 +526,8 @@ export function generatePackageStructure(
       targetCvrOhm: sessionCvr,
       cciAmpe: sessionCci,
       cpd: sessionCpd,
+      sessionLanguage: sessionLang,
+      hintCount: sessionHintCount,
       introTextVi,
       introTextEn,
       items,
@@ -490,6 +594,8 @@ export function generatePackageStructure(
     testType,
     targetQuestions,
     targetCpd,
+    sessionLayout: input.sessionLayout ?? (is7x3 ? "7x3" : targetQuestions === 21 ? "3x7" : undefined),
+    sessionLanguages: activeSessionLanguages,
     lifecycleNarration,
     sections,
     totalItems: globalItemNumber,
@@ -543,6 +649,8 @@ export async function persistDraftPackage(
         testType: structure.testType,
         targetQuestions: structure.targetQuestions,
         targetCpd: structure.targetCpd,
+        sessionLayout: structure.sessionLayout,
+        sessionLanguages: structure.sessionLanguages,
         generatedAt: new Date().toISOString(),
       },
     })
@@ -566,6 +674,8 @@ export async function persistDraftPackage(
         testType: structure.testType,
         targetQuestions: structure.targetQuestions,
         targetCpd: structure.targetCpd,
+        sessionLayout: structure.sessionLayout,
+        sessionLanguages: structure.sessionLanguages,
         lifecycleNarration: structure.lifecycleNarration,
       },
     })
@@ -590,6 +700,8 @@ export async function persistDraftPackage(
           part: sec.part,
           cciAmpe: sec.cciAmpe,
           cpd: sec.cpd,
+          sessionLanguage: sec.sessionLanguage,
+          hintCount: sec.hintCount,
         },
       })
       .select("id")
@@ -613,7 +725,7 @@ export async function persistDraftPackage(
       tc: it.tc,
       lc: it.lc,
       tl: it.tl,
-      cvr_breakdown: {
+      cvr_breakdown: it.cvrBreakdown ?? {
         tc: it.tc,
         lc: it.lc,
         tl: it.tl,

@@ -266,6 +266,48 @@ export type FirestoreChunk = {
   category?: string
 }
 
+export const GREEN_TEST_SESSION_LANGUAGES_7X3: Array<'vi' | 'en'> = [
+  'en',
+  'en',
+  'en',
+  'vi',
+  'vi',
+  'vi',
+  'en',
+]
+export const RED_TEST_SESSION_LANGUAGES_7X3: Array<'vi' | 'en'> = [
+  'vi',
+  'vi',
+  'vi',
+  'en',
+  'en',
+  'en',
+  'en',
+]
+export const RED_TEST_HINT_PROGRESSION_7X3 = [2, 3, 4, 2, 3, 4, 4]
+
+export type CvrBreakdown = {
+  tc: number // Term/Chunk Complexity (1 for Green, 2-4 hints for Red)
+  lc: number // Lexical/Length Complexity (1.0 basic, 1.1-1.2 compound/eCommerce)
+  tl: number // Time Latency (1.0 for continuous Green, 2.0-3.0 for Red with 650ms pauses)
+  cvr: number // Cognitive Voltage Resistance in Ohms (TC * LC * TL)
+  cci: number // Cognitive Current Index in Amps
+  cpd: number // Cognitive Power Dissipation in Volts (CVR * CCI)
+}
+
+export function calculateCvr(tc: number, lc: number, tl: number): number {
+  return Number((tc * lc * tl).toFixed(1))
+}
+
+export function calculateCpd(cvr: number, cci: number): number {
+  return Number((cvr * cci).toFixed(1))
+}
+
+export function calculateCciFromCpd(targetCpd: number, cvr: number): number {
+  if (cvr <= 0) return 1
+  return Math.max(1, Math.round(targetCpd / cvr))
+}
+
 export type GeneratePackageFromVocabInput = {
   testType: 'green' | 'red' | 'GREEN' | 'RED'
   lessonId: string
@@ -274,6 +316,8 @@ export type GeneratePackageFromVocabInput = {
   dayNumber?: number
   questionCount?: number // 21, 42, 49
   targetQuestions?: 21 | 42 | 49
+  sessionLayout?: '7x3' | '3x7' | '6x7' | '7x7' | string
+  sessionLanguages?: Array<'vi' | 'en'>
   targetVoltage?: number // e.g. 12 or 56
   targetCpd?: number
   packageCode?: string
@@ -281,6 +325,7 @@ export type GeneratePackageFromVocabInput = {
   versionLabel?: string
   topic?: string
   saveDraft?: boolean
+  lexicalComplexity?: number
 }
 
 export const CANONICAL_FIRESTORE_LESSONS: FirestoreLesson[] = [
@@ -364,10 +409,13 @@ export async function generatePackageFromVocab(input: GeneratePackageFromVocabIn
       testType,
       lessonId: input.lessonId,
       targetQuestions,
+      sessionLayout: input.sessionLayout,
+      sessionLanguages: input.sessionLanguages,
       targetCpd,
       packageCode,
       title: input.title,
       saveDraft: input.saveDraft ?? true,
+      lexicalComplexity: input.lexicalComplexity,
     })
     if (res?.packageId && res?.packageVersionId) {
       clearRequestCache()
@@ -419,6 +467,8 @@ export async function generatePackageFromVocab(input: GeneratePackageFromVocabIn
         levelCode: input.levelCode,
         dayNumber: input.dayNumber,
         questionCount: input.questionCount,
+        sessionLayout: input.sessionLayout,
+        sessionLanguages: input.sessionLanguages,
         targetVoltage: input.targetVoltage,
         topic: input.topic,
       },
@@ -439,6 +489,8 @@ export async function generatePackageFromVocab(input: GeneratePackageFromVocabIn
         testType: input.testType,
         lessonId: input.lessonId,
         questionCount: input.questionCount,
+        sessionLayout: input.sessionLayout,
+        sessionLanguages: input.sessionLanguages,
         targetVoltage: input.targetVoltage,
       },
     })
@@ -454,11 +506,16 @@ export async function generatePackageFromVocab(input: GeneratePackageFromVocabIn
     sessionCount = 7
     itemsPerSession = 7
   } else if (qCount === 42) {
-    sessionCount = 2
-    itemsPerSession = 21
-  } else if (qCount === 21) {
-    sessionCount = 3
+    sessionCount = 6
     itemsPerSession = 7
+  } else if (qCount === 21) {
+    if (input.sessionLayout === '7x3') {
+      sessionCount = 7
+      itemsPerSession = 3
+    } else {
+      sessionCount = 3
+      itemsPerSession = 7
+    }
   }
 
   const effectiveVoltage = input.targetCpd ?? input.targetVoltage ?? (input.testType.toUpperCase() === 'RED' ? 56 : 12)

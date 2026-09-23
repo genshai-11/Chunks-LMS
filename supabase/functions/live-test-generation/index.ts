@@ -94,11 +94,14 @@ type GeneratePackageFromVocabBody = {
   testType: "GREEN" | "RED" | "green" | "red";
   lessonId: string;
   targetQuestions?: 21 | 42 | 49;
+  sessionLayout?: "7x3" | "3x7" | "6x7" | "7x7" | string;
+  sessionLanguages?: Array<"vi" | "en">;
   targetCpd?: number;
   packageCode?: string;
   title?: string;
   versionLabel?: string;
   saveDraft?: boolean;
+  lexicalComplexity?: number;
 };
 
 type RequestBody =
@@ -905,10 +908,13 @@ async function generatePackageFromVocabHandler(
     lessonId: body.lessonId,
     chunks,
     targetQuestions: body.targetQuestions,
+    sessionLayout: body.sessionLayout,
+    sessionLanguages: body.sessionLanguages,
     targetCpd: body.targetCpd,
     packageCode: body.packageCode,
     title: body.title,
     versionLabel: body.versionLabel || "v1",
+    lexicalComplexity: body.lexicalComplexity,
   });
 
   if (body.saveDraft === false) {

@@ -1,74 +1,70 @@
-# Chunks LMS - Sample Test Packages Report (Complete Sentence & Multi-Type Traps)
+# Chunks LMS • eCommerce Mini Test Suite (7x3 Architecture)
 
-Báo cáo phân tích chuyên sâu 4 bộ bài test mẫu chuẩn hóa theo đúng triết lý đo lường của **Chunks LMS**:
+Generated from **Improv Set 05: E-commerce & Retail (Market Dynamics & Shopping Reflex)**.
 
 ---
 
-## 1. Bảng đối chiếu 4 bài test mẫu
+## 1. Mini Test Architecture (7 Sessions × 3 Questions = 21 Questions)
 
-| Mã bài test | Loại bài | Topic | Dữ liệu gốc (Firestore) | Target Voltage (CPD) | Quy chuẩn cấu trúc & Hint Type |
+Both Green and Red tests follow the high-efficiency **7x3 mini test structure**:
+- **7 sessions per test package**
+- **3 questions per session**
+- **Total: 21 questions**
+- Structured across 3 pedagogical parts:
+  - **Part 1:** Sessions 1–2 (Foundation & core consumer reaction)
+  - **Part 2:** Sessions 3–4 (Compound logic & retail chain connectors)
+  - **Part 3:** Sessions 5–7 (Advanced metaphors, high cognitive resistance & peak fluency)
+
+---
+
+## 2. Mathematical & Physics Model
+
+| Metric | Symbol | Unit | Definition | Green Test Value | Red Test Value |
 |---|---|---|---|---|---|
-| **`G01-9Q-Topic1-Day1Lesson0Orientation`** | **GREEN (Focus)** | Topic 1 | `Day 1 - Lesson 0 Orientation` | **12V** ($CVR \times CCI = 3\Omega \times 4A$) | **100% Câu hoàn chỉnh (Complete Sentences)** phân tầng A2 $\to$ B1 $\to$ B2/C1. Đo sự tập trung & lưu loát nhịp điệu. $TL=1.0$. |
-| **`G02-9Q-Topic2-Day2Lesson1Howtosurvive`** | **GREEN (Focus)** | Topic 2 | `Day 2 - Lesson 1 How to survive` | **12V** ($CVR \times CCI = 3\Omega \times 4A$) | **100% Câu hoàn chỉnh sinh tồn**, nhịp thở liền mạch, $TL=1.0$. |
-| **`R01-9Q-Topic3-56V`** | **RED (Awareness)** | Topic 3 | `Day 3 - Lesson 2 What you'd like to do?` | **56V** ($CVR \times CCI = 7\Omega \times 8A$) | **9 cấu trúc & 9 loại Hint bẫy nhận thức khác biệt hoàn toàn** (Scale Contrast, Plosives, Latency Hold, Sibilants, Syllabic...). SSML 650ms. |
-| **`R02-9Q-Topic4-56V`** | **RED (Awareness)** | Topic 4 | `Day 4 - Lesson 3 I'm a hitchhiker` | **56V** ($CVR \times CCI = 7\Omega \times 8A$) | **9 cấu trúc & 9 loại Hint bẫy nhận thức khác biệt** (Facility-Action, Commercial Duality, Temporal Link, Redundancy Suppression...). SSML 650ms. |
+| **Term Complexity** | $TC$ | Count | Number of chunks / semantic elements | $1$ (sentence core) | $2 - 4$ hints |
+| **Lexical Complexity** | $LC$ | Factor | Domain lexical density & syllable clash | $1.0$ (standard) | $1.15$ (compound eCommerce) |
+| **Time Latency** | $TL$ | Factor | Pacing & cognitive hesitation allowance | $1.0$ (continuous) | $2.0 - 3.0$ (with 650ms pauses) |
+| **Cognitive Voltage Resistance** | $CVR$ | $\Omega$ | $CVR = TC \times LC \times TL$ | $2.0 - 6.0\ \Omega$ | $4.6 - 13.8\ \Omega$ |
+| **Cognitive Current Index** | $CCI$ | $\text{A}$ | Cognitive processing rate | $2\text{A} - 6\text{A}$ | $4\text{A} - 12\text{A}$ |
+| **Cognitive Power Dissipation** | $CPD$ | $\text{V}$ | $CPD = CVR \times CCI$ | **$12\text{V}$** (Focus Target) | **$56\text{V}$** (Awareness Target) |
 
 ---
 
-## 2. Chi tiết 9 loại Hint Bẫy Nhận Thức khác nhau trong Red Test 1 (`R01-9Q-Topic3-56V`)
+## 3. Package Inventory & Comparison
 
-Mỗi câu hỏi có **cấu trúc từ ghép khác nhau** và **chỉ dẫn nhận thức (Hint) chuyên biệt**, không trùng lặp:
-
-1. **Câu 1**: *Elephant ; Black cat*  
-   - **Loại bẫy**: `Scale Contrast Trap (Đơn thể siêu to vs Cụm từ màu sắc nhỏ)`  
-   - **Hint**: *"[Scale Contrast Trap (Đơn thể siêu to vs Cụm từ màu sắc nhỏ)] Điều chỉnh trường năng lượng: Chuyển đổi dứt khoát từ danh từ thực thể lớn sang cụm miêu tả nhỏ sau khoảng ngắt 650ms."*  
-   - **SSML Audio**: `<speak><s>Elephant</s> <break time="650ms"/> <s>Black cat</s></speak>`
-2. **Câu 2**: *Black dog ; Black cat*  
-   - **Loại bẫy**: `Phonetic Terminal Plosive Trap (Bẫy trượt âm cuối /g/ vs /t/)`  
-   - **Hint**: *"[Phonetic Terminal Plosive Trap (Bẫy trượt âm cuối /g/ vs /t/)] Bật rõ âm đuôi /g/ ở vế đầu và /t/ ở vế sau; tuyệt đối không để quán tính lặp từ "Black" làm nuốt phụ âm cuối."*  
-   - **SSML Audio**: `<speak><s>Black dog</s> <break time="650ms"/> <s>Black cat</s></speak>`
-3. **Câu 3**: *Monkey ; Chicken & duck*  
-   - **Loại bẫy**: `Acoustic Latency Hold (Kiềm chế phản xạ sớm qua khoảng lặng)`  
-   - **Hint**: *"[Acoustic Latency Hold (Kiềm chế phản xạ sớm qua khoảng lặng)] Giữ vững sự điềm tĩnh qua khoảng lặng 650ms; không được vội vàng phát âm cụm liên từ trước khi khoảng ngắt chấm dứt."*  
-   - **SSML Audio**: `<speak><s>Monkey</s> <break time="650ms"/> <s>Chicken & duck</s></speak>`
-4. **Câu 4**: *Lion ; Tiger*  
-   - **Loại bẫy**: `Cognitive Semantic Clash (Đối đầu khái niệm dã thú quen thuộc)`  
-   - **Hint**: *"[Cognitive Semantic Clash (Đối đầu khái niệm dã thú quen thuộc)] Tách bạch rõ ràng hai dã thú tương đồng; tránh xu hướng ghép tắt hay đảo vị trí của chuỗi thuật ngữ."*  
-   - **SSML Audio**: `<speak><s>Lion</s> <break time="650ms"/> <s>Tiger</s></speak>`
-5. **Câu 5**: *Dog & cat ; Snake*  
-   - **Loại bẫy**: `Structural Coordination Trap (Cặp vật nuôi kép vs Đơn thú âm xát)`  
-   - **Hint**: *"[Structural Coordination Trap (Cặp vật nuôi kép vs Đơn thú âm xát)] Xử lý trơn tru liên từ "&" ở vế trước, sau đó bật âm xát /s/ sắc nét ở vế sau mà không bị ngắc ngứ."*  
-   - **SSML Audio**: `<speak><s>Dog & cat</s> <break time="650ms"/> <s>Snake</s></speak>`
-6. **Câu 6**: *Cow ; Chicken & duck*  
-   - **Loại bẫy**: `Familiarity Suppression Trap (Ức chế quán tính khẩu ngữ)`  
-   - **Hint**: *"[Familiarity Suppression Trap (Ức chế quán tính khẩu ngữ)] Ức chế thói quen liên tưởng thành ngữ dân gian; phát âm chuẩn xác từng âm vị theo đúng chuỗi tín hiệu."*  
-   - **SSML Audio**: `<speak><s>Cow</s> <break time="650ms"/> <s>Chicken & duck</s></speak>`
-7. **Câu 7**: *Snake ; Elephant*  
-   - **Loại bẫy**: `Syllabic Rhythm Differential (Đơn âm tiết xát sang Ba âm tiết trọng âm)`  
-   - **Hint**: *"[Syllabic Rhythm Differential (Đơn âm tiết xát sang Ba âm tiết trọng âm)] Chuyển đổi nhịp thở từ đơn âm tiết ngắn sang đa âm tiết ba nhịp (el-e-phant) ngay sau độ trễ 650ms."*  
-   - **SSML Audio**: `<speak><s>Snake</s> <break time="650ms"/> <s>Elephant</s></speak>`
-8. **Câu 8**: *Black dog ; Lion*  
-   - **Loại bẫy**: `Categorical Shift Resistance (Chuyển vùng nhận thức gia đình sang hoang dã)`  
-   - **Hint**: *"[Categorical Shift Resistance (Chuyển vùng nhận thức gia đình sang hoang dã)] Chuyển dịch tức thì từ trường thú cưng gia đình sang biểu tượng hoang dã; giữ trọng âm đều ở cả hai vế."*  
-   - **SSML Audio**: `<speak><s>Black dog</s> <break time="650ms"/> <s>Lion</s></speak>`
-9. **Câu 9**: *Tiger ; Monkey*  
-   - **Loại bẫy**: `Peak Cognitive Voltage Challenge (Thử thách điện thế nhận thức 56V)`  
-   - **Hint**: *"[Peak Cognitive Voltage Challenge (Thử thách điện thế nhận thức 56V)] Tại mức điện áp thử thách cao nhất (56V), kiểm soát hoàn toàn phản xạ kiềm chế và phát âm chuẩn xác cả hai vế."*  
-   - **SSML Audio**: `<speak><s>Tiger</s> <break time="650ms"/> <s>Monkey</s></speak>`
+| Package Code | Test Type | CPD Target | Hint Count Progression | CVR Curve ($\Omega$) | CCI Curve (A) | Session Languages |
+|---|---|---|---|---|---|---|
+| **`G01-21Q-Ecommerce-1`** | GREEN (Focus) | 12V | Single complete sentence | `[2.0, 2.0, 3.0, 3.0, 4.0, 4.0, 6.0]` | `[6, 6, 4, 4, 3, 3, 2]` | EN-EN-EN-VI-VI-VI-EN |
+| **`G02-21Q-Ecommerce-2`** | GREEN (Focus) | 12V | Single complete sentence | `[2.0, 2.0, 3.0, 3.0, 4.0, 4.0, 6.0]` | `[6, 6, 4, 4, 3, 3, 2]` | EN-EN-EN-VI-VI-VI-EN |
+| **`R01-21Q-Ecommerce-56V-1`** | RED (Awareness) | 56V | `[2, 3, 4, 2, 3, 4, 4]` | `[4.6, 7.6, 10.6, 5.8, 9.3, 12.9, 13.8]` | `[12, 7, 5, 10, 6, 4, 4]` | VI-VI-VI-EN-EN-EN-EN |
+| **`R02-21Q-Ecommerce-56V-2`** | RED (Awareness) | 56V | `[2, 3, 4, 2, 3, 4, 4]` | `[4.6, 7.6, 10.6, 5.8, 9.3, 12.9, 13.8]` | `[12, 7, 5, 10, 6, 4, 4]` | VI-VI-VI-EN-EN-EN-EN |
 
 ---
 
-## 3. Chi tiết 9 loại Hint Bẫy Nhận Thức khác nhau trong Red Test 2 (`R02-9Q-Topic4-56V`)
+## 4. Per-Session TTS Audio Configuration & Neural2 Voices
 
-1. **Câu 1**: *Airport ; Book 2 tickets* $	o$ `Spatial Facility vs Transactional Verb Phrase (Địa điểm vs Hành động)`
-2. **Câu 2**: *Bank ; Restaurant & hotel* $	o$ `Commercial Duality Shift (Tài chính công vụ vs Dịch vụ kép)`
-3. **Câu 3**: *On Sunday and in May ; Then / after that* $	o$ `Temporal Anchor to Sequential Transition (Mốc thời gian kép vs Từ nối)`
-4. **Câu 4**: *Church ; Go to the church* $	o$ `Lexical Redundancy Suppression (Khử lặp từ vựng quán tính)`
-5. **Câu 5**: *My brother and my sister ; My grandpa and my grandma* $	o$ `Generational Kinship Balance (Đối xứng nhịp điệu họ hàng hai thế hệ)`
-6. **Câu 6**: *Book 2 tickets ; Bank* $	o$ `Operational Divergence (Hành động có đối tượng sang Cơ sở tài chính)`
-7. **Câu 7**: *Then / after that ; Go to the church* $	o$ `Discourse Marker to Religious Action (Chuyển tiếp hành động tâm linh)`
-8. **Câu 8**: *Restaurant & hotel ; Airport* $	o$ `Logistics Spatial Contrast (Khu nghỉ dưỡng sang Ga hàng không)`
-9. **Câu 9**: *On Sunday and in May ; My brother and my sister* $	o$ `Complex Chrono-Social Climax (Đỉnh cao tải nhận thức Thời gian - Xã hội)`
+### Green Test Preset: `['en', 'en', 'en', 'vi', 'vi', 'vi', 'en']`
+- **Sessions 1–3 (Part 1 + S3):** English (`en-US-Neural2-F`)
+- **Sessions 4–6 (Part 2 + S6):** Vietnamese (`vi-VN-Neural2-A`)
+- **Session 7 (Part 3 Peak):** English (`en-US-Neural2-F`)
+
+### Red Test Preset: `['vi', 'vi', 'vi', 'en', 'en', 'en', 'en']`
+- **Sessions 1–3 (Part 1 + S3):** Vietnamese (`vi-VN-Neural2-A`)
+- **Sessions 4–7 (Part 2 & Part 3):** English (`en-US-Neural2-F`)
+
+### SSML Semantic Gap Specification (Red Tests)
+Every Red test question injects exact 650ms semantic pauses between hints to measure learner cognitive recovery:
+```xml
+<speak><s>Ngành thương mại điện tử</s> <break time="650ms"/> <s>cạnh tranh khốc liệt</s></speak>
+```
+All SSML requests automatically route to Google Cloud **Neural2** voices to ensure natural prosody across pauses.
 
 ---
-*Tất cả 4 file JSON hoàn chỉnh đã được cập nhật tại: `@output/`*
+
+## 5. Verification Checklist
+
+- [x] Exactly 21 questions per package (7 sessions × 3 items).
+- [x] Red tests follow exact hint sequence: `[2, 3, 4, 2, 3, 4, 4]`.
+- [x] Green tests maintain $TL=1.0$ continuous complete sentence structure with 12V CPD target.
+- [x] Red tests compute $CVR = TC \times LC \times TL$ ($LC=1.15$, $TL \in [2.0, 3.0]$) with 56V CPD target.
+- [x] Audio Studio supports language presets and per-session voice toggle.

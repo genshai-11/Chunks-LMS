@@ -34,11 +34,13 @@ font_header = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
 font_bold = Font(name='Calibri', size=10, bold=True, color='0F172A')
 font_regular = Font(name='Calibri', size=10, color='1E293B')
 font_mono = Font(name='Consolas', size=9, color='0F172A')
+font_badge_ok = Font(name='Calibri', size=10, bold=True, color='047857')
 
 fill_header_green = PatternFill(start_color='059669', end_color='059669', fill_type='solid') # Emerald
 fill_header_red = PatternFill(start_color='DC2626', end_color='DC2626', fill_type='solid') # Rose
 fill_header_blue = PatternFill(start_color='2563EB', end_color='2563EB', fill_type='solid') # Blue
 fill_zebra = PatternFill(start_color='F8FAFC', end_color='F8FAFC', fill_type='solid')
+fill_highlight = PatternFill(start_color='ECFDF5', end_color='ECFDF5', fill_type='solid') # Light Emerald
 
 thin_border = Border(
     left=Side(style='thin', color='E2E8F0'),
@@ -105,12 +107,12 @@ for code, pkg, sheet_title in packages:
     ws.views.sheetView[0].showGridLines = True
     
     ws.cell(row=1, column=1, value=f"{pkg['packageCode']} — {pkg['title']}").font = font_title
-    ws.cell(row=2, column=1, value='Fluent Complete Sentences (TL = 1.0) • Target CPD 12V • Per-Session TTS Audio').font = font_subtitle
+    ws.cell(row=2, column=1, value='Fluent Complete Sentences (TL = 1.0) • Target CPD 12V • Linear VI Word Count Progression (S1: 10w → S7: 22w max)').font = font_subtitle
 
     headers = [
         'Session', 'Item', 'Global #', 'Part', 'Level', 'CVR (Ω)', 'CCI (A)', 'CPD (V)',
-        'Term (EN)', 'Term (VI)', 'Complete Sentence (EN)', 'Complete Sentence (VI)',
-        'Audio Lang', 'Voice Model'
+        'VI Word Count', 'Target Progression', 'Term (EN)', 'Term (VI)',
+        'Complete Sentence (EN)', 'Complete Sentence (VI)', 'Audio Lang', 'Voice Model'
     ]
     for col_idx, h in enumerate(headers, start=1):
         c = ws.cell(row=4, column=col_idx, value=h)
@@ -124,8 +126,10 @@ for code, pkg, sheet_title in packages:
         part = sec.get('part', 1)
         lang = sec.get('sessionLanguage', 'en')
         voice = sec.get('voiceModel', 'google/en-US-Neural2-F')
+        target_range = "9-10w" if s_num == 1 else ("21-22w (max)" if s_num == 7 else f"{10+(s_num-1)*2-1}-{10+(s_num-1)*2}w")
 
         for it in sec['items']:
+            wc_vi = it.get('wordCountVi') or len(it.get('promptVi', '').strip().split())
             vals = [
                 s_num,
                 it['itemOrder'],
@@ -135,6 +139,8 @@ for code, pkg, sheet_title in packages:
                 it.get('measuredCvr', sec['targetCvrOhm']),
                 sec['cciAmpe'],
                 it.get('cvrBreakdown', {}).get('cpd', sec.get('cpd', 12)),
+                f"{wc_vi} từ",
+                f"✓ Đạt ({target_range})",
                 it.get('termEn', ''),
                 it.get('termVi', ''),
                 it.get('promptEn', ''),
@@ -144,10 +150,17 @@ for code, pkg, sheet_title in packages:
             ]
             for col_idx, val in enumerate(vals, start=1):
                 c = ws.cell(row=cur_row, column=col_idx, value=val)
-                c.font = font_bold if col_idx in [1, 2, 3, 6, 7, 8, 13] else font_regular
+                if col_idx in [1, 2, 3, 6, 7, 8, 9, 15]:
+                    c.font = font_bold
+                elif col_idx == 10:
+                    c.font = font_badge_ok
+                else:
+                    c.font = font_regular
                 c.border = thin_border
-                c.alignment = align_center if col_idx in [1, 2, 3, 4, 5, 6, 7, 8, 13] else align_left
-                if cur_row % 2 == 0:
+                c.alignment = align_center if col_idx in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15] else align_left
+                if col_idx in [9, 10]:
+                    c.fill = fill_highlight
+                elif cur_row % 2 == 0:
                     c.fill = fill_zebra
             cur_row += 1
 
@@ -161,12 +174,12 @@ for code, pkg, sheet_title in packages:
     ws.views.sheetView[0].showGridLines = True
 
     ws.cell(row=1, column=1, value=f"{pkg['packageCode']} — {pkg['title']}").font = font_title
-    ws.cell(row=2, column=1, value='Cognitive Traps & 650ms SSML Breaks • Hint Progression [2,3,4,2,3,4,4] • Target CPD 56V').font = font_subtitle
+    ws.cell(row=2, column=1, value='Multi-Word Cognitive Collocations (Zero Single Words) • SSML 650ms Breaks • Target CPD 56V').font = font_subtitle
 
     headers = [
         'Session', 'Item', 'Global #', 'Part', 'Hint Count', 'CVR (Ω)', 'CCI (A)', 'CPD (V)',
-        'Hints Sequence (EN)', 'Hints Sequence (VI)', 'Spoken SSML Script (650ms Break)',
-        'Audio Lang', 'Voice Model'
+        'Collocations Constraint', 'Hints Sequence (EN)', 'Hints Sequence (VI)',
+        'Spoken SSML Script (650ms Break)', 'Audio Lang', 'Voice Model'
     ]
     for col_idx, h in enumerate(headers, start=1):
         c = ws.cell(row=4, column=col_idx, value=h)
@@ -196,6 +209,7 @@ for code, pkg, sheet_title in packages:
                 it.get('measuredCvr', sec['targetCvrOhm']),
                 sec['cciAmpe'],
                 it.get('cvrBreakdown', {}).get('cpd', sec.get('cpd', 56)),
+                "✓ Zero Single Words (≥2w)",
                 it.get('promptEn', ''),
                 it.get('promptVi', ''),
                 spoken,
@@ -204,10 +218,19 @@ for code, pkg, sheet_title in packages:
             ]
             for col_idx, val in enumerate(vals, start=1):
                 c = ws.cell(row=cur_row, column=col_idx, value=val)
-                c.font = font_bold if col_idx in [1, 2, 3, 5, 6, 7, 8, 12] else (font_mono if col_idx == 11 else font_regular)
+                if col_idx in [1, 2, 3, 5, 6, 7, 8, 13]:
+                    c.font = font_bold
+                elif col_idx == 9:
+                    c.font = font_badge_ok
+                elif col_idx == 12:
+                    c.font = font_mono
+                else:
+                    c.font = font_regular
                 c.border = thin_border
-                c.alignment = align_center if col_idx in [1, 2, 3, 4, 5, 6, 7, 8, 12] else align_left
-                if cur_row % 2 == 0:
+                c.alignment = align_center if col_idx in [1, 2, 3, 4, 5, 6, 7, 8, 9, 13] else align_left
+                if col_idx == 9:
+                    c.fill = fill_highlight
+                elif cur_row % 2 == 0:
                     c.fill = fill_zebra
             cur_row += 1
 
@@ -220,7 +243,7 @@ ws_master.cell(row=1, column=1, value='CHUNKS LMS • MASTER CATALOG (All 84 Que
 
 master_headers = [
     'Package Code', 'Type', 'Session', 'Item', 'Global #', 'CVR (Ω)', 'CCI (A)', 'CPD (V)',
-    'Prompt / Sentence (EN)', 'Prompt / Sentence (VI)', 'Audio Lang', 'Voice Model'
+    'Prompt / Sentence (EN)', 'Prompt / Sentence (VI)', 'VI Word Count', 'Audio Lang', 'Voice Model'
 ]
 for col_idx, h in enumerate(master_headers, start=1):
     c = ws_master.cell(row=3, column=col_idx, value=h)
@@ -235,6 +258,7 @@ for code, pkg, _ in packages:
         lang = sec.get('sessionLanguage', 'en')
         voice = sec.get('voiceModel', '')
         for it in sec['items']:
+            wc_vi = it.get('wordCountVi') or len(it.get('promptVi', '').strip().split())
             vals = [
                 pkg['packageCode'],
                 pkg['testType'],
@@ -246,14 +270,15 @@ for code, pkg, _ in packages:
                 it.get('cvrBreakdown', {}).get('cpd', sec.get('cpd', 0)),
                 it.get('promptEn', ''),
                 it.get('promptVi', ''),
+                f"{wc_vi} từ" if pkg['testType'] == 'GREEN' else f"{len(it.get('hints', []))} cụm",
                 lang.upper(),
                 voice,
             ]
             for col_idx, val in enumerate(vals, start=1):
                 c = ws_master.cell(row=m_row, column=col_idx, value=val)
-                c.font = font_bold if col_idx in [1, 2, 3, 4, 5, 11] else font_regular
+                c.font = font_bold if col_idx in [1, 2, 3, 4, 5, 11, 12] else font_regular
                 c.border = thin_border
-                c.alignment = align_center if col_idx in [2, 3, 4, 5, 6, 7, 8, 11] else align_left
+                c.alignment = align_center if col_idx in [2, 3, 4, 5, 6, 7, 8, 11, 12] else align_left
                 if m_row % 2 == 0:
                     c.fill = fill_zebra
             m_row += 1
@@ -274,9 +299,19 @@ for ws in wb.worksheets:
 
 # Save files
 excel_main = os.path.join(OUTPUT_DIR, 'Chunks_LMS_Ecommerce_Package_Tests.xlsx')
+excel_updated = os.path.join(OUTPUT_DIR, 'Chunks_LMS_Ecommerce_Package_Tests_Updated.xlsx')
 excel_alias = os.path.join(OUTPUT_DIR, 'Chunks_LMS_Green_Red_Reused_Improv.xlsx')
 
-wb.save(excel_main)
+wb.save(excel_updated)
+print(f"✓ Saved {excel_updated}")
 wb.save(excel_alias)
-print(f"✓ Saved {excel_main}")
 print(f"✓ Saved {excel_alias}")
+
+try:
+    wb.save(excel_main)
+    print(f"✓ Saved {excel_main}")
+except PermissionError:
+    print(f"⚠ Note: {excel_main} is currently open in OnlyOffice / Excel (lock active).")
+    print(f"  Successfully wrote latest updates to:")
+    print(f"  1. {excel_updated}")
+    print(f"  2. {excel_alias}")

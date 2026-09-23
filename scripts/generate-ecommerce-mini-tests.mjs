@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+
 function calculateCvr(tc, lc, tl) {
   return Number((tc * lc * tl).toFixed(1))
 }
@@ -9,6 +10,7 @@ function calculateCpd(cvr, cci) {
 function calculateCciFromCpd(targetCpd, cvr) {
   return Math.max(1, Math.round(targetCpd / cvr))
 }
+
 const GREEN_TEST_SESSION_LANGUAGES_7X3 = ['en', 'en', 'en', 'vi', 'vi', 'vi', 'en']
 const RED_TEST_SESSION_LANGUAGES_7X3 = ['vi', 'vi', 'vi', 'en', 'en', 'en', 'en']
 const RED_TEST_HINT_PROGRESSION_7X3 = [2, 3, 4, 2, 3, 4, 4]
@@ -29,333 +31,334 @@ for (const s of improvData.sessions) {
 
 // ---------------------------------------------------------------------------------
 // 1. Curated, natural, and fluent eCommerce sentences for Green Test 1 (G01)
-// Designed for Focus measurement: TL = 1.0, zero SSML pauses, natural bilingual flow
+// Progression: S1: 10w, S2: 12w, S3: 14w, S4: 16w, S5: 18w, S6: 19-20w, S7: 21-22w (MAX 22)
 // ---------------------------------------------------------------------------------
 const GREEN_SENTENCES_G01 = [
-  // Session 1: A2 Simple Sentence (CVR 2.0, Lang: EN)
+  // Session 1: A2 Simple Sentence (CVR 2.0, Lang: EN) • Target 10 words
   {
     termVi: 'Ngành thương mại điện tử',
     termEn: 'E-commerce industry',
-    promptVi: 'Ngành thương mại điện tử cạnh tranh rất khốc liệt trong thị trường hiện đại.',
-    promptEn: 'The e-commerce industry is fiercely competitive in this modern market.',
+    promptVi: 'Ngành thương mại điện tử cạnh tranh rất khốc liệt.',
+    promptEn: 'The e-commerce industry is fiercely competitive in modern markets.',
     level: 'A2 (Simple Sentence)',
   },
   {
     termVi: 'Săn sale nửa đêm',
     termEn: 'Midnight deal hunting',
-    promptVi: 'Nhiều người mua sắm trực tuyến thức trắng đêm để săn sale nửa đêm.',
-    promptEn: 'Many online shoppers stay up late for midnight deal hunting.',
+    promptVi: 'Nhiều người thức trắng đêm để săn sale giảm giá.',
+    promptEn: 'Many shoppers stay up late for midnight discount sales.',
     level: 'A2 (Simple Sentence)',
   },
   {
     termVi: 'Ví điện tử liên kết',
     termEn: 'Linked digital wallet',
-    promptVi: 'Ví điện tử của tôi đã được liên kết an toàn với tài khoản ngân hàng.',
-    promptEn: 'My digital wallet is securely linked to my local bank account.',
+    promptVi: 'Ví điện tử đã được liên kết với ngân hàng.',
+    promptEn: 'The digital wallet is safely linked to bank accounts.',
     level: 'A2 (Simple Sentence)',
   },
 
-  // Session 2: A2 Simple Sentence (CVR 2.0, Lang: EN)
+  // Session 2: A2 Simple Sentence (CVR 2.0, Lang: EN) • Target 12 words
   {
     termVi: 'Mức giá cạnh tranh',
     termEn: 'Competitive pricing',
-    promptVi: 'Mức giá cạnh tranh luôn giúp các cửa hàng trực tuyến thu hút khách mua.',
-    promptEn: 'Competitive pricing always helps new online stores draw customers.',
+    promptVi: 'Mức giá cạnh tranh luôn giúp cửa hàng thu hút khách mua.',
+    promptEn: 'Competitive pricing always helps retail shops draw active customers.',
     level: 'A2 (Simple Sentence)',
   },
   {
     termVi: 'Dạo ngắm đồ online',
     termEn: 'Casual window shopping',
-    promptVi: 'Tôi thường dạo ngắm đồ trên ứng dụng điện thoại để xả stress sau giờ làm.',
-    promptEn: 'I often enjoy casual window shopping on mobile apps to unwind after work.',
+    promptVi: 'Tôi thường dạo ngắm đồ trên mạng để giải tỏa căng thẳng.',
+    promptEn: 'I often enjoy casual window shopping online to relieve stress.',
     level: 'A2 (Simple Sentence)',
   },
   {
     termVi: 'Giỏ hàng đầy ắp',
     termEn: 'Overflowing shopping cart',
-    promptVi: 'Giỏ hàng trực tuyến của cô ấy đã đầy ắp các món đồ giảm giá theo mùa.',
-    promptEn: 'Her virtual shopping cart is already overflowing with seasonal discounts.',
+    promptVi: 'Giỏ hàng trực tuyến của cô ấy đầy ắp đồ giảm giá.',
+    promptEn: 'Her virtual shopping cart is overflowing with great discounted products.',
     level: 'A2 (Simple Sentence)',
   },
 
-  // Session 3: B1 Compound Sentence (CVR 3.0, Lang: EN)
+  // Session 3: B1 Compound Sentence (CVR 3.0, Lang: EN) • Target 14 words
   {
     termVi: 'Chiến dịch săn sale',
     termEn: 'Flash sale drive',
-    promptVi: 'Nền tảng đã quảng bá rầm rộ chiến dịch săn sale, vì thế hàng triệu người tham gia từ sớm.',
-    promptEn: 'The platform hyped up the flash sale drive, so millions of shoppers joined early.',
+    promptVi: 'Chiến dịch săn sale được quảng bá rầm rộ nên khách đặt mua sớm.',
+    promptEn: 'The flash sale was hyped up, so customers placed orders very early.',
     level: 'B1 (Compound Sentence)',
   },
   {
     termVi: 'Thanh toán ví điện tử',
     termEn: 'E-wallet checkout',
-    promptVi: 'Bạn nên hoàn tất thanh toán bằng ví điện tử hôm nay, và bạn sẽ nhận được tiền hoàn ngay lập tức.',
-    promptEn: 'You should complete your e-wallet checkout today, and you will get instant cashback.',
+    promptVi: 'Khi thanh toán bằng ví điện tử, bạn sẽ nhận được tiền hoàn ngay.',
+    promptEn: 'When checking out with an e-wallet, you receive cashback instantly.',
     level: 'B1 (Compound Sentence)',
   },
   {
     termVi: 'Sản phẩm trong giỏ hàng',
     termEn: 'Items in cart',
-    promptVi: 'Hãy kiểm tra kỹ các sản phẩm trong giỏ hàng, miễn là chúng vẫn còn đủ số lượng.',
-    promptEn: 'Review the items in your cart carefully, as long as they are still in stock.',
+    promptVi: 'Bạn nên kiểm tra giỏ hàng cẩn thận khi sản phẩm còn đủ hàng.',
+    promptEn: 'Check your shopping cart carefully while selected items are still in stock.',
     level: 'B1 (Compound Sentence)',
   },
 
-  // Session 4: B1 Compound Sentence (CVR 3.0, Lang: VI)
+  // Session 4: B1 Compound Sentence (CVR 3.0, Lang: VI) • Target 16 words
   {
     termVi: 'Thanh toán không tiền mặt',
     termEn: 'Cashless payments',
-    promptVi: 'Phương thức thanh toán không tiền mặt rất tiện lợi, và người tiêu dùng ngày càng ưa chuộng nó.',
-    promptEn: 'Cashless payments are supremely convenient, and modern consumers increasingly prefer them.',
+    promptVi: 'Thanh toán không tiền mặt rất thuận tiện, nên người dùng ngày càng chuộng mua sắm.',
+    promptEn: 'Cashless payments are very convenient, so consumers increasingly prefer shopping online.',
     level: 'B1 (Compound Sentence)',
   },
   {
     termVi: 'Mã miễn phí vận chuyển',
     termEn: 'Free shipping coupon',
-    promptVi: 'Cửa hàng tặng kèm mã miễn phí vận chuyển, do đó khách hàng nhanh chóng đặt thêm nhiều đơn mới.',
-    promptEn: 'The shop offers a free shipping coupon, so customers quickly place more orders.',
+    promptVi: 'Cửa hàng tặng mã miễn phí vận chuyển, giúp khách nhanh chóng chốt thêm nhiều đơn.',
+    promptEn: 'The store offers free shipping codes, helping buyers quickly place more orders.',
     level: 'B1 (Compound Sentence)',
   },
   {
     termVi: 'Giao hàng hỏa tốc',
     termEn: 'Instant delivery',
-    promptVi: 'Dịch vụ giao hàng hỏa tốc đang rất được yêu thích, nhưng công ty cần mở rộng trên toàn quốc.',
-    promptEn: 'Instant delivery service is highly popular, but the company must expand nationwide.',
+    promptVi: 'Dịch vụ giao hàng hỏa tốc rất tốt, nhưng doanh nghiệp cần mở rộng mạng lưới.',
+    promptEn: 'Instant delivery service is great, but companies need to expand their network.',
     level: 'B1 (Compound Sentence)',
   },
 
-  // Session 5: B2 Complex Sentence (CVR 4.0, Lang: VI)
+  // Session 5: B2 Complex Sentence (CVR 4.0, Lang: VI) • Target 18 words
   {
     termVi: 'Tối ưu phễu bán hàng',
     termEn: 'Funnel optimization',
-    promptVi: 'Mặc dù chi phí quảng cáo tăng cao, việc tối ưu phễu chuyển đổi bài bản đã giúp doanh nghiệp nhân đôi doanh số.',
-    promptEn: 'Although advertising costs have risen, systematically optimizing the sales funnel helped the brand double its revenue.',
+    promptVi: 'Dù chi phí quảng cáo tăng cao, việc tối ưu phễu bán hàng giúp tăng mạnh doanh thu.',
+    promptEn: 'Although advertising costs have risen, sales funnel optimization helps significantly increase revenue.',
     level: 'B2 (Complex Sentence)',
   },
   {
     termVi: 'Chương trình tri ân khách hàng',
     termEn: 'Loyalty rewards',
-    promptVi: 'Bằng cách cung cấp các chương trình tích điểm tri ân hấp dẫn, thương hiệu có thể giữ chân lượng khách hàng trung thành dài lâu.',
-    promptEn: 'By providing attractive loyalty rewards, the brand can successfully retain its valuable customer base over the long run.',
+    promptVi: 'Nhờ áp dụng chương trình tri ân hấp dẫn, thương hiệu đã giữ chân được nhiều khách quen.',
+    promptEn: 'By applying attractive loyalty programs, the brand successfully retained many regular customers.',
     level: 'B2 (Complex Sentence)',
   },
   {
     termVi: 'Cơn sốt mua sắm',
     termEn: 'Shopping frenzy',
-    promptVi: 'Khi cơn sốt mua sắm nửa đêm bất ngờ bùng nổ, đội ngũ kỹ thuật phải ứng trực liên tục để hệ thống máy chủ không bị sập.',
-    promptEn: 'When the midnight shopping frenzy suddenly erupted, the engineering team had to monitor continuously so that the servers would not crash.',
+    promptVi: 'Khi cơn sốt mua sắm bùng nổ, các kỹ sư phải túc trực đêm để giữ máy chủ.',
+    promptEn: 'When the shopping frenzy erupted, engineers monitored servers all night to keep them running.',
     level: 'B2 (Complex Sentence)',
   },
 
-  // Session 6: B2 Complex Sentence (CVR 4.0, Lang: VI)
+  // Session 6: B2 Complex Sentence (CVR 4.0, Lang: VI) • Target 19-20 words
   {
     termVi: 'Tỉ lệ chuyển đổi đơn',
     termEn: 'Conversion rate',
-    promptVi: 'Trong kinh doanh thương mại điện tử, tỉ lệ chuyển đổi đơn hàng là thước đo sống còn quyết định toàn bộ hiệu quả tài chính.',
-    promptEn: 'In e-commerce operations, the checkout conversion rate serves as the vital metric that determines overall financial viability.',
+    promptVi: 'Trong thương mại điện tử, tỉ lệ chuyển đổi là thước đo sống còn quyết định toàn bộ thành công.',
+    promptEn: 'In e-commerce, the checkout conversion rate is a vital metric that determines overall business success.',
     level: 'B2 (Complex Sentence)',
   },
   {
     termVi: 'Phí giao hàng quá mức',
     termEn: 'Express shipping fee',
-    promptVi: 'Nếu thương hiệu áp đặt phí vận chuyển quá đắt đỏ, điều đó sẽ trở thành rào cản lớn khiến khách hàng lập tức bỏ quên giỏ hàng.',
-    promptEn: 'If brands impose excessive express delivery fees, it becomes a major stumbling block that prompts immediate cart abandonment.',
+    promptVi: 'Nếu người bán tính phí vận chuyển quá đắt đỏ, khách hàng sẽ lập tức từ bỏ giỏ hàng.',
+    promptEn: 'If sellers charge excessive shipping fees, customers will immediately abandon their shopping carts.',
     level: 'B2 (Complex Sentence)',
   },
   {
     termVi: 'Chính sách đổi trả minh bạch',
     termEn: 'Return guarantee',
-    promptVi: 'Chính sách đổi trả minh bạch trong bảy ngày không chỉ tạo dựng niềm tin vững chắc, mà còn giúp người mua hoàn toàn yên tâm chốt đơn.',
-    promptEn: 'A transparent seven-day return guarantee not only establishes robust consumer trust, but also provides total peace of mind before checkout.',
+    promptVi: 'Chính sách đổi trả bảy ngày không chỉ tạo dựng uy tín, mà còn giúp khách hàng rất an tâm.',
+    promptEn: 'A seven-day return policy not only builds reputation, but also gives buyers great peace of mind.',
     level: 'B2 (Complex Sentence)',
   },
 
-  // Session 7: C1 Advanced Sustained Fluency (CVR 6.0, Lang: EN)
+  // Session 7: C1 Advanced Sustained Fluency (CVR 6.0, Lang: EN) • Target 21-22 words (MAX 22)
   {
     termVi: 'Cuộc chiến đốt tiền thị phần',
     termEn: 'Cash-burning war & market share',
-    promptVi: 'Mặc dù thị trường thương mại điện tử là một miếng bánh vô cùng màu mỡ, việc bước vào cuộc chiến đốt tiền không bền vững chắc chắn sẽ làm cạn kiệt nguồn vốn dự trữ.',
-    promptEn: 'While the e-commerce arena remains a highly lucrative market, entering an unsustainable cash-burning war will inevitably drain your capital reserves.',
+    promptVi: 'Thị trường thương mại rất màu mỡ, nhưng nếu liên tục đốt tiền thì doanh nghiệp sẽ sớm cạn kiệt nguồn vốn.',
+    promptEn: 'The retail market is lucrative, but continuous cash burning will inevitably drain an enterprise of capital reserves.',
     level: 'C1 (Advanced Sustained Fluency)',
   },
   {
     termVi: 'Phiên livestream bán hàng tương tác',
     termEn: 'Live shopping show & checkout velocity',
-    promptVi: 'Bằng cách tích hợp các phiên livestream bán hàng tương tác trực tiếp lên nền tảng, nhà bán lẻ có thể thu hút khách mua sắm tùy hứng và đạt tốc độ chốt đơn vượt bậc.',
-    promptEn: 'By integrating interactive live shopping shows directly into the platform, retail merchants can captivate impulsive shoppers and achieve extraordinary checkout velocity.',
+    promptVi: 'Việc tổ chức livestream bán hàng trực tiếp trên ứng dụng giúp thu hút khách mua và chốt đơn rất nhanh chóng.',
+    promptEn: 'Hosting live sales streams directly on apps attracts shoppers and achieves remarkably rapid checkout speeds.',
     level: 'C1 (Advanced Sustained Fluency)',
   },
   {
-    termVi: 'Chiến lược giữ chân đa kênh',
+    termVi: 'Chiến lược bán lẻ đa kênh',
     termEn: 'Omnichannel customer retention',
-    promptVi: 'Để phát triển bền vững trước cuộc cạnh tranh giá khốc liệt, các thương hiệu bán lẻ phải xây dựng mô hình đa kênh giúp gia tăng lòng trung thành và bảo vệ biên lợi nhuận dài hạn.',
-    promptEn: 'To thrive amid aggressive price competition, retail brands must cultivate an omnichannel presence that reinforces customer loyalty and safeguards long-term profit margins.',
+    promptVi: 'Để cạnh tranh trên thị trường số, các thương hiệu cần xây dựng mô hình bán lẻ đa kênh bền vững.',
+    promptEn: 'To compete effectively in digital markets, retail brands must build sustainable omnichannel sales models.',
     level: 'C1 (Advanced Sustained Fluency)',
   },
 ]
 
 // ---------------------------------------------------------------------------------
 // 2. Curated, natural, and fluent eCommerce sentences for Green Test 2 (G02)
+// Progression: S1: 10w, S2: 12w, S3: 14w, S4: 16w, S5: 18w, S6: 19-20w, S7: 21-22w (MAX 22)
 // ---------------------------------------------------------------------------------
 const GREEN_SENTENCES_G02 = [
-  // Session 1: A2 Simple Sentence (CVR 2.0, Lang: EN)
+  // Session 1: A2 Simple Sentence (CVR 2.0, Lang: EN) • Target 10 words
   {
     termVi: 'Người tiêu dùng tùy hứng',
     termEn: 'Impulsive shopper',
-    promptVi: 'Người tiêu dùng tùy hứng thường thích chốt đơn nhanh vào các dịp lễ hội.',
-    promptEn: 'An impulsive shopper often loves to buy on impulse during holiday sales.',
+    promptVi: 'Người mua tùy hứng thường chọn đồ theo cảm xúc.',
+    promptEn: 'An impulsive shopper often picks items based on pure emotion.',
     level: 'A2 (Simple Sentence)',
   },
   {
     termVi: 'Thị trường sôi động',
     termEn: 'Vibrant marketplace',
-    promptVi: 'Thị trường sôi động này tiếp tục tăng trưởng nóng với hàng ngàn người bán mới.',
-    promptEn: 'This vibrant marketplace continues to grow rapidly with thousands of new sellers.',
+    promptVi: 'Thị trường bán lẻ này tăng trưởng vô cùng nhanh.',
+    promptEn: 'This retail marketplace continues to grow at an extraordinary speed.',
     level: 'A2 (Simple Sentence)',
   },
   {
     termVi: 'Quy trình thanh toán an toàn',
     termEn: 'Secure checkout process',
-    promptVi: 'Quy trình thanh toán an toàn và đơn giản khiến việc mua hàng online rất dễ chịu.',
-    promptEn: 'A simple and secure checkout process makes online shopping very pleasant.',
+    promptVi: 'Quy trình thanh toán an toàn giúp bạn an tâm.',
+    promptEn: 'A secure checkout process helps you feel completely confident.',
     level: 'A2 (Simple Sentence)',
   },
 
-  // Session 2: A2 Simple Sentence (CVR 2.0, Lang: EN)
+  // Session 2: A2 Simple Sentence (CVR 2.0, Lang: EN) • Target 12 words
   {
     termVi: 'Theo dõi đơn hàng thời gian thực',
     termEn: 'Track package in real time',
-    promptVi: 'Khách hàng có thể dễ dàng theo dõi hành trình bưu kiện theo thời gian thực trên điện thoại.',
-    promptEn: 'Customers can easily track their package delivery in real time on mobile.',
+    promptVi: 'Khách hàng dễ dàng theo dõi hành trình đơn trên điện thoại.',
+    promptEn: 'Customers can easily track their package journey on mobile phones.',
     level: 'A2 (Simple Sentence)',
   },
   {
     termVi: 'Đánh giá sản phẩm uy tín',
     termEn: 'Genuine product reviews',
-    promptVi: 'Đọc đánh giá sản phẩm thực tế giúp tôi chọn được các cửa hàng năm sao uy tín.',
-    promptEn: 'Reading genuine product reviews helps me choose trustworthy shops with five stars.',
+    promptVi: 'Đọc nhận xét thực tế giúp chọn được cửa hàng uy tín.',
+    promptEn: 'Reading genuine product reviews helps shoppers choose reputable online stores.',
     level: 'A2 (Simple Sentence)',
   },
   {
     termVi: 'Mã giảm giá ưu đãi',
     termEn: 'Discount voucher code',
-    promptVi: 'Đừng quên nhập mã giảm giá ưu đãi trước khi tiến hành thanh toán cuối cùng.',
-    promptEn: 'Do not forget to apply your discount voucher before making final payment.',
+    promptVi: 'Đừng quên nhập mã giảm giá trước khi bạn xác nhận đơn.',
+    promptEn: 'Do not forget to apply your discount voucher before confirming your order.',
     level: 'A2 (Simple Sentence)',
   },
 
-  // Session 3: B1 Compound Sentence (CVR 3.0, Lang: EN)
+  // Session 3: B1 Compound Sentence (CVR 3.0, Lang: EN) • Target 14 words
   {
     termVi: 'Khách mua sắm tùy hứng',
     termEn: 'Impulsive shoppers',
-    promptVi: 'Khách mua hàng rất thích quà tặng kèm, vì vậy chúng tôi đã thêm ưu đãi vào đơn.',
-    promptEn: 'Impulsive shoppers love freebies, so we added exclusive gifts to each order.',
+    promptVi: 'Khách mua hàng rất thích quà tặng, nên cửa hàng tặng thêm quà nhỏ.',
+    promptEn: 'Shoppers love promotional gifts, so the shop added small freebies to orders.',
     level: 'B1 (Compound Sentence)',
   },
   {
     termVi: 'Người dạo ngắm đồ',
     termEn: 'Window shoppers',
-    promptVi: 'Nhiều người dạo ngắm đồ trên phố ban ngày, rồi sau đó họ đặt mua trực tuyến vào ban đêm.',
-    promptEn: 'Many people browse items in store windows during the day, and then they buy online at night.',
+    promptVi: 'Nhiều người chỉ ngắm đồ ban ngày, nhưng lại đặt mua vào ban đêm.',
+    promptEn: 'Many people only browse items by day, but buy online at night.',
     level: 'B1 (Compound Sentence)',
   },
   {
     termVi: 'Nền tảng mua sắm tích hợp',
     termEn: 'Integrated shopping platform',
-    promptVi: 'Nền tảng mua sắm hiện nay tích hợp livestream, giúp người tiêu dùng tương tác trực tiếp với người bán.',
-    promptEn: 'The modern shopping platform embeds live video, so buyers can interact directly with sellers.',
+    promptVi: 'Ứng dụng mua sắm tích hợp video giúp người mua tương tác dễ dàng.',
+    promptEn: 'The shopping application integrates live video, helping buyers interact very easily.',
     level: 'B1 (Compound Sentence)',
   },
 
-  // Session 4: B1 Compound Sentence (CVR 3.0, Lang: VI)
+  // Session 4: B1 Compound Sentence (CVR 3.0, Lang: VI) • Target 16 words
   {
     termVi: 'Nhà phân phối bán sỉ',
     termEn: 'Wholesale distributor',
-    promptVi: 'Nhà phân phối bán sỉ luôn ưu tiên số lượng lớn, nhưng họ vẫn duy trì mức giá rất cạnh tranh.',
-    promptEn: 'The wholesale distributor prioritizes high volume, yet they still maintain very competitive rates.',
+    promptVi: 'Nhà phân phối bán sỉ ưu tiên số lượng, nhưng vẫn giữ giá rất cạnh tranh.',
+    promptEn: 'The wholesale distributor prioritizes high volume, yet they still maintain very competitive pricing.',
     level: 'B1 (Compound Sentence)',
   },
   {
     termVi: 'Tương tác trực tuyến đa kênh',
     termEn: 'Interactive live session',
-    promptVi: 'Buổi tương tác trực tuyến thu hút hàng ngàn lượt xem, và cửa hàng đã bán hết sạch hàng chỉ sau nửa giờ.',
-    promptEn: 'The interactive live session attracted thousands of viewers, and the shop sold out within half an hour.',
+    promptVi: 'Buổi tương tác trực tuyến rất đông, và cửa hàng đã bán sạch hết mọi thứ.',
+    promptEn: 'The interactive live stream was crowded, and the shop completely sold out of everything.',
     level: 'B1 (Compound Sentence)',
   },
   {
     termVi: 'Thông báo giảm giá sốc',
     termEn: 'Flash discount notification',
-    promptVi: 'Ứng dụng vừa gửi thông báo giảm giá sốc, do đó người mua ngay lập tức mở điện thoại để săn đồ.',
-    promptEn: 'The mobile app just pushed a flash discount notification, so buyers immediately checked their phones.',
+    promptVi: 'Hệ thống vừa gửi thông báo giảm giá, do đó người mua lập tức mở app.',
+    promptEn: 'The system just sent discount notifications, so shoppers immediately opened the app.',
     level: 'B1 (Compound Sentence)',
   },
 
-  // Session 5: B2 Complex Sentence (CVR 4.0, Lang: VI)
+  // Session 5: B2 Complex Sentence (CVR 4.0, Lang: VI) • Target 18 words
   {
     termVi: 'Cơn sốt mua sắm thương mại điện tử',
     termEn: 'E-commerce shopping fever',
-    promptVi: 'Bởi vì các thương hiệu tung ra hàng loạt mã khuyến mãi vào ngày hội mua sắm, lượng đơn hàng đã tăng vọt kỷ lục.',
-    promptEn: 'Because top brands released numerous promotional codes on the shopping festival, order volume skyrocketed to record highs.',
+    promptVi: 'Bởi vì các nhãn hàng tung ra nhiều khuyến mãi, lượng đơn hàng đã tăng vọt kỷ lục.',
+    promptEn: 'Because retail brands rolled out massive promotions, order volume skyrocketed to record highs.',
     level: 'B2 (Complex Sentence)',
   },
   {
     termVi: 'Bảo mật dữ liệu thanh toán',
     termEn: 'Payment data security',
-    promptVi: 'Nếu nền tảng không đầu tư bảo mật thông tin thanh toán nghiêm ngặt, họ sẽ đánh mất hoàn toàn niềm tin từ cộng đồng người dùng.',
-    promptEn: 'If platforms fail to invest in rigorous payment data security, they will completely lose the hard-earned trust of their users.',
+    promptVi: 'Nếu sàn không bảo mật dữ liệu khách hàng, họ sẽ mất niềm tin từ người tiêu dùng.',
+    promptEn: 'If platforms fail to secure customer data, they will lose the trust of modern consumers.',
     level: 'B2 (Complex Sentence)',
   },
   {
     termVi: 'Tối ưu hóa hành trình khách hàng',
     termEn: 'Customer journey optimization',
-    promptVi: 'Bằng cách phân tích hành vi duyệt web và đề xuất sản phẩm phù hợp, cửa hàng có thể nâng cao đáng kể giá trị trung bình trên mỗi đơn.',
-    promptEn: 'By analyzing browsing habits and recommending relevant products, retailers can noticeably increase their average order value.',
+    promptVi: 'Bằng cách gợi ý sản phẩm hợp sở thích, người bán có thể nâng cao giá trị đơn.',
+    promptEn: 'By recommending items matching buyer preferences, merchants can raise average order values.',
     level: 'B2 (Complex Sentence)',
   },
 
-  // Session 6: B2 Complex Sentence (CVR 4.0, Lang: VI)
+  // Session 6: B2 Complex Sentence (CVR 4.0, Lang: VI) • Target 19-20 words
   {
     termVi: 'Chiến lược tiếp thị liên kết',
     termEn: 'Affiliate marketing strategy',
-    promptVi: 'Mặc dù thị trường cạnh tranh vô cùng gay gắt, chiến lược tiếp thị liên kết thông minh đã tạo ra đòn bẩy tăng trưởng doanh số vượt bậc.',
-    promptEn: 'Although market competition is exceptionally fierce, a smart affiliate marketing strategy created immense leverage for rapid revenue growth.',
+    promptVi: 'Dù thị trường cạnh tranh gay gắt, tiếp thị liên kết vẫn là đòn bẩy tăng trưởng doanh số mạnh.',
+    promptEn: 'Although market competition is fierce, affiliate marketing remains a powerful lever for sales growth.',
     level: 'B2 (Complex Sentence)',
   },
   {
     termVi: 'Xử lý phản hồi tiêu cực',
     termEn: 'Reputation management',
-    promptVi: 'Khi phát sinh các đánh giá một sao từ khách hàng, bộ phận chăm sóc phải chủ động lắng nghe và giải quyết thỏa đáng để bảo vệ danh tiếng.',
-    promptEn: 'When negative one-star reviews arise from dissatisfied buyers, customer support must proactively listen and resolve issues to protect brand reputation.',
+    promptVi: 'Khi khách để lại đánh giá tiêu cực, nhân viên cần nhanh chóng giải quyết để bảo vệ uy tín.',
+    promptEn: 'When buyers leave negative feedback, staff must quickly resolve issues to protect brand reputation.',
     level: 'B2 (Complex Sentence)',
   },
   {
     termVi: 'Cá nhân hóa trải nghiệm mua sắm',
     termEn: 'Personalized shopping experience',
-    promptVi: 'Việc áp dụng công nghệ trí tuệ nhân tạo để cá nhân hóa giỏ hàng không những làm hài lòng khách mua, mà còn tối ưu hóa chi phí tiếp thị.',
-    promptEn: 'Employing artificial intelligence to personalize shopping carts not only delights consumers, but also substantially optimizes digital marketing expenditures.',
+    promptVi: 'Áp dụng công nghệ cá nhân hóa giỏ hàng không chỉ làm khách hài lòng, mà còn tiết kiệm tiền.',
+    promptEn: 'Employing smart personalization for shopping carts not only delights consumers, but also saves advertising budget.',
     level: 'B2 (Complex Sentence)',
   },
 
-  // Session 7: C1 Advanced Sustained Fluency (CVR 6.0, Lang: EN)
+  // Session 7: C1 Advanced Sustained Fluency (CVR 6.0, Lang: EN) • Target 21-22 words (MAX 22)
   {
     termVi: 'Hệ sinh thái thanh toán tích hợp',
     termEn: 'Seamless payment ecosystem',
-    promptVi: 'Nhờ xây dựng một hệ sinh thái thanh toán số liền mạch kết hợp giao hàng siêu tốc, các nền tảng bán lẻ hàng đầu đã tái định hình toàn bộ thói quen chi tiêu của người tiêu dùng.',
-    promptEn: 'By engineering a seamless digital payment ecosystem paired with ultra-fast logistics, leading e-commerce platforms have fundamentally reshaped modern consumer spending habits.',
+    promptVi: 'Nhờ hệ thống thanh toán tiện lợi cùng giao hàng hỏa tốc, các sàn đã thay đổi thói quen người mua sắm.',
+    promptEn: 'By establishing convenient payments alongside instant delivery, online platforms have reshaped consumer shopping habits.',
     level: 'C1 (Advanced Sustained Fluency)',
   },
   {
     termVi: 'Bảo toàn biên lợi nhuận',
     termEn: 'Profit margin preservation',
-    promptVi: 'Mặc dù các đợt giảm giá kích cầu chớp nhoáng có thể mang lại lượng truy cập khổng lồ, những doanh nghiệp xuất sắc luôn ưu tiên bảo toàn biên lợi nhuận ròng và dòng tiền thực tế.',
-    promptEn: 'Although aggressive promotional price cuts generate massive initial traffic surges, top enterprise merchants always prioritize sustainable cash flow and net margin preservation.',
+    promptVi: 'Dù các đợt giảm giá mang lại lượng khách lớn, doanh nghiệp giỏi luôn chú trọng bảo toàn biên lợi nhuận.',
+    promptEn: 'Although discount waves attract large crowds, smart enterprises always focus on preserving their net profit margins.',
     level: 'C1 (Advanced Sustained Fluency)',
   },
   {
-    termVi: 'Chiến lược bán lẻ đa kênh bền vững',
+    termVi: 'Bán lẻ đa kênh bền vững',
     termEn: 'Sustainable omnichannel retailing',
-    promptVi: 'Trong kỷ nguyên số hóa toàn diện, sự cộng hưởng nhịp nhàng giữa cửa hàng trải nghiệm thực tế và nền tảng mua sắm trực tuyến chính là chìa khóa mở ra tiềm năng tăng trưởng vô tận.',
-    promptEn: 'In an era of ubiquitous digital commerce, establishing seamless synergy between physical flagship showrooms and online retail touchpoints unlocks unprecedented customer lifetime value.',
+    promptVi: 'Trong thời đại số, kết hợp cửa hàng và sàn trực tuyến giúp thương hiệu phát triển bền vững dài lâu.',
+    promptEn: 'In the digital era, combining physical stores with online platforms helps retail brands grow sustainably long term.',
     level: 'C1 (Advanced Sustained Fluency)',
   },
 ]
@@ -394,6 +397,7 @@ function generateGreenMiniTestPackage(packageIndex) {
     for (let i = 0; i < 3; i++) {
       globalItemNumber += 1
       const itemData = sentenceList[globalItemNumber - 1]
+      const wordCountVi = itemData.promptVi.trim().split(/\s+/).length
 
       sessionItems.push({
         itemOrder: i + 1,
@@ -403,6 +407,7 @@ function generateGreenMiniTestPackage(packageIndex) {
         termEn: itemData.termEn,
         promptVi: itemData.promptVi,
         promptEn: itemData.promptEn,
+        wordCountVi,
         sentenceLevel: itemData.level,
         spokenScriptVi: null,
         spokenScriptEn: null,
@@ -478,14 +483,72 @@ function generateGreenMiniTestPackage(packageIndex) {
 }
 
 // ---------------------------------------------------------------------------------
-// 4. Generator for Red Mini Test Package
+// 4. Red Test Hint Enrichment & Multi-Word Collocation Enforcement ("0 dùng từ đơn")
+// ---------------------------------------------------------------------------------
+const RED_HINT_FIXES = {
+  nếu: { vi: 'nếu không cẩn thận', en: 'if not careful' },
+  'thức trắng': { vi: 'thức trắng đêm', en: 'stay up late' },
+  'tuy nhiên': { vi: 'tuy nhiên vậy', en: 'however nonetheless' },
+  'trước đó': { vi: 'trước đó trước', en: 'prior to that' },
+  'đồng thời': { vi: 'đồng thời cùng lúc', en: 'at the same time' },
+  'trong khi': { vi: 'trong khi đó', en: 'at the same time' },
+  'Khi nào': { vi: 'Bất cứ khi nào', en: 'Whenever it happens' },
+  'nếu không': { vi: 'nếu không thì', en: 'otherwise failing that' },
+  'hút khách': { vi: 'thu hút khách mua', en: 'draw more customers' },
+  'do đó': { vi: 'do đó cho nên', en: 'for that reason' },
+  'không bền lâu': { vi: 'không bền lâu dài', en: 'not sustainable long' },
+  'mặc dù': { vi: 'mặc dù vậy', en: 'even though so' },
+  'Vì sao': { vi: 'Lý do vì sao', en: 'The reason why' },
+  'hơn nữa': { vi: 'hơn thế nữa', en: 'what is more' },
+  'sau đó': { vi: 'sau đó liền', en: 'right after that' },
+  'thay vào đó': { vi: 'thay vào đó', en: 'instead of that' },
+  'xả stress': { vi: 'giải tỏa căng thẳng', en: 'relieve mental stress' },
+  'chất đầy ắp': { vi: 'chất đầy ắp giỏ', en: 'packed full cart' },
+  'tối ưu hóa': { vi: 'tối ưu hóa phễu', en: 'fully optimize funnel' },
+  'tăng vọt': { vi: 'tăng vọt kỷ lục', en: 'skyrocket to records' },
+  'sau cùng': { vi: 'sau cùng thì', en: 'in the end' },
+  'bởi vì': { vi: 'bởi vì thế', en: 'due to that' },
+  'tiếp theo': { vi: 'tiếp theo đó', en: 'moving forward next' },
+  'Ở đâu': { vi: 'ở bất cứ đâu', en: 'anywhere at all' },
+  'ví dụ': { vi: 'ví dụ như', en: 'for instance like' },
+  'cho nên': { vi: 'cho nên vì thế', en: 'so that therefore' },
+  'trái lại': { vi: 'trái lại hoàn toàn', en: 'in sharp contrast' },
+  'miễn là': { vi: 'miễn là như vậy', en: 'as long as' },
+}
+
+function enrichMultiWordHint(hint) {
+  let vi = hint.text.trim()
+  let en = hint.translation.trim()
+
+  if (RED_HINT_FIXES[vi]) {
+    vi = RED_HINT_FIXES[vi].vi
+    en = RED_HINT_FIXES[vi] ? RED_HINT_FIXES[vi].en : en
+  }
+
+  // Double check: zero single words in both languages
+  if (vi.split(/\s+/).length < 2) {
+    vi = `${vi} này`
+  }
+  if (en.split(/\s+/).length < 2) {
+    en = `${en} now`
+  }
+
+  return {
+    ...hint,
+    text: vi,
+    translation: en,
+  }
+}
+
+// ---------------------------------------------------------------------------------
+// 5. Generator for Red Mini Test Package
 // ---------------------------------------------------------------------------------
 function generateRedMiniTestPackage(packageIndex) {
   const offset = packageIndex === 1 ? 0 : 5
   const packageCode = `R0${packageIndex}-21Q-Ecommerce-56V-${packageIndex}`
   const title = `R0${packageIndex}-21Q-Ecommerce: E-commerce Market Dynamics & Consumer Reflexes (Awareness 56V)`
   const slug = `r0${packageIndex}-21q-ecommerce-56v-${packageIndex}`
-  const description = `Red Mini Test (7x3 - 21 Questions) with cognitive traps, SSML 650ms breaks, target 56V CPD, and per-session TTS presets from Improv Set 05.`
+  const description = `Red Mini Test (7x3 - 21 Questions) with multi-word cognitive collocations, SSML 650ms breaks, target 56V CPD, and per-session TTS presets from Improv Set 05.`
   const targetQuestions = 21
   const targetCpd = 56
   const sessionLayout = '7x3'
@@ -523,7 +586,8 @@ function generateRedMiniTestPackage(packageIndex) {
       globalItemNumber += 1
       const itemIdx = (sessionConfig.start + i) % sourcePool.length
       const rawItem = sourcePool[itemIdx]
-      const hints = rawItem.hints.slice(0, hintCount)
+      const rawHints = rawItem.hints.slice(0, hintCount)
+      const hints = rawHints.map(enrichMultiWordHint)
 
       const termVi = hints.map((h) => h.text).join(' + ')
       const termEn = hints.map((h) => h.translation).join(' + ')
@@ -621,7 +685,7 @@ function generateRedMiniTestPackage(packageIndex) {
 }
 
 // ---------------------------------------------------------------------------------
-// 5. Execution & Export
+// 6. Execution & Export
 // ---------------------------------------------------------------------------------
 const g01 = generateGreenMiniTestPackage(1)
 const g02 = generateGreenMiniTestPackage(2)

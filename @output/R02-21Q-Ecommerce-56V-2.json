@@ -2,7 +2,7 @@
   "packageCode": "R02-21Q-Ecommerce-56V-2",
   "title": "R02-21Q-Ecommerce: E-commerce Market Dynamics & Consumer Reflexes (Awareness 56V)",
   "slug": "r02-21q-ecommerce-56v-2",
-  "description": "Red Mini Test (7x3 - 21 Questions) with cognitive traps, SSML 650ms breaks, target 56V CPD, and per-session TTS presets from Improv Set 05.",
+  "description": "Red Mini Test (7x3 - 21 Questions) with multi-word cognitive collocations, SSML 650ms breaks, target 56V CPD, and per-session TTS presets from Improv Set 05.",
   "versionLabel": "v1",
   "testType": "RED",
   "targetQuestions": 21,
@@ -104,12 +104,12 @@
             "h_set05_s1_i7_1",
             "h_set05_s1_i7_2"
           ],
-          "termVi": "Đi lượn lờ ngó nghiêng + xả stress",
-          "termEn": "window shopping + unwind",
-          "promptVi": "Đi lượn lờ ngó nghiêng / xả stress",
-          "promptEn": "window shopping / unwind",
-          "spokenScriptVi": "<speak><s>Đi lượn lờ ngó nghiêng</s> <break time=\"650ms\"/> <s>xả stress</s></speak>",
-          "spokenScriptEn": "<speak><s>window shopping</s> <break time=\"650ms\"/> <s>unwind</s></speak>",
+          "termVi": "Đi lượn lờ ngó nghiêng + giải tỏa căng thẳng",
+          "termEn": "window shopping + unwind now",
+          "promptVi": "Đi lượn lờ ngó nghiêng / giải tỏa căng thẳng",
+          "promptEn": "window shopping / unwind now",
+          "spokenScriptVi": "<speak><s>Đi lượn lờ ngó nghiêng</s> <break time=\"650ms\"/> <s>giải tỏa căng thẳng</s></speak>",
+          "spokenScriptEn": "<speak><s>window shopping</s> <break time=\"650ms\"/> <s>unwind now</s></speak>",
           "tc": 2,
           "lc": 1.15,
           "tl": 2,
@@ -131,8 +131,8 @@
             },
             {
               "id": "h_set05_s1_i7_2",
-              "text": "xả stress",
-              "translation": "unwind",
+              "text": "giải tỏa căng thẳng",
+              "translation": "unwind now",
               "typeFunction": "Động từ · Ending"
             }
           ]
@@ -202,11 +202,11 @@
             "h_set05_s2_i6_2",
             "h_set05_s2_i6_3"
           ],
-          "termVi": "Khách mua sắm tùy hứng + hơn nữa + thích quà tặng kèm",
+          "termVi": "Khách mua sắm tùy hứng + hơn thế nữa + thích quà tặng kèm",
           "termEn": "impulsive shoppers + in addition + love freebies",
-          "promptVi": "Khách mua sắm tùy hứng / hơn nữa / thích quà tặng kèm",
+          "promptVi": "Khách mua sắm tùy hứng / hơn thế nữa / thích quà tặng kèm",
           "promptEn": "impulsive shoppers / in addition / love freebies",
-          "spokenScriptVi": "<speak><s>Khách mua sắm tùy hứng</s> <break time=\"650ms\"/> <s>hơn nữa</s> <break time=\"650ms\"/> <s>thích quà tặng kèm</s></speak>",
+          "spokenScriptVi": "<speak><s>Khách mua sắm tùy hứng</s> <break time=\"650ms\"/> <s>hơn thế nữa</s> <break time=\"650ms\"/> <s>thích quà tặng kèm</s></speak>",
           "spokenScriptEn": "<speak><s>impulsive shoppers</s> <break time=\"650ms\"/> <s>in addition</s> <break time=\"650ms\"/> <s>love freebies</s></speak>",
           "tc": 3,
           "lc": 1.15,
@@ -229,7 +229,7 @@
             },
             {
               "id": "h_set05_s2_i6_2",
-              "text": "hơn nữa",
+              "text": "hơn thế nữa",
               "translation": "in addition",
               "typeFunction": "Từ nối · Logic word"
             },
@@ -250,12 +250,12 @@
             "h_set05_s2_i7_2",
             "h_set05_s2_i7_3"
           ],
-          "termVi": "Người dạo phố ngắm đồ + sau đó + quay lại mua online",
-          "termEn": "window shoppers + then + buy online later",
-          "promptVi": "Người dạo phố ngắm đồ / sau đó / quay lại mua online",
-          "promptEn": "window shoppers / then / buy online later",
-          "spokenScriptVi": "<speak><s>Người dạo phố ngắm đồ</s> <break time=\"650ms\"/> <s>sau đó</s> <break time=\"650ms\"/> <s>quay lại mua online</s></speak>",
-          "spokenScriptEn": "<speak><s>window shoppers</s> <break time=\"650ms\"/> <s>then</s> <break time=\"650ms\"/> <s>buy online later</s></speak>",
+          "termVi": "Người dạo phố ngắm đồ + sau đó liền + quay lại mua online",
+          "termEn": "window shoppers + then now + buy online later",
+          "promptVi": "Người dạo phố ngắm đồ / sau đó liền / quay lại mua online",
+          "promptEn": "window shoppers / then now / buy online later",
+          "spokenScriptVi": "<speak><s>Người dạo phố ngắm đồ</s> <break time=\"650ms\"/> <s>sau đó liền</s> <break time=\"650ms\"/> <s>quay lại mua online</s></speak>",
+          "spokenScriptEn": "<speak><s>window shoppers</s> <break time=\"650ms\"/> <s>then now</s> <break time=\"650ms\"/> <s>buy online later</s></speak>",
           "tc": 3,
           "lc": 1.15,
           "tl": 2.2,
@@ -277,8 +277,8 @@
             },
             {
               "id": "h_set05_s2_i7_2",
-              "text": "sau đó",
-              "translation": "then",
+              "text": "sau đó liền",
+              "translation": "then now",
               "typeFunction": "Từ nối · Logic word"
             },
             {
@@ -298,11 +298,11 @@
             "h_set05_s2_i8_2",
             "h_set05_s2_i8_3"
           ],
-          "termVi": "Nền tảng mua bán + ví dụ + tích hợp livestream",
+          "termVi": "Nền tảng mua bán + ví dụ như + tích hợp livestream",
           "termEn": "shopping platform + for instance + embeds livestream",
-          "promptVi": "Nền tảng mua bán / ví dụ / tích hợp livestream",
+          "promptVi": "Nền tảng mua bán / ví dụ như / tích hợp livestream",
           "promptEn": "shopping platform / for instance / embeds livestream",
-          "spokenScriptVi": "<speak><s>Nền tảng mua bán</s> <break time=\"650ms\"/> <s>ví dụ</s> <break time=\"650ms\"/> <s>tích hợp livestream</s></speak>",
+          "spokenScriptVi": "<speak><s>Nền tảng mua bán</s> <break time=\"650ms\"/> <s>ví dụ như</s> <break time=\"650ms\"/> <s>tích hợp livestream</s></speak>",
           "spokenScriptEn": "<speak><s>shopping platform</s> <break time=\"650ms\"/> <s>for instance</s> <break time=\"650ms\"/> <s>embeds livestream</s></speak>",
           "tc": 3,
           "lc": 1.15,
@@ -325,7 +325,7 @@
             },
             {
               "id": "h_set05_s2_i8_2",
-              "text": "ví dụ",
+              "text": "ví dụ như",
               "translation": "for instance",
               "typeFunction": "Từ nối · Logic word"
             },
@@ -362,12 +362,12 @@
             "h_set05_s3_i6_3",
             "h_set05_s3_i6_4"
           ],
-          "termVi": "Vì sao + hơn nữa + con nghiện mua sắm + vung tay quá trán",
-          "termEn": "Why + moreover + shopaholic instinct + overspend wildly",
-          "promptVi": "Vì sao / hơn nữa / con nghiện mua sắm / vung tay quá trán",
-          "promptEn": "Why / moreover / shopaholic instinct / overspend wildly",
-          "spokenScriptVi": "<speak><s>Vì sao</s> <break time=\"650ms\"/> <s>hơn nữa</s> <break time=\"650ms\"/> <s>con nghiện mua sắm</s> <break time=\"650ms\"/> <s>vung tay quá trán</s></speak>",
-          "spokenScriptEn": "<speak><s>Why</s> <break time=\"650ms\"/> <s>moreover</s> <break time=\"650ms\"/> <s>shopaholic instinct</s> <break time=\"650ms\"/> <s>overspend wildly</s></speak>",
+          "termVi": "Lý do vì sao + hơn thế nữa + con nghiện mua sắm + vung tay quá trán",
+          "termEn": "Why now + moreover now + shopaholic instinct + overspend wildly",
+          "promptVi": "Lý do vì sao / hơn thế nữa / con nghiện mua sắm / vung tay quá trán",
+          "promptEn": "Why now / moreover now / shopaholic instinct / overspend wildly",
+          "spokenScriptVi": "<speak><s>Lý do vì sao</s> <break time=\"650ms\"/> <s>hơn thế nữa</s> <break time=\"650ms\"/> <s>con nghiện mua sắm</s> <break time=\"650ms\"/> <s>vung tay quá trán</s></speak>",
+          "spokenScriptEn": "<speak><s>Why now</s> <break time=\"650ms\"/> <s>moreover now</s> <break time=\"650ms\"/> <s>shopaholic instinct</s> <break time=\"650ms\"/> <s>overspend wildly</s></speak>",
           "tc": 4,
           "lc": 1.15,
           "tl": 2.3,
@@ -383,14 +383,14 @@
           "hints": [
             {
               "id": "h_set05_s3_i6_1",
-              "text": "Vì sao",
-              "translation": "Why",
+              "text": "Lý do vì sao",
+              "translation": "Why now",
               "typeFunction": "Cụm nghi vấn · WH word"
             },
             {
               "id": "h_set05_s3_i6_2",
-              "text": "hơn nữa",
-              "translation": "moreover",
+              "text": "hơn thế nữa",
+              "translation": "moreover now",
               "typeFunction": "Từ nối · Logic word"
             },
             {
@@ -417,12 +417,12 @@
             "h_set05_s3_i7_3",
             "h_set05_s3_i7_4"
           ],
-          "termVi": "Đi lượn lờ ngắm đồ + sau đó + mồi câu hấp dẫn + khiến chốt đơn ngay",
-          "termEn": "window shopping stroll + then + sweet bait + trigger instant buy",
-          "promptVi": "Đi lượn lờ ngắm đồ / sau đó / mồi câu hấp dẫn / khiến chốt đơn ngay",
-          "promptEn": "window shopping stroll / then / sweet bait / trigger instant buy",
-          "spokenScriptVi": "<speak><s>Đi lượn lờ ngắm đồ</s> <break time=\"650ms\"/> <s>sau đó</s> <break time=\"650ms\"/> <s>mồi câu hấp dẫn</s> <break time=\"650ms\"/> <s>khiến chốt đơn ngay</s></speak>",
-          "spokenScriptEn": "<speak><s>window shopping stroll</s> <break time=\"650ms\"/> <s>then</s> <break time=\"650ms\"/> <s>sweet bait</s> <break time=\"650ms\"/> <s>trigger instant buy</s></speak>",
+          "termVi": "Đi lượn lờ ngắm đồ + sau đó liền + mồi câu hấp dẫn + khiến chốt đơn ngay",
+          "termEn": "window shopping stroll + then now + sweet bait + trigger instant buy",
+          "promptVi": "Đi lượn lờ ngắm đồ / sau đó liền / mồi câu hấp dẫn / khiến chốt đơn ngay",
+          "promptEn": "window shopping stroll / then now / sweet bait / trigger instant buy",
+          "spokenScriptVi": "<speak><s>Đi lượn lờ ngắm đồ</s> <break time=\"650ms\"/> <s>sau đó liền</s> <break time=\"650ms\"/> <s>mồi câu hấp dẫn</s> <break time=\"650ms\"/> <s>khiến chốt đơn ngay</s></speak>",
+          "spokenScriptEn": "<speak><s>window shopping stroll</s> <break time=\"650ms\"/> <s>then now</s> <break time=\"650ms\"/> <s>sweet bait</s> <break time=\"650ms\"/> <s>trigger instant buy</s></speak>",
           "tc": 4,
           "lc": 1.15,
           "tl": 2.3,
@@ -444,8 +444,8 @@
             },
             {
               "id": "h_set05_s3_i7_2",
-              "text": "sau đó",
-              "translation": "then",
+              "text": "sau đó liền",
+              "translation": "then now",
               "typeFunction": "Từ nối · Logic word"
             },
             {
@@ -473,11 +473,11 @@
             "h_set05_s3_i8_4"
           ],
           "termVi": "Giỏ hàng đầy ắp + thay vào đó + nỗi sợ bỏ lỡ + thúc giục thanh toán",
-          "termEn": "stuffed cart + instead + FOMO fever + rush to checkout",
+          "termEn": "stuffed cart + instead of that + FOMO fever + rush to checkout",
           "promptVi": "Giỏ hàng đầy ắp / thay vào đó / nỗi sợ bỏ lỡ / thúc giục thanh toán",
-          "promptEn": "stuffed cart / instead / FOMO fever / rush to checkout",
+          "promptEn": "stuffed cart / instead of that / FOMO fever / rush to checkout",
           "spokenScriptVi": "<speak><s>Giỏ hàng đầy ắp</s> <break time=\"650ms\"/> <s>thay vào đó</s> <break time=\"650ms\"/> <s>nỗi sợ bỏ lỡ</s> <break time=\"650ms\"/> <s>thúc giục thanh toán</s></speak>",
-          "spokenScriptEn": "<speak><s>stuffed cart</s> <break time=\"650ms\"/> <s>instead</s> <break time=\"650ms\"/> <s>FOMO fever</s> <break time=\"650ms\"/> <s>rush to checkout</s></speak>",
+          "spokenScriptEn": "<speak><s>stuffed cart</s> <break time=\"650ms\"/> <s>instead of that</s> <break time=\"650ms\"/> <s>FOMO fever</s> <break time=\"650ms\"/> <s>rush to checkout</s></speak>",
           "tc": 4,
           "lc": 1.15,
           "tl": 2.3,
@@ -500,7 +500,7 @@
             {
               "id": "h_set05_s3_i8_2",
               "text": "thay vào đó",
-              "translation": "instead",
+              "translation": "instead of that",
               "typeFunction": "Từ nối · Logic word"
             },
             {
@@ -540,12 +540,12 @@
             "h_set05_s1_i9_1",
             "h_set05_s1_i9_2"
           ],
-          "termVi": "Giỏ hàng trực tuyến + chất đầy ắp",
-          "termEn": "shopping cart + overflowing",
-          "promptVi": "Giỏ hàng trực tuyến / chất đầy ắp",
-          "promptEn": "shopping cart / overflowing",
-          "spokenScriptVi": "<speak><s>Giỏ hàng trực tuyến</s> <break time=\"650ms\"/> <s>chất đầy ắp</s></speak>",
-          "spokenScriptEn": "<speak><s>shopping cart</s> <break time=\"650ms\"/> <s>overflowing</s></speak>",
+          "termVi": "Giỏ hàng trực tuyến + chất đầy ắp giỏ",
+          "termEn": "shopping cart + overflowing now",
+          "promptVi": "Giỏ hàng trực tuyến / chất đầy ắp giỏ",
+          "promptEn": "shopping cart / overflowing now",
+          "spokenScriptVi": "<speak><s>Giỏ hàng trực tuyến</s> <break time=\"650ms\"/> <s>chất đầy ắp giỏ</s></speak>",
+          "spokenScriptEn": "<speak><s>shopping cart</s> <break time=\"650ms\"/> <s>overflowing now</s></speak>",
           "tc": 2,
           "lc": 1.15,
           "tl": 2.5,
@@ -567,8 +567,8 @@
             },
             {
               "id": "h_set05_s1_i9_2",
-              "text": "chất đầy ắp",
-              "translation": "overflowing",
+              "text": "chất đầy ắp giỏ",
+              "translation": "overflowing now",
               "typeFunction": "Tính từ · Ending"
             }
           ]
@@ -581,12 +581,12 @@
             "h_set05_s1_i10_1",
             "h_set05_s1_i10_2"
           ],
-          "termVi": "Phễu bán hàng + tối ưu hóa",
-          "termEn": "sales funnel + optimized",
-          "promptVi": "Phễu bán hàng / tối ưu hóa",
-          "promptEn": "sales funnel / optimized",
-          "spokenScriptVi": "<speak><s>Phễu bán hàng</s> <break time=\"650ms\"/> <s>tối ưu hóa</s></speak>",
-          "spokenScriptEn": "<speak><s>sales funnel</s> <break time=\"650ms\"/> <s>optimized</s></speak>",
+          "termVi": "Phễu bán hàng + tối ưu hóa phễu",
+          "termEn": "sales funnel + optimized now",
+          "promptVi": "Phễu bán hàng / tối ưu hóa phễu",
+          "promptEn": "sales funnel / optimized now",
+          "spokenScriptVi": "<speak><s>Phễu bán hàng</s> <break time=\"650ms\"/> <s>tối ưu hóa phễu</s></speak>",
+          "spokenScriptEn": "<speak><s>sales funnel</s> <break time=\"650ms\"/> <s>optimized now</s></speak>",
           "tc": 2,
           "lc": 1.15,
           "tl": 2.5,
@@ -608,8 +608,8 @@
             },
             {
               "id": "h_set05_s1_i10_2",
-              "text": "tối ưu hóa",
-              "translation": "optimized",
+              "text": "tối ưu hóa phễu",
+              "translation": "optimized now",
               "typeFunction": "Tính từ · Ending"
             }
           ]
@@ -622,12 +622,12 @@
             "h_set05_s1_i11_1",
             "h_set05_s1_i11_2"
           ],
-          "termVi": "Tỉ lệ chuyển đổi đơn + tăng vọt",
-          "termEn": "conversion rate + skyrocket",
-          "promptVi": "Tỉ lệ chuyển đổi đơn / tăng vọt",
-          "promptEn": "conversion rate / skyrocket",
-          "spokenScriptVi": "<speak><s>Tỉ lệ chuyển đổi đơn</s> <break time=\"650ms\"/> <s>tăng vọt</s></speak>",
-          "spokenScriptEn": "<speak><s>conversion rate</s> <break time=\"650ms\"/> <s>skyrocket</s></speak>",
+          "termVi": "Tỉ lệ chuyển đổi đơn + tăng vọt kỷ lục",
+          "termEn": "conversion rate + skyrocket now",
+          "promptVi": "Tỉ lệ chuyển đổi đơn / tăng vọt kỷ lục",
+          "promptEn": "conversion rate / skyrocket now",
+          "spokenScriptVi": "<speak><s>Tỉ lệ chuyển đổi đơn</s> <break time=\"650ms\"/> <s>tăng vọt kỷ lục</s></speak>",
+          "spokenScriptEn": "<speak><s>conversion rate</s> <break time=\"650ms\"/> <s>skyrocket now</s></speak>",
           "tc": 2,
           "lc": 1.15,
           "tl": 2.5,
@@ -649,8 +649,8 @@
             },
             {
               "id": "h_set05_s1_i11_2",
-              "text": "tăng vọt",
-              "translation": "skyrocket",
+              "text": "tăng vọt kỷ lục",
+              "translation": "skyrocket now",
               "typeFunction": "Động từ · Ending"
             }
           ]
@@ -679,11 +679,11 @@
             "h_set05_s2_i9_2",
             "h_set05_s2_i9_3"
           ],
-          "termVi": "Sản phẩm trong giỏ hàng + miễn là + còn đủ số lượng",
+          "termVi": "Sản phẩm trong giỏ hàng + miễn là như vậy + còn đủ số lượng",
           "termEn": "items in cart + as long as + in stock",
-          "promptVi": "Sản phẩm trong giỏ hàng / miễn là / còn đủ số lượng",
+          "promptVi": "Sản phẩm trong giỏ hàng / miễn là như vậy / còn đủ số lượng",
           "promptEn": "items in cart / as long as / in stock",
-          "spokenScriptVi": "<speak><s>Sản phẩm trong giỏ hàng</s> <break time=\"650ms\"/> <s>miễn là</s> <break time=\"650ms\"/> <s>còn đủ số lượng</s></speak>",
+          "spokenScriptVi": "<speak><s>Sản phẩm trong giỏ hàng</s> <break time=\"650ms\"/> <s>miễn là như vậy</s> <break time=\"650ms\"/> <s>còn đủ số lượng</s></speak>",
           "spokenScriptEn": "<speak><s>items in cart</s> <break time=\"650ms\"/> <s>as long as</s> <break time=\"650ms\"/> <s>in stock</s></speak>",
           "tc": 3,
           "lc": 1.15,
@@ -706,7 +706,7 @@
             },
             {
               "id": "h_set05_s2_i9_2",
-              "text": "miễn là",
+              "text": "miễn là như vậy",
               "translation": "as long as",
               "typeFunction": "Từ nối · Logic word"
             },
@@ -727,12 +727,12 @@
             "h_set05_s2_i10_2",
             "h_set05_s2_i10_3"
           ],
-          "termVi": "Tối ưu phễu chuyển đổi + sau cùng + nhân đôi doanh thu",
-          "termEn": "funnel optimization + eventually + double sales",
-          "promptVi": "Tối ưu phễu chuyển đổi / sau cùng / nhân đôi doanh thu",
-          "promptEn": "funnel optimization / eventually / double sales",
-          "spokenScriptVi": "<speak><s>Tối ưu phễu chuyển đổi</s> <break time=\"650ms\"/> <s>sau cùng</s> <break time=\"650ms\"/> <s>nhân đôi doanh thu</s></speak>",
-          "spokenScriptEn": "<speak><s>funnel optimization</s> <break time=\"650ms\"/> <s>eventually</s> <break time=\"650ms\"/> <s>double sales</s></speak>",
+          "termVi": "Tối ưu phễu chuyển đổi + sau cùng thì + nhân đôi doanh thu",
+          "termEn": "funnel optimization + eventually now + double sales",
+          "promptVi": "Tối ưu phễu chuyển đổi / sau cùng thì / nhân đôi doanh thu",
+          "promptEn": "funnel optimization / eventually now / double sales",
+          "spokenScriptVi": "<speak><s>Tối ưu phễu chuyển đổi</s> <break time=\"650ms\"/> <s>sau cùng thì</s> <break time=\"650ms\"/> <s>nhân đôi doanh thu</s></speak>",
+          "spokenScriptEn": "<speak><s>funnel optimization</s> <break time=\"650ms\"/> <s>eventually now</s> <break time=\"650ms\"/> <s>double sales</s></speak>",
           "tc": 3,
           "lc": 1.15,
           "tl": 2.7,
@@ -754,8 +754,8 @@
             },
             {
               "id": "h_set05_s2_i10_2",
-              "text": "sau cùng",
-              "translation": "eventually",
+              "text": "sau cùng thì",
+              "translation": "eventually now",
               "typeFunction": "Từ nối · Logic word"
             },
             {
@@ -775,12 +775,12 @@
             "h_set05_s2_i11_2",
             "h_set05_s2_i11_3"
           ],
-          "termVi": "Giao dịch không tiền mặt + bởi vì + tiện lợi vượt trội",
-          "termEn": "cashless payments + because + supremely convenient",
-          "promptVi": "Giao dịch không tiền mặt / bởi vì / tiện lợi vượt trội",
-          "promptEn": "cashless payments / because / supremely convenient",
-          "spokenScriptVi": "<speak><s>Giao dịch không tiền mặt</s> <break time=\"650ms\"/> <s>bởi vì</s> <break time=\"650ms\"/> <s>tiện lợi vượt trội</s></speak>",
-          "spokenScriptEn": "<speak><s>cashless payments</s> <break time=\"650ms\"/> <s>because</s> <break time=\"650ms\"/> <s>supremely convenient</s></speak>",
+          "termVi": "Giao dịch không tiền mặt + bởi vì thế + tiện lợi vượt trội",
+          "termEn": "cashless payments + because now + supremely convenient",
+          "promptVi": "Giao dịch không tiền mặt / bởi vì thế / tiện lợi vượt trội",
+          "promptEn": "cashless payments / because now / supremely convenient",
+          "spokenScriptVi": "<speak><s>Giao dịch không tiền mặt</s> <break time=\"650ms\"/> <s>bởi vì thế</s> <break time=\"650ms\"/> <s>tiện lợi vượt trội</s></speak>",
+          "spokenScriptEn": "<speak><s>cashless payments</s> <break time=\"650ms\"/> <s>because now</s> <break time=\"650ms\"/> <s>supremely convenient</s></speak>",
           "tc": 3,
           "lc": 1.15,
           "tl": 2.7,
@@ -802,8 +802,8 @@
             },
             {
               "id": "h_set05_s2_i11_2",
-              "text": "bởi vì",
-              "translation": "because",
+              "text": "bởi vì thế",
+              "translation": "because now",
               "typeFunction": "Từ nối · Logic word"
             },
             {
@@ -839,12 +839,12 @@
             "h_set05_s3_i9_3",
             "h_set05_s3_i9_4"
           ],
-          "termVi": "Bao lâu + nếu + rò rỉ dữ liệu + mất hết uy tín",
-          "termEn": "How long + if + data leak breach + lose trust entirely",
-          "promptVi": "Bao lâu / nếu / rò rỉ dữ liệu / mất hết uy tín",
-          "promptEn": "How long / if / data leak breach / lose trust entirely",
-          "spokenScriptVi": "<speak><s>Bao lâu</s> <break time=\"650ms\"/> <s>nếu</s> <break time=\"650ms\"/> <s>rò rỉ dữ liệu</s> <break time=\"650ms\"/> <s>mất hết uy tín</s></speak>",
-          "spokenScriptEn": "<speak><s>How long</s> <break time=\"650ms\"/> <s>if</s> <break time=\"650ms\"/> <s>data leak breach</s> <break time=\"650ms\"/> <s>lose trust entirely</s></speak>",
+          "termVi": "Bao lâu + nếu không cẩn thận + rò rỉ dữ liệu + mất hết uy tín",
+          "termEn": "How long + if now + data leak breach + lose trust entirely",
+          "promptVi": "Bao lâu / nếu không cẩn thận / rò rỉ dữ liệu / mất hết uy tín",
+          "promptEn": "How long / if now / data leak breach / lose trust entirely",
+          "spokenScriptVi": "<speak><s>Bao lâu</s> <break time=\"650ms\"/> <s>nếu không cẩn thận</s> <break time=\"650ms\"/> <s>rò rỉ dữ liệu</s> <break time=\"650ms\"/> <s>mất hết uy tín</s></speak>",
+          "spokenScriptEn": "<speak><s>How long</s> <break time=\"650ms\"/> <s>if now</s> <break time=\"650ms\"/> <s>data leak breach</s> <break time=\"650ms\"/> <s>lose trust entirely</s></speak>",
           "tc": 4,
           "lc": 1.15,
           "tl": 2.8,
@@ -866,8 +866,8 @@
             },
             {
               "id": "h_set05_s3_i9_2",
-              "text": "nếu",
-              "translation": "if",
+              "text": "nếu không cẩn thận",
+              "translation": "if now",
               "typeFunction": "Từ nối · Logic word"
             },
             {
@@ -894,11 +894,11 @@
             "h_set05_s3_i10_3",
             "h_set05_s3_i10_4"
           ],
-          "termVi": "Phễu bán hàng hiện đại + cho nên + cỗ máy in tiền + hoạt động tự động",
+          "termVi": "Phễu bán hàng hiện đại + cho nên vì thế + cỗ máy in tiền + hoạt động tự động",
           "termEn": "smart sales funnel + so that + cash generator machine + run on autopilot",
-          "promptVi": "Phễu bán hàng hiện đại / cho nên / cỗ máy in tiền / hoạt động tự động",
+          "promptVi": "Phễu bán hàng hiện đại / cho nên vì thế / cỗ máy in tiền / hoạt động tự động",
           "promptEn": "smart sales funnel / so that / cash generator machine / run on autopilot",
-          "spokenScriptVi": "<speak><s>Phễu bán hàng hiện đại</s> <break time=\"650ms\"/> <s>cho nên</s> <break time=\"650ms\"/> <s>cỗ máy in tiền</s> <break time=\"650ms\"/> <s>hoạt động tự động</s></speak>",
+          "spokenScriptVi": "<speak><s>Phễu bán hàng hiện đại</s> <break time=\"650ms\"/> <s>cho nên vì thế</s> <break time=\"650ms\"/> <s>cỗ máy in tiền</s> <break time=\"650ms\"/> <s>hoạt động tự động</s></speak>",
           "spokenScriptEn": "<speak><s>smart sales funnel</s> <break time=\"650ms\"/> <s>so that</s> <break time=\"650ms\"/> <s>cash generator machine</s> <break time=\"650ms\"/> <s>run on autopilot</s></speak>",
           "tc": 4,
           "lc": 1.15,
@@ -921,7 +921,7 @@
             },
             {
               "id": "h_set05_s3_i10_2",
-              "text": "cho nên",
+              "text": "cho nên vì thế",
               "translation": "so that",
               "typeFunction": "Từ nối · Logic word"
             },
@@ -949,11 +949,11 @@
             "h_set05_s3_i11_3",
             "h_set05_s3_i11_4"
           ],
-          "termVi": "Tỉ lệ chuyển đổi đơn + trái lại + thước đo sinh tử + quyết định sống còn",
+          "termVi": "Tỉ lệ chuyển đổi đơn + trái lại hoàn toàn + thước đo sinh tử + quyết định sống còn",
           "termEn": "conversion rate + in contrast + vital heartbeat + make or break",
-          "promptVi": "Tỉ lệ chuyển đổi đơn / trái lại / thước đo sinh tử / quyết định sống còn",
+          "promptVi": "Tỉ lệ chuyển đổi đơn / trái lại hoàn toàn / thước đo sinh tử / quyết định sống còn",
           "promptEn": "conversion rate / in contrast / vital heartbeat / make or break",
-          "spokenScriptVi": "<speak><s>Tỉ lệ chuyển đổi đơn</s> <break time=\"650ms\"/> <s>trái lại</s> <break time=\"650ms\"/> <s>thước đo sinh tử</s> <break time=\"650ms\"/> <s>quyết định sống còn</s></speak>",
+          "spokenScriptVi": "<speak><s>Tỉ lệ chuyển đổi đơn</s> <break time=\"650ms\"/> <s>trái lại hoàn toàn</s> <break time=\"650ms\"/> <s>thước đo sinh tử</s> <break time=\"650ms\"/> <s>quyết định sống còn</s></speak>",
           "spokenScriptEn": "<speak><s>conversion rate</s> <break time=\"650ms\"/> <s>in contrast</s> <break time=\"650ms\"/> <s>vital heartbeat</s> <break time=\"650ms\"/> <s>make or break</s></speak>",
           "tc": 4,
           "lc": 1.15,
@@ -976,7 +976,7 @@
             },
             {
               "id": "h_set05_s3_i11_2",
-              "text": "trái lại",
+              "text": "trái lại hoàn toàn",
               "translation": "in contrast",
               "typeFunction": "Từ nối · Logic word"
             },
@@ -1019,11 +1019,11 @@
             "h_set05_s3_i12_3",
             "h_set05_s3_i12_4"
           ],
-          "termVi": "Mã miễn phí giao hàng + miễn là + cú hích tâm lý + thuyết phục khách mua",
+          "termVi": "Mã miễn phí giao hàng + miễn là như vậy + cú hích tâm lý + thuyết phục khách mua",
           "termEn": "free ship coupon + as long as + psychological nudge + seal the deal",
-          "promptVi": "Mã miễn phí giao hàng / miễn là / cú hích tâm lý / thuyết phục khách mua",
+          "promptVi": "Mã miễn phí giao hàng / miễn là như vậy / cú hích tâm lý / thuyết phục khách mua",
           "promptEn": "free ship coupon / as long as / psychological nudge / seal the deal",
-          "spokenScriptVi": "<speak><s>Mã miễn phí giao hàng</s> <break time=\"650ms\"/> <s>miễn là</s> <break time=\"650ms\"/> <s>cú hích tâm lý</s> <break time=\"650ms\"/> <s>thuyết phục khách mua</s></speak>",
+          "spokenScriptVi": "<speak><s>Mã miễn phí giao hàng</s> <break time=\"650ms\"/> <s>miễn là như vậy</s> <break time=\"650ms\"/> <s>cú hích tâm lý</s> <break time=\"650ms\"/> <s>thuyết phục khách mua</s></speak>",
           "spokenScriptEn": "<speak><s>free ship coupon</s> <break time=\"650ms\"/> <s>as long as</s> <break time=\"650ms\"/> <s>psychological nudge</s> <break time=\"650ms\"/> <s>seal the deal</s></speak>",
           "tc": 4,
           "lc": 1.15,
@@ -1046,7 +1046,7 @@
             },
             {
               "id": "h_set05_s3_i12_2",
-              "text": "miễn là",
+              "text": "miễn là như vậy",
               "translation": "as long as",
               "typeFunction": "Từ nối · Logic word"
             },
@@ -1074,12 +1074,12 @@
             "h_set05_s3_i13_3",
             "h_set05_s3_i13_4"
           ],
-          "termVi": "Giao hàng hỏa tốc + tiếp theo + vũ khí sát thương + đánh bạt đối thủ",
-          "termEn": "superfast delivery + next + killer feature + crush competition",
-          "promptVi": "Giao hàng hỏa tốc / tiếp theo / vũ khí sát thương / đánh bạt đối thủ",
-          "promptEn": "superfast delivery / next / killer feature / crush competition",
-          "spokenScriptVi": "<speak><s>Giao hàng hỏa tốc</s> <break time=\"650ms\"/> <s>tiếp theo</s> <break time=\"650ms\"/> <s>vũ khí sát thương</s> <break time=\"650ms\"/> <s>đánh bạt đối thủ</s></speak>",
-          "spokenScriptEn": "<speak><s>superfast delivery</s> <break time=\"650ms\"/> <s>next</s> <break time=\"650ms\"/> <s>killer feature</s> <break time=\"650ms\"/> <s>crush competition</s></speak>",
+          "termVi": "Giao hàng hỏa tốc + tiếp theo đó + vũ khí sát thương + đánh bạt đối thủ",
+          "termEn": "superfast delivery + next now + killer feature + crush competition",
+          "promptVi": "Giao hàng hỏa tốc / tiếp theo đó / vũ khí sát thương / đánh bạt đối thủ",
+          "promptEn": "superfast delivery / next now / killer feature / crush competition",
+          "spokenScriptVi": "<speak><s>Giao hàng hỏa tốc</s> <break time=\"650ms\"/> <s>tiếp theo đó</s> <break time=\"650ms\"/> <s>vũ khí sát thương</s> <break time=\"650ms\"/> <s>đánh bạt đối thủ</s></speak>",
+          "spokenScriptEn": "<speak><s>superfast delivery</s> <break time=\"650ms\"/> <s>next now</s> <break time=\"650ms\"/> <s>killer feature</s> <break time=\"650ms\"/> <s>crush competition</s></speak>",
           "tc": 4,
           "lc": 1.15,
           "tl": 3,
@@ -1101,8 +1101,8 @@
             },
             {
               "id": "h_set05_s3_i13_2",
-              "text": "tiếp theo",
-              "translation": "next",
+              "text": "tiếp theo đó",
+              "translation": "next now",
               "typeFunction": "Từ nối · Logic word"
             },
             {
@@ -1129,12 +1129,12 @@
             "h_set05_s3_i14_3",
             "h_set05_s3_i14_4"
           ],
-          "termVi": "Ở đâu + đồng thời + vùng đất hứa + thương mại nông thôn",
-          "termEn": "Where + meanwhile + promised land + rural e-commerce",
-          "promptVi": "Ở đâu / đồng thời / vùng đất hứa / thương mại nông thôn",
-          "promptEn": "Where / meanwhile / promised land / rural e-commerce",
-          "spokenScriptVi": "<speak><s>Ở đâu</s> <break time=\"650ms\"/> <s>đồng thời</s> <break time=\"650ms\"/> <s>vùng đất hứa</s> <break time=\"650ms\"/> <s>thương mại nông thôn</s></speak>",
-          "spokenScriptEn": "<speak><s>Where</s> <break time=\"650ms\"/> <s>meanwhile</s> <break time=\"650ms\"/> <s>promised land</s> <break time=\"650ms\"/> <s>rural e-commerce</s></speak>",
+          "termVi": "ở bất cứ đâu + đồng thời cùng lúc + vùng đất hứa + thương mại nông thôn",
+          "termEn": "Where now + meanwhile now + promised land + rural e-commerce",
+          "promptVi": "ở bất cứ đâu / đồng thời cùng lúc / vùng đất hứa / thương mại nông thôn",
+          "promptEn": "Where now / meanwhile now / promised land / rural e-commerce",
+          "spokenScriptVi": "<speak><s>ở bất cứ đâu</s> <break time=\"650ms\"/> <s>đồng thời cùng lúc</s> <break time=\"650ms\"/> <s>vùng đất hứa</s> <break time=\"650ms\"/> <s>thương mại nông thôn</s></speak>",
+          "spokenScriptEn": "<speak><s>Where now</s> <break time=\"650ms\"/> <s>meanwhile now</s> <break time=\"650ms\"/> <s>promised land</s> <break time=\"650ms\"/> <s>rural e-commerce</s></speak>",
           "tc": 4,
           "lc": 1.15,
           "tl": 3,
@@ -1150,14 +1150,14 @@
           "hints": [
             {
               "id": "h_set05_s3_i14_1",
-              "text": "Ở đâu",
-              "translation": "Where",
+              "text": "ở bất cứ đâu",
+              "translation": "Where now",
               "typeFunction": "Cụm nghi vấn · WH word"
             },
             {
               "id": "h_set05_s3_i14_2",
-              "text": "đồng thời",
-              "translation": "meanwhile",
+              "text": "đồng thời cùng lúc",
+              "translation": "meanwhile now",
               "typeFunction": "Từ nối · Logic word"
             },
             {

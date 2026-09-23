@@ -21,6 +21,8 @@ web/.env
 # Local tooling / editor
 .DS_Store
 Thumbs.db
+.~lock.*
+.~lock.*#
 .vscode/
 .idea/
 

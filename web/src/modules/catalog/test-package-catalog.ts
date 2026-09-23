@@ -58,7 +58,9 @@ export type CciProfile = {
   name: string
   versionLabel: string
   status: 'draft' | 'active' | 'archived'
+  description?: string | null
 }
+
 
 export type CciCategory = {
   id: string
@@ -258,3 +260,86 @@ export function detectPackageTestType(pkg: {
 
   return 'green'
 }
+
+export function calculateCvr(tc: number, lc: number, tl: number): number {
+  return roundMeasurement(tc * lc * tl)
+}
+
+export function calculateCpd(cvr: number, cci: number): number {
+  return roundMeasurement(cvr * cci)
+}
+
+export function calculateCciFromCpd(targetCpd: number, cvr: number): number {
+  if (cvr <= 0) return 1
+  return Math.max(1, Math.round(targetCpd / cvr))
+}
+
+export function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length
+}
+
+export function calculateWordCountLc(wordCount: number): number {
+  if (wordCount <= 8) return 1.0
+  if (wordCount <= 14) return roundMeasurement(1.0 + ((wordCount - 8) / 6) * 0.4)
+  if (wordCount <= 17) return roundMeasurement(1.4 + ((wordCount - 14) / 3) * 0.3)
+  if (wordCount <= 22) return roundMeasurement(1.7 + ((wordCount - 17) / 5) * 0.3)
+  return roundMeasurement(2.0 + Math.min(0.5, ((wordCount - 22) / 10) * 0.5))
+}
+
+export function validateGreenSentence(
+  prompt: string,
+  options?: { minWords?: number; maxWords?: number },
+): { wordCount: number; valid: boolean; reason?: string } {
+  const min = options?.minWords ?? 8
+  const max = options?.maxWords ?? 22
+  const words = countWords(prompt)
+  if (words < min) {
+    return {
+      wordCount: words,
+      valid: false,
+      reason: `Sentence is too short (${words} words, minimum ${min})`,
+    }
+  }
+  if (words > max) {
+    return {
+      wordCount: words,
+      valid: false,
+      reason: `Sentence exceeds maximum allowed length (${words} words, maximum ${max})`,
+    }
+  }
+  return { wordCount: words, valid: true }
+}
+
+export function validateRedCollocations(
+  hints: Array<{ text?: string | null } | string>,
+): { valid: boolean; singleWords: string[]; totalHints: number; reason?: string } {
+  const singleWords: string[] = []
+  let totalHints = 0
+  for (const hint of hints) {
+    const text = (typeof hint === 'string' ? hint : hint.text ?? '').trim()
+    if (!text) continue
+    totalHints += 1
+    const words = text.split(/\s+/).filter(Boolean)
+    if (words.length < 2) {
+      singleWords.push(text)
+    }
+  }
+  if (totalHints === 0) {
+    return {
+      valid: false,
+      singleWords: [],
+      totalHints: 0,
+      reason: 'No hints provided for Red test item',
+    }
+  }
+  return {
+    valid: singleWords.length === 0,
+    singleWords,
+    totalHints,
+    reason:
+      singleWords.length > 0
+        ? `Zero single words violated: ${singleWords.join(', ')}`
+        : undefined,
+  }
+}
+

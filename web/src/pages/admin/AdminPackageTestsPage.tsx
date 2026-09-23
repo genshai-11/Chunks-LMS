@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Activity,
   AlertTriangle,
-  ArrowRight,
   Eye,
   FileText,
   Headphones,
@@ -12,23 +10,29 @@ import {
   Play,
   Plus,
   RefreshCw,
+  Save,
   Search,
+  Sliders,
   Sparkles,
   Trash2,
+  Upload,
   Volume2,
   WandSparkles,
   X,
   Zap,
 } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { Flash } from '../../components/Flash'
 import { PageHeader } from '../../components/PageHeader'
-import { EmptyState } from '../../components/ui'
 import { useFlash } from '../../hooks/useFlash'
 import { getSupabase } from '../../lib/supabase'
 import {
+  batchSaveCciCategories,
+  createCciProfile,
   createDraftTestPackage,
   deleteTestPackage,
+  listCciCategories,
+  listCciProfiles,
   listTestItems,
   listTestPackageVersions,
   listTestPackages,
@@ -36,7 +40,14 @@ import {
   updateTestPackageMetadata,
 } from '../../lib/test-packages'
 import {
+  calculateCciFromCpd,
+  calculateCvr,
+  countWords,
   detectPackageTestType,
+  validateGreenSentence,
+  validateRedCollocations,
+  type CciCategory,
+  type CciProfile,
   type TestItem,
   type TestPackage,
   type TestPackageVersion,
@@ -47,17 +58,19 @@ import {
   generatePackageFromVocab,
   getFirestoreLessonChunks,
   listFirestoreLessons,
-  listTtsModels,
   playGoogleCloudTts,
+  uploadNarrationAudio,
   GREEN_TEST_SESSION_LANGUAGES_7X3,
   RED_TEST_SESSION_LANGUAGES_7X3,
   type FirestoreChunk,
   type FirestoreLesson,
+  type NarrationGenerationTarget,
 } from '../../modules/catalog/live-test-generation'
 
-type FilterTab = 'all' | 'green' | 'red'
-
 export { detectPackageTestType }
+
+export type StudioTab = 'packages' | 'content' | 'audio' | 'cci'
+type FilterTab = 'all' | 'green' | 'red'
 
 export type PackageSummary = {
   pkg: TestPackage
@@ -75,38 +88,78 @@ export type PackageSummary = {
 }
 
 export function AdminPackageTestsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const { message, error, ok, err } = useFlash()
 
-  // State
+  // Studio Tab State
+  const initialTab = (searchParams.get('tab') as StudioTab) || 'packages'
+  const [activeTab, setActiveTab] = useState<StudioTab>(initialTab)
+
+  const handleTabChange = (tab: StudioTab) => {
+    setActiveTab(tab)
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.set('tab', tab)
+      return next
+    })
+  }
+
+  // Catalog State
   const [packageSummaries, setPackageSummaries] = useState<PackageSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [filterTab, setFilterTab] = useState<FilterTab>('all')
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Active Selected Package
+  const selectedVersionId = searchParams.get('version') ?? ''
+  const selectedPackage = useMemo(() => {
+    if (!selectedVersionId && packageSummaries.length > 0) return packageSummaries[0]
+    return (
+      packageSummaries.find((s) => s.version?.id === selectedVersionId) ??
+      packageSummaries[0] ??
+      null
+    )
+  }, [packageSummaries, selectedVersionId])
+
+  const selectPackage = (pkg: PackageSummary) => {
+    if (!pkg.version) return
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.set('version', pkg.version!.id)
+      return next
+    })
+  }
 
   // Modals state
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [createTab, setCreateTab] = useState<'ai' | 'manual'>('ai')
   const [creatingPackage, setCreatingPackage] = useState(false)
 
-  // AI Generator fields
+  // AI Active Generator Fields (Fully customizable CPD, Sessions, Questions, CVR)
   const [lessons, setLessons] = useState<FirestoreLesson[]>([])
   const [selectedLessonId, setSelectedLessonId] = useState('')
   const [lessonChunks, setLessonChunks] = useState<FirestoreChunk[]>([])
   const [loadingChunks, setLoadingChunks] = useState(false)
   const [aiTestType, setAiTestType] = useState<'green' | 'red'>('red')
-  const [aiQuestionCount, setAiQuestionCount] = useState<21 | 42 | 49>(42)
-  const [aiTopic, setAiTopic] = useState('topic12')
+  const [aiSessionCount, setAiSessionCount] = useState<number>(7)
+  const [aiQuestionsPerSession, setAiQuestionsPerSession] = useState<number>(3)
   const [aiTargetVoltage, setAiTargetVoltage] = useState(56)
-  const [aiSessionLayout, setAiSessionLayout] = useState<'7x3' | '3x7'>('7x3')
+  const aiTopic = 'ecommerce'
   const [customPackageCode, setCustomPackageCode] = useState('')
   const [customTitle, setCustomTitle] = useState('')
   const [allowCustomCode, setAllowCustomCode] = useState(false)
 
+  // Direct UI controls for CVR = TC x TL x LC
+  const [uiTc, setUiTc] = useState<number>(3.0) // Term Complexity, default 3 ohm
+  const [uiTl, setUiTl] = useState<number>(2.0) // Topic Level / Latency (1.0 to 2.0)
+  const [uiLc, setUiLc] = useState<number>(1.15) // Length Complexity (1.0 to 2.5)
+  const [perSessionAmple, setPerSessionAmple] = useState<number[]>([12, 7, 5, 10, 6, 4, 4])
+
   // Manual Blank Draft fields
   const [manualTitle, setManualTitle] = useState('')
   const [manualVersionLabel, setManualVersionLabel] = useState('v1')
-  const [manualSessionCount, setManualSessionCount] = useState(6)
-  const [manualItemsPerSession, setManualItemsPerSession] = useState(7)
+  const [manualSessionCount, setManualSessionCount] = useState(7)
+  const [manualItemsPerSession, setManualItemsPerSession] = useState(3)
 
   // Edit Metadata Modal
   const [editingPackage, setEditingPackage] = useState<TestPackage | null>(null)
@@ -119,48 +172,77 @@ export function AdminPackageTestsPage() {
   const [deletingPackage, setDeletingPackage] = useState<TestPackage | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  // Full Preview Modal
+  // Preview Modal
   const [previewPackage, setPreviewPackage] = useState<PackageSummary | null>(null)
-  const [previewPlayingId, setPreviewPlayingId] = useState<string | null>(null)
 
-  // Audio Studio Modal
-  const [audioStudioPackage, setAudioStudioPackage] = useState<PackageSummary | null>(null)
-  const [sessionLanguages, setSessionLanguages] = useState<Array<'vi' | 'en'>>([])
-  const [ttsLanguage, setTtsLanguage] = useState<'vi' | 'en'>('en')
-  const [ttsVoiceId, setTtsVoiceId] = useState('google/en-US-Neural2-F')
-  const [ttsModels, setTtsModels] = useState<Array<{ id: string; provider: string; label: string }>>([])
+  // Audio Studio State
+  const [audioVoiceId, setAudioVoiceId] = useState('google/vi-VN-Neural2-A')
+  const [audioVoiceLang, setAudioVoiceLang] = useState<'vi' | 'en'>('vi')
   const [testingTtsVoice, setTestingTtsVoice] = useState(false)
-  const [batchAudioProgress, setBatchAudioProgress] = useState<{ done: number; total: number } | null>(null)
+  const [playingAudioKey, setPlayingAudioKey] = useState<string | null>(null)
+  const [batchAudioProgress, setBatchAudioProgress] = useState<{ done: number; total: number } | null>(
+    null,
+  )
   const [batchGenerating, setBatchGenerating] = useState(false)
+  const [uploadingTargetKey, setUploadingTargetKey] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [pendingUploadTarget, setPendingUploadTarget] = useState<{
+    target: NarrationGenerationTarget
+    part?: number
+    testSectionId?: string
+    testItemId?: string
+    language: 'vi' | 'en'
+    text: string
+  } | null>(null)
 
-  // Default TTS Voice lists
-  const defaultViVoices = [
-    { id: 'google/vi-VN-Neural2-A', provider: 'google', label: 'Google vi-VN-Neural2-A (Female)' },
-    { id: 'google/vi-VN-Neural2-D', provider: 'google', label: 'Google vi-VN-Neural2-D (Male)' },
-    { id: 'google/vi-VN-Wavenet-A', provider: 'google', label: 'Google vi-VN-Wavenet-A (Female)' },
-    { id: 'google/vi-VN-Wavenet-C', provider: 'google', label: 'Google vi-VN-Wavenet-C (Male)' },
-  ]
-  const defaultEnVoices = [
-    { id: 'google/en-US-Journey-F', provider: 'google', label: 'Google en-US-Journey-F (Female)' },
-    { id: 'google/en-US-Journey-D', provider: 'google', label: 'Google en-US-Journey-D (Male)' },
-    { id: 'google/en-US-Neural2-F', provider: 'google', label: 'Google en-US-Neural2-F (Female)' },
-    { id: 'google/en-US-Neural2-J', provider: 'google', label: 'Google en-US-Neural2-J (Male)' },
-  ]
+  // CCI Profiles Tab State
+  const [cciProfiles, setCciProfiles] = useState<CciProfile[]>([])
+  const [selectedCciProfileId, setSelectedCciProfileId] = useState<string>('')
+  const [selectedCategories, setSelectedCategories] = useState<CciCategory[]>([])
+  const [loadingCci, setLoadingCci] = useState(false)
+  const [savingCci, setSavingCci] = useState(false)
+  const [showNewProfileModal, setShowNewProfileModal] = useState(false)
+  const [newProfileName, setNewProfileName] = useState('')
+  const [newProfileDesc, setNewProfileDesc] = useState('')
 
-  // Update target voltage automatically when test type changes if not manually set
+  // Derived calculations
+  const totalQuestions = useMemo(
+    () => aiSessionCount * aiQuestionsPerSession,
+    [aiSessionCount, aiQuestionsPerSession],
+  )
+
+  const computedCvr = useMemo(() => {
+    return calculateCvr(uiTc, uiLc, uiTl)
+  }, [uiTc, uiLc, uiTl])
+
+  const computedDerivedCci = useMemo(() => {
+    return calculateCciFromCpd(aiTargetVoltage, computedCvr)
+  }, [aiTargetVoltage, computedCvr])
+
+  // Sync test type defaults for CVR/CPD/Ample
   useEffect(() => {
-    if (!allowCustomCode) {
-      setAiTargetVoltage(aiTestType === 'red' ? 56 : 12)
+    if (aiTestType === 'green') {
+      setAiTargetVoltage(12)
+      setUiTc(3.0)
+      setUiTl(1.0)
+      setUiLc(1.0)
+      setPerSessionAmple([6, 6, 4, 4, 3, 3, 2])
+    } else {
+      setAiTargetVoltage(56)
+      setUiTc(3.0)
+      setUiTl(2.0)
+      setUiLc(1.15)
+      setPerSessionAmple([12, 7, 5, 10, 6, 4, 4])
     }
-  }, [aiTestType, allowCustomCode])
+  }, [aiTestType])
 
   // Compute live package code and title
   const computedPackageCode = useMemo(() => {
     const prefix = aiTestType === 'red' ? 'R01' : 'G01'
     const cleanTopic = aiTopic.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')
     const topicSegment = cleanTopic ? `-${cleanTopic}` : ''
-    return `${prefix}-${aiQuestionCount}Q${topicSegment}-${aiTargetVoltage}V`
-  }, [aiTestType, aiQuestionCount, aiTopic, aiTargetVoltage])
+    return `${prefix}-${totalQuestions}Q${topicSegment}-${aiTargetVoltage}V`
+  }, [aiTestType, totalQuestions, aiTopic, aiTargetVoltage])
 
   const selectedLesson = useMemo(() => {
     return lessons.find((l) => l.id === selectedLessonId) ?? null
@@ -169,10 +251,11 @@ export function AdminPackageTestsPage() {
   const computedTitle = useMemo(() => {
     const typeLabel = aiTestType === 'red' ? 'RED (Awareness & Traps)' : 'GREEN (Focus)'
     const lessonLabel = selectedLesson?.lessonTitle || selectedLessonId || 'General'
-    return `[${typeLabel}] ${lessonLabel} · ${aiQuestionCount}Q - ${aiTargetVoltage}V`
-  }, [aiTestType, selectedLesson, selectedLessonId, aiQuestionCount, aiTargetVoltage])
+    return `[${typeLabel}] ${lessonLabel} · ${totalQuestions}Q - ${aiTargetVoltage}V`
+  }, [aiTestType, selectedLesson, selectedLessonId, totalQuestions, aiTargetVoltage])
 
-  const activePackageCode = allowCustomCode && customPackageCode ? customPackageCode : computedPackageCode
+  const activePackageCode =
+    allowCustomCode && customPackageCode ? customPackageCode : computedPackageCode
   const activeTitle = allowCustomCode && customTitle ? customTitle : computedTitle
 
   // Load packages catalog
@@ -185,7 +268,6 @@ export function AdminPackageTestsPage() {
         return
       }
 
-      // Build summaries for each package
       const summaries: PackageSummary[] = await Promise.all(
         res.data.map(async (pkg) => {
           const versionsRes = await listTestPackageVersions(pkg.id)
@@ -210,27 +292,37 @@ export function AdminPackageTestsPage() {
                 .from('narration_variants')
                 .select('id, approval_status')
                 .eq('package_version_id', version.id)
-              audioApproved = (variants ?? []).filter((v: any) => v.approval_status === 'approved').length
+              audioApproved = (variants ?? []).filter(
+                (v: any) => v.approval_status === 'approved',
+              ).length
             }
           }
 
           const testType = detectPackageTestType(pkg)
-
           const targetVoltage = Number(
             pkg.sourceMetadata?.targetVoltage ??
               pkg.sourceMetadata?.targetCpd ??
               (testType === 'red' ? 56 : 12),
           )
-
-          const questionCount = items.length || Number(pkg.sourceMetadata?.questionCount ?? 42)
+          const questionCount =
+            items.length || Number(pkg.sourceMetadata?.questionCount ?? 21)
 
           const cvrValues = items
             .map((i) => i.measuredCvr)
             .filter((c): c is number => c != null && !isNaN(c))
-          const cvrMin = cvrValues.length ? Math.min(...cvrValues) : testType === 'red' ? 3 : 1
-          const cvrMax = cvrValues.length ? Math.max(...cvrValues) : testType === 'red' ? 24 : 13
+          const cvrMin = cvrValues.length
+            ? Math.min(...cvrValues)
+            : testType === 'red'
+              ? 4.6
+              : 2.0
+          const cvrMax = cvrValues.length
+            ? Math.max(...cvrValues)
+            : testType === 'red'
+              ? 13.8
+              : 6.0
 
-          const isLegacyLive = pkg.title.includes('· LIVE') || version?.versionLabel === 'LIVE'
+          const isLegacyLive =
+            pkg.title.includes('· LIVE') || version?.versionLabel === 'LIVE'
 
           return {
             pkg,
@@ -257,87 +349,65 @@ export function AdminPackageTestsPage() {
     }
   }, [err])
 
-  useEffect(() => {
-    loadPackages()
-  }, [loadPackages])
-
-  // Load Firestore lessons
-  const loadLessons = useCallback(async () => {
+  // Load CCI Profiles
+  const loadCciProfiles = useCallback(async () => {
+    setLoadingCci(true)
     try {
-      const data = await listFirestoreLessons()
-      setLessons(data)
-      if (data.length > 0 && !selectedLessonId) {
-        setSelectedLessonId(data[0]!.id)
+      const res = await listCciProfiles()
+      if (res.ok) {
+        setCciProfiles(res.data)
+        if (res.data.length > 0 && !selectedCciProfileId) {
+          setSelectedCciProfileId(res.data[0].id)
+        }
       }
-    } catch (e) {
-      // Ignored if offline
+    } catch {
+      // ignore
+    } finally {
+      setLoadingCci(false)
     }
-  }, [selectedLessonId])
+  }, [selectedCciProfileId])
 
+  // Load Categories for Selected CCI Profile
   useEffect(() => {
-    loadLessons()
-  }, [loadLessons])
+    if (!selectedCciProfileId) {
+      setSelectedCategories([])
+      return
+    }
+    void (async () => {
+      const res = await listCciCategories(selectedCciProfileId)
+      if (res.ok) setSelectedCategories(res.data)
+    })()
+  }, [selectedCciProfileId])
 
-  // Load chunks when selected lesson changes
+  // Initial Load
+  useEffect(() => {
+    void loadPackages()
+    void loadCciProfiles()
+    void (async () => {
+      try {
+        const loadedLessons = await listFirestoreLessons()
+        setLessons(loadedLessons)
+        if (loadedLessons.length > 0) {
+          setSelectedLessonId(loadedLessons[0].id)
+        }
+      } catch {
+        // fallback
+      }
+    })()
+  }, [loadPackages, loadCciProfiles])
+
+  // Load chunks when lesson changes
   useEffect(() => {
     if (!selectedLessonId) {
       setLessonChunks([])
       return
     }
-    let cancelled = false
     setLoadingChunks(true)
-    getFirestoreLessonChunks(selectedLessonId)
-      .then((chunks) => {
-        if (!cancelled) setLessonChunks(chunks)
-      })
-      .catch(() => {
-        if (!cancelled) setLessonChunks([])
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingChunks(false)
-      })
-    return () => {
-      cancelled = true
-    }
+    void getFirestoreLessonChunks(selectedLessonId)
+      .then((chunks) => setLessonChunks(chunks))
+      .catch(() => setLessonChunks([]))
+      .finally(() => setLoadingChunks(false))
   }, [selectedLessonId])
-
-  // Load TTS models for Audio studio
-  useEffect(() => {
-    listTtsModels(ttsLanguage)
-      .then((res) => {
-        if (res?.models?.length) {
-          setTtsModels(res.models)
-        } else {
-          setTtsModels(ttsLanguage === 'vi' ? defaultViVoices : defaultEnVoices)
-        }
-      })
-      .catch(() => {
-        setTtsModels(ttsLanguage === 'vi' ? defaultViVoices : defaultEnVoices)
-      })
-  }, [ttsLanguage])
-
-  // Sync per-session audio languages when Audio Studio opens
-  useEffect(() => {
-    if (!audioStudioPackage) {
-      setSessionLanguages([])
-      return
-    }
-    const secCount = audioStudioPackage.sections.length || 7
-    const metaLangs = (audioStudioPackage.pkg.sourceMetadata as any)?.sessionLanguages
-    if (Array.isArray(metaLangs) && metaLangs.length >= secCount) {
-      setSessionLanguages(metaLangs)
-      return
-    }
-    if (audioStudioPackage.testType === 'green') {
-      setSessionLanguages(
-        Array.from({ length: secCount }, (_, i) => GREEN_TEST_SESSION_LANGUAGES_7X3[i] ?? (i < 3 ? 'en' : i < 6 ? 'vi' : 'en')),
-      )
-    } else {
-      setSessionLanguages(
-        Array.from({ length: secCount }, (_, i) => RED_TEST_SESSION_LANGUAGES_7X3[i] ?? (i < 3 ? 'vi' : 'en')),
-      )
-    }
-  }, [audioStudioPackage])
 
   // Filtered packages
   const filteredSummaries = useMemo(() => {
@@ -351,37 +421,51 @@ export function AdminPackageTestsPage() {
         const slug = summary.pkg.slug.toLowerCase()
         const desc = (summary.pkg.description || '').toLowerCase()
         const code = String(summary.pkg.sourceMetadata?.packageCode || '').toLowerCase()
-        return cleanTitle.includes(query) || slug.includes(query) || desc.includes(query) || code.includes(query)
+        return (
+          cleanTitle.includes(query) ||
+          slug.includes(query) ||
+          desc.includes(query) ||
+          code.includes(query)
+        )
       }
       return true
     })
   }, [packageSummaries, filterTab, searchQuery])
 
-  // Handle AI Package Generation
+  // Handle AI Package Generation with custom CVR math and Ample
   async function handleGenerateAiPackage(e: React.FormEvent) {
     e.preventDefault()
-    if (!selectedLessonId) {
-      return err('Please select a lesson')
-    }
+    if (!selectedLessonId) return err('Vui lòng chọn bài học Firestore')
     setCreatingPackage(true)
     try {
       const res = await generatePackageFromVocab({
         testType: aiTestType,
         lessonId: selectedLessonId,
-        targetQuestions: aiQuestionCount,
-        sessionLayout: aiQuestionCount === 21 ? aiSessionLayout : undefined,
+        targetQuestions: totalQuestions,
+        sessionCount: aiSessionCount,
+        questionsPerSession: aiQuestionsPerSession,
+        sessionLayout: `${aiSessionCount}x${aiQuestionsPerSession}`,
+        sessionLanguages:
+          aiTestType === 'red'
+            ? RED_TEST_SESSION_LANGUAGES_7X3
+            : GREEN_TEST_SESSION_LANGUAGES_7X3,
         targetCpd: aiTargetVoltage,
+        tc: uiTc,
+        tl: uiTl,
+        lexicalComplexity: uiLc,
+        cciProgression: perSessionAmple,
         packageCode: activePackageCode,
         title: activeTitle,
         versionLabel: 'v1',
         saveDraft: true,
       })
 
-      ok(`Generated and saved package "${res.title}" with ${res.itemsCount} questions!`)
+      ok(`Đã tạo thành công gói bài test "${res.title}" (${res.itemsCount} câu)!`)
       setShowCreateModal(false)
       await loadPackages()
+      handleTabChange('content')
     } catch (e) {
-      err(e instanceof Error ? e.message : 'AI package generation failed')
+      err(e instanceof Error ? e.message : 'Tạo bài test thất bại')
     } finally {
       setCreatingPackage(false)
     }
@@ -390,7 +474,7 @@ export function AdminPackageTestsPage() {
   // Handle Manual Package Creation
   async function handleCreateManualPackage(e: React.FormEvent) {
     e.preventDefault()
-    if (!manualTitle.trim()) return err('Title is required')
+    if (!manualTitle.trim()) return err('Tiêu đề không được để trống')
     setCreatingPackage(true)
     try {
       const defaultSessions = Array.from({ length: manualSessionCount }, (_, idx) => ({
@@ -400,7 +484,7 @@ export function AdminPackageTestsPage() {
         cciProfileId: '',
         cciCategoryId: '',
         cciCategoryLabel: 'Focus Baseline',
-        cciValue: 2,
+        cciValue: 4,
       }))
 
       const res = await createDraftTestPackage({
@@ -412,12 +496,12 @@ export function AdminPackageTestsPage() {
       })
       if (!res.ok) throw new Error(res.error)
 
-      ok(`Created manual test package "${res.data.package.title}"`)
+      ok(`Đã tạo gói bài test thủ công "${res.data.package.title}"`)
       setShowCreateModal(false)
       setManualTitle('')
       await loadPackages()
     } catch (e) {
-      err(e instanceof Error ? e.message : 'Manual package creation failed')
+      err(e instanceof Error ? e.message : 'Tạo gói thủ công thất bại')
     } finally {
       setCreatingPackage(false)
     }
@@ -434,11 +518,11 @@ export function AdminPackageTestsPage() {
         slug: editSlug,
         description: editDescription,
       })
-      ok('Package metadata updated successfully.')
+      ok('Cập nhật thông tin gói thành công.')
       setEditingPackage(null)
       await loadPackages()
     } catch (e) {
-      err(e instanceof Error ? e.message : 'Failed to update package metadata')
+      err(e instanceof Error ? e.message : 'Cập nhật thất bại')
     } finally {
       setSavingMetadata(false)
     }
@@ -450,83 +534,153 @@ export function AdminPackageTestsPage() {
     setDeleting(true)
     try {
       await deleteTestPackage(deletingPackage.id)
-      ok(`Package "${deletingPackage.title}" and all its versions were deleted.`)
+      ok(`Đã xóa vĩnh viễn gói "${deletingPackage.title}"`)
       setDeletingPackage(null)
       await loadPackages()
     } catch (e) {
-      err(e instanceof Error ? e.message : 'Failed to delete package')
+      err(e instanceof Error ? e.message : 'Xóa gói bài test thất bại')
     } finally {
       setDeleting(false)
     }
   }
 
-  // Audio Play helper for preview
-  async function playItemAudio(item: TestItem) {
-    const textToSpeak = item.spokenScriptEn || item.promptEn || item.spokenScriptVi || item.promptVi || ''
-    if (!textToSpeak) {
-      return err('No spoken script or prompt text to play.')
-    }
-    const lang = item.spokenScriptEn || item.promptEn ? 'en' : 'vi'
-    const voice = lang === 'vi' ? 'google/vi-VN-Neural2-A' : 'google/en-US-Neural2-F'
-    setPreviewPlayingId(item.id)
-    try {
-      await playGoogleCloudTts(textToSpeak, lang, voice)
-    } catch (e) {
-      err(e instanceof Error ? e.message : 'TTS playback failed')
-    } finally {
-      setPreviewPlayingId(null)
-    }
-  }
-
-  // Audio Play helper for scripts
-  async function playScriptAudio(scriptKey: string, text: string, lang: 'vi' | 'en') {
-    if (!text) return
-    setPreviewPlayingId(scriptKey)
-    const voice = lang === 'vi' ? 'google/vi-VN-Neural2-A' : 'google/en-US-Neural2-F'
-    try {
-      await playGoogleCloudTts(text, lang, voice)
-    } catch (e) {
-      err(e instanceof Error ? e.message : 'TTS playback failed')
-    } finally {
-      setPreviewPlayingId(null)
-    }
-  }
-
-  // Test voice sample
-  async function handleTestTtsVoice() {
+  // Inline Test Voice Playback
+  async function handleTestVoice() {
     const sample =
-      ttsLanguage === 'vi'
-        ? 'Xin chào! Đây là giọng đọc nhân tạo chuẩn Google Cloud trên Chunks LMS.'
-        : 'Hello! This is a high-fidelity Google Cloud voice model on Chunks LMS.'
+      audioVoiceLang === 'vi'
+        ? 'Xin chào! Đây là mô hình giọng đọc chuẩn Google Cloud Neural2 trên hệ thống Chunks LMS.'
+        : 'Hello! This is a high-fidelity Google Cloud Neural2 voice model on Chunks LMS.'
     setTestingTtsVoice(true)
     try {
-      await playGoogleCloudTts(sample, ttsLanguage, ttsVoiceId)
+      await playGoogleCloudTts(sample, audioVoiceLang, audioVoiceId)
     } catch (e) {
-      err(e instanceof Error ? e.message : 'Failed to preview TTS voice')
+      err(e instanceof Error ? e.message : 'Lỗi nghe thử giọng đọc')
     } finally {
       setTestingTtsVoice(false)
     }
   }
 
-  // Batch generate all items
-  async function handleBatchGenerate(pkg: PackageSummary) {
-    if (!pkg.version) return
+  // Inline Audio Playback for Item / Intro
+  async function handlePlayItemAudio(key: string, text: string, lang: 'vi' | 'en') {
+    setPlayingAudioKey(key)
+    try {
+      const voice = lang === 'vi' ? 'google/vi-VN-Neural2-A' : 'google/en-US-Neural2-F'
+      await playGoogleCloudTts(text, lang, voice)
+    } catch (e) {
+      err(e instanceof Error ? e.message : 'Phát âm thanh thất bại')
+    } finally {
+      setPlayingAudioKey(null)
+    }
+  }
+
+  // Regenerate Audio via GCP TTS
+  async function handleRegenerateAudio(
+    target: NarrationGenerationTarget,
+    text: string,
+    lang: 'vi' | 'en',
+    sectionId?: string,
+    itemId?: string,
+    part?: number,
+  ) {
+    if (!selectedPackage?.version) return
+    const voice = lang === 'vi' ? 'google/vi-VN-Neural2-A' : 'google/en-US-Neural2-F'
+    try {
+      await generateNarration({
+        packageVersionId: selectedPackage.version.id,
+        target,
+        part,
+        testSectionId: sectionId,
+        testItemId: itemId,
+        language: lang,
+        voiceId: voice,
+        textOverride: text,
+      })
+      ok('Đã sinh mới file âm thanh từ Google Cloud TTS!')
+      await loadPackages()
+    } catch (e) {
+      err(e instanceof Error ? e.message : 'Lỗi sinh âm thanh từ GCP')
+    }
+  }
+
+  // Trigger Custom Audio Upload File Picker
+  function handleTriggerUpload(
+    target: NarrationGenerationTarget,
+    text: string,
+    lang: 'vi' | 'en',
+    sectionId?: string,
+    itemId?: string,
+    part?: number,
+  ) {
+    setPendingUploadTarget({
+      target,
+      part,
+      testSectionId: sectionId,
+      testItemId: itemId,
+      language: lang,
+      text,
+    })
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+      fileInputRef.current.click()
+    }
+  }
+
+  // Process Uploaded File
+  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !pendingUploadTarget || !selectedPackage?.version) return
+    setUploadingTargetKey('uploading')
+    try {
+      const voice =
+        pendingUploadTarget.language === 'vi'
+          ? 'google/vi-VN-Neural2-A'
+          : 'google/en-US-Neural2-F'
+      await uploadNarrationAudio({
+        packageVersionId: selectedPackage.version.id,
+        target: pendingUploadTarget.target,
+        part: pendingUploadTarget.part,
+        testSectionId: pendingUploadTarget.testSectionId,
+        testItemId: pendingUploadTarget.testItemId,
+        language: pendingUploadTarget.language,
+        voiceId: voice,
+        sourceTextHash: `hash-${Date.now()}`,
+        file,
+      })
+      ok(`Đã tải lên và phê duyệt file audio: "${file.name}"!`)
+      await loadPackages()
+    } catch (e) {
+      err(e instanceof Error ? e.message : 'Tải lên file audio thất bại')
+    } finally {
+      setUploadingTargetKey(null)
+      setPendingUploadTarget(null)
+    }
+  }
+
+  // Batch generate all missing audio
+  async function handleBatchGenerateAll() {
+    if (!selectedPackage?.version) return
     setBatchGenerating(true)
-    setBatchAudioProgress({ done: 0, total: pkg.items.length })
+    setBatchAudioProgress({ done: 0, total: selectedPackage.items.length })
     let done = 0
     try {
-      for (const item of pkg.items) {
-        const secIdx = pkg.sections.findIndex((s) => s.id === item.sectionId)
+      for (const item of selectedPackage.items) {
+        const sec = selectedPackage.sections.find((s) => s.id === item.sectionId)
         const lang: 'vi' | 'en' =
-          secIdx >= 0 && sessionLanguages[secIdx] ? sessionLanguages[secIdx] : ttsLanguage
-        const isEn = lang === 'en'
-        // Ensure Neural2 voice is selected according to language
-        const voice = isEn ? 'google/en-US-Neural2-F' : 'google/vi-VN-Neural2-A'
-        const script = isEn
-          ? item.spokenScriptEn || item.promptEn || item.spokenScriptVi || item.promptVi || ''
-          : item.spokenScriptVi || item.promptVi || item.spokenScriptEn || item.promptEn || ''
+          selectedPackage.testType === 'green'
+            ? sec && sec.sectionOrder <= 3
+              ? 'en'
+              : 'vi'
+            : sec && sec.sectionOrder <= 3
+              ? 'vi'
+              : 'en'
+        const voice = lang === 'vi' ? 'google/vi-VN-Neural2-A' : 'google/en-US-Neural2-F'
+        const script =
+          lang === 'vi'
+            ? item.spokenScriptVi || item.promptVi || ''
+            : item.spokenScriptEn || item.promptEn || ''
+
         await generateNarration({
-          packageVersionId: pkg.version.id,
+          packageVersionId: selectedPackage.version.id,
           target: 'test_item',
           testItemId: item.id,
           language: lang,
@@ -534,23 +688,97 @@ export function AdminPackageTestsPage() {
           textOverride: script,
         })
         done++
-        setBatchAudioProgress({ done, total: pkg.items.length })
+        setBatchAudioProgress({ done, total: selectedPackage.items.length })
       }
-      ok(`Batch generated ${done} items with Google Cloud TTS!`)
+      ok(`Đã tạo xong ${done} file âm thanh Google Cloud TTS!`)
       await loadPackages()
     } catch (e) {
-      err(e instanceof Error ? e.message : 'Batch generation stopped with error')
+      err(e instanceof Error ? e.message : 'Sinh âm thanh hàng loạt dừng do lỗi')
     } finally {
       setBatchGenerating(false)
       setBatchAudioProgress(null)
     }
   }
 
+  // Save CCI Categories (Ample CRUD)
+  async function handleSaveCciCategories() {
+    if (!selectedCciProfileId) return
+    setSavingCci(true)
+    try {
+      const res = await batchSaveCciCategories(
+        selectedCciProfileId,
+        selectedCategories.map((c) => ({
+          id: c.id,
+          categoryOrder: c.categoryOrder,
+          label: c.label,
+          value: c.value,
+          description: c.description,
+        })),
+      )
+      if (!res.ok) throw new Error(res.error)
+      ok('Đã lưu thành công các thông số Ample cho profile!')
+      await loadCciProfiles()
+    } catch (e) {
+      err(e instanceof Error ? e.message : 'Lưu CCI thất bại')
+    } finally {
+      setSavingCci(false)
+    }
+  }
+
+  // Create new CCI Profile
+  async function handleCreateProfileSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newProfileName.trim()) return
+    try {
+      const sb = getSupabase() as any
+      const { data: orgs } = await sb.from('organizations').select('id').limit(1)
+      const orgId = orgs?.[0]?.id
+      if (!orgId) throw new Error('Organization not found')
+
+      const res = await createCciProfile({
+        organizationId: orgId,
+        name: newProfileName.trim(),
+        description: newProfileDesc.trim() || null,
+        status: 'active',
+      })
+      if (!res.ok) throw new Error(res.error)
+
+      // Add default 7 session categories (Ample)
+      await batchSaveCciCategories(res.data.id, [
+        { categoryOrder: 1, label: 'Session 1 Ample', value: 6.0 },
+        { categoryOrder: 2, label: 'Session 2 Ample', value: 6.0 },
+        { categoryOrder: 3, label: 'Session 3 Ample', value: 4.0 },
+        { categoryOrder: 4, label: 'Session 4 Ample', value: 4.0 },
+        { categoryOrder: 5, label: 'Session 5 Ample', value: 3.0 },
+        { categoryOrder: 6, label: 'Session 6 Ample', value: 3.0 },
+        { categoryOrder: 7, label: 'Session 7 Ample', value: 2.0 },
+      ])
+
+      ok(`Đã tạo hồ sơ CCI mới: "${newProfileName}"!`)
+      setShowNewProfileModal(false)
+      setNewProfileName('')
+      setNewProfileDesc('')
+      setSelectedCciProfileId(res.data.id)
+      await loadCciProfiles()
+    } catch (e) {
+      err(e instanceof Error ? e.message : 'Tạo hồ sơ CCI thất bại')
+    }
+  }
+
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-16">
+      {/* Hidden File Input for Custom Audio Upload */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={(e) => void handleFileSelected(e)}
+        accept="audio/*,.mp3,.wav,.ogg,.m4a"
+        className="hidden"
+      />
+
       <PageHeader
         title="Package Tests Studio"
-        subtitle="Manage focus & awareness packages, generate AI tests from vocab, full hierarchy preview, and Google Cloud audio pipeline."
+        subtitle="Quản lý toàn diện gói bài test: CVR/CPD Physics, cấu hình Ample (CCI), kiểm soát nội dung câu hỏi Green & Red test và pipeline âm thanh Google Cloud TTS."
         actions={
           <div className="flex items-center gap-3">
             <button
@@ -560,7 +788,7 @@ export function AdminPackageTestsPage() {
               disabled={loading}
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              <span>Refresh</span>
+              <span>Làm mới</span>
             </button>
             <button
               type="button"
@@ -576,277 +804,984 @@ export function AdminPackageTestsPage() {
 
       <Flash message={message} error={error} />
 
-      {/* Catalog Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-        {/* Tabs */}
-        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200/60">
+      {/* Main Studio Navigation Tabs */}
+      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-2 rounded-2xl shadow-xs">
+        <div className="flex items-center gap-2 py-2">
           <button
             type="button"
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              filterTab === 'all'
-                ? 'bg-white text-slate-900 shadow-sm border border-slate-200/50'
-                : 'text-slate-600 hover:text-slate-900'
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              activeTab === 'packages'
+                ? 'bg-slate-900 text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
-            onClick={() => setFilterTab('all')}
+            onClick={() => handleTabChange('packages')}
           >
-            All ({packageSummaries.length})
+            <Layers className="h-4 w-4" />
+            <span>Gói bài test ({packageSummaries.length})</span>
           </button>
+
           <button
             type="button"
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-              filterTab === 'green'
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              activeTab === 'content'
                 ? 'bg-emerald-600 text-white shadow-sm'
-                : 'text-emerald-700 hover:bg-emerald-50'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
-            onClick={() => setFilterTab('green')}
+            onClick={() => handleTabChange('content')}
           >
-            <Zap className="h-3.5 w-3.5" />
-            <span>Green Tests ({packageSummaries.filter((s) => s.testType === 'green').length})</span>
+            <FileText className="h-4 w-4" />
+            <span>Soạn thảo & Nội dung câu</span>
           </button>
+
           <button
             type="button"
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-              filterTab === 'red'
-                ? 'bg-rose-600 text-white shadow-sm'
-                : 'text-rose-700 hover:bg-rose-50'
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              activeTab === 'audio'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
-            onClick={() => setFilterTab('red')}
+            onClick={() => handleTabChange('audio')}
           >
-            <Activity className="h-3.5 w-3.5" />
-            <span>Red Tests ({packageSummaries.filter((s) => s.testType === 'red').length})</span>
+            <Headphones className="h-4 w-4" />
+            <span>Quản lý Audio & Review</span>
+          </button>
+
+          <button
+            type="button"
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              activeTab === 'cci'
+                ? 'bg-amber-600 text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+            onClick={() => handleTabChange('cci')}
+          >
+            <Zap className="h-4 w-4" />
+            <span>Hệ số CCI & Ample CRUD</span>
           </button>
         </div>
 
-        {/* Search */}
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by title, code, slug..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
+        {selectedPackage && activeTab !== 'packages' && (
+          <div className="flex items-center gap-2 text-xs py-2 pr-2">
+            <span className="text-slate-400">Đang chọn:</span>
+            <select
+              value={selectedPackage.version?.id ?? ''}
+              onChange={(e) => {
+                const target = packageSummaries.find((s) => s.version?.id === e.target.value)
+                if (target) selectPackage(target)
+              }}
+              className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-slate-800 focus:outline-hidden"
+            >
+              {packageSummaries.map((s) => (
+                <option key={s.pkg.id} value={s.version?.id ?? ''}>
+                  {s.pkg.title.replace(/ · LIVE$/i, '')} ({s.testType.toUpperCase()} - {s.targetVoltage}V)
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
-      {/* Package Cards Grid */}
-      {loading ? (
-        <div className="flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-slate-200 shadow-sm">
-          <Loader2 className="h-8 w-8 animate-spin text-indigo-500 mb-3" />
-          <span className="text-sm text-slate-500">Loading test packages catalog...</span>
-        </div>
-      ) : filteredSummaries.length === 0 ? (
-        <EmptyState
-          title="No package tests found"
-          description={
-            searchQuery
-              ? `No packages match "${searchQuery}". Try clearing search.`
-              : 'Create your first Green Focus or Red Awareness test package with the AI generator.'
-          }
-          action={
-            <button
-              type="button"
-              className="primary flex items-center gap-2"
-              onClick={() => setShowCreateModal(true)}
-            >
-              <Plus className="h-4 w-4" />
-              <span>Create Package</span>
-            </button>
-          }
-        />
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredSummaries.map((summary) => {
-            const cleanTitle = summary.pkg.title.replace(/ · LIVE$/i, '').trim()
-            const versionLabel =
-              summary.version?.versionLabel && summary.version.versionLabel !== 'LIVE'
-                ? summary.version.versionLabel
-                : 'v1'
-            const isRed = summary.testType === 'red'
-            const audioPercent =
-              summary.audioTotalCount > 0
-                ? Math.round((summary.audioApprovedCount / summary.audioTotalCount) * 100)
-                : 0
-
-            return (
-              <div
-                key={summary.pkg.id}
-                className="group relative flex flex-col justify-between bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-all hover:border-indigo-300"
+      {/* ======================================================== */}
+      {/* TAB 1: PACKAGES CATALOG                                  */}
+      {/* ======================================================== */}
+      {activeTab === 'packages' && (
+        <div className="space-y-6">
+          {/* Catalog Filter Bar */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+            {/* Filter Buttons */}
+            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200/60">
+              <button
+                type="button"
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  filterTab === 'all'
+                    ? 'bg-white text-slate-900 shadow-sm border border-slate-200/50'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                onClick={() => setFilterTab('all')}
               >
-                <div>
-                  {/* Card Header Badges */}
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wider uppercase ${
-                        isRed
-                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                          : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                      }`}
-                    >
-                      {isRed ? <Activity className="h-3 w-3" /> : <Zap className="h-3 w-3" />}
-                      {isRed ? 'Red Test (Awareness)' : 'Green Test (Focus)'}
-                    </span>
+                Tất cả ({packageSummaries.length})
+              </button>
+              <button
+                type="button"
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                  filterTab === 'green'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-emerald-700 hover:bg-emerald-50'
+                }`}
+                onClick={() => setFilterTab('green')}
+              >
+                <span>Green Tests (Focus 12V)</span>
+              </button>
+              <button
+                type="button"
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                  filterTab === 'red'
+                    ? 'bg-rose-600 text-white shadow-sm'
+                    : 'text-rose-700 hover:bg-rose-50'
+                }`}
+                onClick={() => setFilterTab('red')}
+              >
+                <span>Red Tests (Awareness 56V)</span>
+              </button>
+            </div>
 
-                    <span
-                      className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
-                        summary.version?.status === 'published'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}
-                    >
-                      {summary.version?.status === 'published' ? 'Published' : 'Draft'} · {versionLabel}
-                    </span>
-                  </div>
+            {/* Search */}
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Tìm mã gói, bài học..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-slate-900/10 transition-all"
+              />
+            </div>
+          </div>
 
-                  {/* Title & Code */}
-                  <h3 className="text-base font-bold text-slate-900 leading-snug line-clamp-2 mb-1">
-                    {cleanTitle}
-                  </h3>
-                  <div className="text-xs font-mono text-slate-500 mb-4">
-                    {String(summary.pkg.sourceMetadata?.packageCode || summary.pkg.slug)}
-                  </div>
-
-                  {/* Metrics Badges Row */}
-                  <div className="grid grid-cols-2 gap-2 text-xs mb-4">
-                    <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
-                      <div className="text-[10px] text-slate-400 uppercase font-semibold">Questions</div>
-                      <div className="font-bold text-slate-800">
-                        {summary.questionCount}Q · {summary.sections.length} Sessions
-                      </div>
-                    </div>
-                    <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
-                      <div className="text-[10px] text-slate-400 uppercase font-semibold">Target Voltage</div>
-                      <div className="font-bold text-indigo-600">
-                        {summary.targetVoltage}V CPD
-                      </div>
-                    </div>
-                    <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
-                      <div className="text-[10px] text-slate-400 uppercase font-semibold">CVR Range</div>
-                      <div className="font-semibold text-slate-700">
-                        {summary.cvrMin}Ω – {summary.cvrMax}Ω
-                      </div>
-                    </div>
-                    <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
-                      <div className="text-[10px] text-slate-400 uppercase font-semibold">Audio Readiness</div>
-                      <div className="font-semibold text-slate-700 flex items-center justify-between">
-                        <span>{summary.audioApprovedCount}/{summary.audioTotalCount}</span>
-                        <span className="text-[10px] text-slate-400">{audioPercent}%</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Audio Progress Bar */}
-                  <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden mb-4">
-                    <div
-                      className={`h-full transition-all ${
-                        audioPercent === 100
-                          ? 'bg-emerald-500'
-                          : audioPercent > 0
-                          ? 'bg-indigo-500'
-                          : 'bg-slate-300'
-                      }`}
-                      style={{ width: `${audioPercent}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Card Actions */}
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-1">
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 flex items-center gap-1.5 transition-colors"
-                      onClick={() => setPreviewPackage(summary)}
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                      <span>Preview</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-1.5 transition-colors"
-                      onClick={() => setAudioStudioPackage(summary)}
-                    >
-                      <Headphones className="h-3.5 w-3.5 text-indigo-500" />
-                      <span>Audio Studio</span>
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-                      title="Edit metadata"
-                      onClick={() => {
-                        setEditingPackage(summary.pkg)
-                        setEditTitle(cleanTitle)
-                        setEditSlug(summary.pkg.slug)
-                        setEditDescription(summary.pkg.description || '')
-                      }}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      className="p-1.5 rounded-lg text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                      title="Delete package"
-                      onClick={() => setDeletingPackage(summary.pkg)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
+          {/* Packages Grid */}
+          {loading ? (
+            <div className="flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-slate-200">
+              <Loader2 className="h-8 w-8 text-slate-400 animate-spin mb-3" />
+              <p className="text-xs text-slate-500 font-medium">Đang tải danh mục bài test...</p>
+            </div>
+          ) : filteredSummaries.length === 0 ? (
+            <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center space-y-4">
+              <div className="mx-auto w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                <FileText className="h-6 w-6" />
               </div>
-            )
-          })}
+              <h3 className="text-sm font-bold text-slate-800">Không tìm thấy gói bài test</h3>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                Chưa có gói bài test nào phù hợp với bộ lọc. Hãy tạo bài test mới bằng AI Generator hoặc làm mới danh sách.
+              </p>
+              <button
+                type="button"
+                className="primary text-xs mx-auto"
+                onClick={() => setShowCreateModal(true)}
+              >
+                Tạo Bài Test Đầu Tiên
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {filteredSummaries.map((summary) => {
+                const isGreen = summary.testType === 'green'
+                const cleanTitle = summary.pkg.title.replace(/ · LIVE$/i, '')
+                const audioRatio =
+                  summary.audioTotalCount > 0
+                    ? Math.round((summary.audioApprovedCount / summary.audioTotalCount) * 100)
+                    : 0
+
+                return (
+                  <div
+                    key={summary.pkg.id}
+                    className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group space-y-4"
+                  >
+                    <div className="space-y-3">
+                      {/* Top Badges */}
+                      <div className="flex items-center justify-between gap-2">
+                        <span
+                          className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${
+                            isGreen
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                              : 'bg-rose-50 text-rose-700 border border-rose-200/60'
+                          }`}
+                        >
+                          {isGreen ? 'GREEN FOCUS' : 'RED AWARENESS'} • {summary.targetVoltage}V
+                        </span>
+
+                        <span className="text-[11px] font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
+                          {summary.questionCount}Q
+                        </span>
+                      </div>
+
+                      {/* Title & Description */}
+                      <div>
+                        <h3 className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors line-clamp-2">
+                          {cleanTitle}
+                        </h3>
+                        <p className="text-xs text-slate-500 line-clamp-2 mt-1">
+                          {summary.pkg.description || 'Chưa có mô tả chi tiết cho gói bài test.'}
+                        </p>
+                      </div>
+
+                      {/* Physics & Audio Meter */}
+                      <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200/60 space-y-2 text-[11px]">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500">Kháng trở CVR (Ohm):</span>
+                          <span className="font-mono font-bold text-slate-800">
+                            {summary.cvrMin.toFixed(1)}Ω – {summary.cvrMax.toFixed(1)}Ω
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500">Tiến độ Audio:</span>
+                          <span className="font-bold text-indigo-600">
+                            {summary.audioApprovedCount} / {summary.audioTotalCount} ({audioRatio}%)
+                          </span>
+                        </div>
+
+                        <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className={`h-full transition-all duration-300 ${
+                              audioRatio === 100
+                                ? 'bg-emerald-500'
+                                : audioRatio > 0
+                                  ? 'bg-indigo-500'
+                                  : 'bg-slate-300'
+                            }`}
+                            style={{ width: `${audioRatio}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Actions Toolbar */}
+                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            selectPackage(summary)
+                            handleTabChange('content')
+                          }}
+                          className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors flex items-center gap-1"
+                        >
+                          <FileText className="h-3.5 w-3.5" />
+                          <span>Soạn nội dung</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            selectPackage(summary)
+                            handleTabChange('audio')
+                          }}
+                          className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors flex items-center gap-1"
+                        >
+                          <Headphones className="h-3.5 w-3.5" />
+                          <span>Audio</span>
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewPackage(summary)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                          title="Xem trước cấu trúc"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingPackage(summary.pkg)
+                            setEditTitle(summary.pkg.title)
+                            setEditSlug(summary.pkg.slug)
+                            setEditDescription(summary.pkg.description || '')
+                          }}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                          title="Sửa thông tin"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setDeletingPackage(summary.pkg)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                          title="Xóa vĩnh viễn"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 
-      {/* CREATE PACKAGE MODAL */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden my-8">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-5 border-b border-slate-200 bg-slate-50/80">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600">
-                  <WandSparkles className="h-5 w-5" />
+      {/* ======================================================== */}
+      {/* TAB 2: CONTENT & QUESTIONS INSPECTOR                     */}
+      {/* ======================================================== */}
+      {activeTab === 'content' && (
+        <div className="space-y-6">
+          {!selectedPackage ? (
+            <div className="p-8 text-center bg-white rounded-2xl border border-slate-200 text-slate-500 text-xs">
+              Vui lòng chọn một gói bài test từ danh mục.
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Package Meta Header */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase ${
+                        selectedPackage.testType === 'green'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-rose-50 text-rose-700 border border-rose-200'
+                      }`}
+                    >
+                      {selectedPackage.testType.toUpperCase()} TEST • {selectedPackage.targetVoltage}V
+                    </span>
+                    <span className="text-xs font-mono text-slate-400">
+                      Mã: {selectedPackage.pkg.slug}
+                    </span>
+                  </div>
+                  <h2 className="text-lg font-bold text-slate-900">
+                    {selectedPackage.pkg.title.replace(/ · LIVE$/i, '')}
+                  </h2>
                 </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleTabChange('audio')}
+                    className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm flex items-center gap-1.5 transition-all"
+                  >
+                    <Headphones className="h-4 w-4" />
+                    <span>Mở Audio Studio</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Sessions Accordion List */}
+              <div className="space-y-4">
+                {selectedPackage.sections.map((sec, secIdx) => {
+                  const secItems = selectedPackage.items.filter((i) => i.sectionId === sec.id)
+                  const isGreen = selectedPackage.testType === 'green'
+
+                  return (
+                    <div
+                      key={sec.id}
+                      className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs"
+                    >
+                      <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <span className="w-7 h-7 rounded-lg bg-slate-200 font-bold text-xs flex items-center justify-center text-slate-700">
+                            {sec.sectionOrder}
+                          </span>
+                          <div>
+                            <div className="font-bold text-slate-800 text-xs">
+                              {sec.title || `Session ${sec.sectionOrder}`}
+                            </div>
+                            <div className="text-[11px] text-slate-500">
+                              {secItems.length} câu hỏi • Mục tiêu CVR: {sec.targetCvrOhm ?? 3}Ω
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Session Physics Badge */}
+                        <div className="flex items-center gap-2 text-[11px]">
+                          <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono">
+                            CVR: {sec.targetCvrOhm ?? 3}Ω
+                          </span>
+                          <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-mono">
+                            Ample: {perSessionAmple[secIdx] ?? 6}A
+                          </span>
+                          <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 font-mono">
+                            CPD: {selectedPackage.targetVoltage}V
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Items Table */}
+                      <div className="divide-y divide-slate-100">
+                        {secItems.map((item) => {
+                          const wordsVi = countWords(item.promptVi || '')
+                          const greenValidation = isGreen
+                            ? validateGreenSentence(item.promptVi || '', { minWords: 8, maxWords: 22 })
+                            : null
+
+                          const hintsList = !isGreen && item.promptVi ? item.promptVi.split('/') : []
+                          const redValidation = !isGreen ? validateRedCollocations(hintsList) : null
+
+                          return (
+                            <div key={item.id} className="p-4 hover:bg-slate-50/50 transition-colors space-y-2">
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="space-y-1.5 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                                      #{item.itemOrder}
+                                    </span>
+                                    <span className="font-bold text-xs text-slate-800">
+                                      {item.termVi || 'Cụm từ trọng tâm'}
+                                    </span>
+                                    {item.termEn && (
+                                      <span className="text-xs text-slate-400 font-medium">
+                                        ({item.termEn})
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Vietnamese Prompt */}
+                                  <div className="text-xs text-slate-900 font-medium flex items-center gap-2">
+                                    <span className="text-[10px] font-bold text-rose-500 uppercase">VI:</span>
+                                    <span>{item.promptVi}</span>
+                                  </div>
+
+                                  {/* English Prompt */}
+                                  <div className="text-xs text-slate-600 flex items-center gap-2">
+                                    <span className="text-[10px] font-bold text-indigo-500 uppercase">EN:</span>
+                                    <span>{item.promptEn}</span>
+                                  </div>
+                                </div>
+
+                                {/* Validation Meters */}
+                                <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                                  {isGreen && greenValidation && (
+                                    <span
+                                      className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 ${
+                                        greenValidation.valid
+                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                          : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                      }`}
+                                    >
+                                      {greenValidation.valid ? '✓' : '⚠️'} {wordsVi} từ (Giới hạn: 8–22 từ)
+                                    </span>
+                                  )}
+
+                                  {!isGreen && redValidation && (
+                                    <span
+                                      className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 ${
+                                        redValidation.valid
+                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                          : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                      }`}
+                                    >
+                                      {redValidation.valid ? '✓ Zero single words' : '⚠️ Chứa từ đơn'} (
+                                      {redValidation.totalHints} hints)
+                                    </span>
+                                  )}
+
+                                  <div className="text-[10px] font-mono text-slate-400">
+                                    TC: {item.tc ?? 2} • LC: {item.lc ?? 1} • TL: {item.tl ?? 1} • CVR: {item.measuredCvr ?? 3}Ω
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* TAB 3: AUDIO MANAGEMENT & REVIEW STUDIO                  */}
+      {/* ======================================================== */}
+      {activeTab === 'audio' && (
+        <div className="space-y-6">
+          {!selectedPackage ? (
+            <div className="p-8 text-center bg-white rounded-2xl border border-slate-200 text-slate-500 text-xs">
+              Vui lòng chọn một gói bài test từ danh mục để quản lý âm thanh.
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Studio Header Toolbar */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900">Create Test Package</h2>
+                  <h3 className="font-bold text-slate-900 text-base">
+                    Quản lý & Review Audio Google Cloud TTS
+                  </h3>
                   <p className="text-xs text-slate-500">
-                    Generate from Firestore Vocab with dual-term cognition or create blank package.
+                    Gói bài test: <strong className="text-slate-800">{selectedPackage.pkg.title.replace(/ · LIVE$/i, '')}</strong> • Giọng đọc chuẩn GCP Text-to-Speech API
                   </p>
                 </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <select
+                    value={audioVoiceId}
+                    onChange={(e) => {
+                      setAudioVoiceId(e.target.value)
+                      setAudioVoiceLang(e.target.value.includes('vi-VN') ? 'vi' : 'en')
+                    }}
+                    className="text-xs border border-slate-300 rounded-xl px-3 py-1.5 bg-white text-slate-800 focus:outline-hidden"
+                  >
+                    <option value="google/vi-VN-Neural2-A">vi-VN-Neural2-A (Nữ - Tiếng Việt)</option>
+                    <option value="google/vi-VN-Neural2-D">vi-VN-Neural2-D (Nam - Tiếng Việt)</option>
+                    <option value="google/en-US-Neural2-F">en-US-Neural2-F (Nữ - Tiếng Anh)</option>
+                    <option value="google/en-US-Neural2-J">en-US-Neural2-J (Nam - Tiếng Anh)</option>
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={() => void handleTestVoice()}
+                    disabled={testingTtsVoice}
+                    className="px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                  >
+                    {testingTtsVoice ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Volume2 className="h-3.5 w-3.5" />}
+                    <span>Test Giọng</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => void handleBatchGenerateAll()}
+                    disabled={batchGenerating || selectedPackage.items.length === 0}
+                    className="px-4 py-1.5 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm flex items-center gap-1.5 transition-all disabled:opacity-50"
+                  >
+                    {batchGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                    <span>Sinh Tất Cả Câu Bằng GCP</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Batch Progress Bar */}
+              {batchAudioProgress && (
+                <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 space-y-2">
+                  <div className="flex justify-between text-xs text-indigo-900 font-bold">
+                    <span>Đang gọi Google Cloud TTS sinh âm thanh...</span>
+                    <span>
+                      {batchAudioProgress.done} / {batchAudioProgress.total} (
+                      {Math.round((batchAudioProgress.done / batchAudioProgress.total) * 100)}%)
+                    </span>
+                  </div>
+                  <div className="w-full bg-indigo-200 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-indigo-600 h-full transition-all duration-300"
+                      style={{
+                        width: `${(batchAudioProgress.done / batchAudioProgress.total) * 100}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {uploadingTargetKey && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 text-xs text-emerald-800 font-semibold">
+                  <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />
+                  <span>Đang tải lên và xử lý tệp audio ghi đè...</span>
+                </div>
+              )}
+
+              {/* 1. Lifecycle Narrations Section */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-sm">1. Audio Giới Thiệu & Kết Thúc (Lifecycle)</h4>
+                    <p className="text-[11px] text-slate-500">
+                      Bao gồm lời chào đầu bài (package_start), giới thiệu từng phần (part_intro), và lời chúc mừng kết thúc (package_end).
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Package Start */}
+                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-xs text-slate-800">Lời Chào Đầu Bài (Package Start)</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        package_start
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 italic">
+                      "Chào mừng em đến với bài kiểm tra Chunks LMS. Lắng nghe cẩn thận và phát âm chính xác..."
+                    </p>
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200/60">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void handlePlayItemAudio(
+                            'pkg_start',
+                            'Chào mừng em đến với bài kiểm tra Chunks LMS. Lắng nghe cẩn thận và phát âm chính xác.',
+                            'vi',
+                          )
+                        }
+                        className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 flex items-center gap-1 transition-colors"
+                      >
+                        <Play className="h-3 w-3 fill-current" />
+                        <span>Nghe thử</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void handleRegenerateAudio(
+                            'package_start',
+                            'Chào mừng em đến với bài kiểm tra Chunks LMS. Lắng nghe cẩn thận và phát âm chính xác.',
+                            'vi',
+                          )
+                        }
+                        className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 flex items-center gap-1 transition-colors"
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                        <span>Sinh GCP</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleTriggerUpload(
+                            'package_start',
+                            'Chào mừng em đến với bài kiểm tra Chunks LMS.',
+                            'vi',
+                          )
+                        }
+                        className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 flex items-center gap-1 transition-colors"
+                      >
+                        <Upload className="h-3 w-3" />
+                        <span>Upload File</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Package End */}
+                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-xs text-slate-800">Lời Chúc Mừng Kết Thúc (Package End)</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        package_end
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 italic">
+                      "Chúc mừng em đã hoàn thành toàn bộ bài kiểm tra. Em đã thể hiện sự tập trung và lưu loát rất xuất sắc!"
+                    </p>
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200/60">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void handlePlayItemAudio(
+                            'pkg_end',
+                            'Chúc mừng em đã hoàn thành toàn bộ bài kiểm tra. Em đã thể hiện sự tập trung và lưu loát rất xuất sắc!',
+                            'vi',
+                          )
+                        }
+                        className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 flex items-center gap-1 transition-colors"
+                      >
+                        <Play className="h-3 w-3 fill-current" />
+                        <span>Nghe thử</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void handleRegenerateAudio(
+                            'package_end',
+                            'Chúc mừng em đã hoàn thành toàn bộ bài kiểm tra. Em đã thể hiện sự tập trung và lưu loát rất xuất sắc!',
+                            'vi',
+                          )
+                        }
+                        className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 flex items-center gap-1 transition-colors"
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                        <span>Sinh GCP</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleTriggerUpload(
+                            'package_end',
+                            'Chúc mừng em đã hoàn thành toàn bộ bài kiểm tra.',
+                            'vi',
+                          )
+                        }
+                        className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 flex items-center gap-1 transition-colors"
+                      >
+                        <Upload className="h-3 w-3" />
+                        <span>Upload File</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Test Items Audio Review List */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-sm">2. Audio Từng Câu Hỏi ({selectedPackage.items.length} câu)</h4>
+                    <p className="text-[11px] text-slate-500">
+                      Nghe thử trực tiếp giọng GCP Neural2, tạo lại (regenerate) hoặc tải lên file audio ghi âm thực tế.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto pr-2">
+                  {selectedPackage.items.map((item) => {
+                    const sec = selectedPackage.sections.find((s) => s.id === item.sectionId)
+                    const lang: 'vi' | 'en' =
+                      selectedPackage.testType === 'green'
+                        ? sec && sec.sectionOrder <= 3
+                          ? 'en'
+                          : 'vi'
+                        : sec && sec.sectionOrder <= 3
+                          ? 'vi'
+                          : 'en'
+                    const script =
+                      lang === 'vi'
+                        ? item.spokenScriptVi || item.promptVi || ''
+                        : item.spokenScriptEn || item.promptEn || ''
+
+                    return (
+                      <div key={item.id} className="py-3 flex items-center justify-between gap-4 hover:bg-slate-50 px-2 rounded-xl transition-colors">
+                        <div className="space-y-1 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                              #{item.itemOrder}
+                            </span>
+                            <span className="font-bold text-xs text-slate-800">
+                              {item.termVi || 'Core Term'}
+                            </span>
+                            <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">
+                              {lang}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-700 line-clamp-1 font-medium">
+                            {script}
+                          </div>
+                        </div>
+
+                        {/* Audio Item Controls */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => void handlePlayItemAudio(`item_${item.id}`, script, lang)}
+                            disabled={playingAudioKey === `item_${item.id}`}
+                            className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                            title="Nghe thử"
+                          >
+                            {playingAudioKey === `item_${item.id}` ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Play className="h-3.5 w-3.5 fill-current" />
+                            )}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void handleRegenerateAudio('test_item', script, lang, item.sectionId, item.id)
+                            }
+                            className="p-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors"
+                            title="Sinh lại bằng GCP TTS"
+                          >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleTriggerUpload('test_item', script, lang, item.sectionId, item.id)
+                            }
+                            className="p-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition-colors"
+                            title="Upload audio thay thế"
+                          >
+                            <Upload className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* TAB 4: CCI & AMPLE PROFILES CRUD                         */}
+      {/* ======================================================== */}
+      {activeTab === 'cci' && (
+        <div className="space-y-6">
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <h3 className="font-bold text-slate-900 text-base">
+                Quản lý Hệ Số CCI & Cường Độ Ample (A)
+              </h3>
+              <p className="text-xs text-slate-500">
+                Thiết lập mức cường độ nhận thức cho từng session (Session 1 đến 7) để phục vụ công thức CPD = CVR × CCI.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <select
+                value={selectedCciProfileId}
+                onChange={(e) => setSelectedCciProfileId(e.target.value)}
+                className="text-xs border border-slate-300 rounded-xl px-3 py-1.5 bg-white text-slate-800 focus:outline-hidden font-bold"
+              >
+                {cciProfiles.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.versionLabel})
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={() => setShowNewProfileModal(true)}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 flex items-center gap-1.5 transition-colors"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>+ Hồ sơ mới</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void handleSaveCciCategories()}
+                disabled={savingCci || selectedCategories.length === 0}
+                className="px-4 py-1.5 rounded-xl text-xs font-bold bg-amber-600 text-white hover:bg-amber-700 shadow-sm flex items-center gap-1.5 transition-all disabled:opacity-50"
+              >
+                {savingCci ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                <span>Lưu Thay Đổi Ample</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Categories Ample Table */}
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <h4 className="font-bold text-slate-800 text-xs">
+                Danh mục Session & Giá trị Ample (A)
+              </h4>
+              <span className="text-[11px] text-slate-500 font-mono flex items-center gap-1.5">
+                {loadingCci && <Loader2 className="h-3 w-3 animate-spin text-amber-600" />}
+                <span>{selectedCategories.length} sessions được cấu hình</span>
+              </span>
+            </div>
+
+            <div className="divide-y divide-slate-100">
+              {selectedCategories.map((cat, idx) => (
+                <div key={cat.id || idx} className="p-4 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="w-8 h-8 rounded-lg bg-amber-100 font-bold text-xs text-amber-800 flex items-center justify-center">
+                      S{cat.categoryOrder}
+                    </span>
+                    <div>
+                      <div className="font-bold text-xs text-slate-800">{cat.label}</div>
+                      <div className="text-[11px] text-slate-400">
+                        {cat.description || 'Mức độ tiêu hao nhận thức theo phiên'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Ample Value Input */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1 rounded-xl">
+                      <span className="text-[11px] font-bold text-slate-500">Ample:</span>
+                      <input
+                        type="number"
+                        step="0.5"
+                        min="1"
+                        max="24"
+                        value={cat.value}
+                        onChange={(e) => {
+                          const val = Number(e.target.value)
+                          setSelectedCategories((prev) =>
+                            prev.map((c, i) => (i === idx ? { ...c, value: val } : c)),
+                          )
+                        }}
+                        className="w-16 text-xs font-mono font-bold text-slate-800 bg-white border border-slate-300 rounded px-1.5 py-0.5 text-center focus:outline-hidden"
+                      />
+                      <span className="text-xs font-bold text-amber-600">A</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedCategories((prev) => prev.filter((_, i) => i !== idx))
+                      }}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
+                      title="Xóa session"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  const nextOrder = selectedCategories.length + 1
+                  setSelectedCategories((prev) => [
+                    ...prev,
+                    {
+                      id: `temp_${Date.now()}`,
+                      profileId: selectedCciProfileId,
+                      categoryOrder: nextOrder,
+                      label: `Session ${nextOrder} Ample`,
+                      value: 4.0,
+                      description: `Session ${nextOrder} cognitive rate`,
+                      metadata: {},
+                    },
+                  ])
+                }}
+                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>+ Thêm Session Ample</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void handleSaveCciCategories()}
+                className="primary text-xs"
+                disabled={savingCci}
+              >
+                {savingCci ? 'Đang lưu...' : 'Lưu Thay Đổi Ample'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* ACTIVE PACKAGE CREATOR MODAL                             */}
+      {/* ======================================================== */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden my-8">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Create Test Package
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Tạo bài test chủ động: nhập CPD, số session, số câu, và tùy chỉnh tham số CVR (TC x TL x LC).
+                </p>
               </div>
               <button
                 type="button"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
                 onClick={() => setShowCreateModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            {/* Modal Tabs */}
-            <div className="flex border-b border-slate-200 px-5 pt-3 bg-white">
+            {/* Modal Mode Selector */}
+            <div className="p-4 border-b border-slate-100 bg-slate-50/30 flex items-center gap-2">
               <button
                 type="button"
-                className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all ${
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
                   createTab === 'ai'
-                    ? 'border-indigo-600 text-indigo-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'text-slate-600 hover:bg-slate-100'
                 }`}
                 onClick={() => setCreateTab('ai')}
               >
-                AI Generator (Firestore Vocab)
+                <span className="flex items-center gap-1.5">
+                  <WandSparkles className="h-3.5 w-3.5" />
+                  <span>AI Generator (Firestore Vocab)</span>
+                </span>
               </button>
               <button
                 type="button"
-                className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all ${
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
                   createTab === 'manual'
-                    ? 'border-indigo-600 text-indigo-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'text-slate-600 hover:bg-slate-100'
                 }`}
                 onClick={() => setCreateTab('manual')}
               >
@@ -854,335 +1789,314 @@ export function AdminPackageTestsPage() {
               </button>
             </div>
 
-            {/* Form Body */}
+            {/* Modal Body */}
             {createTab === 'ai' ? (
-              <form onSubmit={(e) => void handleGenerateAiPackage(e)} className="p-6 space-y-5 bg-white">
-                {/* Lesson Selector */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Source Lesson (Firestore) <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={selectedLessonId}
-                    onChange={(e) => setSelectedLessonId(e.target.value)}
-                    required
-                    className="w-full text-xs rounded-xl border border-slate-300 bg-white text-slate-800 px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  >
-                    {lessons.length === 0 ? (
-                      <option value="">Loading lessons from Firestore...</option>
-                    ) : (
-                      lessons.map((lesson) => (
-                        <option key={lesson.id} value={lesson.id}>
-                          {lesson.levelCode ? `[${lesson.levelCode}] ` : ''}Day {lesson.dayNumber}: {lesson.lessonTitle} ({lesson.totalChunks} chunks)
-                        </option>
-                      ))
-                    )}
-                  </select>
-                  {loadingChunks ? (
-                    <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-1.5">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      Loading lesson chunks...
-                    </div>
-                  ) : lessonChunks.length > 0 ? (
-                    <div className="text-[11px] text-emerald-600 mt-1">
-                      ✓ {lessonChunks.length} chunks ready for synthesis
-                    </div>
-                  ) : null}
-                </div>
-
-                {/* Test Type Selector */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                    Dynamic Test Type <span className="text-red-500">*</span>
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <form onSubmit={(e) => void handleGenerateAiPackage(e)} className="p-6 space-y-6 text-xs">
+                {/* Dynamic Test Type */}
+                <div className="space-y-2">
+                  <label className="block font-bold text-slate-800">Dynamic Test Type</label>
+                  <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
                       onClick={() => setAiTestType('green')}
-                      className={`p-3.5 rounded-xl text-left border-2 transition-all ${
+                      className={`p-3.5 rounded-2xl border text-left transition-all ${
                         aiTestType === 'green'
-                          ? 'border-emerald-500 bg-emerald-50/50'
-                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                          ? 'border-emerald-600 bg-emerald-50/60 shadow-xs'
+                          : 'border-slate-200 bg-white hover:border-slate-300'
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold text-emerald-700 flex items-center gap-1.5">
-                          <Zap className="h-3.5 w-3.5" />
-                          Green Test (Focus)
-                        </span>
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
-                          12V CPD
-                        </span>
+                      <div className="font-bold text-emerald-800 flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                        <span>Green Focus Test (12V)</span>
                       </div>
-                      <p className="text-[11px] text-slate-500">
-                        Baseline cognitive focus test. Single-chunk recognition with latency measurement.
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        1 câu hoàn chỉnh tự nhiên, đếm từ lũy tiến 9-10w đến 22w max. Continuous rhythm ($TL=1.0$).
                       </p>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setAiTestType('red')}
-                      className={`p-3.5 rounded-xl text-left border-2 transition-all ${
+                      className={`p-3.5 rounded-2xl border text-left transition-all ${
                         aiTestType === 'red'
-                          ? 'border-rose-500 bg-rose-50/50'
-                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                          ? 'border-rose-600 bg-rose-50/60 shadow-xs'
+                          : 'border-slate-200 bg-white hover:border-slate-300'
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold text-rose-700 flex items-center gap-1.5">
-                          <Activity className="h-3.5 w-3.5" />
-                          Red Test (Awareness)
-                        </span>
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800">
-                          56V CPD
-                        </span>
+                      <div className="font-bold text-rose-800 flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                        <span>Red Awareness Test (56V)</span>
                       </div>
-                      <p className="text-[11px] text-slate-500">
-                        High cognitive load with dual contrasting terms and 650ms SSML pauses.
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        Chuỗi collocations (Zero single words, $\ge 2$ từ), anchor từ Chunks, khoảng lặng SSML 650ms.
                       </p>
                     </button>
                   </div>
                 </div>
 
-                {/* Question Count & Topic */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                      Question Count
-                    </label>
-                    <div className="flex items-center gap-2">
-                      {([21, 42, 49] as const).map((count) => (
-                        <button
-                          key={count}
-                          type="button"
-                          onClick={() => setAiQuestionCount(count)}
-                          className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all ${
-                            aiQuestionCount === count
-                              ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
-                              : 'border-slate-200 text-slate-600 hover:border-slate-300 bg-white'
-                          }`}
-                        >
-                          {count}Q
-                        </button>
-                      ))}
-                    </div>
-                    {aiQuestionCount === 21 && (
-                      <div className="mt-2 flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setAiSessionLayout('7x3')}
-                          className={`flex-1 py-1.5 px-2 text-[11px] font-bold rounded-lg border transition-all ${
-                            aiSessionLayout === '7x3'
-                              ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
-                              : 'border-slate-200 text-slate-600 bg-white hover:border-slate-300'
-                          }`}
-                        >
-                          7×3 (Mini Test · 7 Sessions)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setAiSessionLayout('3x7')}
-                          className={`flex-1 py-1.5 px-2 text-[11px] font-bold rounded-lg border transition-all ${
-                            aiSessionLayout === '3x7'
-                              ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
-                              : 'border-slate-200 text-slate-600 bg-white hover:border-slate-300'
-                          }`}
-                        >
-                          3×7 (Standard · 3 Sessions)
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                      Topic Keyword (e.g. topic12)
-                    </label>
-                    <input
-                      type="text"
-                      value={aiTopic}
-                      onChange={(e) => setAiTopic(e.target.value)}
-                      placeholder="topic12, animals, verbs..."
-                      className="w-full text-xs rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Target CPD Voltage */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Target CPD Voltage (Volts)
+                {/* Firestore Lesson Picker */}
+                <div className="space-y-1.5">
+                  <label className="block font-bold text-slate-800">
+                    Bài học nguồn (Firestore Lessons)
                   </label>
-                  <input
-                    type="number"
-                    value={aiTargetVoltage}
-                    onChange={(e) => setAiTargetVoltage(Number(e.target.value) || 0)}
-                    min={1}
-                    max={120}
-                    className="w-full text-xs rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                  <span className="text-[11px] text-slate-400 mt-1 block">
-                    Standard: 12V for Green Tests (Focus), 56V for Red Tests (Awareness).
-                  </span>
+                  <select
+                    value={selectedLessonId}
+                    onChange={(e) => setSelectedLessonId(e.target.value)}
+                    required
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 font-medium focus:outline-hidden"
+                  >
+                    {lessons.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        [{l.levelCode}] {l.lessonTitle} (Day {l.dayNumber} • {l.totalChunks} chunks)
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5">
+                    <span>
+                      {loadingChunks
+                        ? 'Đang nạp chunks...'
+                        : `Đã nạp ${lessonChunks.length} chunks từ bài học`}
+                    </span>
+                    <span>Từ vựng chuẩn giáo trình Chunks LMS</span>
+                  </div>
                 </div>
 
-                {/* Real-time Computed Code & Title Preview */}
-                <div className="p-4 rounded-xl border border-indigo-100 bg-indigo-50/50 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-indigo-900">
-                      Auto-computed Metadata:
-                    </span>
-                    <label className="flex items-center gap-1.5 text-[11px] text-indigo-700 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={allowCustomCode}
-                        onChange={(e) => {
-                          setAllowCustomCode(e.target.checked)
-                          if (e.target.checked) {
-                            setCustomPackageCode(computedPackageCode)
-                            setCustomTitle(computedTitle)
-                          }
-                        }}
-                      />
-                      <span>Customize manually</span>
-                    </label>
+                {/* Structure: Sessions & Questions */}
+                <div className="grid grid-cols-3 gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Số Session</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={12}
+                      value={aiSessionCount}
+                      onChange={(e) => setAiSessionCount(Number(e.target.value))}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-center font-bold"
+                    />
+                    <span className="text-[10px] text-slate-400 mt-0.5 block text-center">Mặc định: 7 sessions</span>
                   </div>
 
-                  {allowCustomCode ? (
-                    <div className="space-y-2 pt-2">
-                      <div>
-                        <span className="text-[10px] text-slate-500 uppercase font-semibold">Package Code</span>
-                        <input
-                          type="text"
-                          value={customPackageCode}
-                          onChange={(e) => setCustomPackageCode(e.target.value)}
-                          className="w-full text-xs font-mono rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-slate-800"
-                        />
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Số câu / session</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={15}
+                      value={aiQuestionsPerSession}
+                      onChange={(e) => setAiQuestionsPerSession(Number(e.target.value))}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-center font-bold"
+                    />
+                    <span className="text-[10px] text-slate-400 mt-0.5 block text-center">Mặc định: 3 câu (7x3=21Q)</span>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Target CPD (Volt)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={120}
+                      value={aiTargetVoltage}
+                      onChange={(e) => setAiTargetVoltage(Number(e.target.value))}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-center font-bold text-indigo-600"
+                    />
+                    <span className="text-[10px] text-slate-400 mt-0.5 block text-center">
+                      Green: 12V | Red: 56V
+                    </span>
+                  </div>
+                </div>
+
+                {/* Physics CVR Controls: TC, TL, LC */}
+                <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-indigo-900 flex items-center gap-1.5">
+                      <Sliders className="h-3.5 w-3.5" />
+                      <span>Tham số CVR = TC × TL × LC</span>
+                    </span>
+                    <span className="text-xs font-mono font-bold text-indigo-700">
+                      CVR = {computedCvr}Ω • Suy diễn CCI: {computedDerivedCci}A
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3 pt-1">
+                    <div>
+                      <div className="flex justify-between text-[11px] mb-1 font-semibold text-slate-700">
+                        <span>TC (Term)</span>
+                        <span className="font-mono text-indigo-600">{uiTc}Ω</span>
                       </div>
+                      <input
+                        type="range"
+                        min="1.0"
+                        max="6.0"
+                        step="0.5"
+                        value={uiTc}
+                        onChange={(e) => setUiTc(Number(e.target.value))}
+                        className="w-full accent-indigo-600"
+                      />
+                      <span className="text-[9px] text-slate-400">Resource chunks (def 3Ω)</span>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between text-[11px] mb-1 font-semibold text-slate-700">
+                        <span>TL (Topic Level)</span>
+                        <span className="font-mono text-indigo-600">{uiTl}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1.0"
+                        max="2.0"
+                        step="0.1"
+                        value={uiTl}
+                        onChange={(e) => setUiTl(Number(e.target.value))}
+                        className="w-full accent-indigo-600"
+                      />
+                      <span className="text-[9px] text-slate-400">Level & latency (1.0 - 2.0)</span>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between text-[11px] mb-1 font-semibold text-slate-700">
+                        <span>LC (Length)</span>
+                        <span className="font-mono text-indigo-600">{uiLc}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1.0"
+                        max="2.5"
+                        step="0.05"
+                        value={uiLc}
+                        onChange={(e) => setUiLc(Number(e.target.value))}
+                        className="w-full accent-indigo-600"
+                      />
+                      <span className="text-[9px] text-slate-400">8w=1.0, 15w=1.5, 22w=2.0</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Optional Custom Naming */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-slate-700">Tùy biến tên & mã gói (tùy chọn)</label>
+                    <button
+                      type="button"
+                      onClick={() => setAllowCustomCode(!allowCustomCode)}
+                      className="text-[11px] text-indigo-600 hover:underline font-semibold"
+                    >
+                      {allowCustomCode ? 'Sử dụng tự động' : 'Tùy chỉnh thủ công'}
+                    </button>
+                  </div>
+                  {allowCustomCode && (
+                    <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
                       <div>
-                        <span className="text-[10px] text-slate-500 uppercase font-semibold">Package Title</span>
+                        <label className="block text-[11px] text-slate-500 mb-1">Tên gói bài test</label>
                         <input
                           type="text"
                           value={customTitle}
                           onChange={(e) => setCustomTitle(e.target.value)}
-                          className="w-full text-xs font-bold rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-slate-800"
+                          placeholder="Nhập tên tùy chỉnh..."
+                          className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs"
                         />
                       </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <div className="text-xs font-mono font-bold text-indigo-600">
-                        {computedPackageCode}
-                      </div>
-                      <div className="text-xs font-semibold text-slate-800">
-                        {computedTitle}
+                      <div>
+                        <label className="block text-[11px] text-slate-500 mb-1">Mã gói (Package Code)</label>
+                        <input
+                          type="text"
+                          value={customPackageCode}
+                          onChange={(e) => setCustomPackageCode(e.target.value)}
+                          placeholder="e.g. GREEN-12V-7X3"
+                          className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-mono"
+                        />
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Actions */}
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+                {/* Modal Actions */}
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
                   <button
                     type="button"
                     className="ghost text-xs"
-                    disabled={creatingPackage}
                     onClick={() => setShowCreateModal(false)}
+                    disabled={creatingPackage}
                   >
-                    Cancel
+                    Hủy
                   </button>
                   <button
                     type="submit"
-                    className="primary text-xs flex items-center gap-2"
-                    disabled={creatingPackage || !selectedLessonId}
+                    className="primary text-xs flex items-center gap-1.5"
+                    disabled={creatingPackage}
                   >
                     {creatingPackage ? (
                       <>
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        <span>Generating & Saving...</span>
+                        <span>Đang tạo bài test...</span>
                       </>
                     ) : (
                       <>
                         <Sparkles className="h-3.5 w-3.5" />
-                        <span>Generate & Save Draft Package</span>
+                        <span>Tạo Gói Bài Test ({totalQuestions}Q)</span>
                       </>
                     )}
                   </button>
                 </div>
               </form>
             ) : (
-              <form onSubmit={(e) => void handleCreateManualPackage(e)} className="p-6 space-y-4 bg-white">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Package Title <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={manualTitle}
-                    onChange={(e) => setManualTitle(e.target.value)}
-                    required
-                    placeholder="e.g. Green Test Practice 21Q"
-                    className="w-full text-xs rounded-xl border border-slate-300 bg-white px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                      Version Label
-                    </label>
+              <form onSubmit={(e) => void handleCreateManualPackage(e)} className="p-6 space-y-4 text-xs">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-2">
+                    <label className="block font-semibold mb-1">Package Title</label>
                     <input
                       type="text"
-                      value={manualVersionLabel}
-                      onChange={(e) => setManualVersionLabel(e.target.value)}
-                      placeholder="v1"
-                      className="w-full text-xs rounded-xl border border-slate-300 bg-white px-3 py-2"
+                      placeholder="e.g. Custom Diagnostic Test"
+                      value={manualTitle}
+                      onChange={(e) => setManualTitle(e.target.value)}
+                      required
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                      Sessions Count
-                    </label>
+                    <label className="block font-semibold mb-1">Version</label>
                     <input
-                      type="number"
-                      value={manualSessionCount}
-                      onChange={(e) => setManualSessionCount(Number(e.target.value) || 1)}
-                      min={1}
-                      max={10}
-                      className="w-full text-xs rounded-xl border border-slate-300 bg-white px-3 py-2"
+                      type="text"
+                      placeholder="v1"
+                      value={manualVersionLabel}
+                      onChange={(e) => setManualVersionLabel(e.target.value)}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800"
                     />
                   </div>
                 </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Items Per Session
-                  </label>
-                  <input
-                    type="number"
-                    value={manualItemsPerSession}
-                    onChange={(e) => setManualItemsPerSession(Number(e.target.value) || 1)}
-                    min={1}
-                    max={20}
-                    className="w-full text-xs rounded-xl border border-slate-300 bg-white px-3 py-2"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block font-semibold mb-1">Session Count</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={manualSessionCount}
+                      onChange={(e) => setManualSessionCount(Number(e.target.value))}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold mb-1">Questions / Session</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={manualItemsPerSession}
+                      onChange={(e) => setManualItemsPerSession(Number(e.target.value))}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2"
+                    />
+                  </div>
                 </div>
-
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+                <div className="flex items-center justify-end gap-2 pt-4">
                   <button
                     type="button"
                     className="ghost text-xs"
-                    disabled={creatingPackage}
                     onClick={() => setShowCreateModal(false)}
                   >
-                    Cancel
+                    Hủy
                   </button>
-                  <button
-                    type="submit"
-                    className="primary text-xs flex items-center gap-2"
-                    disabled={creatingPackage}
-                  >
-                    {creatingPackage ? 'Creating...' : 'Create Blank Package'}
+                  <button type="submit" className="primary text-xs" disabled={creatingPackage}>
+                    {creatingPackage ? 'Đang tạo...' : 'Tạo Bản Thảo Thủ Công'}
                   </button>
                 </div>
               </form>
@@ -1191,570 +2105,105 @@ export function AdminPackageTestsPage() {
         </div>
       )}
 
-      {/* FULL PACKAGE PREVIEW MODAL */}
-      {previewPackage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden my-6 max-h-[92vh] flex flex-col">
-            {/* Preview Modal Header */}
-            <div className="p-5 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between flex-shrink-0">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                      previewPackage.testType === 'red'
-                        ? 'bg-rose-100 text-rose-800'
-                        : 'bg-emerald-100 text-emerald-800'
-                    }`}
-                  >
-                    {previewPackage.testType === 'red' ? 'Red Test (Awareness)' : 'Green Test (Focus)'}
-                  </span>
-                  <span className="text-xs font-mono text-slate-500">
-                    {String(previewPackage.pkg.sourceMetadata?.packageCode || previewPackage.pkg.slug)}
-                  </span>
-                  <span className="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold">
-                    {previewPackage.targetVoltage}V CPD
-                  </span>
-                </div>
-                <h2 className="text-lg font-bold text-slate-900">
-                  {previewPackage.pkg.title.replace(/ · LIVE$/i, '')}
-                </h2>
-              </div>
-              <button
-                type="button"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-                onClick={() => setPreviewPackage(null)}
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Preview Modal Body */}
-            <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs bg-white">
-              {/* Hierarchy View (Parts & CVR Curve) */}
+      {/* NEW CCI PROFILE MODAL */}
+      {showNewProfileModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
+            <h3 className="text-base font-bold text-slate-900">Tạo Hồ Sơ CCI Mới</h3>
+            <form onSubmit={(e) => void handleCreateProfileSubmit(e)} className="space-y-4 text-xs">
               <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
-                    <Layers className="h-4 w-4 text-indigo-500" />
-                    <span>Test Structure & CVR Progression Curve</span>
-                  </h4>
-                  <span className="text-[11px] font-mono text-slate-400">
-                    Target: {previewPackage.items.length}Q · {previewPackage.sections.length} Sessions
-                  </span>
-                </div>
-
-                {/* Visual CVR Resistance Curve */}
-                <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 mb-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                      Cognitive Resistance Curve (CVR Ohms per Session)
-                    </span>
-                    <span className="text-[10px] font-mono text-indigo-600 font-bold">
-                      Peak: {Math.max(...previewPackage.sections.map((s) => s.targetCvrOhm ?? s.sectionOrder * 2), 1)}Ω
-                    </span>
-                  </div>
-                  <div className="h-16 flex items-end gap-2 pt-2 px-1">
-                    {previewPackage.sections.map((sec) => {
-                      const cvrVal = sec.targetCvrOhm ?? sec.sectionOrder * 2
-                      const maxCvr = Math.max(...previewPackage.sections.map((s) => s.targetCvrOhm ?? s.sectionOrder * 2), 10)
-                      const pct = Math.max(15, Math.min(100, Math.round((cvrVal / maxCvr) * 100)))
-                      return (
-                        <div key={sec.id} className="flex-1 flex flex-col items-center gap-1 group">
-                          <span className="text-[10px] font-mono font-bold text-slate-700 group-hover:text-indigo-600">
-                            {cvrVal}Ω
-                          </span>
-                          <div
-                            style={{ height: `${pct}%` }}
-                            className="w-full rounded-t-md bg-gradient-to-t from-indigo-500 to-indigo-400 transition-all group-hover:from-indigo-600 group-hover:to-indigo-300"
-                            title={`Session ${sec.sectionOrder}: CVR ${cvrVal}Ω`}
-                          />
-                          <span className="text-[9px] font-medium text-slate-400">
-                            S{sec.sectionOrder}
-                          </span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {previewPackage.sections.map((sec) => (
-                    <div
-                      key={sec.id}
-                      className="p-3 rounded-xl border border-slate-200 bg-white shadow-xs"
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-bold text-slate-900">
-                          Session {sec.sectionOrder}
-                        </span>
-                        <span className="font-mono text-[11px] font-bold text-indigo-600">
-                          {sec.targetCvrOhm ?? sec.sectionOrder * 2}Ω CVR
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-slate-500 line-clamp-1">
-                        {sec.title || `Section ${sec.sectionOrder}`}
-                      </div>
-                      <div className="text-[10px] text-slate-400 mt-2 flex items-center justify-between">
-                        <span>Items: {previewPackage.items.filter((i) => i.sectionId === sec.id).length}</span>
-                        <span className="text-emerald-600 font-medium">Intro Audio ✓</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <label className="block font-semibold mb-1">Tên hồ sơ</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Ecommerce 7-Session Ample"
+                  value={newProfileName}
+                  onChange={(e) => setNewProfileName(e.target.value)}
+                  required
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800"
+                />
               </div>
-
-              {/* Items Table */}
               <div>
-                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3 flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-indigo-500" />
-                  <span>Items Table ({previewPackage.items.length} questions)</span>
-                </h4>
-                <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-                  <table className="w-full text-left border-collapse">
-                    <thead className="bg-slate-100 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                      <tr>
-                        <th className="p-3">#</th>
-                        <th className="p-3">Target Term(s)</th>
-                        <th className="p-3">Prompt EN / VI</th>
-                        <th className="p-3">SSML & Pause</th>
-                        <th className="p-3">CVR (TC/LC/TL)</th>
-                        <th className="p-3 text-right">TTS Audio</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200">
-                      {previewPackage.items.map((item, idx) => {
-                        const hasSsml =
-                          (item.spokenScriptEn && item.spokenScriptEn.includes('<break')) ||
-                          (item.spokenScriptVi && item.spokenScriptVi.includes('<break'))
-                        const isPlaying = previewPlayingId === item.id
-
-                        return (
-                          <tr key={item.id} className="hover:bg-slate-50">
-                            <td className="p-3 font-mono font-bold text-slate-400">{idx + 1}</td>
-                            <td className="p-3 font-medium text-slate-900">
-                              <div>{item.termEn || item.termVi || '—'}</div>
-                              {item.termEn && item.termVi && (
-                                <div className="text-[11px] text-slate-400">{item.termVi}</div>
-                              )}
-                            </td>
-                            <td className="p-3 space-y-0.5 max-w-xs">
-                              <div className="font-semibold text-slate-800">
-                                {item.promptEn || item.spokenScriptEn || '—'}
-                              </div>
-                              <div className="text-[11px] text-slate-400">
-                                {item.promptVi || item.spokenScriptVi || '—'}
-                              </div>
-                            </td>
-                            <td className="p-3 font-mono text-[10px]">
-                              {hasSsml ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
-                                  Pause 650ms
-                                </span>
-                              ) : (
-                                <span className="text-slate-400">Standard</span>
-                              )}
-                            </td>
-                            <td className="p-3 font-mono text-slate-600">
-                              <div className="font-bold text-slate-900">
-                                {item.measuredCvr ? `${item.measuredCvr}Ω` : '—'}
-                              </div>
-                              <div className="text-[10px] text-slate-400">
-                                TC:{item.tc ?? 1} LC:{item.lc ?? 1} TL:{item.tl ?? 1}
-                              </div>
-                            </td>
-                            <td className="p-3 text-right">
-                              <button
-                                type="button"
-                                className="p-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors inline-flex items-center gap-1"
-                                onClick={() => void playItemAudio(item)}
-                                disabled={isPlaying}
-                                title="Play Google Cloud TTS"
-                              >
-                                {isPlaying ? (
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                ) : (
-                                  <Play className="h-3.5 w-3.5 fill-current" />
-                                )}
-                              </button>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                <label className="block font-semibold mb-1">Mô tả</label>
+                <textarea
+                  placeholder="Mô tả mục tiêu cường độ nhận thức..."
+                  value={newProfileDesc}
+                  onChange={(e) => setNewProfileDesc(e.target.value)}
+                  rows={3}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800"
+                />
               </div>
-            </div>
-
-            {/* Preview Modal Footer */}
-            <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between flex-shrink-0">
-              <span className="text-xs text-slate-500">
-                {previewPackage.items.length} total questions · {previewPackage.sections.length} sessions
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1.5 shadow-sm"
-                  onClick={() => {
-                    const target = previewPackage
-                    setPreviewPackage(null)
-                    setAudioStudioPackage(target)
-                  }}
-                >
-                  <Headphones className="h-3.5 w-3.5" />
-                  <span>Open Audio Studio</span>
-                </button>
+              <div className="flex items-center justify-end gap-2 pt-2">
                 <button
                   type="button"
                   className="ghost text-xs"
-                  onClick={() => setPreviewPackage(null)}
+                  onClick={() => setShowNewProfileModal(false)}
                 >
-                  Close
+                  Hủy
+                </button>
+                <button type="submit" className="primary text-xs">
+                  Tạo Hồ Sơ
                 </button>
               </div>
-            </div>
+            </form>
           </div>
         </div>
       )}
 
-      {/* AUDIO STUDIO MODAL */}
-      {audioStudioPackage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden my-6 max-h-[92vh] flex flex-col">
-            {/* Header */}
-            <div className="p-5 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between flex-shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600">
-                  <Headphones className="h-5 w-5" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900">
-                    Audio Studio: {audioStudioPackage.pkg.title.replace(/ · LIVE$/i, '')}
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    Google Cloud Text-to-Speech synthesis pipeline & batch generation.
-                  </p>
-                </div>
+      {/* PREVIEW MODAL */}
+      {previewPackage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden my-8 max-h-[85vh] flex flex-col">
+            <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50 flex-shrink-0">
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm">
+                  {previewPackage.pkg.title.replace(/ · LIVE$/i, '')}
+                </h3>
+                <span className="text-[11px] text-slate-500 font-mono">
+                  {previewPackage.sections.length} Sessions • {previewPackage.items.length} Questions • Target {previewPackage.targetVoltage}V CPD
+                </span>
               </div>
               <button
                 type="button"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-                onClick={() => setAudioStudioPackage(null)}
+                onClick={() => setPreviewPackage(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            {/* Body */}
-            <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs bg-white">
-              {/* Voice Model Selector */}
-              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-4">
-                <span className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Google Cloud Voice Model
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-[11px] text-slate-500 font-semibold mb-1">Language</label>
-                    <select
-                      value={ttsLanguage}
-                      onChange={(e) => {
-                        const lang = e.target.value as 'vi' | 'en'
-                        setTtsLanguage(lang)
-                        setTtsVoiceId(
-                          lang === 'vi' ? 'google/vi-VN-Neural2-A' : 'google/en-US-Neural2-F',
-                        )
-                      }}
-                      className="w-full text-xs rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800"
-                    >
-                      <option value="en">English (US)</option>
-                      <option value="vi">Tiếng Việt (VN)</option>
-                    </select>
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block text-[11px] text-slate-500 font-semibold mb-1">
-                      Neural / Wavenet Voice
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={ttsVoiceId}
-                        onChange={(e) => setTtsVoiceId(e.target.value)}
-                        className="flex-1 text-xs rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800"
-                      >
-                        {ttsModels.map((m) => (
-                          <option key={m.id} value={m.id}>
-                            {m.label}
-                          </option>
-                        ))}
-                      </select>
-
-                      <button
-                        type="button"
-                        onClick={() => void handleTestTtsVoice()}
-                        disabled={testingTtsVoice}
-                        className="px-3 py-2 text-xs font-semibold rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 flex items-center gap-1.5 transition-colors whitespace-nowrap"
-                      >
-                        {testingTtsVoice ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Volume2 className="h-3.5 w-3.5" />
-                        )}
-                        <span>Nghe thử model</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Per-Session TTS Language Configuration */}
-              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <span className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                      Per-Session Language Presets
-                    </span>
-                    <p className="text-[11px] text-slate-500">
-                      Configure custom audio synthesis language per session (uses Neural2 voices automatically).
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const count = audioStudioPackage.sections.length || 7
-                        setSessionLanguages(
-                          Array.from({ length: count }, (_, i) => GREEN_TEST_SESSION_LANGUAGES_7X3[i] ?? (i < 3 ? 'en' : i < 6 ? 'vi' : 'en')),
-                        )
-                      }}
-                      className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-colors"
-                    >
-                      Green Preset (EN-VI-EN)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const count = audioStudioPackage.sections.length || 7
-                        setSessionLanguages(
-                          Array.from({ length: count }, (_, i) => RED_TEST_SESSION_LANGUAGES_7X3[i] ?? (i < 3 ? 'vi' : 'en')),
-                        )
-                      }}
-                      className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-rose-300 bg-rose-50 text-rose-800 hover:bg-rose-100 transition-colors"
-                    >
-                      Red Preset (VI-EN-EN)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const count = audioStudioPackage.sections.length || 7
-                        setSessionLanguages(Array(count).fill('en'))
-                      }}
-                      className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 transition-colors"
-                    >
-                      All EN
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const count = audioStudioPackage.sections.length || 7
-                        setSessionLanguages(Array(count).fill('vi'))
-                      }}
-                      className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 transition-colors"
-                    >
-                      All VI
-                    </button>
-                  </div>
-                </div>
-
-                {/* Session by Session Language Badges / Toggles */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 pt-1">
-                  {(audioStudioPackage.sections.length > 0
-                    ? audioStudioPackage.sections
-                    : Array.from({ length: 7 }, (_, i) => ({ id: `s-${i + 1}`, sectionOrder: i + 1, title: `Session ${i + 1}` }))
-                  ).map((sec, idx) => {
-                    const currentLang = sessionLanguages[idx] ?? (audioStudioPackage.testType === 'red' ? (idx < 3 ? 'vi' : 'en') : (idx < 3 ? 'en' : idx < 6 ? 'vi' : 'en'))
-                    return (
-                      <div
-                        key={sec.id ?? idx}
-                        className={`p-2 rounded-xl border flex flex-col items-center justify-between gap-1 text-center transition-all ${
-                          currentLang === 'vi'
-                            ? 'bg-amber-50/80 border-amber-200'
-                            : 'bg-blue-50/80 border-blue-200'
-                        }`}
-                      >
-                        <span className="text-[10px] font-bold text-slate-600">
-                          S{sec.sectionOrder ?? idx + 1}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const next = [...sessionLanguages]
-                              next[idx] = 'en'
-                              setSessionLanguages(next)
-                            }}
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-all ${
-                              currentLang === 'en'
-                                ? 'bg-blue-600 text-white shadow-xs'
-                                : 'bg-white/80 text-slate-500 hover:text-slate-800'
-                            }`}
-                          >
-                            EN
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const next = [...sessionLanguages]
-                              next[idx] = 'vi'
-                              setSessionLanguages(next)
-                            }}
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-all ${
-                              currentLang === 'vi'
-                                ? 'bg-amber-600 text-white shadow-xs'
-                                : 'bg-white/80 text-slate-500 hover:text-slate-800'
-                            }`}
-                          >
-                            VI
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Lifecycle Scripts Preview & Audio */}
-              <div className="space-y-3">
-                <span className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Lifecycle Narrations
-                </span>
-
-                <div className="space-y-2">
-                  <div className="p-3 rounded-xl border border-slate-200 bg-white flex items-center justify-between gap-4 shadow-xs">
-                    <div>
-                      <div className="font-bold text-slate-800">Package Start Script</div>
-                      <div className="text-[11px] text-slate-500">
-                        {audioStudioPackage.testType === 'red'
-                          ? 'Bắt đầu bài kiểm tra Red Test (Awareness & Traps). Lắng nghe hai cụm từ và phát âm chính xác.'
-                          : 'Bắt đầu bài kiểm tra Green Test (Focus). Hãy lắng nghe và phản xạ nhanh.'}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void playScriptAudio(
-                          'start',
-                          audioStudioPackage.testType === 'red'
-                            ? 'Start the Red Test Awareness and Traps assessment. Listen carefully to each term pair.'
-                            : 'Start the Green Test Focus assessment. Listen and respond quickly.',
-                          'en',
-                        )
-                      }
-                      className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
-                      title="Play Audio"
-                    >
-                      <Play className="h-3.5 w-3.5 fill-current" />
-                    </button>
-                  </div>
-
-                  <div className="p-3 rounded-xl border border-slate-200 bg-white flex items-center justify-between gap-4 shadow-xs">
-                    <div>
-                      <div className="font-bold text-slate-800">Package Outro Script</div>
-                      <div className="text-[11px] text-slate-500">
-                        Chúc mừng em đã hoàn thành toàn bộ bài kiểm tra. Em đã thể hiện sự tập trung rất tốt!
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void playScriptAudio(
-                          'end',
-                          'Congratulations on completing the entire test package. Excellent effort!',
-                          'en',
-                        )
-                      }
-                      className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
-                      title="Play Audio"
-                    >
-                      <Play className="h-3.5 w-3.5 fill-current" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Batch Item Generation Card */}
-              <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/50 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-bold text-slate-900">Batch Audio Generation</h4>
-                    <p className="text-[11px] text-slate-500">
-                      Generate Google Cloud speech assets for all {audioStudioPackage.items.length} questions in this package.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void handleBatchGenerate(audioStudioPackage)}
-                    disabled={batchGenerating || audioStudioPackage.items.length === 0}
-                    className="px-4 py-2 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm flex items-center gap-1.5 transition-all disabled:opacity-50"
-                  >
-                    {batchGenerating ? (
-                      <>
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        <span>Generating...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-3.5 w-3.5" />
-                        <span>Generate All Items</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {batchAudioProgress && (
-                  <div className="space-y-1 pt-2">
-                    <div className="flex justify-between text-[11px] text-indigo-700 font-semibold">
-                      <span>Generating audio items...</span>
-                      <span>
-                        {batchAudioProgress.done} / {batchAudioProgress.total} (
-                        {Math.round((batchAudioProgress.done / batchAudioProgress.total) * 100)}%)
+            <div className="p-6 overflow-y-auto space-y-4 flex-1 text-xs divide-y divide-slate-100">
+              {previewPackage.sections.map((sec) => {
+                const sItems = previewPackage.items.filter((i) => i.sectionId === sec.id)
+                return (
+                  <div key={sec.id} className="pt-4 first:pt-0 space-y-2">
+                    <div className="font-bold text-slate-800 flex items-center justify-between">
+                      <span>{sec.title || `Session ${sec.sectionOrder}`}</span>
+                      <span className="text-[10px] font-mono text-slate-400">
+                        Target CVR: {sec.targetCvrOhm}Ω
                       </span>
                     </div>
-                    <div className="w-full bg-indigo-200 rounded-full h-2 overflow-hidden">
-                      <div
-                        className="bg-indigo-600 h-full transition-all duration-300"
-                        style={{
-                          width: `${(batchAudioProgress.done / batchAudioProgress.total) * 100}%`,
-                        }}
-                      />
+                    <div className="space-y-2 pl-3 border-l-2 border-slate-200">
+                      {sItems.map((item) => (
+                        <div key={item.id} className="space-y-0.5">
+                          <div className="font-bold text-slate-800">
+                            #{item.itemOrder}. {item.promptVi}
+                          </div>
+                          <div className="text-slate-500 text-[11px]">{item.promptEn}</div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                )}
-              </div>
-
-              {/* Link to Full Studio */}
-              <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50 text-[11px]">
-                <span className="text-slate-500">
-                  Need waveform editor, approval sign-off, or custom file upload?
-                </span>
-                {audioStudioPackage.version && (
-                  <Link
-                    to={`/admin/resources/audio?version=${audioStudioPackage.version.id}`}
-                    className="text-indigo-600 font-bold hover:underline flex items-center gap-1"
-                  >
-                    <span>Open Advanced Studio</span>
-                    <ArrowRight className="h-3 w-3" />
-                  </Link>
-                )}
-              </div>
+                )
+              })}
             </div>
 
-            {/* Footer */}
             <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end flex-shrink-0">
               <button
                 type="button"
-                className="ghost text-xs"
-                onClick={() => setAudioStudioPackage(null)}
+                className="primary text-xs"
+                onClick={() => setPreviewPackage(null)}
               >
-                Done
+                Đóng
               </button>
             </div>
           </div>
@@ -1765,12 +2214,10 @@ export function AdminPackageTestsPage() {
       {editingPackage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
           <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
-            <h3 className="text-base font-bold text-slate-900">
-              Edit Package Metadata
-            </h3>
+            <h3 className="text-base font-bold text-slate-900">Sửa Thông Tin Gói</h3>
             <form onSubmit={(e) => void handleSaveMetadata(e)} className="space-y-4 text-xs">
               <div>
-                <label className="block font-semibold mb-1">Title</label>
+                <label className="block font-semibold mb-1">Tiêu đề</label>
                 <input
                   type="text"
                   value={editTitle}
@@ -1780,7 +2227,7 @@ export function AdminPackageTestsPage() {
                 />
               </div>
               <div>
-                <label className="block font-semibold mb-1">Slug / Code</label>
+                <label className="block font-semibold mb-1">Mã định danh (Slug)</label>
                 <input
                   type="text"
                   value={editSlug}
@@ -1790,7 +2237,7 @@ export function AdminPackageTestsPage() {
                 />
               </div>
               <div>
-                <label className="block font-semibold mb-1">Description</label>
+                <label className="block font-semibold mb-1">Mô tả</label>
                 <textarea
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
@@ -1806,10 +2253,10 @@ export function AdminPackageTestsPage() {
                   onClick={() => setEditingPackage(null)}
                   disabled={savingMetadata}
                 >
-                  Cancel
+                  Hủy
                 </button>
                 <button type="submit" className="primary text-xs" disabled={savingMetadata}>
-                  {savingMetadata ? 'Saving...' : 'Save Changes'}
+                  {savingMetadata ? 'Đang lưu...' : 'Lưu Thay Đổi'}
                 </button>
               </div>
             </form>
@@ -1823,10 +2270,14 @@ export function AdminPackageTestsPage() {
           <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
             <div className="flex items-center gap-3 text-rose-600">
               <AlertTriangle className="h-6 w-6 flex-shrink-0" />
-              <h3 className="text-base font-bold text-slate-900">Delete Package?</h3>
+              <h3 className="text-base font-bold text-slate-900">Xác nhận xóa gói?</h3>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Are you sure you want to delete <strong className="text-slate-900">{deletingPackage.title.replace(/ · LIVE$/i, '')}</strong>? This will cascade-delete all versions, sections, items, and narration assets permanently.
+              Bạn có chắc chắn muốn xóa vĩnh viễn gói bài test{' '}
+              <strong className="text-slate-900">
+                {deletingPackage.title.replace(/ · LIVE$/i, '')}
+              </strong>
+              ? Toàn bộ các phiên bản, câu hỏi, và file âm thanh liên quan sẽ bị xóa sạch khỏi hệ thống.
             </p>
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
@@ -1835,7 +2286,7 @@ export function AdminPackageTestsPage() {
                 onClick={() => setDeletingPackage(null)}
                 disabled={deleting}
               >
-                Cancel
+                Hủy
               </button>
               <button
                 type="button"
@@ -1843,7 +2294,7 @@ export function AdminPackageTestsPage() {
                 disabled={deleting}
                 className="px-4 py-2 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-700 text-white transition-colors"
               >
-                {deleting ? 'Deleting...' : 'Yes, Delete Package'}
+                {deleting ? 'Đang xóa...' : 'Đồng Ý Xóa Vĩnh Viễn'}
               </button>
             </div>
           </div>

@@ -21,29 +21,45 @@ export async function fetchFirestoreLessons(
   googleApiKey: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<FirestoreLessonSummary[]> {
-  const url = `https://firestore.googleapis.com/v1/projects/chunks-voicecloning-genshai/databases/(default)/documents/lessons?key=${googleApiKey}&pageSize=100`;
-  const response = await fetchImpl(url);
-  if (!response.ok) {
-    let errorText = "";
-    try {
-      errorText = await response.text();
-    } catch {
-      // ignore
+  const allDocuments: Array<{
+    name: string;
+    // deno-lint-ignore no-explicit-any
+    fields?: Record<string, any>;
+  }> = [];
+
+  let pageToken: string | undefined = undefined;
+  do {
+    const pageParam = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : "";
+    const url = `https://firestore.googleapis.com/v1/projects/chunks-voicecloning-genshai/databases/(default)/documents/lessons?key=${googleApiKey}&pageSize=100${pageParam}`;
+    const response = await fetchImpl(url);
+    if (!response.ok) {
+      let errorText = "";
+      try {
+        errorText = await response.text();
+      } catch {
+        // ignore
+      }
+      throw new Error(
+        `Firestore list lessons failed (${response.status}): ${errorText}`,
+      );
     }
-    throw new Error(
-      `Firestore list lessons failed (${response.status}): ${errorText}`,
-    );
-  }
 
-  const data = (await response.json()) as {
-    documents?: Array<{
-      name: string;
-      // deno-lint-ignore no-explicit-any
-      fields?: Record<string, any>;
-    }>;
-  };
+    const data = (await response.json()) as {
+      documents?: Array<{
+        name: string;
+        // deno-lint-ignore no-explicit-any
+        fields?: Record<string, any>;
+      }>;
+      nextPageToken?: string;
+    };
 
-  const lessons: FirestoreLessonSummary[] = (data.documents ?? []).map((doc) => {
+    if (data.documents && data.documents.length > 0) {
+      allDocuments.push(...data.documents);
+    }
+    pageToken = data.nextPageToken;
+  } while (pageToken);
+
+  const lessons: FirestoreLessonSummary[] = allDocuments.map((doc) => {
     const nameParts = doc.name.split("/");
     const id =
       doc.fields?.id?.stringValue ??

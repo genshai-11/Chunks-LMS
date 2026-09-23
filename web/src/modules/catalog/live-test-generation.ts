@@ -171,7 +171,10 @@ async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
 
 export async function uploadNarrationAudio(input: {
   packageVersionId: string
-  target: Extract<NarrationGenerationTarget, 'package_start' | 'part_intro' | 'package_end'>
+  target: NarrationGenerationTarget
+  part?: number
+  testSectionId?: string
+  testItemId?: string
   language: 'vi' | 'en'
   voiceId: string
   sourceTextHash: string
@@ -190,7 +193,14 @@ export async function uploadNarrationAudio(input: {
   const bytes = await input.file.arrayBuffer()
   const sha256 = `sha256:${await sha256Hex(bytes)}`
   const ext = input.file.name.split('.').pop()?.toLowerCase() || 'mp3'
-  const storagePath = `narrations/${input.packageVersionId}/uploads/${input.target}-${input.language}-${Date.now()}.${ext}`
+  const targetTag = input.testItemId
+    ? `item-${input.testItemId}`
+    : input.testSectionId
+      ? `section-${input.testSectionId}`
+      : input.part
+        ? `part-${input.part}`
+        : input.target
+  const storagePath = `narrations/${input.packageVersionId}/uploads/${targetTag}-${input.language}-${Date.now()}.${ext}`
   const { error: uploadError } = await sb.storage
     .from('narration-audio')
     .upload(storagePath, input.file, {
@@ -210,16 +220,28 @@ export async function uploadNarrationAudio(input: {
       visibility: 'private',
       source_kind: 'custom_upload',
       bytes: input.file.size,
-      metadata: { uploadedFor: input.target, fileName: input.file.name },
+      metadata: {
+        uploadedFor: input.target,
+        fileName: input.file.name,
+        testSectionId: input.testSectionId,
+        testItemId: input.testItemId,
+        part: input.part,
+      },
     })
     .select('id')
     .single()
   if (audioError) throw new Error(audioError.message)
+  if (!audio) throw new Error('Audio asset insertion failed')
+  const targetSectionId = input.target === 'section_intro' ? input.testSectionId ?? null : null
+  const targetItemId = input.target === 'test_item' ? input.testItemId ?? null : null
+
   const { data: variant, error: variantError } = await sb
     .from('narration_variants')
     .insert({
       package_version_id: input.packageVersionId,
       narration_target: input.target,
+      test_section_id: targetSectionId,
+      test_item_id: targetItemId,
       language: input.language,
       voice_id: input.voiceId,
       voice_label: input.voiceId,
@@ -227,13 +249,19 @@ export async function uploadNarrationAudio(input: {
       audio_asset_id: audio.id,
       approval_status: 'approved',
       approved_at: new Date().toISOString(),
-      provider_metadata: { uploaded: true, fileName: input.file.name },
+      provider_metadata: {
+        uploaded: true,
+        fileName: input.file.name,
+        ...(input.part != null ? { part: input.part } : {}),
+      },
     })
     .select('id')
     .single()
+
   if (variantError) throw new Error(variantError.message)
   return { narrationVariantId: variant.id, audioAssetId: audio.id }
 }
+
 
 export function getNarrationPlaybackUrl(narrationVariantId: string): Promise<{
   narrationVariantId: string
@@ -314,18 +342,23 @@ export type GeneratePackageFromVocabInput = {
   lessonTitle?: string
   levelCode?: string
   dayNumber?: number
-  questionCount?: number // 21, 42, 49
-  targetQuestions?: 21 | 42 | 49
+  questionCount?: number
+  targetQuestions?: number
+  sessionCount?: number
+  questionsPerSession?: number
   sessionLayout?: '7x3' | '3x7' | '6x7' | '7x7' | string
   sessionLanguages?: Array<'vi' | 'en'>
   targetVoltage?: number // e.g. 12 or 56
   targetCpd?: number
   packageCode?: string
-  title: string
+  title?: string
   versionLabel?: string
   topic?: string
   saveDraft?: boolean
   lexicalComplexity?: number
+  tc?: number
+  tl?: number
+  cciProgression?: number[]
 }
 
 export const CANONICAL_FIRESTORE_LESSONS: FirestoreLesson[] = [
@@ -436,7 +469,11 @@ export async function generatePackageFromVocab(input: GeneratePackageFromVocabIn
 
   // 2. Create dedicated CCI profile in draft status for this package
   const isGreen = input.testType.toLowerCase() === 'green'
-  const profileName = `${input.title} CCI (${Date.now().toString(36)})`
+  const effectiveVoltage = input.targetCpd ?? input.targetVoltage ?? (isGreen ? 12 : 56)
+  const effectiveTitle =
+    input.title?.trim() ||
+    `${isGreen ? 'Green Focus Test' : 'Red Awareness Test'} (${effectiveVoltage}V)`
+  const profileName = `${effectiveTitle} CCI (${Date.now().toString(36)})`
   const { data: profile, error: pErr } = await sb
     .from('cci_profiles')
     .insert({
@@ -444,21 +481,21 @@ export async function generatePackageFromVocab(input: GeneratePackageFromVocabIn
       name: profileName,
       version_label: 'v1',
       status: 'draft',
-      description: `CCI metrics for ${isGreen ? 'Green Focus' : 'Red Awareness'} test package: ${input.title}`,
+      description: `CCI metrics for ${isGreen ? 'Green Focus' : 'Red Awareness'} test package: ${effectiveTitle}`,
     })
     .select('id, name')
     .single()
   if (pErr) throw new Error(pErr.message)
 
   // 3. Create package
-  const slug = `${input.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`
+  const slug = `${effectiveTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`
   const { data: pkgRow, error: pkgError } = await sb
     .from('test_packages')
     .insert({
       organization_id: organizationId,
-      title: input.title,
+      title: effectiveTitle,
       slug,
-      description: `${input.testType === 'green' ? 'Green Focus' : 'Red Awareness'} AI Vocab Package (${input.questionCount}Q - ${input.targetVoltage}V) from lesson ${input.lessonTitle ?? input.lessonId}`,
+      description: `${input.testType === 'green' ? 'Green Focus' : 'Red Awareness'} AI Vocab Package (${input.questionCount ?? input.targetQuestions ?? 21}Q - ${input.targetVoltage ?? effectiveVoltage}V) from lesson ${input.lessonTitle ?? input.lessonId}`,
       source_metadata: {
         source: 'ai-vocab-generator',
         testType: input.testType,
@@ -466,7 +503,7 @@ export async function generatePackageFromVocab(input: GeneratePackageFromVocabIn
         lessonTitle: input.lessonTitle,
         levelCode: input.levelCode,
         dayNumber: input.dayNumber,
-        questionCount: input.questionCount,
+        questionCount: input.questionCount ?? input.targetQuestions ?? 21,
         sessionLayout: input.sessionLayout,
         sessionLanguages: input.sessionLanguages,
         targetVoltage: input.targetVoltage,
@@ -500,32 +537,19 @@ export async function generatePackageFromVocab(input: GeneratePackageFromVocabIn
 
   // 5. Structure sessions
   const qCount = input.targetQuestions ?? input.questionCount ?? 42
-  let sessionCount = 1
-  let itemsPerSession = qCount
-  if (qCount === 49) {
-    sessionCount = 7
-    itemsPerSession = 7
-  } else if (qCount === 42) {
-    sessionCount = 6
-    itemsPerSession = 7
-  } else if (qCount === 21) {
-    if (input.sessionLayout === '7x3') {
-      sessionCount = 7
-      itemsPerSession = 3
-    } else {
-      sessionCount = 3
-      itemsPerSession = 7
-    }
-  }
-
-  const effectiveVoltage = input.targetCpd ?? input.targetVoltage ?? (input.testType.toUpperCase() === 'RED' ? 56 : 12)
-  const cciValue = isGreen ? 4 : 8
-  const baseCvr = Math.max(1, Math.round(effectiveVoltage / cciValue))
+  let sessionCount = input.sessionCount ?? (qCount === 49 ? 7 : qCount === 42 ? 6 : qCount === 21 ? (input.sessionLayout === '7x3' ? 7 : 3) : 7)
+  let itemsPerSession = input.questionsPerSession ?? (sessionCount > 0 ? Math.ceil(qCount / sessionCount) : 3)
+  const defaultCciValue = isGreen ? 4 : 8
+  const baseCvr =
+    input.tc != null && input.tl != null && input.lexicalComplexity != null
+      ? Number((input.tc * input.tl * input.lexicalComplexity).toFixed(1))
+      : Math.max(1, Math.round(effectiveVoltage / defaultCciValue))
 
   // Insert categories into the new draft profile
   const categoriesToUse: Array<{ id: string; label: string; value: number }> = []
   for (let s = 1; s <= sessionCount; s++) {
     const sessionLabel = `${isGreen ? 'Focus Sprint' : 'Awareness Trap'} ${s}`
+    const cciValue = input.cciProgression?.[s - 1] ?? defaultCciValue
     const { data: newCat, error: cErr } = await sb
       .from('cci_categories')
       .insert({

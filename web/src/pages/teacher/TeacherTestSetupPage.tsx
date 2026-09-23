@@ -261,8 +261,9 @@ export function TeacherTestSetupPage() {
   }
 
   function audioPrepHref(section: TestSection, language: AudioLanguage) {
-    return `/admin/resources/audio?version=${packageVersionId}&section=${section.id}&language=${language}&voice=${encodeURIComponent(voiceId)}`
+    return `/admin/package-tests?tab=audio&version=${packageVersionId}&section=${section.id}&language=${language}&voice=${encodeURIComponent(voiceId)}`
   }
+
 
   async function generateAudioForTargets(
     targets: Array<{ section: TestSection; language: AudioLanguage }>,

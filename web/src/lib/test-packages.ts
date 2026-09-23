@@ -101,8 +101,10 @@ function mapCciProfile(row: any): CciProfile {
     name: row.name,
     versionLabel: row.version_label,
     status: row.status,
+    description: row.description ?? null,
   }
 }
+
 
 function mapCciCategory(row: any): CciCategory {
   return {
@@ -298,6 +300,151 @@ export async function listCciCategories(profileId: string): Promise<Result<CciCa
   if (error) return { ok: false, error: error.message }
   return { ok: true, data: (data ?? []).map(mapCciCategory) }
 }
+
+export async function createCciProfile(input: {
+  organizationId: string
+  name: string
+  versionLabel?: string
+  status?: 'draft' | 'active' | 'archived'
+  description?: string | null
+}): Promise<Result<CciProfile>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { data, error } = await sb
+    .from('cci_profiles')
+    .insert([
+      {
+        organization_id: input.organizationId,
+        name: input.name,
+        version_label: input.versionLabel ?? 'v1',
+        status: input.status ?? 'active',
+        description: input.description ?? null,
+      },
+    ])
+    .select()
+    .single()
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: mapCciProfile(data) }
+}
+
+export async function updateCciProfile(
+  profileId: string,
+  updates: Partial<Pick<CciProfile, 'name' | 'versionLabel' | 'status'>> & {
+    description?: string | null
+  },
+): Promise<Result<CciProfile>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const payload: Record<string, unknown> = {}
+  if (updates.name !== undefined) payload.name = updates.name
+  if (updates.versionLabel !== undefined) payload.version_label = updates.versionLabel
+  if (updates.status !== undefined) payload.status = updates.status
+  if (updates.description !== undefined) payload.description = updates.description
+  const { data, error } = await sb
+    .from('cci_profiles')
+    .update(payload)
+    .eq('id', profileId)
+    .select()
+    .single()
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: mapCciProfile(data) }
+}
+
+export async function deleteCciProfile(profileId: string): Promise<Result<boolean>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { error } = await sb.from('cci_profiles').delete().eq('id', profileId)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: true }
+}
+
+export async function createCciCategory(input: {
+  profileId: string
+  categoryOrder: number
+  label: string
+  value: number
+  description?: string | null
+  metadata?: Record<string, unknown>
+}): Promise<Result<CciCategory>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { data, error } = await sb
+    .from('cci_categories')
+    .insert([
+      {
+        profile_id: input.profileId,
+        category_order: input.categoryOrder,
+        label: input.label,
+        value: input.value,
+        description: input.description ?? null,
+        metadata: input.metadata ?? {},
+      },
+    ])
+    .select()
+    .single()
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: mapCciCategory(data) }
+}
+
+export async function updateCciCategory(
+  categoryId: string,
+  updates: Partial<Pick<CciCategory, 'label' | 'value' | 'categoryOrder' | 'description' | 'metadata'>>,
+): Promise<Result<CciCategory>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const payload: Record<string, unknown> = {}
+  if (updates.label !== undefined) payload.label = updates.label
+  if (updates.value !== undefined) payload.value = updates.value
+  if (updates.categoryOrder !== undefined) payload.category_order = updates.categoryOrder
+  if (updates.description !== undefined) payload.description = updates.description
+  if (updates.metadata !== undefined) payload.metadata = updates.metadata
+  const { data, error } = await sb
+    .from('cci_categories')
+    .update(payload)
+    .eq('id', categoryId)
+    .select()
+    .single()
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: mapCciCategory(data) }
+}
+
+export async function deleteCciCategory(categoryId: string): Promise<Result<boolean>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const { error } = await sb.from('cci_categories').delete().eq('id', categoryId)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: true }
+}
+
+export async function batchSaveCciCategories(
+  profileId: string,
+  categories: Array<{
+    id?: string
+    categoryOrder: number
+    label: string
+    value: number
+    description?: string | null
+  }>,
+): Promise<Result<CciCategory[]>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+  const rows = categories.map((cat) => ({
+    ...(cat.id ? { id: cat.id } : {}),
+    profile_id: profileId,
+    category_order: cat.categoryOrder,
+    label: cat.label,
+    value: cat.value,
+    description: cat.description ?? null,
+  }))
+  const { data, error } = await sb
+    .from('cci_categories')
+    .upsert(rows)
+    .select()
+    .order('category_order')
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: (data ?? []).map(mapCciCategory) }
+}
+
 
 export async function getSectionSnapshot(
   sectionId: string,

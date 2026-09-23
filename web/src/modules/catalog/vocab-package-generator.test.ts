@@ -161,6 +161,36 @@ describe('Firestore Vocab Ingestion', () => {
     expect(lessons[2].levelCode).toBe('LEVEL_B')
   })
 
+  it('paginates lessons using nextPageToken until exhausted', async () => {
+    const page1 = {
+      documents: [
+        {
+          name: 'projects/p/databases/(default)/documents/lessons/level_a_day_1',
+          fields: { id: { stringValue: 'level_a_day_1' }, day_number: { integerValue: '1' }, level_code: { stringValue: 'A' } },
+        },
+      ],
+      nextPageToken: 'token_page_2',
+    }
+    const page2 = {
+      documents: [
+        {
+          name: 'projects/p/databases/(default)/documents/lessons/level_b_ere_day_1',
+          fields: { id: { stringValue: 'level_b_ere_day_1' }, day_number: { integerValue: '1' }, level_code: { stringValue: 'B' } },
+        },
+      ],
+    }
+
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => page1 })
+      .mockResolvedValueOnce({ ok: true, json: async () => page2 })
+
+    const lessons = await fetchFirestoreLessons('fake-key', mockFetch as any)
+    expect(mockFetch).toHaveBeenCalledTimes(2)
+    expect(lessons).toHaveLength(2)
+    expect(lessons.map((l) => l.id)).toEqual(['level_a_day_1', 'level_b_ere_day_1'])
+  })
+
   it('parses lesson chunks correctly', async () => {
     const mockDoc = {
       fields: {

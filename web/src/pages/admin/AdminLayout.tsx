@@ -2,7 +2,6 @@ import {
   BookOpen,
   Boxes,
   ChartColumn,
-  Database,
   Gauge,
   GraduationCap,
   LayoutDashboard,
@@ -18,9 +17,9 @@ const ITEMS = [
   { to: '/admin/courses', label: 'Courses', icon: BookOpen },
   { to: '/admin/classes', label: 'Classes', icon: GraduationCap },
   { to: '/admin/metrics', label: 'Metrics', icon: Gauge },
-  { to: '/admin/resources', label: 'Resources', icon: Database },
   { to: '/admin/analysis', label: 'Analysis', icon: ChartColumn },
 ]
+
 
 export function AdminLayout() {
   const { roster } = useAppState()

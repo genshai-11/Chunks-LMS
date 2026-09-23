@@ -116,4 +116,94 @@ describe('AdminPackageTestsPage', () => {
     expect(detectPackageTestType({ title: 'GREEN-TEST-FOCUS', slug: 'green-test-01' })).toBe('green')
     expect(detectPackageTestType({ title: 'General Practice Test', slug: 'general-practice' })).toBe('green')
   })
+
+  it('switches between Studio tabs (Gói bài test, Soạn thảo, Audio, CCI)', async () => {
+    const user = userEvent.setup()
+
+    vi.spyOn(testPackagesLib, 'listTestPackages').mockResolvedValue({
+      ok: true,
+      data: [],
+    })
+    vi.spyOn(testPackagesLib, 'listCciProfiles').mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'prof-1',
+          organizationId: 'org-1',
+          name: 'Ecommerce 7-Session Ample',
+          versionLabel: 'v1',
+          status: 'active',
+          description: 'Ample curve for eCommerce',
+        },
+      ],
+    })
+    vi.spyOn(testPackagesLib, 'listCciCategories').mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'cat-1',
+          profileId: 'prof-1',
+          categoryOrder: 1,
+          label: 'Session 1 Ample',
+          value: 6.0,
+          description: null,
+          metadata: {},
+        },
+      ],
+    })
+
+    render(
+      <MemoryRouter>
+        <AdminPackageTestsPage />
+      </MemoryRouter>,
+    )
+
+    // Switch to Soạn thảo & Nội dung câu
+    const contentTab = screen.getByRole('button', { name: /Soạn thảo & Nội dung câu/i })
+    await user.click(contentTab)
+    expect(screen.getByText(/Vui lòng chọn một gói bài test từ danh mục/i)).toBeInTheDocument()
+
+    // Switch to Quản lý Audio & Review
+    const audioTab = screen.getByRole('button', { name: /Quản lý Audio & Review/i })
+    await user.click(audioTab)
+    expect(screen.getByText(/Vui lòng chọn một gói bài test từ danh mục để quản lý âm thanh/i)).toBeInTheDocument()
+
+    // Switch to Hệ số CCI & Ample CRUD
+    const cciTab = screen.getByRole('button', { name: /Hệ số CCI & Ample CRUD/i })
+    await user.click(cciTab)
+    expect(screen.getByRole('heading', { name: /Quản lý Hệ Số CCI & Cường Độ Ample/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /\+ Hồ sơ mới/i })).toBeInTheDocument()
+  })
+
+  it('displays CVR formula and Ample inputs in active AI generator modal', async () => {
+    const user = userEvent.setup()
+
+    vi.spyOn(testPackagesLib, 'listTestPackages').mockResolvedValue({
+      ok: true,
+      data: [],
+    })
+    vi.spyOn(liveTestGenLib, 'listFirestoreLessons').mockResolvedValue([
+      { id: 'l1', lessonTitle: 'Day 1 Lesson', levelCode: 'A', dayNumber: 1, totalChunks: 40 },
+    ])
+
+    render(
+      <MemoryRouter>
+        <AdminPackageTestsPage />
+      </MemoryRouter>,
+    )
+
+    const createBtn = screen.getByRole('button', { name: /Create Package Test/i })
+    await user.click(createBtn)
+
+    // Verify CVR controls are present
+    expect(screen.getByText(/Tham số CVR = TC × TL × LC/i)).toBeInTheDocument()
+    expect(screen.getByText(/TC \(Term\)/i)).toBeInTheDocument()
+    expect(screen.getByText(/TL \(Topic Level\)/i)).toBeInTheDocument()
+    expect(screen.getByText(/LC \(Length\)/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/Số Session/i).length).toBeGreaterThan(0)
+    expect(screen.getByText(/Số câu \/ session/i)).toBeInTheDocument()
+    expect(screen.getByText(/Target CPD \(Volt\)/i)).toBeInTheDocument()
+  })
+
 })
+

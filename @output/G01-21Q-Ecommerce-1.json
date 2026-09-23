@@ -2,7 +2,7 @@
   "packageCode": "G01-21Q-Ecommerce-1",
   "title": "G01-21Q-Ecommerce: E-commerce Market Dynamics & Shopping Reflex (Focus 12V)",
   "slug": "g01-21q-ecommerce-1",
-  "description": "Green Mini Test (7x3 - 21 Questions) for fluent focus, complete sentences, TL=1.0, target 12V CPD, and per-session TTS presets from Improv Set 05.",
+  "description": "Green Mini Test (7x3 - 21 Questions) with natural, fluent complete sentences, TL=1.0, progressive CVR curve, target 12V CPD, and per-session TTS presets from Improv Set 05.",
   "versionLabel": "v1",
   "testType": "GREEN",
   "targetQuestions": 21,
@@ -19,26 +19,26 @@
   ],
   "lifecycleNarration": {
     "package_start": {
-      "vi": "Chào mừng em đến với bài kiểm tra Green Test eCommerce (Focus). Lắng nghe trọn vẹn và phát âm câu hoàn chỉnh với nhịp điệu tự nhiên.",
-      "en": "Welcome to the Green Test eCommerce assessment. Listen attentively and articulate each complete sentence with natural flow."
+      "vi": "Chào mừng em đến với bài kiểm tra Green Test eCommerce (Focus). Lắng nghe và hoàn thiện các câu hoàn chỉnh song ngữ để đo lường độ Tập Trung và nhịp điệu phát âm.",
+      "en": "Welcome to the Green Test eCommerce assessment. Listen and articulate complete sentences to measure your Focus and speech rhythm."
     },
     "part_intro": {
       "1": {
-        "vi": "Bắt đầu Phần 1: Phản xạ câu đơn giản về thị trường thương mại điện tử cơ bản.",
-        "en": "Starting Part 1: Basic eCommerce sentence rhythms and core retail vocabulary."
+        "vi": "Bắt đầu Phần 1: Các câu đơn giản thường nhật về mua sắm và thanh toán.",
+        "en": "Starting Part 1: Everyday simple sentences on retail and payments."
       },
       "2": {
-        "vi": "Bắt đầu Phần 2: Mở rộng câu ghép và cấu trúc hành vi người tiêu dùng trực tuyến.",
-        "en": "Starting Part 2: Compound sentence expansion and consumer behavior patterns."
+        "vi": "Bắt đầu Phần 2: Mở rộng các câu ghép với liên từ và nhịp điệu dồn dập.",
+        "en": "Starting Part 2: Compound sentences with connectives and steady tempo."
       },
       "3": {
-        "vi": "Bắt đầu Phần 3: Thử thách tập trung câu phức hợp và chiến lược bán lẻ hiện đại.",
-        "en": "Starting Part 3: Complex sentence integration and high-level retail strategy."
+        "vi": "Bắt đầu Phần 3: Thử thách câu phức thương mại điện tử chuyên sâu và hơi thở liền mạch.",
+        "en": "Starting Part 3: Advanced complex sentences and sustained fluency."
       }
     },
     "package_end": {
-      "vi": "Chúc mừng em đã hoàn thành toàn bộ bài kiểm tra Green Test eCommerce 21Q. Em đã thể hiện sự tập trung và ngữ điệu rất xuất sắc!",
-      "en": "Congratulations on completing the 21Q eCommerce Green Test. Outstanding focus and fluency sustained throughout!"
+      "vi": "Chúc mừng em đã hoàn thành toàn bộ bài kiểm tra Green Test eCommerce 21Q! Em đã thể hiện sự tập trung và lưu loát rất xuất sắc.",
+      "en": "Congratulations on completing the 21Q eCommerce Green Test! Excellent focus and continuous fluency."
     }
   },
   "sections": [
@@ -52,21 +52,20 @@
       "hintCount": 1,
       "sessionLanguage": "en",
       "voiceModel": "google/en-US-Neural2-F",
-      "introTextVi": "Session 1: Mức kháng trở 2 Ohm, cường độ 6 Ampe. Mục tiêu 12V CPD. Phát âm câu trôi chảy.",
-      "introTextEn": "Session 1: Resistance 2 Ohm, current 6 Amps. Target 12V CPD. Speak fluently.",
+      "introTextVi": "Session 1: Mức kháng trở 2 Ohm, cường độ 6 Ampe. Mục tiêu 12V CPD. Phát âm câu hoàn chỉnh trôi chảy.",
+      "introTextEn": "Session 1: Resistance 2 Ohm, current 6 Amps. Target 12V CPD. Articulate complete sentence fluently.",
       "items": [
         {
           "itemOrder": 1,
           "globalItemNumber": 1,
-          "sourceItemId": "set05_s1_i01",
           "chunkIds": [
-            "h_set05_s1_i1_1",
-            "h_set05_s1_i1_2"
+            "g01-chunk-1"
           ],
-          "termVi": "Ngành thương mại điện tử cạnh tranh khốc liệt",
-          "termEn": "e-commerce industry fiercely competitive",
-          "promptVi": "Ngành thương mại điện tử cạnh tranh khốc liệt.",
-          "promptEn": "E-commerce industry fiercely competitive.",
+          "termVi": "Ngành thương mại điện tử",
+          "termEn": "E-commerce industry",
+          "promptVi": "Ngành thương mại điện tử cạnh tranh rất khốc liệt trong thị trường hiện đại.",
+          "promptEn": "The e-commerce industry is fiercely competitive in this modern market.",
+          "sentenceLevel": "A2 (Simple Sentence)",
           "spokenScriptVi": null,
           "spokenScriptEn": null,
           "tc": 2,
@@ -80,34 +79,19 @@
             "cvr": 2,
             "cci": 6,
             "cpd": 12
-          },
-          "hints": [
-            {
-              "id": "h_set05_s1_i1_1",
-              "text": "Ngành thương mại điện tử",
-              "translation": "e-commerce industry",
-              "typeFunction": "Danh từ · Keyword"
-            },
-            {
-              "id": "h_set05_s1_i1_2",
-              "text": "cạnh tranh khốc liệt",
-              "translation": "fiercely competitive",
-              "typeFunction": "Tính từ · Ending"
-            }
-          ]
+          }
         },
         {
           "itemOrder": 2,
           "globalItemNumber": 2,
-          "sourceItemId": "set05_s1_i02",
           "chunkIds": [
-            "h_set05_s1_i2_1",
-            "h_set05_s1_i2_2"
+            "g01-chunk-2"
           ],
-          "termVi": "Săn sale nửa đêm thức trắng",
-          "termEn": "midnight deal hunting stay up late",
-          "promptVi": "Săn sale nửa đêm thức trắng.",
-          "promptEn": "Midnight deal hunting stay up late.",
+          "termVi": "Săn sale nửa đêm",
+          "termEn": "Midnight deal hunting",
+          "promptVi": "Nhiều người mua sắm trực tuyến thức trắng đêm để săn sale nửa đêm.",
+          "promptEn": "Many online shoppers stay up late for midnight deal hunting.",
+          "sentenceLevel": "A2 (Simple Sentence)",
           "spokenScriptVi": null,
           "spokenScriptEn": null,
           "tc": 2,
@@ -121,34 +105,19 @@
             "cvr": 2,
             "cci": 6,
             "cpd": 12
-          },
-          "hints": [
-            {
-              "id": "h_set05_s1_i2_1",
-              "text": "Săn sale nửa đêm",
-              "translation": "midnight deal hunting",
-              "typeFunction": "Danh từ · Keyword"
-            },
-            {
-              "id": "h_set05_s1_i2_2",
-              "text": "thức trắng",
-              "translation": "stay up late",
-              "typeFunction": "Động từ · Ending"
-            }
-          ]
+          }
         },
         {
           "itemOrder": 3,
           "globalItemNumber": 3,
-          "sourceItemId": "set05_s1_i03",
           "chunkIds": [
-            "h_set05_s1_i3_1",
-            "h_set05_s1_i3_2"
+            "g01-chunk-3"
           ],
-          "termVi": "Ví điện tử liên kết ngân hàng",
-          "termEn": "digital wallet linked to bank",
-          "promptVi": "Ví điện tử liên kết ngân hàng.",
-          "promptEn": "Digital wallet linked to bank.",
+          "termVi": "Ví điện tử liên kết",
+          "termEn": "Linked digital wallet",
+          "promptVi": "Ví điện tử của tôi đã được liên kết an toàn với tài khoản ngân hàng.",
+          "promptEn": "My digital wallet is securely linked to my local bank account.",
+          "sentenceLevel": "A2 (Simple Sentence)",
           "spokenScriptVi": null,
           "spokenScriptEn": null,
           "tc": 2,
@@ -162,21 +131,7 @@
             "cvr": 2,
             "cci": 6,
             "cpd": 12
-          },
-          "hints": [
-            {
-              "id": "h_set05_s1_i3_1",
-              "text": "Ví điện tử",
-              "translation": "digital wallet",
-              "typeFunction": "Danh từ · Keyword"
-            },
-            {
-              "id": "h_set05_s1_i3_2",
-              "text": "liên kết ngân hàng",
-              "translation": "linked to bank",
-              "typeFunction": "Tính từ · Ending"
-            }
-          ]
+          }
         }
       ]
     },
@@ -190,21 +145,20 @@
       "hintCount": 1,
       "sessionLanguage": "en",
       "voiceModel": "google/en-US-Neural2-F",
-      "introTextVi": "Session 2: Mức kháng trở 2 Ohm, cường độ 6 Ampe. Mục tiêu 12V CPD. Phát âm câu trôi chảy.",
-      "introTextEn": "Session 2: Resistance 2 Ohm, current 6 Amps. Target 12V CPD. Speak fluently.",
+      "introTextVi": "Session 2: Mức kháng trở 2 Ohm, cường độ 6 Ampe. Mục tiêu 12V CPD. Phát âm câu hoàn chỉnh trôi chảy.",
+      "introTextEn": "Session 2: Resistance 2 Ohm, current 6 Amps. Target 12V CPD. Articulate complete sentence fluently.",
       "items": [
         {
           "itemOrder": 1,
           "globalItemNumber": 4,
-          "sourceItemId": "set05_s1_i04",
           "chunkIds": [
-            "h_set05_s1_i4_1",
-            "h_set05_s1_i4_2"
+            "g01-chunk-4"
           ],
-          "termVi": "Trò chơi đốt tiền kiệt quệ tài chính",
-          "termEn": "cash-burning game financially drained",
-          "promptVi": "Trò chơi đốt tiền kiệt quệ tài chính.",
-          "promptEn": "Cash-burning game financially drained.",
+          "termVi": "Mức giá cạnh tranh",
+          "termEn": "Competitive pricing",
+          "promptVi": "Mức giá cạnh tranh luôn giúp các cửa hàng trực tuyến thu hút khách mua.",
+          "promptEn": "Competitive pricing always helps new online stores draw customers.",
+          "sentenceLevel": "A2 (Simple Sentence)",
           "spokenScriptVi": null,
           "spokenScriptEn": null,
           "tc": 2,
@@ -218,34 +172,19 @@
             "cvr": 2,
             "cci": 6,
             "cpd": 12
-          },
-          "hints": [
-            {
-              "id": "h_set05_s1_i4_1",
-              "text": "Trò chơi đốt tiền",
-              "translation": "cash-burning game",
-              "typeFunction": "Danh từ · Keyword"
-            },
-            {
-              "id": "h_set05_s1_i4_2",
-              "text": "kiệt quệ tài chính",
-              "translation": "financially drained",
-              "typeFunction": "Tính từ · Ending"
-            }
-          ]
+          }
         },
         {
           "itemOrder": 2,
           "globalItemNumber": 5,
-          "sourceItemId": "set05_s1_i05",
           "chunkIds": [
-            "h_set05_s1_i5_1",
-            "h_set05_s1_i5_2"
+            "g01-chunk-5"
           ],
-          "termVi": "Mức giá cạnh tranh hút khách",
-          "termEn": "competitive pricing draw customers",
-          "promptVi": "Mức giá cạnh tranh hút khách.",
-          "promptEn": "Competitive pricing draw customers.",
+          "termVi": "Dạo ngắm đồ online",
+          "termEn": "Casual window shopping",
+          "promptVi": "Tôi thường dạo ngắm đồ trên ứng dụng điện thoại để xả stress sau giờ làm.",
+          "promptEn": "I often enjoy casual window shopping on mobile apps to unwind after work.",
+          "sentenceLevel": "A2 (Simple Sentence)",
           "spokenScriptVi": null,
           "spokenScriptEn": null,
           "tc": 2,
@@ -259,34 +198,19 @@
             "cvr": 2,
             "cci": 6,
             "cpd": 12
-          },
-          "hints": [
-            {
-              "id": "h_set05_s1_i5_1",
-              "text": "Mức giá cạnh tranh",
-              "translation": "competitive pricing",
-              "typeFunction": "Danh từ · Keyword"
-            },
-            {
-              "id": "h_set05_s1_i5_2",
-              "text": "hút khách",
-              "translation": "draw customers",
-              "typeFunction": "Động từ · Ending"
-            }
-          ]
+          }
         },
         {
           "itemOrder": 3,
           "globalItemNumber": 6,
-          "sourceItemId": "set05_s1_i06",
           "chunkIds": [
-            "h_set05_s1_i6_1",
-            "h_set05_s1_i6_2"
+            "g01-chunk-6"
           ],
-          "termVi": "Người tiêu dùng tùy hứng chốt đơn nhanh",
-          "termEn": "impulsive spender buy on impulse",
-          "promptVi": "Người tiêu dùng tùy hứng chốt đơn nhanh.",
-          "promptEn": "Impulsive spender buy on impulse.",
+          "termVi": "Giỏ hàng đầy ắp",
+          "termEn": "Overflowing shopping cart",
+          "promptVi": "Giỏ hàng trực tuyến của cô ấy đã đầy ắp các món đồ giảm giá theo mùa.",
+          "promptEn": "Her virtual shopping cart is already overflowing with seasonal discounts.",
+          "sentenceLevel": "A2 (Simple Sentence)",
           "spokenScriptVi": null,
           "spokenScriptEn": null,
           "tc": 2,
@@ -300,21 +224,7 @@
             "cvr": 2,
             "cci": 6,
             "cpd": 12
-          },
-          "hints": [
-            {
-              "id": "h_set05_s1_i6_1",
-              "text": "Người tiêu dùng tùy hứng",
-              "translation": "impulsive spender",
-              "typeFunction": "Danh từ · Keyword"
-            },
-            {
-              "id": "h_set05_s1_i6_2",
-              "text": "chốt đơn nhanh",
-              "translation": "buy on impulse",
-              "typeFunction": "Động từ · Ending"
-            }
-          ]
+          }
         }
       ]
     },
@@ -328,22 +238,20 @@
       "hintCount": 1,
       "sessionLanguage": "en",
       "voiceModel": "google/en-US-Neural2-F",
-      "introTextVi": "Session 3: Mức kháng trở 3 Ohm, cường độ 4 Ampe. Mục tiêu 12V CPD. Phát âm câu trôi chảy.",
-      "introTextEn": "Session 3: Resistance 3 Ohm, current 4 Amps. Target 12V CPD. Speak fluently.",
+      "introTextVi": "Session 3: Mức kháng trở 3 Ohm, cường độ 4 Ampe. Mục tiêu 12V CPD. Phát âm câu hoàn chỉnh trôi chảy.",
+      "introTextEn": "Session 3: Resistance 3 Ohm, current 4 Amps. Target 12V CPD. Articulate complete sentence fluently.",
       "items": [
         {
           "itemOrder": 1,
           "globalItemNumber": 7,
-          "sourceItemId": "set05_s2_i01",
           "chunkIds": [
-            "h_set05_s2_i1_1",
-            "h_set05_s2_i1_2",
-            "h_set05_s2_i1_3"
+            "g01-chunk-7"
           ],
-          "termVi": "Thị trường thương mại điện tử tuy nhiên bão hòa nhanh",
-          "termEn": "e-commerce landscape however saturates quickly",
-          "promptVi": "Thị trường thương mại điện tử tuy nhiên bão hòa nhanh.",
-          "promptEn": "E-commerce landscape however saturates quickly.",
+          "termVi": "Chiến dịch săn sale",
+          "termEn": "Flash sale drive",
+          "promptVi": "Nền tảng đã quảng bá rầm rộ chiến dịch săn sale, vì thế hàng triệu người tham gia từ sớm.",
+          "promptEn": "The platform hyped up the flash sale drive, so millions of shoppers joined early.",
+          "sentenceLevel": "B1 (Compound Sentence)",
           "spokenScriptVi": null,
           "spokenScriptEn": null,
           "tc": 3,
@@ -357,41 +265,19 @@
             "cvr": 3,
             "cci": 4,
             "cpd": 12
-          },
-          "hints": [
-            {
-              "id": "h_set05_s2_i1_1",
-              "text": "Thị trường thương mại điện tử",
-              "translation": "e-commerce landscape",
-              "typeFunction": "Danh từ · Keyword"
-            },
-            {
-              "id": "h_set05_s2_i1_2",
-              "text": "tuy nhiên",
-              "translation": "however",
-              "typeFunction": "Từ nối · Logic word"
-            },
-            {
-              "id": "h_set05_s2_i1_3",
-              "text": "bão hòa nhanh",
-              "translation": "saturates quickly",
-              "typeFunction": "Tính từ · Ending"
-            }
-          ]
+          }
         },
         {
           "itemOrder": 2,
           "globalItemNumber": 8,
-          "sourceItemId": "set05_s2_i02",
           "chunkIds": [
-            "h_set05_s2_i2_1",
-            "h_set05_s2_i2_2",
-            "h_set05_s2_i2_3"
+            "g01-chunk-8"
           ],
-          "termVi": "Chiến dịch săn sale trước đó quảng bá rầm rộ",
-          "termEn": "flash sale drive before that hyped up",
-          "promptVi": "Chiến dịch săn sale trước đó quảng bá rầm rộ.",
-          "promptEn": "Flash sale drive before that hyped up.",
+          "termVi": "Thanh toán ví điện tử",
+          "termEn": "E-wallet checkout",
+          "promptVi": "Bạn nên hoàn tất thanh toán bằng ví điện tử hôm nay, và bạn sẽ nhận được tiền hoàn ngay lập tức.",
+          "promptEn": "You should complete your e-wallet checkout today, and you will get instant cashback.",
+          "sentenceLevel": "B1 (Compound Sentence)",
           "spokenScriptVi": null,
           "spokenScriptEn": null,
           "tc": 3,
@@ -405,41 +291,19 @@
             "cvr": 3,
             "cci": 4,
             "cpd": 12
-          },
-          "hints": [
-            {
-              "id": "h_set05_s2_i2_1",
-              "text": "Chiến dịch săn sale",
-              "translation": "flash sale drive",
-              "typeFunction": "Danh từ · Keyword"
-            },
-            {
-              "id": "h_set05_s2_i2_2",
-              "text": "trước đó",
-              "translation": "before that",
-              "typeFunction": "Từ nối · Logic word"
-            },
-            {
-              "id": "h_set05_s2_i2_3",
-              "text": "quảng bá rầm rộ",
-              "translation": "hyped up",
-              "typeFunction": "Tính từ · Ending"
-            }
-          ]
+          }
         },
         {
           "itemOrder": 3,
           "globalItemNumber": 9,
-          "sourceItemId": "set05_s2_i03",
           "chunkIds": [
-            "h_set05_s2_i3_1",
-            "h_set05_s2_i3_2",
-            "h_set05_s2_i3_3"
+            "g01-chunk-9"
           ],
-          "termVi": "Thanh toán ví điện tử đồng thời nhận mã hoàn tiền",
-          "termEn": "e-wallet checkout meanwhile get cashback",
-          "promptVi": "Thanh toán ví điện tử đồng thời nhận mã hoàn tiền.",
-          "promptEn": "E-wallet checkout meanwhile get cashback.",
+          "termVi": "Sản phẩm trong giỏ hàng",
+          "termEn": "Items in cart",
+          "promptVi": "Hãy kiểm tra kỹ các sản phẩm trong giỏ hàng, miễn là chúng vẫn còn đủ số lượng.",
+          "promptEn": "Review the items in your cart carefully, as long as they are still in stock.",
+          "sentenceLevel": "B1 (Compound Sentence)",
           "spokenScriptVi": null,
           "spokenScriptEn": null,
           "tc": 3,
@@ -453,27 +317,7 @@
             "cvr": 3,
             "cci": 4,
             "cpd": 12
-          },
-          "hints": [
-            {
-              "id": "h_set05_s2_i3_1",
-              "text": "Thanh toán ví điện tử",
-              "translation": "e-wallet checkout",
-              "typeFunction": "Danh từ · Keyword"
-            },
-            {
-              "id": "h_set05_s2_i3_2",
-              "text": "đồng thời",
-              "translation": "meanwhile",
-              "typeFunction": "Từ nối · Logic word"
-            },
-            {
-              "id": "h_set05_s2_i3_3",
-              "text": "nhận mã hoàn tiền",
-              "translation": "get cashback",
-              "typeFunction": "Động từ · Ending"
-            }
-          ]
+          }
         }
       ]
     },
@@ -487,22 +331,20 @@
       "hintCount": 1,
       "sessionLanguage": "vi",
       "voiceModel": "google/vi-VN-Neural2-A",
-      "introTextVi": "Session 4: Mức kháng trở 3 Ohm, cường độ 4 Ampe. Mục tiêu 12V CPD. Phát âm câu trôi chảy.",
-      "introTextEn": "Session 4: Resistance 3 Ohm, current 4 Amps. Target 12V CPD. Speak fluently.",
+      "introTextVi": "Session 4: Mức kháng trở 3 Ohm, cường độ 4 Ampe. Mục tiêu 12V CPD. Phát âm câu hoàn chỉnh trôi chảy.",
+      "introTextEn": "Session 4: Resistance 3 Ohm, current 4 Amps. Target 12V CPD. Articulate complete sentence fluently.",
       "items": [
         {
           "itemOrder": 1,
           "globalItemNumber": 10,
-          "sourceItemId": "set05_s2_i04",
           "chunkIds": [
-            "h_set05_s2_i4_1",
-            "h_set05_s2_i4_2",
-            "h_set05_s2_i4_3"
+            "g01-chunk-10"
           ],
-          "termVi": "Chiêu trò đốt tiền do đó không bền lâu",
-          "termEn": "cash burning tactics therefore unsustainable",
-          "promptVi": "Chiêu trò đốt tiền do đó không bền lâu.",
-          "promptEn": "Cash burning tactics therefore unsustainable.",
+          "termVi": "Thanh toán không tiền mặt",
+          "termEn": "Cashless payments",
+          "promptVi": "Phương thức thanh toán không tiền mặt rất tiện lợi, và người tiêu dùng ngày càng ưa chuộng nó.",
+          "promptEn": "Cashless payments are supremely convenient, and modern consumers increasingly prefer them.",
+          "sentenceLevel": "B1 (Compound Sentence)",
           "spokenScriptVi": null,
           "spokenScriptEn": null,
           "tc": 3,
@@ -516,41 +358,19 @@
             "cvr": 3,
             "cci": 4,
             "cpd": 12
-          },
-          "hints": [
-            {
-              "id": "h_set05_s2_i4_1",
-              "text": "Chiêu trò đốt tiền",
-              "translation": "cash burning tactics",
-              "typeFunction": "Danh từ · Keyword"
-            },
-            {
-              "id": "h_set05_s2_i4_2",
-              "text": "do đó",
-              "translation": "therefore",
-              "typeFunction": "Từ nối · Logic word"
-            },
-            {
-              "id": "h_set05_s2_i4_3",
-              "text": "không bền lâu",
-              "translation": "unsustainable",
-              "typeFunction": "Tính từ · Ending"
-            }
-          ]
+          }
         },
         {
           "itemOrder": 2,
           "globalItemNumber": 11,
-          "sourceItemId": "set05_s2_i05",
           "chunkIds": [
-            "h_set05_s2_i5_1",
-            "h_set05_s2_i5_2",
-            "h_set05_s2_i5_3"
+            "g01-chunk-11"
           ],
-          "termVi": "Chiến lược giá cạnh tranh nếu không mất thị phần",
-          "termEn": "competitive pricing otherwise lose market share",
-          "promptVi": "Chiến lược giá cạnh tranh nếu không mất thị phần.",
-          "promptEn": "Competitive pricing otherwise lose market share.",
+          "termVi": "Mã miễn phí vận chuyển",
+          "termEn": "Free shipping coupon",
+          "promptVi": "Cửa hàng tặng kèm mã miễn phí vận chuyển, do đó khách hàng nhanh chóng đặt thêm nhiều đơn mới.",
+          "promptEn": "The shop offers a free shipping coupon, so customers quickly place more orders.",
+          "sentenceLevel": "B1 (Compound Sentence)",
           "spokenScriptVi": null,
           "spokenScriptEn": null,
           "tc": 3,
@@ -564,41 +384,19 @@
             "cvr": 3,
             "cci": 4,
             "cpd": 12
-          },
-          "hints": [
-            {
-              "id": "h_set05_s2_i5_1",
-              "text": "Chiến lược giá cạnh tranh",
-              "translation": "competitive pricing",
-              "typeFunction": "Danh từ · Keyword"
-            },
-            {
-              "id": "h_set05_s2_i5_2",
-              "text": "nếu không",
-              "translation": "otherwise",
-              "typeFunction": "Từ nối · Logic word"
-            },
-            {
-              "id": "h_set05_s2_i5_3",
-              "text": "mất thị phần",
-              "translation": "lose market share",
-              "typeFunction": "Động từ · Ending"
-            }
-          ]
+          }
         },
         {
           "itemOrder": 3,
           "globalItemNumber": 12,
-          "sourceItemId": "set05_s2_i06",
           "chunkIds": [
-            "h_set05_s2_i6_1",
-            "h_set05_s2_i6_2",
-            "h_set05_s2_i6_3"
+            "g01-chunk-12"
           ],
-          "termVi": "Khách mua sắm tùy hứng hơn nữa thích quà tặng kèm",
-          "termEn": "impulsive shoppers in addition love freebies",
-          "promptVi": "Khách mua sắm tùy hứng hơn nữa thích quà tặng kèm.",
-          "promptEn": "Impulsive shoppers in addition love freebies.",
+          "termVi": "Giao hàng hỏa tốc",
+          "termEn": "Instant delivery",
+          "promptVi": "Dịch vụ giao hàng hỏa tốc đang rất được yêu thích, nhưng công ty cần mở rộng trên toàn quốc.",
+          "promptEn": "Instant delivery service is highly popular, but the company must expand nationwide.",
+          "sentenceLevel": "B1 (Compound Sentence)",
           "spokenScriptVi": null,
           "spokenScriptEn": null,
           "tc": 3,
@@ -612,27 +410,7 @@
             "cvr": 3,
             "cci": 4,
             "cpd": 12
-          },
-          "hints": [
-            {
-              "id": "h_set05_s2_i6_1",
-              "text": "Khách mua sắm tùy hứng",
-              "translation": "impulsive shoppers",
-              "typeFunction": "Danh từ · Keyword"
-            },
-            {
-              "id": "h_set05_s2_i6_2",
-              "text": "hơn nữa",
-              "translation": "in addition",
-              "typeFunction": "Từ nối · Logic word"
-            },
-            {
-              "id": "h_set05_s2_i6_3",
-              "text": "thích quà tặng kèm",
-              "translation": "love freebies",
-              "typeFunction": "Động từ · Ending"
-            }
-          ]
+          }
         }
       ]
     },
@@ -646,23 +424,20 @@
       "hintCount": 1,
       "sessionLanguage": "vi",
       "voiceModel": "google/vi-VN-Neural2-A",
-      "introTextVi": "Session 5: Mức kháng trở 4 Ohm, cường độ 3 Ampe. Mục tiêu 12V CPD. Phát âm câu trôi chảy.",
-      "introTextEn": "Session 5: Resistance 4 Ohm, current 3 Amps. Target 12V CPD. Speak fluently.",
+      "introTextVi": "Session 5: Mức kháng trở 4 Ohm, cường độ 3 Ampe. Mục tiêu 12V CPD. Phát âm câu hoàn chỉnh trôi chảy.",
+      "introTextEn": "Session 5: Resistance 4 Ohm, current 3 Amps. Target 12V CPD. Articulate complete sentence fluently.",
       "items": [
         {
           "itemOrder": 1,
           "globalItemNumber": 13,
-          "sourceItemId": "set05_s3_i01",
           "chunkIds": [
-            "h_set05_s3_i1_1",
-            "h_set05_s3_i1_2",
-            "h_set05_s3_i1_3",
-            "h_set05_s3_i1_4"
+            "g01-chunk-13"
           ],
-          "termVi": "Ngành thương mại điện tử trong khi miếng bánh màu mỡ ai cũng muốn chia phần",
-          "termEn": "e-commerce arena while lucrative pie everyone wants slice",
-          "promptVi": "Ngành thương mại điện tử trong khi miếng bánh màu mỡ ai cũng muốn chia phần.",
-          "promptEn": "E-commerce arena while lucrative pie everyone wants slice.",
+          "termVi": "Tối ưu phễu bán hàng",
+          "termEn": "Funnel optimization",
+          "promptVi": "Mặc dù chi phí quảng cáo tăng cao, việc tối ưu phễu chuyển đổi bài bản đã giúp doanh nghiệp nhân đôi doanh số.",
+          "promptEn": "Although advertising costs have risen, systematically optimizing the sales funnel helped the brand double its revenue.",
+          "sentenceLevel": "B2 (Complex Sentence)",
           "spokenScriptVi": null,
           "spokenScriptEn": null,
           "tc": 4,
@@ -676,48 +451,19 @@
             "cvr": 4,
             "cci": 3,
             "cpd": 12
-          },
-          "hints": [
-            {
-              "id": "h_set05_s3_i1_1",
-              "text": "Ngành thương mại điện tử",
-              "translation": "e-commerce arena",
-              "typeFunction": "Danh từ · Keyword"
-            },
-            {
-              "id": "h_set05_s3_i1_2",
-              "text": "trong khi",
-              "translation": "while",
-              "typeFunction": "Từ nối · Logic word"
-            },
-            {
-              "id": "h_set05_s3_i1_3",
-              "text": "miếng bánh màu mỡ",
-              "translation": "lucrative pie",
-              "typeFunction": "Ẩn dụ · Fancy word"
-            },
-            {
-              "id": "h_set05_s3_i1_4",
-              "text": "ai cũng muốn chia phần",
-              "translation": "everyone wants slice",
-              "typeFunction": "Động từ · Ending"
-            }
-          ]
+          }
         },
         {
           "itemOrder": 2,
           "globalItemNumber": 14,
-          "sourceItemId": "set05_s3_i02",
           "chunkIds": [
-            "h_set05_s3_i2_1",
-            "h_set05_s3_i2_2",
-            "h_set05_s3_i2_3",
-            "h_set05_s3_i2_4"
+            "g01-chunk-14"
           ],
-          "termVi": "Khi nào nếu không cơn bão săn sale sẽ làm sập hệ thống",
-          "termEn": "When otherwise shopping frenzy crash servers",
-          "promptVi": "Khi nào nếu không cơn bão săn sale sẽ làm sập hệ thống.",
-          "promptEn": "When otherwise shopping frenzy crash servers.",
+          "termVi": "Chương trình tri ân khách hàng",
+          "termEn": "Loyalty rewards",
+          "promptVi": "Bằng cách cung cấp các chương trình tích điểm tri ân hấp dẫn, thương hiệu có thể giữ chân lượng khách hàng trung thành dài lâu.",
+          "promptEn": "By providing attractive loyalty rewards, the brand can successfully retain its valuable customer base over the long run.",
+          "sentenceLevel": "B2 (Complex Sentence)",
           "spokenScriptVi": null,
           "spokenScriptEn": null,
           "tc": 4,
@@ -731,48 +477,19 @@
             "cvr": 4,
             "cci": 3,
             "cpd": 12
-          },
-          "hints": [
-            {
-              "id": "h_set05_s3_i2_1",
-              "text": "Khi nào",
-              "translation": "When",
-              "typeFunction": "Cụm nghi vấn · WH word"
-            },
-            {
-              "id": "h_set05_s3_i2_2",
-              "text": "nếu không",
-              "translation": "otherwise",
-              "typeFunction": "Từ nối · Logic word"
-            },
-            {
-              "id": "h_set05_s3_i2_3",
-              "text": "cơn bão săn sale",
-              "translation": "shopping frenzy",
-              "typeFunction": "Ẩn dụ · Fancy word"
-            },
-            {
-              "id": "h_set05_s3_i2_4",
-              "text": "sẽ làm sập hệ thống",
-              "translation": "crash servers",
-              "typeFunction": "Động từ · Ending"
-            }
-          ]
+          }
         },
         {
           "itemOrder": 3,
           "globalItemNumber": 15,
-          "sourceItemId": "set05_s3_i03",
           "chunkIds": [
-            "h_set05_s3_i3_1",
-            "h_set05_s3_i3_2",
-            "h_set05_s3_i3_3",
-            "h_set05_s3_i3_4"
+            "g01-chunk-15"
           ],
-          "termVi": "Ví điện tử liên kết tuy nhiên thỏi nam châm hút khách tăng độ gắn kết",
-          "termEn": "linked e-wallet however customer magnet boost retention",
-          "promptVi": "Ví điện tử liên kết tuy nhiên thỏi nam châm hút khách tăng độ gắn kết.",
-          "promptEn": "Linked e-wallet however customer magnet boost retention.",
+          "termVi": "Cơn sốt mua sắm",
+          "termEn": "Shopping frenzy",
+          "promptVi": "Khi cơn sốt mua sắm nửa đêm bất ngờ bùng nổ, đội ngũ kỹ thuật phải ứng trực liên tục để hệ thống máy chủ không bị sập.",
+          "promptEn": "When the midnight shopping frenzy suddenly erupted, the engineering team had to monitor continuously so that the servers would not crash.",
+          "sentenceLevel": "B2 (Complex Sentence)",
           "spokenScriptVi": null,
           "spokenScriptEn": null,
           "tc": 4,
@@ -786,33 +503,7 @@
             "cvr": 4,
             "cci": 3,
             "cpd": 12
-          },
-          "hints": [
-            {
-              "id": "h_set05_s3_i3_1",
-              "text": "Ví điện tử liên kết",
-              "translation": "linked e-wallet",
-              "typeFunction": "Danh từ · Keyword"
-            },
-            {
-              "id": "h_set05_s3_i3_2",
-              "text": "tuy nhiên",
-              "translation": "however",
-              "typeFunction": "Từ nối · Logic word"
-            },
-            {
-              "id": "h_set05_s3_i3_3",
-              "text": "thỏi nam châm hút khách",
-              "translation": "customer magnet",
-              "typeFunction": "Ẩn dụ · Fancy word"
-            },
-            {
-              "id": "h_set05_s3_i3_4",
-              "text": "tăng độ gắn kết",
-              "translation": "boost retention",
-              "typeFunction": "Động từ · Ending"
-            }
-          ]
+          }
         }
       ]
     },
@@ -826,23 +517,20 @@
       "hintCount": 1,
       "sessionLanguage": "vi",
       "voiceModel": "google/vi-VN-Neural2-A",
-      "introTextVi": "Session 6: Mức kháng trở 4 Ohm, cường độ 3 Ampe. Mục tiêu 12V CPD. Phát âm câu trôi chảy.",
-      "introTextEn": "Session 6: Resistance 4 Ohm, current 3 Amps. Target 12V CPD. Speak fluently.",
+      "introTextVi": "Session 6: Mức kháng trở 4 Ohm, cường độ 3 Ampe. Mục tiêu 12V CPD. Phát âm câu hoàn chỉnh trôi chảy.",
+      "introTextEn": "Session 6: Resistance 4 Ohm, current 3 Amps. Target 12V CPD. Articulate complete sentence fluently.",
       "items": [
         {
           "itemOrder": 1,
           "globalItemNumber": 16,
-          "sourceItemId": "set05_s3_i04",
           "chunkIds": [
-            "h_set05_s3_i4_1",
-            "h_set05_s3_i4_2",
-            "h_set05_s3_i4_3",
-            "h_set05_s3_i4_4"
+            "g01-chunk-16"
           ],
-          "termVi": "Trò chơi đốt tiền do đó hố sâu không đáy nuốt trọn nguồn vốn",
-          "termEn": "cash-burning war therefore bottomless pit swallow capital",
-          "promptVi": "Trò chơi đốt tiền do đó hố sâu không đáy nuốt trọn nguồn vốn.",
-          "promptEn": "Cash-burning war therefore bottomless pit swallow capital.",
+          "termVi": "Tỉ lệ chuyển đổi đơn",
+          "termEn": "Conversion rate",
+          "promptVi": "Trong kinh doanh thương mại điện tử, tỉ lệ chuyển đổi đơn hàng là thước đo sống còn quyết định toàn bộ hiệu quả tài chính.",
+          "promptEn": "In e-commerce operations, the checkout conversion rate serves as the vital metric that determines overall financial viability.",
+          "sentenceLevel": "B2 (Complex Sentence)",
           "spokenScriptVi": null,
           "spokenScriptEn": null,
           "tc": 4,
@@ -856,48 +544,19 @@
             "cvr": 4,
             "cci": 3,
             "cpd": 12
-          },
-          "hints": [
-            {
-              "id": "h_set05_s3_i4_1",
-              "text": "Trò chơi đốt tiền",
-              "translation": "cash-burning war",
-              "typeFunction": "Danh từ · Keyword"
-            },
-            {
-              "id": "h_set05_s3_i4_2",
-              "text": "do đó",
-              "translation": "therefore",
-              "typeFunction": "Từ nối · Logic word"
-            },
-            {
-              "id": "h_set05_s3_i4_3",
-              "text": "hố sâu không đáy",
-              "translation": "bottomless pit",
-              "typeFunction": "Ẩn dụ · Fancy word"
-            },
-            {
-              "id": "h_set05_s3_i4_4",
-              "text": "nuốt trọn nguồn vốn",
-              "translation": "swallow capital",
-              "typeFunction": "Động từ · Ending"
-            }
-          ]
+          }
         },
         {
           "itemOrder": 2,
           "globalItemNumber": 17,
-          "sourceItemId": "set05_s3_i05",
           "chunkIds": [
-            "h_set05_s3_i5_1",
-            "h_set05_s3_i5_2",
-            "h_set05_s3_i5_3",
-            "h_set05_s3_i5_4"
+            "g01-chunk-17"
           ],
-          "termVi": "Giá cả cạnh tranh mặc dù con dao hai lưỡi bào mòn lợi nhuận",
-          "termEn": "aggressive price cuts although double-edged blade erode profit margins",
-          "promptVi": "Giá cả cạnh tranh mặc dù con dao hai lưỡi bào mòn lợi nhuận.",
-          "promptEn": "Aggressive price cuts although double-edged blade erode profit margins.",
+          "termVi": "Phí giao hàng quá mức",
+          "termEn": "Express shipping fee",
+          "promptVi": "Nếu thương hiệu áp đặt phí vận chuyển quá đắt đỏ, điều đó sẽ trở thành rào cản lớn khiến khách hàng lập tức bỏ quên giỏ hàng.",
+          "promptEn": "If brands impose excessive express delivery fees, it becomes a major stumbling block that prompts immediate cart abandonment.",
+          "sentenceLevel": "B2 (Complex Sentence)",
           "spokenScriptVi": null,
           "spokenScriptEn": null,
           "tc": 4,
@@ -911,48 +570,19 @@
             "cvr": 4,
             "cci": 3,
             "cpd": 12
-          },
-          "hints": [
-            {
-              "id": "h_set05_s3_i5_1",
-              "text": "Giá cả cạnh tranh",
-              "translation": "aggressive price cuts",
-              "typeFunction": "Danh từ · Keyword"
-            },
-            {
-              "id": "h_set05_s3_i5_2",
-              "text": "mặc dù",
-              "translation": "although",
-              "typeFunction": "Từ nối · Logic word"
-            },
-            {
-              "id": "h_set05_s3_i5_3",
-              "text": "con dao hai lưỡi",
-              "translation": "double-edged blade",
-              "typeFunction": "Ẩn dụ · Fancy word"
-            },
-            {
-              "id": "h_set05_s3_i5_4",
-              "text": "bào mòn lợi nhuận",
-              "translation": "erode profit margins",
-              "typeFunction": "Động từ · Ending"
-            }
-          ]
+          }
         },
         {
           "itemOrder": 3,
           "globalItemNumber": 18,
-          "sourceItemId": "set05_s3_i06",
           "chunkIds": [
-            "h_set05_s3_i6_1",
-            "h_set05_s3_i6_2",
-            "h_set05_s3_i6_3",
-            "h_set05_s3_i6_4"
+            "g01-chunk-18"
           ],
-          "termVi": "Vì sao hơn nữa con nghiện mua sắm vung tay quá trán",
-          "termEn": "Why moreover shopaholic instinct overspend wildly",
-          "promptVi": "Vì sao hơn nữa con nghiện mua sắm vung tay quá trán.",
-          "promptEn": "Why moreover shopaholic instinct overspend wildly.",
+          "termVi": "Chính sách đổi trả minh bạch",
+          "termEn": "Return guarantee",
+          "promptVi": "Chính sách đổi trả minh bạch trong bảy ngày không chỉ tạo dựng niềm tin vững chắc, mà còn giúp người mua hoàn toàn yên tâm chốt đơn.",
+          "promptEn": "A transparent seven-day return guarantee not only establishes robust consumer trust, but also provides total peace of mind before checkout.",
+          "sentenceLevel": "B2 (Complex Sentence)",
           "spokenScriptVi": null,
           "spokenScriptEn": null,
           "tc": 4,
@@ -966,33 +596,7 @@
             "cvr": 4,
             "cci": 3,
             "cpd": 12
-          },
-          "hints": [
-            {
-              "id": "h_set05_s3_i6_1",
-              "text": "Vì sao",
-              "translation": "Why",
-              "typeFunction": "Cụm nghi vấn · WH word"
-            },
-            {
-              "id": "h_set05_s3_i6_2",
-              "text": "hơn nữa",
-              "translation": "moreover",
-              "typeFunction": "Từ nối · Logic word"
-            },
-            {
-              "id": "h_set05_s3_i6_3",
-              "text": "con nghiện mua sắm",
-              "translation": "shopaholic instinct",
-              "typeFunction": "Ẩn dụ · Fancy word"
-            },
-            {
-              "id": "h_set05_s3_i6_4",
-              "text": "vung tay quá trán",
-              "translation": "overspend wildly",
-              "typeFunction": "Động từ · Ending"
-            }
-          ]
+          }
         }
       ]
     },
@@ -1006,24 +610,20 @@
       "hintCount": 1,
       "sessionLanguage": "en",
       "voiceModel": "google/en-US-Neural2-F",
-      "introTextVi": "Session 7: Mức kháng trở 6 Ohm, cường độ 2 Ampe. Mục tiêu 12V CPD. Phát âm câu trôi chảy.",
-      "introTextEn": "Session 7: Resistance 6 Ohm, current 2 Amps. Target 12V CPD. Speak fluently.",
+      "introTextVi": "Session 7: Mức kháng trở 6 Ohm, cường độ 2 Ampe. Mục tiêu 12V CPD. Phát âm câu hoàn chỉnh trôi chảy.",
+      "introTextEn": "Session 7: Resistance 6 Ohm, current 2 Amps. Target 12V CPD. Articulate complete sentence fluently.",
       "items": [
         {
           "itemOrder": 1,
           "globalItemNumber": 19,
-          "sourceItemId": "set05_s4_i01",
           "chunkIds": [
-            "h_set05_s4_i1_1",
-            "h_set05_s4_i1_2",
-            "h_set05_s4_i1_3",
-            "h_set05_s4_i1_4",
-            "h_set05_s4_i1_5"
+            "g01-chunk-19"
           ],
-          "termVi": "Vấn đề là ngành thương mại điện tử tuy nhiên trò chơi đốt tiền khó duy trì mãi",
-          "termEn": "The point is e-commerce arena however cash-burning game hard to sustain",
-          "promptVi": "Vấn đề là ngành thương mại điện tử tuy nhiên trò chơi đốt tiền khó duy trì mãi.",
-          "promptEn": "The point is e-commerce arena however cash-burning game hard to sustain.",
+          "termVi": "Cuộc chiến đốt tiền thị phần",
+          "termEn": "Cash-burning war & market share",
+          "promptVi": "Mặc dù thị trường thương mại điện tử là một miếng bánh vô cùng màu mỡ, việc bước vào cuộc chiến đốt tiền không bền vững chắc chắn sẽ làm cạn kiệt nguồn vốn dự trữ.",
+          "promptEn": "While the e-commerce arena remains a highly lucrative market, entering an unsustainable cash-burning war will inevitably drain your capital reserves.",
+          "sentenceLevel": "C1 (Advanced Sustained Fluency)",
           "spokenScriptVi": null,
           "spokenScriptEn": null,
           "tc": 6,
@@ -1037,55 +637,19 @@
             "cvr": 6,
             "cci": 2,
             "cpd": 12
-          },
-          "hints": [
-            {
-              "id": "h_set05_s4_i1_1",
-              "text": "Vấn đề là",
-              "translation": "The point is",
-              "typeFunction": "Cụm mào đầu · Intro"
-            },
-            {
-              "id": "h_set05_s4_i1_2",
-              "text": "ngành thương mại điện tử",
-              "translation": "e-commerce arena",
-              "typeFunction": "Danh từ · Keyword"
-            },
-            {
-              "id": "h_set05_s4_i1_3",
-              "text": "tuy nhiên",
-              "translation": "however",
-              "typeFunction": "Từ nối · Logic word"
-            },
-            {
-              "id": "h_set05_s4_i1_4",
-              "text": "trò chơi đốt tiền",
-              "translation": "cash-burning game",
-              "typeFunction": "Ẩn dụ · Fancy word"
-            },
-            {
-              "id": "h_set05_s4_i1_5",
-              "text": "khó duy trì mãi",
-              "translation": "hard to sustain",
-              "typeFunction": "Tính từ · Ending"
-            }
-          ]
+          }
         },
         {
           "itemOrder": 2,
           "globalItemNumber": 20,
-          "sourceItemId": "set05_s4_i02",
           "chunkIds": [
-            "h_set05_s4_i2_1",
-            "h_set05_s4_i2_2",
-            "h_set05_s4_i2_3",
-            "h_set05_s4_i2_4",
-            "h_set05_s4_i2_5"
+            "g01-chunk-20"
           ],
-          "termVi": "Làm gì có chuyện đó mã giảm giá 90% do đó miếng pho mát trong bẫy phải hết sức cẩn thận",
-          "termEn": "No way 90% promo voucher therefore cheese in mousetrap proceed with caution",
-          "promptVi": "Làm gì có chuyện đó mã giảm giá 90% do đó miếng pho mát trong bẫy phải hết sức cẩn thận.",
-          "promptEn": "No way 90% promo voucher therefore cheese in mousetrap proceed with caution.",
+          "termVi": "Phiên livestream bán hàng tương tác",
+          "termEn": "Live shopping show & checkout velocity",
+          "promptVi": "Bằng cách tích hợp các phiên livestream bán hàng tương tác trực tiếp lên nền tảng, nhà bán lẻ có thể thu hút khách mua sắm tùy hứng và đạt tốc độ chốt đơn vượt bậc.",
+          "promptEn": "By integrating interactive live shopping shows directly into the platform, retail merchants can captivate impulsive shoppers and achieve extraordinary checkout velocity.",
+          "sentenceLevel": "C1 (Advanced Sustained Fluency)",
           "spokenScriptVi": null,
           "spokenScriptEn": null,
           "tc": 6,
@@ -1099,55 +663,19 @@
             "cvr": 6,
             "cci": 2,
             "cpd": 12
-          },
-          "hints": [
-            {
-              "id": "h_set05_s4_i2_1",
-              "text": "Làm gì có chuyện đó",
-              "translation": "No way",
-              "typeFunction": "Cụm mào đầu · Intro"
-            },
-            {
-              "id": "h_set05_s4_i2_2",
-              "text": "mã giảm giá 90%",
-              "translation": "90% promo voucher",
-              "typeFunction": "Danh từ · Keyword"
-            },
-            {
-              "id": "h_set05_s4_i2_3",
-              "text": "do đó",
-              "translation": "therefore",
-              "typeFunction": "Từ nối · Logic word"
-            },
-            {
-              "id": "h_set05_s4_i2_4",
-              "text": "miếng pho mát trong bẫy",
-              "translation": "cheese in mousetrap",
-              "typeFunction": "Ẩn dụ · Fancy word"
-            },
-            {
-              "id": "h_set05_s4_i2_5",
-              "text": "phải hết sức cẩn thận",
-              "translation": "proceed with caution",
-              "typeFunction": "Tính từ · Ending"
-            }
-          ]
+          }
         },
         {
           "itemOrder": 3,
           "globalItemNumber": 21,
-          "sourceItemId": "set05_s4_i03",
           "chunkIds": [
-            "h_set05_s4_i3_1",
-            "h_set05_s4_i3_2",
-            "h_set05_s4_i3_3",
-            "h_set05_s4_i3_4",
-            "h_set05_s4_i3_5"
+            "g01-chunk-21"
           ],
-          "termVi": "Cậu biết sao không khách mua hàng tùy hứng mặc dù con mồi dễ dãi đem lại doanh thu khủng",
-          "termEn": "You know what impulsive shoppers although easy targets drive giant profits",
-          "promptVi": "Cậu biết sao không khách mua hàng tùy hứng mặc dù con mồi dễ dãi đem lại doanh thu khủng.",
-          "promptEn": "You know what impulsive shoppers although easy targets drive giant profits.",
+          "termVi": "Chiến lược giữ chân đa kênh",
+          "termEn": "Omnichannel customer retention",
+          "promptVi": "Để phát triển bền vững trước cuộc cạnh tranh giá khốc liệt, các thương hiệu bán lẻ phải xây dựng mô hình đa kênh giúp gia tăng lòng trung thành và bảo vệ biên lợi nhuận dài hạn.",
+          "promptEn": "To thrive amid aggressive price competition, retail brands must cultivate an omnichannel presence that reinforces customer loyalty and safeguards long-term profit margins.",
+          "sentenceLevel": "C1 (Advanced Sustained Fluency)",
           "spokenScriptVi": null,
           "spokenScriptEn": null,
           "tc": 6,
@@ -1161,39 +689,7 @@
             "cvr": 6,
             "cci": 2,
             "cpd": 12
-          },
-          "hints": [
-            {
-              "id": "h_set05_s4_i3_1",
-              "text": "Cậu biết sao không",
-              "translation": "You know what",
-              "typeFunction": "Cụm mào đầu · Intro"
-            },
-            {
-              "id": "h_set05_s4_i3_2",
-              "text": "khách mua hàng tùy hứng",
-              "translation": "impulsive shoppers",
-              "typeFunction": "Danh từ · Keyword"
-            },
-            {
-              "id": "h_set05_s4_i3_3",
-              "text": "mặc dù",
-              "translation": "although",
-              "typeFunction": "Từ nối · Logic word"
-            },
-            {
-              "id": "h_set05_s4_i3_4",
-              "text": "con mồi dễ dãi",
-              "translation": "easy targets",
-              "typeFunction": "Ẩn dụ · Fancy word"
-            },
-            {
-              "id": "h_set05_s4_i3_5",
-              "text": "đem lại doanh thu khủng",
-              "translation": "drive giant profits",
-              "typeFunction": "Động từ · Ending"
-            }
-          ]
+          }
         }
       ]
     }

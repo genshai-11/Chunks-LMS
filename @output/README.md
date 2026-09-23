@@ -61,10 +61,23 @@ All SSML requests automatically route to Google Cloud **Neural2** voices to ensu
 
 ---
 
-## 5. Verification Checklist
+## 5. Excel Workbook Specifications (`@output/Chunks_LMS_Ecommerce_Package_Tests.xlsx`)
+
+The entire test suite is compiled and formatted into a production-ready Excel workbook with 6 structured sheets:
+1. **`Overview`**: Global catalog summarizing all 4 packages, target CPD, CVR curves, CCI progressions, and per-session audio presets.
+2. **`G01_Green_Focus`**: Complete 21-question bilingual curriculum for Green Test 1 with natural, fluent sentences across levels A2 -> B1 -> B2 -> C1.
+3. **`G02_Green_Focus`**: Complete 21-question bilingual curriculum for Green Test 2 with independent natural sentences.
+4. **`R01_Red_Awareness`**: 21-question cognitive trap dataset for Red Test 1 with exact hint progression (`[2,3,4,2,3,4,4]`), semantic traps, and 650ms SSML breaks.
+5. **`R02_Red_Awareness`**: 21-question cognitive trap dataset for Red Test 2 with distinct eCommerce traps and 650ms SSML breaks.
+6. **`Master_Catalog`**: Comprehensive 84-item ledger combining all packages for filtering, data reconciliation, and batch TTS auditing.
+
+---
+
+## 6. Verification Checklist
 
 - [x] Exactly 21 questions per package (7 sessions × 3 items).
 - [x] Red tests follow exact hint sequence: `[2, 3, 4, 2, 3, 4, 4]`.
-- [x] Green tests maintain $TL=1.0$ continuous complete sentence structure with 12V CPD target.
+- [x] Green tests feature 100% natural, fluent complete sentences with $TL=1.0$ and 12V CPD target.
 - [x] Red tests compute $CVR = TC \times LC \times TL$ ($LC=1.15$, $TL \in [2.0, 3.0]$) with 56V CPD target.
 - [x] Audio Studio supports language presets and per-session voice toggle.
+- [x] Formatted Excel workbook saved at `@output/Chunks_LMS_Ecommerce_Package_Tests.xlsx`.

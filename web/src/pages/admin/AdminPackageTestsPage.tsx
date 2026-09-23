@@ -111,18 +111,19 @@ export function AdminPackageTestsPage() {
   const [searchQuery, setSearchQuery] = useState('')
 
   // Active Selected Package
-  const selectedVersionId = searchParams.get('version') ?? ''
+  const [selectedVersionState, setSelectedVersionState] = useState('')
+  const selectedVersionId = searchParams.get('version') || selectedVersionState
   const selectedPackage = useMemo(() => {
-    if (!selectedVersionId && packageSummaries.length > 0) return packageSummaries[0]
-    return (
-      packageSummaries.find((s) => s.version?.id === selectedVersionId) ??
-      packageSummaries[0] ??
-      null
-    )
+    if (selectedVersionId) {
+      const found = packageSummaries.find((s) => s.version?.id === selectedVersionId)
+      if (found) return found
+    }
+    return packageSummaries[0] ?? null
   }, [packageSummaries, selectedVersionId])
 
   const selectPackage = (pkg: PackageSummary) => {
     if (!pkg.version) return
+    setSelectedVersionState(pkg.version.id)
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev)
       next.set('version', pkg.version!.id)
@@ -564,7 +565,12 @@ export function AdminPackageTestsPage() {
   async function handlePlayItemAudio(key: string, text: string, lang: 'vi' | 'en') {
     setPlayingAudioKey(key)
     try {
-      const voice = lang === 'vi' ? 'google/vi-VN-Neural2-A' : 'google/en-US-Neural2-F'
+      const voice =
+        audioVoiceLang === lang
+          ? audioVoiceId
+          : lang === 'vi'
+            ? 'google/vi-VN-Neural2-A'
+            : 'google/en-US-Neural2-F'
       await playGoogleCloudTts(text, lang, voice)
     } catch (e) {
       err(e instanceof Error ? e.message : 'Phát âm thanh thất bại')
@@ -583,7 +589,12 @@ export function AdminPackageTestsPage() {
     part?: number,
   ) {
     if (!selectedPackage?.version) return
-    const voice = lang === 'vi' ? 'google/vi-VN-Neural2-A' : 'google/en-US-Neural2-F'
+    const voice =
+      audioVoiceLang === lang
+        ? audioVoiceId
+        : lang === 'vi'
+          ? 'google/vi-VN-Neural2-A'
+          : 'google/en-US-Neural2-F'
     try {
       await generateNarration({
         packageVersionId: selectedPackage.version.id,
@@ -632,9 +643,11 @@ export function AdminPackageTestsPage() {
     setUploadingTargetKey('uploading')
     try {
       const voice =
-        pendingUploadTarget.language === 'vi'
-          ? 'google/vi-VN-Neural2-A'
-          : 'google/en-US-Neural2-F'
+        audioVoiceLang === pendingUploadTarget.language
+          ? audioVoiceId
+          : pendingUploadTarget.language === 'vi'
+            ? 'google/vi-VN-Neural2-A'
+            : 'google/en-US-Neural2-F'
       await uploadNarrationAudio({
         packageVersionId: selectedPackage.version.id,
         target: pendingUploadTarget.target,
@@ -1490,6 +1503,148 @@ export function AdminPackageTestsPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Part Intros (1..3) */}
+                <div className="pt-3 border-t border-slate-100 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h5 className="font-bold text-xs text-slate-800 uppercase tracking-wide">
+                      Giới thiệu từng phần (Part Intros · P1 - P3)
+                    </h5>
+                    <span className="text-[10px] font-semibold text-slate-400">
+                      part_intro (1..3)
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {[1, 2, 3].map((p) => {
+                      const partScript =
+                        p === 1
+                          ? 'Phần 1 - Khởi động nhận thức. Lắng nghe cẩn thận và sẵn sàng phản hồi.'
+                          : p === 2
+                            ? 'Phần 2 - Tăng tốc phản xạ. Giữ vững nhịp điệu và độ chính xác.'
+                            : 'Phần 3 - Về đích và giải phóng áp lực nhận thức.'
+                      return (
+                        <div key={p} className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-xs text-slate-800">Part {p} Intro</span>
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                              P{p}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 line-clamp-2 italic">
+                            "{partScript}"
+                          </p>
+                          <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-slate-200/60">
+                            <button
+                              type="button"
+                              onClick={() => void handlePlayItemAudio(`part_${p}`, partScript, 'vi')}
+                              className="px-2 py-1 text-[11px] font-semibold rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 flex items-center gap-1 transition-colors"
+                              title="Nghe thử"
+                            >
+                              <Play className="h-3 w-3 fill-current" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void handleRegenerateAudio('part_intro', partScript, 'vi', undefined, undefined, p)
+                              }
+                              className="px-2 py-1 text-[11px] font-semibold rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 flex items-center gap-1 transition-colors"
+                              title="Sinh lại bằng GCP TTS"
+                            >
+                              <RefreshCw className="h-3 w-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleTriggerUpload('part_intro', partScript, 'vi', undefined, undefined, p)
+                              }
+                              className="px-2 py-1 text-[11px] font-semibold rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 flex items-center gap-1 transition-colors"
+                              title="Upload file ghi đè"
+                            >
+                              <Upload className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Session Intros (1..N) */}
+                {selectedPackage.sections.length > 0 && (
+                  <div className="pt-3 border-t border-slate-100 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h5 className="font-bold text-xs text-slate-800 uppercase tracking-wide">
+                        Giới thiệu từng phiên (Session Intros · {selectedPackage.sections.length} sessions)
+                      </h5>
+                      <span className="text-[10px] font-semibold text-slate-400">
+                        section_intro
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[320px] overflow-y-auto pr-1">
+                      {selectedPackage.sections.map((sec) => {
+                        const secLang: 'vi' | 'en' =
+                          selectedPackage.testType === 'green'
+                            ? sec.sectionOrder <= 3
+                              ? 'en'
+                              : 'vi'
+                            : sec.sectionOrder <= 3
+                              ? 'vi'
+                              : 'en'
+                        const secScript =
+                          secLang === 'vi'
+                            ? sec.introTextVi ||
+                              `Phiên ${sec.sectionOrder} - ${sec.title}. CVR ${sec.targetCvrOhm} ohms, CCI ${perSessionAmple[sec.sectionOrder - 1] ?? 6} Ampe. Bắt đầu.`
+                            : sec.introTextEn ||
+                              `Session ${sec.sectionOrder} - ${sec.title}. CVR ${sec.targetCvrOhm} ohms, CCI ${perSessionAmple[sec.sectionOrder - 1] ?? 6} Amps. Start.`
+                        return (
+                          <div key={sec.id} className="p-3 rounded-xl border border-slate-200 bg-slate-50/60 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-xs text-slate-800">
+                                Session {sec.sectionOrder}: {sec.title}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 uppercase">
+                                {secLang} · S{sec.sectionOrder}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-600 line-clamp-1 italic">
+                              "{secScript}"
+                            </p>
+                            <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-slate-200/60">
+                              <button
+                                type="button"
+                                onClick={() => void handlePlayItemAudio(`sec_${sec.id}`, secScript, secLang)}
+                                className="px-2 py-1 text-[11px] font-semibold rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 flex items-center gap-1 transition-colors"
+                                title="Nghe thử"
+                              >
+                                <Play className="h-3 w-3 fill-current" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void handleRegenerateAudio('section_intro', secScript, secLang, sec.id)
+                                }
+                                className="px-2 py-1 text-[11px] font-semibold rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 flex items-center gap-1 transition-colors"
+                                title="Sinh lại bằng GCP TTS"
+                              >
+                                <RefreshCw className="h-3 w-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleTriggerUpload('section_intro', secScript, secLang, sec.id)
+                                }
+                                className="px-2 py-1 text-[11px] font-semibold rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 flex items-center gap-1 transition-colors"
+                                title="Upload file ghi đè"
+                              >
+                                <Upload className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* 2. Test Items Audio Review List */}

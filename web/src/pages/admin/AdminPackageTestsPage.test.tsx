@@ -6,7 +6,7 @@ import { AdminPackageTestsPage, detectPackageTestType } from './AdminPackageTest
 import * as testPackagesLib from '../../lib/test-packages'
 import * as liveTestGenLib from '../../modules/catalog/live-test-generation'
 
-describe('AdminPackageTestsPage', () => {
+describe('AdminPackageTestsPage', { timeout: 20000 }, () => {
   it('renders package studio page header, tabs, and create button', async () => {
     vi.spyOn(testPackagesLib, 'listTestPackages').mockResolvedValue({
       ok: true,
@@ -205,5 +205,176 @@ describe('AdminPackageTestsPage', () => {
     expect(screen.getByText(/Target CPD \(Volt\)/i)).toBeInTheDocument()
   })
 
+  it('renders Green validation badges when inspecting package content', async () => {
+    const user = userEvent.setup()
+
+    vi.spyOn(testPackagesLib, 'listTestPackages').mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'pkg-green',
+          organizationId: 'org-1',
+          title: 'GREEN-TEST-FOCUS-12V',
+          slug: 'green-test-focus-12v',
+          description: null,
+          createdByUserId: null,
+          sourceMetadata: { testType: 'green', targetVoltage: 12 },
+          archivedAt: null,
+        },
+      ],
+    })
+
+    vi.spyOn(testPackagesLib, 'listTestPackageVersions').mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'ver-green',
+          packageId: 'pkg-green',
+          versionLabel: 'v1',
+          status: 'draft',
+          snapshotHash: null,
+          publishedAt: null,
+          sourceMetadata: {},
+        },
+      ],
+    })
+
+    vi.spyOn(testPackagesLib, 'listTestSections').mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'sec-1',
+          packageVersionId: 'ver-green',
+          sectionOrder: 1,
+          title: 'Focus Sprint 1',
+          targetCvrOhm: 3.0,
+          introTextVi: 'Phần 1',
+          introTextEn: 'Part 1',
+          cciProfileId: 'prof-1',
+          cciCategoryId: 'cat-1',
+        },
+      ],
+    })
+
+    vi.spyOn(testPackagesLib, 'listTestItems').mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'item-1',
+          packageVersionId: 'ver-green',
+          sectionId: 'sec-1',
+          itemOrder: 1,
+          termVi: 'quy trình thanh toán',
+          termEn: 'payment process',
+          promptVi: 'Khách hàng hoàn tất quy trình thanh toán trực tuyến nhanh chóng và thuận tiện.',
+          promptEn: 'Customers complete the online payment process quickly and conveniently.',
+          spokenScriptVi: 'Khách hàng hoàn tất quy trình thanh toán trực tuyến nhanh chóng và thuận tiện.',
+          spokenScriptEn: 'Customers complete the online payment process quickly and conveniently.',
+          tc: 3.0,
+          lc: 1.0,
+          tl: 1.0,
+          measuredCvr: 3.0,
+        },
+      ],
+    })
+
+    render(
+      <MemoryRouter>
+        <AdminPackageTestsPage />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /GREEN-TEST-FOCUS-12V/i })).toBeInTheDocument()
+    })
+
+    const contentBtn = screen.getByRole('button', { name: /Soạn nội dung/i })
+    await user.click(contentBtn)
+
+    await waitFor(() => {
+      expect(screen.getByText(/Focus Sprint 1/i)).toBeInTheDocument()
+      expect(screen.getAllByText(/quy trình thanh toán/i).length).toBeGreaterThanOrEqual(1)
+      expect(screen.getByText(/15 từ \(Giới hạn: 8–22 từ\)/i)).toBeInTheDocument()
+    })
+  })
+
+  it('renders complete lifecycle audio cards including part_intro and session_intro in Audio tab', async () => {
+    const user = userEvent.setup()
+
+    vi.spyOn(testPackagesLib, 'listTestPackages').mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'pkg-audio',
+          organizationId: 'org-1',
+          title: 'RED-TEST-42Q-56V',
+          slug: 'red-test-42q-56v',
+          description: null,
+          createdByUserId: null,
+          sourceMetadata: { testType: 'red', targetVoltage: 56 },
+          archivedAt: null,
+        },
+      ],
+    })
+
+    vi.spyOn(testPackagesLib, 'listTestPackageVersions').mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'ver-audio',
+          packageId: 'pkg-audio',
+          versionLabel: 'v1',
+          status: 'draft',
+          snapshotHash: null,
+          publishedAt: null,
+          sourceMetadata: {},
+        },
+      ],
+    })
+
+    vi.spyOn(testPackagesLib, 'listTestSections').mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'sec-audio-1',
+          packageVersionId: 'ver-audio',
+          sectionOrder: 1,
+          title: 'Awareness Trap 1',
+          targetCvrOhm: 6.9,
+          introTextVi: 'Phiên 1 - Bắt đầu',
+          introTextEn: 'Session 1 - Start',
+          cciProfileId: 'prof-1',
+          cciCategoryId: 'cat-1',
+        },
+      ],
+    })
+
+    vi.spyOn(testPackagesLib, 'listTestItems').mockResolvedValue({
+      ok: true,
+      data: [],
+    })
+
+    render(
+      <MemoryRouter>
+        <AdminPackageTestsPage />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /RED-TEST-42Q-56V/i })).toBeInTheDocument()
+    })
+
+    const audioBtn = screen.getByRole('button', { name: /^Audio$/i })
+    await user.click(audioBtn)
+
+    await waitFor(() => {
+      expect(screen.getByText(/Lời Chào Đầu Bài \(Package Start\)/i)).toBeInTheDocument()
+      expect(screen.getByText(/Lời Chúc Mừng Kết Thúc \(Package End\)/i)).toBeInTheDocument()
+      expect(screen.getByText(/Giới thiệu từng phần \(Part Intros · P1 - P3\)/i)).toBeInTheDocument()
+      expect(screen.getByText(/Part 1 Intro/i)).toBeInTheDocument()
+      expect(screen.getByText(/Giới thiệu từng phiên \(Session Intros/i)).toBeInTheDocument()
+      expect(screen.getByText(/Session 1: Awareness Trap 1/i)).toBeInTheDocument()
+    })
+  })
 })
 

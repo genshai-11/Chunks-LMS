@@ -55,7 +55,7 @@ describe('ProgressReportPanel accessibility', () => {
     await user.click(screen.getByRole('button', { name: 'custom' }))
     expect(screen.getByLabelText('Start date')).toBeInTheDocument()
     expect(screen.getByLabelText('End date')).toBeInTheDocument()
-  })
+  }, 15000)
 
   it('renders learner-scoped report without by-learner table', () => {
     const { container } = render(

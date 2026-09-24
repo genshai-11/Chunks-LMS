@@ -65,7 +65,7 @@ export function ScreenTooltip({
     <>
       <span
         ref={triggerRef}
-        className={`observe-has-tooltip inline-flex items-center ${className}`}
+        className={`observe-has-tooltip ${className ? className : 'inline-flex items-center'}`}
         onMouseEnter={show}
         onMouseLeave={hide}
         onFocus={show}

@@ -76,8 +76,8 @@ describe('AdminPackageTestsPage', { timeout: 20000 }, () => {
     })
 
     // Filter tabs
-    expect(screen.getByRole('button', { name: /Green Focus/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Red Awareness/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Green test/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Red test/i })).toBeInTheDocument()
   })
 
   it('opens Create Package Test modal when clicking Create Package Test button', async () => {

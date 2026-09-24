@@ -401,6 +401,8 @@ describe('test-packages CRUD helpers', () => {
     expect(insertedPackage?.source_metadata?.package_kind).toBe('mini')
     expect(insertedPackage?.source_metadata?.total_items).toBe(21)
     expect(insertedVersion?.package_id).toBe('pkg-mini-123')
+    expect(insertedVersion?.status).toBe('published')
+    expect(insertedVersion?.snapshot_hash).toBeDefined()
     expect(insertedSections.length).toBeGreaterThan(0)
 
     // Verify exactly 21 items inserted

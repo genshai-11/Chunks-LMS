@@ -145,6 +145,8 @@ export function AdminPackageTestsPage() {
   const [miniSamplingStrategy, setMiniSamplingStrategy] = useState<'random' | 'first'>('random')
   const [miniCopyAudio, setMiniCopyAudio] = useState(true)
   const [creatingMini, setCreatingMini] = useState(false)
+  const [batchCreatingMini, setBatchCreatingMini] = useState(false)
+  const [batchProgress, setBatchProgress] = useState<string | null>(null)
 
   // Active Selected Package
   const [selectedVersionState, setSelectedVersionState] = useState('')
@@ -756,6 +758,71 @@ export function AdminPackageTestsPage() {
     } finally {
       setCreatingMini(false)
     }
+  }
+
+  async function handleBatchCreateMiniTests() {
+    const standardPackages = packageSummaries.filter(
+      (s) => s.packageKind === 'standard' && s.version,
+    )
+    if (standardPackages.length === 0) {
+      err('Không tìm thấy gói Standard test nào để tạo biến thể mini.')
+      return
+    }
+
+    if (
+      !window.confirm(
+        `Xác nhận tự động tạo ${standardPackages.length} bài Mini-Test (21 câu / zero-waste audio reuse) tương ứng với các gói Standard hiện có?`,
+      )
+    ) {
+      return
+    }
+
+    setBatchCreatingMini(true)
+    let createdCount = 0
+    let skippedCount = 0
+    const errors: string[] = []
+
+    for (let i = 0; i < standardPackages.length; i++) {
+      const summary = standardPackages[i]
+      const baseSlug = summary.pkg.slug || 'standard'
+      const targetSlug = baseSlug.startsWith('mini-') ? baseSlug : `mini-${baseSlug}`
+      const baseTitle = summary.pkg.title.replace(/\s*·\s*LIVE.*$/i, '').trim()
+      const targetTitle = baseTitle.startsWith('[Mini]') ? baseTitle : `[Mini] ${baseTitle}`
+
+      // Check if already exists in packageSummaries
+      const alreadyExists = packageSummaries.some((s) => s.pkg.slug === targetSlug)
+      if (alreadyExists) {
+        skippedCount++
+        continue
+      }
+
+      setBatchProgress(`Đang tạo (${i + 1}/${standardPackages.length}): ${targetSlug}...`)
+
+      const res = await createMiniTestVariantFromPackage({
+        sourcePackageVersionId: summary.version!.id,
+        customCode: targetSlug,
+        customTitle: targetTitle,
+        samplingStrategy: 'random',
+        questionsPerSection: 3,
+        copyAudio: true,
+      })
+
+      if (res.ok) {
+        createdCount++
+      } else {
+        errors.push(`${summary.pkg.title}: ${res.error}`)
+      }
+    }
+
+    setBatchCreatingMini(false)
+    setBatchProgress(null)
+
+    if (errors.length > 0) {
+      err(`Hoàn tất tạo ${createdCount} gói. Có lỗi: ${errors.join(', ')}`)
+    } else {
+      ok(`Đã tạo thành công ${createdCount} bài Mini-Test mới! (Đã bỏ qua ${skippedCount} gói đã tồn tại)`)
+    }
+    await loadPackages()
   }
 
   // Handle AI Package Generation with custom CVR math and Ample
@@ -1375,7 +1442,7 @@ export function AdminPackageTestsPage() {
                   }`}
                   onClick={() => setFilterTab('green')}
                 >
-                  <span>Green Focus (12V)</span>
+                  <span>Green test</span>
                 </button>
                 <button
                   type="button"
@@ -1386,7 +1453,7 @@ export function AdminPackageTestsPage() {
                   }`}
                   onClick={() => setFilterTab('red')}
                 >
-                  <span>Red Awareness (56V)</span>
+                  <span>Red test</span>
                 </button>
               </div>
 
@@ -1426,6 +1493,18 @@ export function AdminPackageTestsPage() {
                   <span>Mini-test (21 câu)</span>
                 </button>
               </div>
+
+              {/* Batch Mini Generator Action */}
+              <button
+                type="button"
+                onClick={() => void handleBatchCreateMiniTests()}
+                disabled={batchCreatingMini}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50 shrink-0"
+                title="Tự động tạo các biến thể Mini-test 21 câu từ tất cả các gói Standard test"
+              >
+                <Sparkles className="h-3.5 w-3.5 text-slate-950" />
+                <span>{batchCreatingMini ? (batchProgress || 'Đang tạo...') : '⚡ Tạo 8 bài Mini-test'}</span>
+              </button>
             </div>
 
             <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
@@ -3889,7 +3968,7 @@ export function AdminPackageTestsPage() {
                     >
                       <div className="font-bold text-emerald-800 flex items-center gap-1.5">
                         <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                        <span>Green Focus Test (12V)</span>
+                        <span>Green Focus Test</span>
                       </div>
                       <p className="text-[11px] text-slate-500 mt-1">
                         1 câu hoàn chỉnh tự nhiên, đếm từ lũy tiến 9-10w đến 22w max. Continuous rhythm ($TL=1.0$).
@@ -3907,7 +3986,7 @@ export function AdminPackageTestsPage() {
                     >
                       <div className="font-bold text-rose-800 flex items-center gap-1.5">
                         <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-                        <span>Red Awareness Test (56V)</span>
+                        <span>Red Awareness Test</span>
                       </div>
                       <p className="text-[11px] text-slate-500 mt-1">
                         Chuỗi collocations (Zero single words, $\ge 2$ từ), anchor từ Chunks, khoảng lặng SSML 650ms.

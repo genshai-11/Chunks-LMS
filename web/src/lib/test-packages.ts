@@ -1464,6 +1464,11 @@ export async function createMiniTestVariantFromPackage(
     }
 
     // 7. Create new test_package_versions row (published immediately for testing)
+    const derivedSnapshotHash =
+      sourceVerRow.snapshot_hash
+        ? `mini:${sourceVerRow.snapshot_hash}`
+        : `mini-snapshot-${newPkgRow.id}-${Date.now()}`
+
     const { data: newVerRow, error: verInsertErr } = await sb
       .from('test_package_versions')
       .insert({
@@ -1471,6 +1476,7 @@ export async function createMiniTestVariantFromPackage(
         version_label: 'v1.0.0',
         status: 'published',
         published_at: new Date().toISOString(),
+        snapshot_hash: derivedSnapshotHash,
         source_metadata: {
           package_kind: 'mini',
           is_mini_test: true,

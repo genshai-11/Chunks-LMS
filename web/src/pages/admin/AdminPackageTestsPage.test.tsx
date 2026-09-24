@@ -376,5 +376,148 @@ describe('AdminPackageTestsPage', { timeout: 20000 }, () => {
       expect(screen.getByText(/Session 1: Awareness Trap 1/i)).toBeInTheDocument()
     })
   })
+
+  it('switches to Formulas & Generator Physics tab and displays formulas, archetype matrix, and physics sandbox', async () => {
+    const user = userEvent.setup()
+
+    vi.spyOn(testPackagesLib, 'listTestPackages').mockResolvedValue({
+      ok: true,
+      data: [],
+    })
+
+    render(
+      <MemoryRouter>
+        <AdminPackageTestsPage />
+      </MemoryRouter>,
+    )
+
+    const formulasTab = screen.getByRole('button', { name: /Công thức & Generator Physics/i })
+    await user.click(formulasTab)
+
+    expect(screen.getByText(/Vật Lý Nhận Thức & Công Thức Sinh Đề Chunks/i)).toBeInTheDocument()
+    expect(screen.getByText(/CVR = TC × TL × LC/i)).toBeInTheDocument()
+    expect(screen.getByText(/CPD = CVR × CCI/i)).toBeInTheDocument()
+    expect(screen.getByText(/CCI = round\(CPD \/ CVR\)/i)).toBeInTheDocument()
+    expect(screen.getByText(/GREEN TEST \(Focus\)/i)).toBeInTheDocument()
+    expect(screen.getByText(/RED TEST \(Awareness\)/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Green Focus 12V/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Red Awareness 56V/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Áp dụng vào Generator & Tạo Đề/i })).toBeInTheDocument()
+  })
+
+  it('supports multi-view modes across Packages, Content, and Audio tabs', async () => {
+    const user = userEvent.setup()
+
+    vi.spyOn(testPackagesLib, 'listTestPackages').mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'pkg-modes',
+          organizationId: 'org-1',
+          title: 'GREEN-TEST-21Q-FOCUS-12V',
+          slug: 'green-test-21q-focus-12v',
+          description: 'Package for view mode test',
+          createdByUserId: null,
+          sourceMetadata: { testType: 'green', targetVoltage: 12 },
+          archivedAt: null,
+        },
+      ],
+    })
+
+    vi.spyOn(testPackagesLib, 'listTestPackageVersions').mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'ver-modes',
+          packageId: 'pkg-modes',
+          versionLabel: 'v1',
+          status: 'draft',
+          snapshotHash: null,
+          publishedAt: null,
+          sourceMetadata: {},
+        },
+      ],
+    })
+
+    vi.spyOn(testPackagesLib, 'listTestSections').mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'sec-m1',
+          packageVersionId: 'ver-modes',
+          sectionOrder: 1,
+          title: 'Section 1',
+          targetCvrOhm: 3.0,
+          introTextVi: 'Intro 1',
+          introTextEn: 'Intro 1',
+          cciProfileId: null,
+          cciCategoryId: null,
+        },
+      ],
+    })
+
+    vi.spyOn(testPackagesLib, 'listTestItems').mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'item-m1',
+          packageVersionId: 'ver-modes',
+          sectionId: 'sec-m1',
+          itemOrder: 1,
+          termVi: 'quy trình xử lý',
+          termEn: 'processing flow',
+          promptVi: 'Đội ngũ kỹ sư tiến hành kiểm tra quy trình xử lý dữ liệu tự động.',
+          promptEn: 'Engineers test the automated data processing workflow.',
+          spokenScriptVi: 'Đội ngũ kỹ sư tiến hành kiểm tra quy trình xử lý dữ liệu tự động.',
+          spokenScriptEn: 'Engineers test the automated data processing workflow.',
+          tc: 3.0,
+          lc: 1.0,
+          tl: 1.0,
+          measuredCvr: 3.0,
+        },
+      ],
+    })
+
+    render(
+      <MemoryRouter>
+        <AdminPackageTestsPage />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /GREEN-TEST-21Q-FOCUS-12V/i })).toBeInTheDocument()
+    })
+
+    // Test Packages Tab: Switch to Table View
+    const packagesTableBtn = screen.getByTitle(/Dạng bảng chi tiết/i)
+    await user.click(packagesTableBtn)
+    expect(screen.getByText(/Phân loại & Điện áp/i)).toBeInTheDocument()
+
+    // Switch to Content tab
+    const contentTab = screen.getByRole('button', { name: /Soạn thảo & Nội dung câu/i })
+    await user.click(contentTab)
+
+    // Test Content Tab: Table View
+    const contentTableBtn = screen.getByTitle(/Bảng toàn bộ câu hỏi/i)
+    await user.click(contentTableBtn)
+    expect(screen.getByText(/Nội dung Tiếng Việt \(VI\)/i)).toBeInTheDocument()
+
+    // Test Content Tab: Validation View
+    const contentValidationBtn = screen.getByTitle(/Kiểm định chất lượng & Vật lý/i)
+    await user.click(contentValidationBtn)
+    expect(screen.getByText(/Tỷ lệ tuân thủ quy chuẩn/i)).toBeInTheDocument()
+    expect(screen.getByText(/Quy chuẩn vật lý & ngôn ngữ học cho GREEN TEST/i)).toBeInTheDocument()
+
+    // Switch to Audio tab
+    const audioTab = screen.getByRole('button', { name: /Quản lý Audio & Review/i })
+    await user.click(audioTab)
+
+    // Test Audio Tab: Table View
+    const audioTableBtn = screen.getByTitle(/Bảng tổng hợp Audio/i)
+    await user.click(audioTableBtn)
+    expect(screen.getByText(/Bảng tổng hợp toàn bộ tài sản âm thanh/i)).toBeInTheDocument()
+    expect(screen.getByText(/Kịch bản phát âm \(Script\)/i)).toBeInTheDocument()
+  })
 })
+
 

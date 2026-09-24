@@ -1,10 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
+  ArrowRight,
+  Calculator,
+  Check,
+  CheckCircle2,
+  Copy,
   Eye,
   FileText,
   Headphones,
+  Info,
   Layers,
+  LayoutGrid,
   Loader2,
   Pencil,
   Play,
@@ -14,6 +21,7 @@ import {
   Search,
   Sliders,
   Sparkles,
+  Table,
   Trash2,
   Upload,
   Volume2,
@@ -42,6 +50,7 @@ import {
 import {
   calculateCciFromCpd,
   calculateCvr,
+  calculateWordCountLc,
   countWords,
   detectPackageTestType,
   validateGreenSentence,
@@ -69,7 +78,7 @@ import {
 
 export { detectPackageTestType }
 
-export type StudioTab = 'packages' | 'content' | 'audio' | 'cci'
+export type StudioTab = 'packages' | 'content' | 'audio' | 'formulas' | 'cci'
 type FilterTab = 'all' | 'green' | 'red'
 
 export type PackageSummary = {
@@ -129,6 +138,67 @@ export function AdminPackageTestsPage() {
       next.set('version', pkg.version!.id)
       return next
     })
+  }
+
+  // View Modes across tabs
+  const [packagesViewMode, setPackagesViewMode] = useState<'grid' | 'table'>('grid')
+  const [contentViewMode, setContentViewMode] = useState<'accordion' | 'table' | 'validation'>('accordion')
+  const [audioViewMode, setAudioViewMode] = useState<'lifecycle' | 'table'>('lifecycle')
+
+  // Formula & Physics Sandbox State
+  const [calcTc, setCalcTc] = useState<number>(3.0)
+  const [calcTl, setCalcTl] = useState<number>(1.5)
+  const [calcWordCount, setCalcWordCount] = useState<number>(14)
+  const [calcCpd, setCalcCpd] = useState<number>(56)
+  const [copiedFormula, setCopiedFormula] = useState(false)
+
+  // Derived Sandbox Values
+  const derivedSandboxLc = useMemo(() => calculateWordCountLc(calcWordCount), [calcWordCount])
+  const derivedSandboxCvr = useMemo(
+    () => calculateCvr(calcTc, derivedSandboxLc, calcTl),
+    [calcTc, derivedSandboxLc, calcTl],
+  )
+  const derivedSandboxCci = useMemo(
+    () => calculateCciFromCpd(calcCpd, derivedSandboxCvr),
+    [calcCpd, derivedSandboxCvr],
+  )
+
+  const applySandboxPreset = (type: 'green_12v' | 'green_18v' | 'red_56v' | 'red_72v') => {
+    if (type === 'green_12v') {
+      setCalcCpd(12)
+      setCalcTc(3.0)
+      setCalcTl(1.0)
+      setCalcWordCount(10)
+    } else if (type === 'green_18v') {
+      setCalcCpd(18)
+      setCalcTc(3.0)
+      setCalcTl(1.25)
+      setCalcWordCount(15)
+    } else if (type === 'red_56v') {
+      setCalcCpd(56)
+      setCalcTc(3.0)
+      setCalcTl(2.0)
+      setCalcWordCount(12)
+    } else if (type === 'red_72v') {
+      setCalcCpd(72)
+      setCalcTc(4.0)
+      setCalcTl(2.0)
+      setCalcWordCount(18)
+    }
+  }
+
+  const applySandboxToGenerator = () => {
+    setAiTargetVoltage(calcCpd)
+    setUiTc(calcTc)
+    setUiTl(calcTl)
+    setUiLc(derivedSandboxLc)
+    if (calcCpd <= 24) {
+      setAiTestType('green')
+    } else {
+      setAiTestType('red')
+    }
+    setShowCreateModal(true)
+    setCreateTab('ai')
   }
 
   // Modals state
@@ -818,11 +888,11 @@ export function AdminPackageTestsPage() {
       <Flash message={message} error={error} />
 
       {/* Main Studio Navigation Tabs */}
-      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-2 rounded-2xl shadow-xs">
-        <div className="flex items-center gap-2 py-2">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-200 bg-white px-3 py-2 rounded-2xl shadow-xs">
+        <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none">
           <button
             type="button"
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
               activeTab === 'packages'
                 ? 'bg-slate-900 text-white shadow-sm'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -830,12 +900,19 @@ export function AdminPackageTestsPage() {
             onClick={() => handleTabChange('packages')}
           >
             <Layers className="h-4 w-4" />
-            <span>Gói bài test ({packageSummaries.length})</span>
+            <span>Gói bài test</span>
+            <span
+              className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono ${
+                activeTab === 'packages' ? 'bg-slate-800 text-slate-200' : 'bg-slate-200/80 text-slate-600'
+              }`}
+            >
+              {packageSummaries.length}
+            </span>
           </button>
 
           <button
             type="button"
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
               activeTab === 'content'
                 ? 'bg-emerald-600 text-white shadow-sm'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -848,7 +925,7 @@ export function AdminPackageTestsPage() {
 
           <button
             type="button"
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
               activeTab === 'audio'
                 ? 'bg-indigo-600 text-white shadow-sm'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -861,7 +938,23 @@ export function AdminPackageTestsPage() {
 
           <button
             type="button"
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              activeTab === 'formulas'
+                ? 'bg-violet-600 text-white shadow-sm ring-2 ring-violet-400/20'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+            onClick={() => handleTabChange('formulas')}
+          >
+            <Calculator className="h-4 w-4 text-violet-300" />
+            <span>Công thức & Generator Physics</span>
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-violet-500/20 text-violet-100">
+              CVR/CPD
+            </span>
+          </button>
+
+          <button
+            type="button"
+            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
               activeTab === 'cci'
                 ? 'bg-amber-600 text-white shadow-sm'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -873,16 +966,16 @@ export function AdminPackageTestsPage() {
           </button>
         </div>
 
-        {selectedPackage && activeTab !== 'packages' && (
-          <div className="flex items-center gap-2 text-xs py-2 pr-2">
-            <span className="text-slate-400">Đang chọn:</span>
+        {selectedPackage && activeTab !== 'packages' && activeTab !== 'formulas' && (
+          <div className="flex items-center gap-2 text-xs py-1">
+            <span className="text-slate-400 font-medium">Gói đang chọn:</span>
             <select
               value={selectedPackage.version?.id ?? ''}
               onChange={(e) => {
                 const target = packageSummaries.find((s) => s.version?.id === e.target.value)
                 if (target) selectPackage(target)
               }}
-              className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-slate-800 focus:outline-hidden"
+              className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-slate-800 focus:outline-hidden max-w-xs truncate"
             >
               {packageSummaries.map((s) => (
                 <option key={s.pkg.id} value={s.version?.id ?? ''}>
@@ -938,20 +1031,52 @@ export function AdminPackageTestsPage() {
               </button>
             </div>
 
-            {/* Search */}
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Tìm mã gói, bài học..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-slate-900/10 transition-all"
-              />
+            <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+              {/* Search */}
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Tìm mã gói, bài học..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-slate-900/10 transition-all"
+                />
+              </div>
+
+              {/* View Mode Toggle */}
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/60 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setPackagesViewMode('grid')}
+                  className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                    packagesViewMode === 'grid'
+                      ? 'bg-white text-slate-900 shadow-sm border border-slate-200/50'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                  title="Dạng thẻ lưới (Grid View)"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                  <span className="hidden sm:inline">Lưới</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPackagesViewMode('table')}
+                  className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                    packagesViewMode === 'table'
+                      ? 'bg-white text-slate-900 shadow-sm border border-slate-200/50'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                  title="Dạng bảng chi tiết (Table View)"
+                >
+                  <Table className="h-4 w-4" />
+                  <span className="hidden sm:inline">Bảng</span>
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Packages Grid */}
+          {/* Packages Content */}
           {loading ? (
             <div className="flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-slate-200">
               <Loader2 className="h-8 w-8 text-slate-400 animate-spin mb-3" />
@@ -974,7 +1099,7 @@ export function AdminPackageTestsPage() {
                 Tạo Bài Test Đầu Tiên
               </button>
             </div>
-          ) : (
+          ) : packagesViewMode === 'grid' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {filteredSummaries.map((summary) => {
                 const isGreen = summary.testType === 'green'
@@ -1114,6 +1239,139 @@ export function AdminPackageTestsPage() {
                 )
               })}
             </div>
+          ) : (
+            /* Table View */
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-semibold">
+                      <th className="py-3.5 px-4">Gói bài test</th>
+                      <th className="py-3.5 px-4">Phân loại & Điện áp</th>
+                      <th className="py-3.5 px-4">Cấu trúc đề</th>
+                      <th className="py-3.5 px-4">Kháng trở CVR (Ω)</th>
+                      <th className="py-3.5 px-4">Tiến độ Audio</th>
+                      <th className="py-3.5 px-4 text-right">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredSummaries.map((summary) => {
+                      const isGreen = summary.testType === 'green'
+                      const cleanTitle = summary.pkg.title.replace(/ · LIVE$/i, '')
+                      const audioRatio =
+                        summary.audioTotalCount > 0
+                          ? Math.round((summary.audioApprovedCount / summary.audioTotalCount) * 100)
+                          : 0
+
+                      return (
+                        <tr key={summary.pkg.id} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="py-3.5 px-4">
+                            <div className="font-bold text-slate-900 line-clamp-1">{cleanTitle}</div>
+                            <div className="text-[11px] font-mono text-slate-400 mt-0.5">{summary.pkg.slug}</div>
+                          </td>
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <span
+                              className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${
+                                isGreen
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                                  : 'bg-rose-50 text-rose-700 border border-rose-200/60'
+                              }`}
+                            >
+                              {isGreen ? 'GREEN FOCUS' : 'RED AWARENESS'} • {summary.targetVoltage}V
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <span className="font-bold text-slate-800">{summary.sections.length}</span>{' '}
+                            <span className="text-slate-400">sessions •</span>{' '}
+                            <span className="font-bold text-slate-800">{summary.questionCount}</span>{' '}
+                            <span className="text-slate-400">câu</span>
+                          </td>
+                          <td className="py-3.5 px-4 whitespace-nowrap font-mono font-bold text-slate-800">
+                            {summary.cvrMin.toFixed(1)}Ω – {summary.cvrMax.toFixed(1)}Ω
+                          </td>
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <div className="w-20 bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                                <div
+                                  className={`h-full ${
+                                    audioRatio === 100
+                                      ? 'bg-emerald-500'
+                                      : audioRatio > 0
+                                        ? 'bg-indigo-500'
+                                        : 'bg-slate-300'
+                                  }`}
+                                  style={{ width: `${audioRatio}%` }}
+                                />
+                              </div>
+                              <span className="text-[11px] font-bold text-slate-600">
+                                {summary.audioApprovedCount}/{summary.audioTotalCount} ({audioRatio}%)
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  selectPackage(summary)
+                                  handleTabChange('content')
+                                }}
+                                className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors flex items-center gap-1"
+                                title="Soạn nội dung"
+                              >
+                                <FileText className="h-3.5 w-3.5" />
+                                <span className="hidden md:inline">Soạn</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  selectPackage(summary)
+                                  handleTabChange('audio')
+                                }}
+                                className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors flex items-center gap-1"
+                                title="Quản lý audio"
+                              >
+                                <Headphones className="h-3.5 w-3.5" />
+                                <span className="hidden md:inline">Audio</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setPreviewPackage(summary)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                                title="Xem trước cấu trúc"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingPackage(summary.pkg)
+                                  setEditTitle(summary.pkg.title)
+                                  setEditSlug(summary.pkg.slug)
+                                  setEditDescription(summary.pkg.description || '')
+                                }}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                                title="Sửa thông tin"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDeletingPackage(summary.pkg)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                                title="Xóa"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           )}
         </div>
       )}
@@ -1152,6 +1410,49 @@ export function AdminPackageTestsPage() {
                 </div>
 
                 <div className="flex items-center gap-3">
+                  {/* View Mode Toggle */}
+                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/60">
+                    <button
+                      type="button"
+                      onClick={() => setContentViewMode('accordion')}
+                      className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                        contentViewMode === 'accordion'
+                          ? 'bg-white text-slate-900 shadow-sm border border-slate-200/50'
+                          : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                      title="Dạng Session Accordion"
+                    >
+                      <Layers className="h-4 w-4" />
+                      <span className="hidden sm:inline">Theo Session</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setContentViewMode('table')}
+                      className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                        contentViewMode === 'table'
+                          ? 'bg-white text-slate-900 shadow-sm border border-slate-200/50'
+                          : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                      title="Bảng toàn bộ câu hỏi"
+                    >
+                      <Table className="h-4 w-4" />
+                      <span className="hidden sm:inline">Bảng</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setContentViewMode('validation')}
+                      className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                        contentViewMode === 'validation'
+                          ? 'bg-white text-slate-900 shadow-sm border border-slate-200/50'
+                          : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                      title="Kiểm định chất lượng & Vật lý"
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span className="hidden sm:inline">Kiểm định</span>
+                    </button>
+                  </div>
+
                   <button
                     type="button"
                     onClick={() => handleTabChange('audio')}
@@ -1163,128 +1464,391 @@ export function AdminPackageTestsPage() {
                 </div>
               </div>
 
-              {/* Sessions Accordion List */}
-              <div className="space-y-4">
-                {selectedPackage.sections.map((sec, secIdx) => {
-                  const secItems = selectedPackage.items.filter((i) => i.sectionId === sec.id)
-                  const isGreen = selectedPackage.testType === 'green'
+              {/* CONTENT VIEW MODE 1: ACCORDION */}
+              {contentViewMode === 'accordion' && (
+                <div className="space-y-4">
+                  {selectedPackage.sections.map((sec, secIdx) => {
+                    const secItems = selectedPackage.items.filter((i) => i.sectionId === sec.id)
+                    const isGreen = selectedPackage.testType === 'green'
 
-                  return (
-                    <div
-                      key={sec.id}
-                      className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs"
-                    >
-                      <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <span className="w-7 h-7 rounded-lg bg-slate-200 font-bold text-xs flex items-center justify-center text-slate-700">
-                            {sec.sectionOrder}
-                          </span>
-                          <div>
-                            <div className="font-bold text-slate-800 text-xs">
-                              {sec.title || `Session ${sec.sectionOrder}`}
+                    return (
+                      <div
+                        key={sec.id}
+                        className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs"
+                      >
+                        <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <span className="w-7 h-7 rounded-lg bg-slate-200 font-bold text-xs flex items-center justify-center text-slate-700">
+                              {sec.sectionOrder}
+                            </span>
+                            <div>
+                              <div className="font-bold text-slate-800 text-xs">
+                                {sec.title || `Session ${sec.sectionOrder}`}
+                              </div>
+                              <div className="text-[11px] text-slate-500">
+                                {secItems.length} câu hỏi • Mục tiêu CVR: {sec.targetCvrOhm ?? 3}Ω
+                              </div>
                             </div>
-                            <div className="text-[11px] text-slate-500">
-                              {secItems.length} câu hỏi • Mục tiêu CVR: {sec.targetCvrOhm ?? 3}Ω
-                            </div>
+                          </div>
+
+                          {/* Session Physics Badge */}
+                          <div className="flex items-center gap-2 text-[11px]">
+                            <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono">
+                              CVR: {sec.targetCvrOhm ?? 3}Ω
+                            </span>
+                            <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-mono">
+                              Ample: {perSessionAmple[secIdx] ?? 6}A
+                            </span>
+                            <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 font-mono">
+                              CPD: {selectedPackage.targetVoltage}V
+                            </span>
                           </div>
                         </div>
 
-                        {/* Session Physics Badge */}
-                        <div className="flex items-center gap-2 text-[11px]">
-                          <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono">
-                            CVR: {sec.targetCvrOhm ?? 3}Ω
-                          </span>
-                          <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-mono">
-                            Ample: {perSessionAmple[secIdx] ?? 6}A
-                          </span>
-                          <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 font-mono">
-                            CPD: {selectedPackage.targetVoltage}V
-                          </span>
+                        {/* Items Table */}
+                        <div className="divide-y divide-slate-100">
+                          {secItems.map((item) => {
+                            const wordsVi = countWords(item.promptVi || '')
+                            const greenValidation = isGreen
+                              ? validateGreenSentence(item.promptVi || '', { minWords: 8, maxWords: 22 })
+                              : null
+
+                            const hintsList = !isGreen && item.promptVi ? item.promptVi.split('/') : []
+                            const redValidation = !isGreen ? validateRedCollocations(hintsList) : null
+
+                            return (
+                              <div key={item.id} className="p-4 hover:bg-slate-50/50 transition-colors space-y-2">
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="space-y-1.5 flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                                        #{item.itemOrder}
+                                      </span>
+                                      <span className="font-bold text-xs text-slate-800">
+                                        {item.termVi || 'Cụm từ trọng tâm'}
+                                      </span>
+                                      {item.termEn && (
+                                        <span className="text-xs text-slate-400 font-medium">
+                                          ({item.termEn})
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {/* Vietnamese Prompt */}
+                                    <div className="text-xs text-slate-900 font-medium flex items-center gap-2">
+                                      <span className="text-[10px] font-bold text-rose-500 uppercase">VI:</span>
+                                      <span>{item.promptVi}</span>
+                                    </div>
+
+                                    {/* English Prompt */}
+                                    <div className="text-xs text-slate-600 flex items-center gap-2">
+                                      <span className="text-[10px] font-bold text-indigo-500 uppercase">EN:</span>
+                                      <span>{item.promptEn}</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Validation Meters */}
+                                  <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                                    {isGreen && greenValidation && (
+                                      <span
+                                        className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 ${
+                                          greenValidation.valid
+                                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                            : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                        }`}
+                                      >
+                                        {greenValidation.valid ? '✓' : '⚠️'} {wordsVi} từ (Giới hạn: 8–22 từ)
+                                      </span>
+                                    )}
+
+                                    {!isGreen && redValidation && (
+                                      <span
+                                        className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 ${
+                                          redValidation.valid
+                                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                            : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                        }`}
+                                      >
+                                        {redValidation.valid ? '✓ Zero single words' : '⚠️ Chứa từ đơn'} (
+                                        {redValidation.totalHints} hints)
+                                      </span>
+                                    )}
+
+                                    <div className="text-[10px] font-mono text-slate-400">
+                                      TC: {item.tc ?? 2} • LC: {item.lc ?? 1} • TL: {item.tl ?? 1} • CVR: {item.measuredCvr ?? 3}Ω
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
+                    )
+                  })}
+                </div>
+              )}
 
-                      {/* Items Table */}
-                      <div className="divide-y divide-slate-100">
-                        {secItems.map((item) => {
+              {/* CONTENT VIEW MODE 2: LINEAR TABLE */}
+              {contentViewMode === 'table' && (
+                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-semibold">
+                          <th className="py-3 px-4 w-12 text-center">#</th>
+                          <th className="py-3 px-4">Session</th>
+                          <th className="py-3 px-4">Cụm từ trọng tâm</th>
+                          <th className="py-3 px-4">Nội dung Tiếng Việt (VI)</th>
+                          <th className="py-3 px-4">Nội dung Tiếng Anh (EN)</th>
+                          <th className="py-3 px-4">Tham số CVR</th>
+                          <th className="py-3 px-4">Chuẩn</th>
+                          <th className="py-3 px-4 text-right">Audio</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {selectedPackage.items.map((item) => {
+                          const sec = selectedPackage.sections.find((s) => s.id === item.sectionId)
+                          const isGreen = selectedPackage.testType === 'green'
                           const wordsVi = countWords(item.promptVi || '')
                           const greenValidation = isGreen
                             ? validateGreenSentence(item.promptVi || '', { minWords: 8, maxWords: 22 })
                             : null
-
                           const hintsList = !isGreen && item.promptVi ? item.promptVi.split('/') : []
                           const redValidation = !isGreen ? validateRedCollocations(hintsList) : null
 
+                          const lang: 'vi' | 'en' =
+                            selectedPackage.testType === 'green'
+                              ? sec && sec.sectionOrder <= 3
+                                ? 'en'
+                                : 'vi'
+                              : sec && sec.sectionOrder <= 3
+                                ? 'vi'
+                                : 'en'
+                          const script =
+                            lang === 'vi'
+                              ? item.spokenScriptVi || item.promptVi || ''
+                              : item.spokenScriptEn || item.promptEn || ''
+
                           return (
-                            <div key={item.id} className="p-4 hover:bg-slate-50/50 transition-colors space-y-2">
-                              <div className="flex items-start justify-between gap-4">
-                                <div className="space-y-1.5 flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
-                                      #{item.itemOrder}
-                                    </span>
-                                    <span className="font-bold text-xs text-slate-800">
-                                      {item.termVi || 'Cụm từ trọng tâm'}
-                                    </span>
-                                    {item.termEn && (
-                                      <span className="text-xs text-slate-400 font-medium">
-                                        ({item.termEn})
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  {/* Vietnamese Prompt */}
-                                  <div className="text-xs text-slate-900 font-medium flex items-center gap-2">
-                                    <span className="text-[10px] font-bold text-rose-500 uppercase">VI:</span>
-                                    <span>{item.promptVi}</span>
-                                  </div>
-
-                                  {/* English Prompt */}
-                                  <div className="text-xs text-slate-600 flex items-center gap-2">
-                                    <span className="text-[10px] font-bold text-indigo-500 uppercase">EN:</span>
-                                    <span>{item.promptEn}</span>
-                                  </div>
-                                </div>
-
-                                {/* Validation Meters */}
-                                <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                                  {isGreen && greenValidation && (
-                                    <span
-                                      className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 ${
-                                        greenValidation.valid
-                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                          : 'bg-rose-50 text-rose-700 border border-rose-200'
-                                      }`}
-                                    >
-                                      {greenValidation.valid ? '✓' : '⚠️'} {wordsVi} từ (Giới hạn: 8–22 từ)
-                                    </span>
+                            <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
+                              <td className="py-3 px-4 text-center font-mono font-bold text-slate-400">
+                                #{item.itemOrder}
+                              </td>
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold text-[11px]">
+                                  S{sec?.sectionOrder ?? 1}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="font-bold text-slate-800">{item.termVi || '—'}</div>
+                                {item.termEn && <div className="text-[11px] text-slate-400">{item.termEn}</div>}
+                              </td>
+                              <td className="py-3 px-4 max-w-xs">
+                                <div className="text-slate-800 line-clamp-2">{item.promptVi}</div>
+                              </td>
+                              <td className="py-3 px-4 max-w-xs">
+                                <div className="text-slate-600 line-clamp-2">{item.promptEn}</div>
+                              </td>
+                              <td className="py-3 px-4 whitespace-nowrap font-mono text-[11px] text-slate-500">
+                                <div>CVR: <strong className="text-slate-800">{item.measuredCvr ?? 3}Ω</strong></div>
+                                <div className="text-[10px] text-slate-400">TC:{item.tc ?? 2} TL:{item.tl ?? 1} LC:{item.lc ?? 1}</div>
+                              </td>
+                              <td className="py-3 px-4 whitespace-nowrap">
+                                {isGreen && greenValidation && (
+                                  <span
+                                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                      greenValidation.valid
+                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                        : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                    }`}
+                                  >
+                                    {greenValidation.valid ? '✓ Đạt' : '⚠️ Lỗi'} ({wordsVi}w)
+                                  </span>
+                                )}
+                                {!isGreen && redValidation && (
+                                  <span
+                                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                      redValidation.valid
+                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                        : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                    }`}
+                                  >
+                                    {redValidation.valid ? '✓ Đạt' : '⚠️ Lỗi'} ({redValidation.totalHints}h)
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-right whitespace-nowrap">
+                                <button
+                                  type="button"
+                                  onClick={() => void handlePlayItemAudio(`item_${item.id}`, script, lang)}
+                                  disabled={playingAudioKey === `item_${item.id}`}
+                                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                                  title="Nghe thử"
+                                >
+                                  {playingAudioKey === `item_${item.id}` ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Play className="h-3.5 w-3.5 fill-current" />
                                   )}
+                                </button>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
 
-                                  {!isGreen && redValidation && (
-                                    <span
-                                      className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 ${
-                                        redValidation.valid
-                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                          : 'bg-amber-50 text-amber-700 border border-amber-200'
-                                      }`}
-                                    >
-                                      {redValidation.valid ? '✓ Zero single words' : '⚠️ Chứa từ đơn'} (
-                                      {redValidation.totalHints} hints)
-                                    </span>
-                                  )}
+              {/* CONTENT VIEW MODE 3: VALIDATION AUDIT CHECKLIST */}
+              {contentViewMode === 'validation' && (() => {
+                const isGreen = selectedPackage.testType === 'green'
+                const totalItems = selectedPackage.items.length
+                let validCount = 0
+                let invalidCount = 0
 
-                                  <div className="text-[10px] font-mono text-slate-400">
-                                    TC: {item.tc ?? 2} • LC: {item.lc ?? 1} • TL: {item.tl ?? 1} • CVR: {item.measuredCvr ?? 3}Ω
-                                  </div>
+                selectedPackage.items.forEach((item) => {
+                  if (isGreen) {
+                    const g = validateGreenSentence(item.promptVi || '', { minWords: 8, maxWords: 22 })
+                    if (g.valid) validCount++
+                    else invalidCount++
+                  } else {
+                    const hintsList = item.promptVi ? item.promptVi.split('/') : []
+                    const r = validateRedCollocations(hintsList)
+                    if (r.valid) validCount++
+                    else invalidCount++
+                  }
+                })
+
+                const compliancePercent = totalItems > 0 ? Math.round((validCount / totalItems) * 100) : 100
+
+                return (
+                  <div className="space-y-6">
+                    {/* Quality Overview Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-1">
+                        <span className="text-[11px] text-slate-500 font-medium">Tỷ lệ tuân thủ quy chuẩn</span>
+                        <div className="flex items-center justify-between">
+                          <span className={`text-2xl font-black ${compliancePercent === 100 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                            {compliancePercent}%
+                          </span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
+                            {validCount}/{totalItems} câu đạt
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-1">
+                        <span className="text-[11px] text-slate-500 font-medium">Kháng trở CVR trung bình</span>
+                        <div className="flex items-center justify-between">
+                          <span className="text-2xl font-black text-slate-900 font-mono">
+                            {((selectedPackage.cvrMin + selectedPackage.cvrMax) / 2).toFixed(1)}Ω
+                          </span>
+                          <span className="text-xs text-slate-400 font-mono">
+                            [{selectedPackage.cvrMin.toFixed(1)}Ω - {selectedPackage.cvrMax.toFixed(1)}Ω]
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-1">
+                        <span className="text-[11px] text-slate-500 font-medium">Target CPD (Điện thế)</span>
+                        <div className="flex items-center justify-between">
+                          <span className="text-2xl font-black text-indigo-600 font-mono">
+                            {selectedPackage.targetVoltage}V
+                          </span>
+                          <span className="text-xs font-bold text-slate-500 uppercase">
+                            {selectedPackage.testType}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-1">
+                        <span className="text-[11px] text-slate-500 font-medium">Trạng thái rào cản</span>
+                        <div className="flex items-center gap-1.5 pt-1">
+                          <CheckCircle2 className={`h-5 w-5 ${invalidCount === 0 ? 'text-emerald-500' : 'text-amber-500'}`} />
+                          <span className="font-bold text-xs text-slate-800">
+                            {invalidCount === 0 ? 'Sẵn sàng triển khai' : `Cần điều chỉnh (${invalidCount} câu)`}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Archetype Rule Manifest */}
+                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                      <div className="font-bold text-xs text-slate-800 flex items-center gap-2">
+                        <Info className="h-4 w-4 text-indigo-600" />
+                        <span>Quy chuẩn vật lý & ngôn ngữ học cho {isGreen ? 'GREEN TEST (Focus)' : 'RED TEST (Awareness)'}</span>
+                      </div>
+                      {isGreen ? (
+                        <ul className="text-xs text-slate-600 space-y-1 pl-6 list-disc">
+                          <li><strong>Độ dài câu:</strong> Mỗi câu hoàn chỉnh phải từ <strong>8 đến 22 từ</strong> để đảm bảo áp lực lưu giữ trong bộ nhớ làm việc.</li>
+                          <li><strong>Ngữ pháp tự nhiên:</strong> 1 câu trọn vẹn, dòng chảy ngữ âm liền mạch, không sử dụng dấu gạch chéo tạo bẫy dừng ngắt quãng.</li>
+                          <li><strong>Nhịp điệu liên tục:</strong> Tốc độ đọc ổn định, không chèn khoảng dừng nhân tạo.</li>
+                        </ul>
+                      ) : (
+                        <ul className="text-xs text-slate-600 space-y-1 pl-6 list-disc">
+                          <li><strong>Cụm collocations:</strong> Tuyệt đối <strong>không chứa từ đơn lẻ</strong>, mỗi cụm phải có ít nhất <strong>2 từ</strong> (≥ 2 words).</li>
+                          <li><strong>Neo từ vựng:</strong> Cụm từ đầu tiên luôn được neo trong ngân hàng tài nguyên Chunks để giữ tính kế thừa giáo trình.</li>
+                          <li><strong>Khoảng lặng SSML:</strong> Chèn khoảng nghỉ 650ms giữa các cụm để buộc não bộ xử lý nhận thức và kích hoạt bẫy phản xạ.</li>
+                        </ul>
+                      )}
+                    </div>
+
+                    {/* Detailed Audit Table */}
+                    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                      <div className="p-4 bg-slate-50/80 border-b border-slate-200 font-bold text-xs text-slate-800">
+                        Danh sách kiểm tra chi tiết từng câu ({selectedPackage.items.length} câu)
+                      </div>
+                      <div className="divide-y divide-slate-100">
+                        {selectedPackage.items.map((item) => {
+                          const isGreen = selectedPackage.testType === 'green'
+                          const wordsVi = countWords(item.promptVi || '')
+                          const greenValidation = isGreen
+                            ? validateGreenSentence(item.promptVi || '', { minWords: 8, maxWords: 22 })
+                            : null
+                          const hintsList = !isGreen && item.promptVi ? item.promptVi.split('/') : []
+                          const redValidation = !isGreen ? validateRedCollocations(hintsList) : null
+                          const isItemValid = isGreen ? greenValidation?.valid : redValidation?.valid
+
+                          return (
+                            <div key={item.id} className="p-4 flex items-start justify-between gap-4 hover:bg-slate-50/50">
+                              <div className="space-y-1 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded">
+                                    #{item.itemOrder}
+                                  </span>
+                                  <span className="font-bold text-xs text-slate-800">{item.termVi || 'Core Term'}</span>
+                                  <span
+                                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                      isItemValid
+                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                        : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                    }`}
+                                  >
+                                    {isItemValid ? '✓ Hợp lệ' : '⚠️ Cần sửa'}
+                                  </span>
                                 </div>
+                                <div className="text-xs text-slate-800">{item.promptVi}</div>
+                                {!isItemValid && (
+                                  <div className="text-[11px] text-rose-600 font-medium">
+                                    {isGreen ? greenValidation?.reason : redValidation?.reason}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="text-right text-[11px] font-mono text-slate-400 shrink-0">
+                                {isGreen ? `${wordsVi} từ` : `${hintsList.length} collocations`}
                               </div>
                             </div>
                           )
                         })}
                       </div>
                     </div>
-                  )
-                })}
-              </div>
+                  </div>
+                )
+              })()}
             </div>
           )}
         </div>
@@ -1313,6 +1877,36 @@ export function AdminPackageTestsPage() {
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
+                  {/* Audio View Mode Switcher */}
+                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/60">
+                    <button
+                      type="button"
+                      onClick={() => setAudioViewMode('lifecycle')}
+                      className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                        audioViewMode === 'lifecycle'
+                          ? 'bg-white text-slate-900 shadow-sm border border-slate-200/50'
+                          : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                      title="Quy trình Vòng đời (Lifecycle View)"
+                    >
+                      <Layers className="h-4 w-4" />
+                      <span className="hidden sm:inline">Vòng đời</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAudioViewMode('table')}
+                      className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                        audioViewMode === 'table'
+                          ? 'bg-white text-slate-900 shadow-sm border border-slate-200/50'
+                          : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                      title="Bảng tổng hợp Audio (Table View)"
+                    >
+                      <Table className="h-4 w-4" />
+                      <span className="hidden sm:inline">Bảng</span>
+                    </button>
+                  </div>
+
                   <select
                     value={audioVoiceId}
                     onChange={(e) => {
@@ -1377,8 +1971,11 @@ export function AdminPackageTestsPage() {
                 </div>
               )}
 
-              {/* 1. Lifecycle Narrations Section */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
+              {/* AUDIO VIEW MODE 1: LIFECYCLE */}
+              {audioViewMode === 'lifecycle' && (
+                <div className="space-y-6">
+                  {/* 1. Lifecycle Narrations Section */}
+                  <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div>
                     <h4 className="font-bold text-slate-900 text-sm">1. Audio Giới Thiệu & Kết Thúc (Lifecycle)</h4>
@@ -1738,11 +2335,674 @@ export function AdminPackageTestsPage() {
               </div>
             </div>
           )}
+
+          {/* AUDIO VIEW MODE 2: TABLE VIEW */}
+          {audioViewMode === 'table' && (() => {
+            type FlatAudioRow = {
+              key: string
+              target: NarrationGenerationTarget
+              label: string
+              orderRef: string
+              lang: 'vi' | 'en'
+              text: string
+              part?: number
+              sectionId?: string
+              itemId?: string
+            }
+
+            const rows: FlatAudioRow[] = []
+
+            // Package Start
+            rows.push({
+              key: 'pkg_start',
+              target: 'package_start',
+              label: 'Lời chào đầu bài',
+              orderRef: 'START',
+              lang: 'vi',
+              text: 'Chào mừng em đến với bài kiểm tra Chunks LMS. Lắng nghe cẩn thận và phát âm chính xác.',
+            })
+
+            // Part Intros (P1..P3)
+            ;[1, 2, 3].forEach((p) => {
+              const partScript =
+                p === 1
+                  ? 'Phần 1 - Khởi động nhận thức. Lắng nghe cẩn thận và sẵn sàng phản hồi.'
+                  : p === 2
+                    ? 'Phần 2 - Tăng tốc phản xạ. Giữ vững nhịp điệu và độ chính xác.'
+                    : 'Phần 3 - Về đích và giải phóng áp lực nhận thức.'
+              rows.push({
+                key: `part_${p}`,
+                target: 'part_intro',
+                label: `Part ${p} Intro`,
+                orderRef: `P${p}`,
+                lang: 'vi',
+                text: partScript,
+                part: p,
+              })
+            })
+
+            // Session Intros (1..N)
+            selectedPackage.sections.forEach((sec) => {
+              const secLang: 'vi' | 'en' =
+                selectedPackage.testType === 'green'
+                  ? sec.sectionOrder <= 3
+                    ? 'en'
+                    : 'vi'
+                  : sec.sectionOrder <= 3
+                    ? 'vi'
+                    : 'en'
+              const secScript =
+                secLang === 'vi'
+                  ? sec.introTextVi ||
+                    `Phiên ${sec.sectionOrder} - ${sec.title}. CVR ${sec.targetCvrOhm} ohms, CCI ${perSessionAmple[sec.sectionOrder - 1] ?? 6} Ampe. Bắt đầu.`
+                  : sec.introTextEn ||
+                    `Session ${sec.sectionOrder} - ${sec.title}. CVR ${sec.targetCvrOhm} ohms, CCI ${perSessionAmple[sec.sectionOrder - 1] ?? 6} Amps. Start.`
+              rows.push({
+                key: `sec_${sec.id}`,
+                target: 'section_intro',
+                label: `Session ${sec.sectionOrder}: ${sec.title || 'Session'}`,
+                orderRef: `S${sec.sectionOrder}`,
+                lang: secLang,
+                text: secScript,
+                sectionId: sec.id,
+              })
+            })
+
+            // Items (1..N)
+            selectedPackage.items.forEach((item) => {
+              const sec = selectedPackage.sections.find((s) => s.id === item.sectionId)
+              const lang: 'vi' | 'en' =
+                selectedPackage.testType === 'green'
+                  ? sec && sec.sectionOrder <= 3
+                    ? 'en'
+                    : 'vi'
+                  : sec && sec.sectionOrder <= 3
+                    ? 'vi'
+                    : 'en'
+              const script =
+                lang === 'vi'
+                  ? item.spokenScriptVi || item.promptVi || ''
+                  : item.spokenScriptEn || item.promptEn || ''
+              rows.push({
+                key: `item_${item.id}`,
+                target: 'test_item',
+                label: `Câu #${item.itemOrder} (${item.termVi || 'Core Term'})`,
+                orderRef: `#${item.itemOrder}`,
+                lang,
+                text: script,
+                sectionId: item.sectionId,
+                itemId: item.id,
+              })
+            })
+
+            // Package End
+            rows.push({
+              key: 'pkg_end',
+              target: 'package_end',
+              label: 'Lời kết thúc bài',
+              orderRef: 'END',
+              lang: 'vi',
+              text: 'Chúc mừng em đã hoàn thành toàn bộ bài kiểm tra. Em đã thể hiện sự tập trung và lưu loát rất xuất sắc!',
+            })
+
+            return (
+              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                <div className="p-4 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between">
+                  <span className="font-bold text-xs text-slate-800">
+                    Bảng tổng hợp toàn bộ tài sản âm thanh ({rows.length} files)
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-mono">
+                    GCP Text-to-Speech Neural2
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50/50 border-b border-slate-200 text-slate-500 font-semibold">
+                        <th className="py-3 px-4 w-16">Ref</th>
+                        <th className="py-3 px-4">Mục tiêu (Target)</th>
+                        <th className="py-3 px-4">Tên tài sản</th>
+                        <th className="py-3 px-4 w-16">Ngôn ngữ</th>
+                        <th className="py-3 px-4">Kịch bản phát âm (Script)</th>
+                        <th className="py-3 px-4 text-right">Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {rows.map((row) => (
+                        <tr key={row.key} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="py-3 px-4 font-mono font-bold text-slate-400 text-[11px]">
+                            {row.orderRef}
+                          </td>
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-slate-100 text-slate-700">
+                              {row.target}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 font-bold text-slate-800 whitespace-nowrap">
+                            {row.label}
+                          </td>
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-200 text-slate-700">
+                              {row.lang}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-slate-700 max-w-sm line-clamp-1">
+                            {row.text}
+                          </td>
+                          <td className="py-3 px-4 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => void handlePlayItemAudio(row.key, row.text, row.lang)}
+                                disabled={playingAudioKey === row.key}
+                                className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                                title="Nghe thử"
+                              >
+                                {playingAudioKey === row.key ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Play className="h-3.5 w-3.5 fill-current" />
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void handleRegenerateAudio(
+                                    row.target,
+                                    row.text,
+                                    row.lang,
+                                    row.sectionId,
+                                    row.itemId,
+                                    row.part,
+                                  )
+                                }
+                                className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors"
+                                title="Sinh lại bằng GCP TTS"
+                              >
+                                <RefreshCw className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleTriggerUpload(
+                                    row.target,
+                                    row.text,
+                                    row.lang,
+                                    row.sectionId,
+                                    row.itemId,
+                                    row.part,
+                                  )
+                                }
+                                className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                                title="Upload file ghi đè"
+                              >
+                                <Upload className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          })()}
+            </div>
+          )}
         </div>
       )}
 
       {/* ======================================================== */}
-      {/* TAB 4: CCI & AMPLE PROFILES CRUD                         */}
+      {/* TAB 4: FORMULAS & GENERATOR PHYSICS SPECS                */}
+      {/* ======================================================== */}
+      {activeTab === 'formulas' && (
+        <div className="space-y-6">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-r from-violet-900 via-indigo-900 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-md relative overflow-hidden">
+            <div className="relative z-10 max-w-3xl space-y-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-500/20 border border-violet-400/30 text-violet-200 text-xs font-bold tracking-wide uppercase">
+                <Calculator className="h-3.5 w-3.5 text-violet-300" />
+                <span>Cognitive Physics & Math Matrix</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+                Vật Lý Nhận Thức & Công Thức Sinh Đề Chunks
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                Định nghĩa toán học cho toàn bộ quá trình tự động sinh bài test: từ kháng trở từ vựng (CVR), hiệu điện thế nhận thức (CPD), đến phân phối cường độ dòng chú ý Ample (CCI) qua các phiên học.
+              </p>
+              <div className="pt-2 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const formulaText = `CHUNKS LMS GENERATOR PHYSICS:\n1. CVR = TC × TL × LC (Ohm)\n2. CPD = CVR × CCI (Volt)\n3. CCI = round(CPD / CVR) (Ample)\n\nGREEN TEST:\n- 12V CPD\n- 8-22 words complete sentence\n- Continuous phonological flow, 0 trap pauses\n\nRED TEST:\n- 56V CPD\n- Collocations >= 2 words (Zero single words)\n- Anchor in Chunks resource\n- 650ms SSML pauses between chunks`
+                    void navigator.clipboard.writeText(formulaText)
+                    setCopiedFormula(true)
+                    setTimeout(() => setCopiedFormula(false), 2500)
+                  }}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 border border-white/20 text-white flex items-center gap-2 transition-all"
+                >
+                  {copiedFormula ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                  <span>{copiedFormula ? 'Đã sao chép đặc tả!' : 'Sao chép đặc tả công thức'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(true)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-violet-500 hover:bg-violet-400 text-white shadow-sm flex items-center gap-2 transition-all"
+                >
+                  <WandSparkles className="h-4 w-4" />
+                  <span>Mở AI Package Generator</span>
+                </button>
+              </div>
+            </div>
+            {/* Background Accent Grid */}
+            <div className="absolute -right-10 -bottom-10 w-80 h-80 rounded-full bg-violet-600/10 blur-3xl pointer-events-none" />
+          </div>
+
+          {/* Section 1: The Three Fundamental Formulas */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-violet-600" />
+              <h3 className="font-bold text-sm text-slate-900 uppercase tracking-wider">
+                1. Ba Định Luật Vật Lý Nhận Thức Nền Tảng
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              {/* Formula 1: CVR */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-violet-50 text-violet-700 border border-violet-200">
+                      Kháng trở (Resistance)
+                    </span>
+                    <span className="font-mono font-bold text-xs text-slate-400">Đơn vị: Ohm (Ω)</span>
+                  </div>
+
+                  <div className="p-3 bg-violet-50/50 rounded-xl border border-violet-100 text-center">
+                    <div className="font-mono font-black text-lg text-violet-900 tracking-wide">
+                      CVR = TC × TL × LC
+                    </div>
+                    <div className="text-[10px] text-violet-700 mt-0.5">
+                      Cognitive Vocabulary Resistance
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-xs text-slate-600">
+                    <div className="p-2 bg-slate-50 rounded-lg">
+                      <strong className="text-slate-900">TC (Term Complexity):</strong> Kháng trở cơ sở của cụm từ vựng (mặc định <strong>3.0Ω</strong> từ ngân hàng Chunks).
+                    </div>
+                    <div className="p-2 bg-slate-50 rounded-lg">
+                      <strong className="text-slate-900">TL (Topic Level):</strong> Mức độ trừu tượng ngữ nghĩa & áp lực phản xạ (<strong>1.0 – 2.0</strong>, A1=1.0, B1=1.25, B2=1.5, C1=1.75, C2=2.0).
+                    </div>
+                    <div className="p-2 bg-slate-50 rounded-lg">
+                      <strong className="text-slate-900">LC (Length Complexity):</strong> Hệ số độ dài từ: ≤8 từ (1.0), 9-14 từ (1.0-1.4), 15-17 từ (1.4-1.7), 18-22 từ (1.7-2.0), &gt;22 từ (2.0-2.5).
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Formula 2: CPD */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-indigo-50 text-indigo-700 border border-indigo-200">
+                      Hiệu điện thế (Voltage)
+                    </span>
+                    <span className="font-mono font-bold text-xs text-slate-400">Đơn vị: Volt (V)</span>
+                  </div>
+
+                  <div className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-100 text-center">
+                    <div className="font-mono font-black text-lg text-indigo-900 tracking-wide">
+                      CPD = CVR × CCI
+                    </div>
+                    <div className="text-[10px] text-indigo-700 mt-0.5">
+                      Cognitive Potential Difference
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-xs text-slate-600">
+                    <div className="p-2 bg-slate-50 rounded-lg">
+                      <strong className="text-slate-900">Tải Nhận Thức Mục Tiêu:</strong> Điện thế nhận thức cần tác động lên não bộ để kích hoạt trạng thái chú ý sâu.
+                    </div>
+                    <div className="p-2 bg-emerald-50 text-emerald-800 rounded-lg border border-emerald-100">
+                      <strong>Green Focus Test (12V):</strong> Tải điện thế êm ái, câu hoàn chỉnh liền mạch, đo sự bền bỉ của dòng chú ý (Focus).
+                    </div>
+                    <div className="p-2 bg-rose-50 text-rose-800 rounded-lg border border-rose-100">
+                      <strong>Red Awareness Test (56V):</strong> Tải điện thế cao, chuỗi collocations rời rạc, đo khả năng ức chế phản xạ sai lầm (Awareness).
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Formula 3: CCI */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-200">
+                      Cường độ dòng (Current)
+                    </span>
+                    <span className="font-mono font-bold text-xs text-slate-400">Đơn vị: Ample (A)</span>
+                  </div>
+
+                  <div className="p-3 bg-amber-50/50 rounded-xl border border-amber-100 text-center">
+                    <div className="font-mono font-black text-lg text-amber-900 tracking-wide">
+                      CCI = round(CPD / CVR)
+                    </div>
+                    <div className="text-[10px] text-amber-700 mt-0.5">
+                      Cognitive Current Intensity
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-xs text-slate-600">
+                    <div className="p-2 bg-slate-50 rounded-lg">
+                      <strong className="text-slate-900">Cường Độ Ample:</strong> Mức độ năng lượng kích hoạt cần duy trì qua từng session (Session 1 đến 7).
+                    </div>
+                    <div className="p-2 bg-slate-50 rounded-lg">
+                      <strong className="text-slate-900">Đường cong 7 Sessions:</strong> Phản ánh chu kỳ mỏi nhận thức (Cognitive Fatigue Curve): [12, 7, 5, 10, 6, 4, 4]A cho Red test.
+                    </div>
+                    <div className="p-2 bg-slate-50 rounded-lg">
+                      <strong className="text-slate-900">Quản lý linh hoạt:</strong> Có thể điều chỉnh và lưu trữ qua tab <strong>Hồ sơ CCI & Ample CRUD</strong>.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2: Green vs Red Archetype Matrix */}
+          <div className="space-y-4 pt-2">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-indigo-600" />
+              <h3 className="font-bold text-sm text-slate-900 uppercase tracking-wider">
+                2. Ma Trận Đối Chiếu Archetype: Green Test vs Red Test
+              </h3>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-bold">
+                      <th className="py-3 px-4 w-40">Thuộc tính</th>
+                      <th className="py-3 px-4 bg-emerald-50/50 text-emerald-800">
+                        GREEN TEST (Focus)
+                      </th>
+                      <th className="py-3 px-4 bg-rose-50/50 text-rose-800">
+                        RED TEST (Awareness)
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="py-3 px-4 font-bold text-slate-800">Mục tiêu đo lường</td>
+                      <td className="py-3 px-4 text-emerald-700 font-medium">
+                        Focus: Khả năng duy trì sự tập trung liền mạch và độ trôi chảy ngữ âm.
+                      </td>
+                      <td className="py-3 px-4 text-rose-700 font-medium">
+                        Awareness: Khả năng nhận thức bẫy, ức chế phản xạ thói quen và phản xạ nhanh.
+                      </td>
+                    </tr>
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="py-3 px-4 font-bold text-slate-800">Cấu trúc ngữ pháp</td>
+                      <td className="py-3 px-4">
+                        1 câu hoàn chỉnh có cấu trúc đầy đủ, ngữ nghĩa tự nhiên, dài từ <strong>8 đến 22 từ</strong>.
+                      </td>
+                      <td className="py-3 px-4">
+                        Chuỗi collocations rời rạc (tương tự Improv), tuyệt đối <strong>không chứa từ đơn lẻ (≥ 2 từ/cụm)</strong>.
+                      </td>
+                    </tr>
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="py-3 px-4 font-bold text-slate-800">Neo từ vựng nguồn</td>
+                      <td className="py-3 px-4">
+                        Lấy từ vựng từ ngân hàng Chunks Firestore, sau đó xây dựng câu hoàn chỉnh theo yêu cầu.
+                      </td>
+                      <td className="py-3 px-4">
+                        <strong>Cụm từ đầu tiên luôn neo trong Chunks</strong>, các cụm sau mở rộng theo độ khó và tần suất xuất hiện.
+                      </td>
+                    </tr>
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="py-3 px-4 font-bold text-slate-800">Rào cản cấm (Gate)</td>
+                      <td className="py-3 px-4 text-rose-600 font-semibold">
+                        Cấm dùng dấu gạch chéo (/), cấm bẫy ngắt quãng nhân tạo.
+                      </td>
+                      <td className="py-3 px-4 text-rose-600 font-semibold">
+                        Cấm từ đơn lẻ (Zero single words). Mọi thành phần đều phải là cụm từ có nghĩa.
+                      </td>
+                    </tr>
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="py-3 px-4 font-bold text-slate-800">Nhịp điệu âm thanh TTS</td>
+                      <td className="py-3 px-4">
+                        Dòng chảy ngữ âm liền mạch (Continuous phonological flow), nhịp đọc tự nhiên không ngắt quãng.
+                      </td>
+                      <td className="py-3 px-4">
+                        Chèn khoảng lặng <strong>650ms SSML (&lt;break time="650ms"/&gt;)</strong> giữa các cụm để buộc não bộ giải phóng áp lực.
+                      </td>
+                    </tr>
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="py-3 px-4 font-bold text-slate-800">Điện thế mục tiêu (CPD)</td>
+                      <td className="py-3 px-4 font-mono font-bold text-emerald-600">
+                        12V – 24V (Tiêu chuẩn: 12V)
+                      </td>
+                      <td className="py-3 px-4 font-mono font-bold text-rose-600">
+                        48V – 72V (Tiêu chuẩn: 56V)
+                      </td>
+                    </tr>
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="py-3 px-4 font-bold text-slate-800">Dải Kháng trở CVR</td>
+                      <td className="py-3 px-4 font-mono text-slate-700">
+                        3.0Ω – 6.0Ω (Kháng trở êm dịu)
+                      </td>
+                      <td className="py-3 px-4 font-mono text-slate-700">
+                        6.0Ω – 16.0Ω (Kháng trở xung áp cao)
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3: Interactive Cognitive Physics Sandbox & Calculator */}
+          <div className="space-y-4 pt-2">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
+              <h3 className="font-bold text-sm text-slate-900 uppercase tracking-wider">
+                3. Interactive Physics Sandbox & Bộ Tính Toán Trực Quan
+              </h3>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-6">
+              {/* Presets Toolbar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                <span className="text-xs font-bold text-slate-700">Cấu hình mẫu định sẵn (Presets):</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => applySandboxPreset('green_12v')}
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors border border-emerald-200/60"
+                  >
+                    Green Focus 12V
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applySandboxPreset('green_18v')}
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors border border-emerald-200/60"
+                  >
+                    Green Sprint 18V
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applySandboxPreset('red_56v')}
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors border border-rose-200/60"
+                  >
+                    Red Awareness 56V
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applySandboxPreset('red_72v')}
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors border border-rose-200/60"
+                  >
+                    Red Extreme 72V
+                  </button>
+                </div>
+              </div>
+
+              {/* Sliders Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* TC Slider */}
+                <div className="space-y-2 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                  <div className="flex justify-between items-center text-xs font-bold text-slate-800">
+                    <span>TC (Term Complexity)</span>
+                    <span className="font-mono text-indigo-600 bg-white px-2 py-0.5 rounded border border-slate-200">
+                      {calcTc.toFixed(1)}Ω
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1.0"
+                    max="6.0"
+                    step="0.5"
+                    value={calcTc}
+                    onChange={(e) => setCalcTc(Number(e.target.value))}
+                    className="w-full accent-indigo-600"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-400">
+                    <span>1.0 (Dễ)</span>
+                    <span>3.0 (Chuẩn)</span>
+                    <span>6.0 (Cao cấp)</span>
+                  </div>
+                </div>
+
+                {/* TL Slider */}
+                <div className="space-y-2 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                  <div className="flex justify-between items-center text-xs font-bold text-slate-800">
+                    <span>TL (Topic Level / Latency)</span>
+                    <span className="font-mono text-indigo-600 bg-white px-2 py-0.5 rounded border border-slate-200">
+                      {calcTl.toFixed(2)}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1.0"
+                    max="2.0"
+                    step="0.05"
+                    value={calcTl}
+                    onChange={(e) => setCalcTl(Number(e.target.value))}
+                    className="w-full accent-indigo-600"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-400">
+                    <span>1.0 (A1-A2)</span>
+                    <span>1.5 (B2)</span>
+                    <span>2.0 (C2)</span>
+                  </div>
+                </div>
+
+                {/* Word Count -> LC */}
+                <div className="space-y-2 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                  <div className="flex justify-between items-center text-xs font-bold text-slate-800">
+                    <span>Số từ (Word count → LC)</span>
+                    <span className="font-mono text-indigo-600 bg-white px-2 py-0.5 rounded border border-slate-200">
+                      {calcWordCount}w (LC:{derivedSandboxLc})
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="4"
+                    max="30"
+                    step="1"
+                    value={calcWordCount}
+                    onChange={(e) => setCalcWordCount(Number(e.target.value))}
+                    className="w-full accent-indigo-600"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-400">
+                    <span>8w (1.0)</span>
+                    <span>15w (1.5)</span>
+                    <span>22w (2.0)</span>
+                  </div>
+                </div>
+
+                {/* CPD Target Slider */}
+                <div className="space-y-2 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                  <div className="flex justify-between items-center text-xs font-bold text-slate-800">
+                    <span>Target CPD (Voltage)</span>
+                    <span className="font-mono text-indigo-600 bg-white px-2 py-0.5 rounded border border-slate-200">
+                      {calcCpd}V
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="6"
+                    max="96"
+                    step="2"
+                    value={calcCpd}
+                    onChange={(e) => setCalcCpd(Number(e.target.value))}
+                    className="w-full accent-indigo-600"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-400">
+                    <span>12V (Green)</span>
+                    <span>56V (Red)</span>
+                    <span>96V (Max)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Realtime Output Meters */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5 p-5 bg-gradient-to-r from-slate-900 to-indigo-950 text-white rounded-2xl">
+                {/* Meter 1: CVR */}
+                <div className="space-y-1">
+                  <span className="text-[11px] text-slate-400 font-medium">Kháng trở CVR tính toán</span>
+                  <div className="text-3xl font-black font-mono text-emerald-400">
+                    {derivedSandboxCvr.toFixed(2)}Ω
+                  </div>
+                  <p className="text-[10px] text-slate-300">
+                    = {calcTc.toFixed(1)}Ω × {calcTl.toFixed(2)} × {derivedSandboxLc}
+                  </p>
+                </div>
+
+                {/* Meter 2: Derived CCI */}
+                <div className="space-y-1">
+                  <span className="text-[11px] text-slate-400 font-medium">Cường độ dòng CCI (Ample)</span>
+                  <div className="text-3xl font-black font-mono text-amber-400">
+                    {derivedSandboxCci}A
+                  </div>
+                  <p className="text-[10px] text-slate-300">
+                    = round({calcCpd}V / {derivedSandboxCvr.toFixed(2)}Ω)
+                  </p>
+                </div>
+
+                {/* Meter 3: Tension Status & Generator Trigger */}
+                <div className="flex flex-col justify-between space-y-2">
+                  <div>
+                    <span className="text-[11px] text-slate-400 font-medium">Tải nhận thức (Cognitive Tension)</span>
+                    <div className="text-sm font-bold mt-1">
+                      {calcCpd <= 24 ? (
+                        <span className="text-emerald-400">Low Tension • Sustained Focus Flow</span>
+                      ) : calcCpd <= 60 ? (
+                        <span className="text-amber-400">High Tension • Awareness & Inhibition</span>
+                      ) : (
+                        <span className="text-rose-400">Extreme Surge • Severe Trap Challenge</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={applySandboxToGenerator}
+                    className="w-full py-2 px-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-md"
+                  >
+                    <span>Áp dụng vào Generator & Tạo Đề</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* TAB 5: CCI & AMPLE PROFILES CRUD                         */}
       {/* ======================================================== */}
       {activeTab === 'cci' && (
         <div className="space-y-6">

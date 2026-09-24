@@ -1728,12 +1728,14 @@ export function TeacherTestRunPage() {
             <>
               <p className="observe-rail-name">{learnerName}</p>
               <div className="observe-meta-row live-test-rail-meta">
-                <span className="observe-learner-rfc observe-has-tooltip is-rfc" tabIndex={0} aria-label={summaryMetrics.rfcTitle}>
-                  RFC {summaryMetrics.rfc}%
+                <span className="observe-learner-rfc observe-has-tooltip is-rfc justify-between min-w-[5.25rem]" tabIndex={0} aria-label={summaryMetrics.rfcTitle}>
+                  <span>RFC</span>
+                  <span className="font-mono font-bold text-right ml-1.5">{summaryMetrics.rfc}%</span>
                   <span className="observe-metric-tooltip" role="tooltip">{summaryMetrics.rfcTitle} Lower RFC means less observed struggle.</span>
                 </span>
-                <span className="observe-learner-rfc observe-has-tooltip is-percent-c" tabIndex={0} aria-label={summaryMetrics.racTitle}>
-                  {racMetricLabel} {summaryMetrics.rac}%
+                <span className="observe-learner-rfc observe-has-tooltip is-percent-c justify-between min-w-[5.25rem]" tabIndex={0} aria-label={summaryMetrics.racTitle}>
+                  <span>{racMetricLabel}</span>
+                  <span className="font-mono font-bold text-right ml-1.5">{summaryMetrics.rac}%</span>
                   <span className="observe-metric-tooltip" role="tooltip">{summaryMetrics.racTitle}</span>
                 </span>
                 <span

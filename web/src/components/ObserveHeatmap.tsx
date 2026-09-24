@@ -86,8 +86,8 @@ export function ObserveHeatmap({
             </>
           }
         >
-          <span className="observe-heat-metric" tabIndex={0}>
-            RFC <strong>{nTotal ? `${rfcPct}%` : '—'}</strong>
+          <span className="observe-heat-metric inline-flex items-center justify-between min-w-[4.5rem]" tabIndex={0}>
+            <span>RFC</span> <strong className="text-right ml-auto">{nTotal ? `${rfcPct}%` : '—'}</strong>
           </span>
         </ScreenTooltip>
 
@@ -128,8 +128,8 @@ export function ObserveHeatmap({
             </>
           }
         >
-          <span className="observe-heat-metric muted" tabIndex={0}>
-            %c <strong>{nTotal ? `${racPct}%` : '—'}</strong>
+          <span className="observe-heat-metric muted inline-flex items-center justify-between min-w-[4.5rem]" tabIndex={0}>
+            <span>%c</span> <strong className="text-right ml-auto">{nTotal ? `${racPct}%` : '—'}</strong>
           </span>
         </ScreenTooltip>
 

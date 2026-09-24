@@ -111,7 +111,7 @@ describe('metric calculations', () => {
     const metrics = calculateMetrics([
       { effectiveColor: 'red', enteredProbeFlow: false, probeEventCount: 0 },
       { effectiveColor: 'orange', enteredProbeFlow: false, probeEventCount: 0 },
-      { effectiveColor: 'yellow', enteredProbeFlow: true, probeEventCount: 1 },
+      { effectiveColor: 'yellow', enteredProbeFlow: true, probeEventCount: 0 },
       { effectiveColor: 'indigo', enteredProbeFlow: true, probeEventCount: 2 },
     ])
     const rfc = metrics.find((m) => m.key === 'rfc')!
@@ -141,7 +141,7 @@ describe('metric calculations', () => {
     const breakdown = calculateSpectrumStepBreakdown([
       { effectiveColor: 'red', enteredProbeFlow: false, probeEventCount: 0 },
       { effectiveColor: 'orange', enteredProbeFlow: false, probeEventCount: 0 },
-      { effectiveColor: 'yellow', enteredProbeFlow: true, probeEventCount: 1 },
+      { effectiveColor: 'yellow', enteredProbeFlow: true, probeEventCount: 0 },
       { effectiveColor: 'indigo', enteredProbeFlow: true, probeEventCount: 3 },
       { effectiveColor: 'purple', enteredProbeFlow: false, probeEventCount: 0 },
     ])
@@ -198,7 +198,7 @@ describe('metric calculations', () => {
 
     // 3. Probed attempt: Yellow fail (green 50% + yellow 34% = sum 84%, avg 42%)
     const yellowFailBreakdown = calculateSpectrumStepBreakdown([
-      { effectiveColor: 'yellow', enteredProbeFlow: true, probeEventCount: 1 },
+      { effectiveColor: 'yellow', enteredProbeFlow: true, probeEventCount: 0 },
     ])
     expect(yellowFailBreakdown.totalRecords).toBe(2)
     expect(yellowFailBreakdown.sumPercentX).toBe(84)
@@ -218,7 +218,7 @@ describe('metric calculations', () => {
     const mixedBreakdown = calculateSpectrumStepBreakdown([
       { effectiveColor: 'red', enteredProbeFlow: false, probeEventCount: 0 },
       { effectiveColor: 'orange', enteredProbeFlow: false, probeEventCount: 0 },
-      { effectiveColor: 'yellow', enteredProbeFlow: true, probeEventCount: 1 },
+      { effectiveColor: 'yellow', enteredProbeFlow: true, probeEventCount: 0 },
       { effectiveColor: 'indigo', enteredProbeFlow: true, probeEventCount: 3 },
       { effectiveColor: 'purple', enteredProbeFlow: false, probeEventCount: 0 },
     ])
@@ -290,7 +290,8 @@ describe('metric calculations', () => {
 
   it('expands finalized attempts into chronological N_total records', () => {
     expect(spectrumRecordsForAttempt({ effectiveColor: 'red', enteredProbeFlow: false, probeEventCount: 0 })).toEqual(['red'])
-    expect(spectrumRecordsForAttempt({ effectiveColor: 'yellow', enteredProbeFlow: true, probeEventCount: 1 })).toEqual(['green', 'yellow'])
+    expect(spectrumRecordsForAttempt({ effectiveColor: 'yellow', enteredProbeFlow: true, probeEventCount: 0 })).toEqual(['green', 'yellow'])
+    expect(spectrumRecordsForAttempt({ effectiveColor: 'yellow', enteredProbeFlow: true, probeEventCount: 1 })).toEqual(['green', 'blue', 'yellow'])
     expect(spectrumRecordsForAttempt({ effectiveColor: 'indigo', enteredProbeFlow: true, probeEventCount: 3 })).toEqual(['green', 'blue', 'blue', 'indigo'])
   })
 })

@@ -1237,9 +1237,12 @@ export function TeacherObservePage() {
                   </>
                 }
               >
-                <span className="observe-learner-rfc is-rfc">
-                  <Activity className="h-3.5 w-3.5" aria-hidden />
-                  RFC {learnerDone ? `${learnerRfc}%` : '—'}
+                <span className="observe-learner-rfc is-rfc justify-between min-w-[5.25rem]">
+                  <span className="inline-flex items-center gap-1">
+                    <Activity className="h-3.5 w-3.5" aria-hidden />
+                    <span>RFC</span>
+                  </span>
+                  <span className="font-mono font-bold text-right ml-1.5">{learnerDone ? `${learnerRfc}%` : '—'}</span>
                 </span>
               </ScreenTooltip>
               <span className="observe-meta-muted">
@@ -1386,11 +1389,14 @@ export function TeacherObservePage() {
               }
             >
               <span
-                className="observe-learner-rfc is-rfc"
+                className="observe-learner-rfc is-rfc justify-between min-w-[5.25rem]"
                 aria-label={rfcTitle}
               >
-                <Activity className="h-3.5 w-3.5" aria-hidden />
-                RFC {rfcPct}%
+                <span className="inline-flex items-center gap-1">
+                  <Activity className="h-3.5 w-3.5" aria-hidden />
+                  <span>RFC</span>
+                </span>
+                <span className="font-mono font-bold text-right ml-1.5">{rfcPct}%</span>
               </span>
             </ScreenTooltip>
 
@@ -1431,8 +1437,9 @@ export function TeacherObservePage() {
                 </>
               }
             >
-              <span className="observe-learner-rfc is-percent-c" aria-label={racTitle}>
-                %c {racPct}%
+              <span className="observe-learner-rfc is-percent-c justify-between min-w-[5.25rem]" aria-label={racTitle}>
+                <span>%c</span>
+                <span className="font-mono font-bold text-right ml-1.5">{racPct}%</span>
               </span>
             </ScreenTooltip>
           </>

@@ -231,15 +231,17 @@ export function calculateSpectrumStepBreakdown(
     if (attempt.enteredProbeFlow) {
       byColor.green += 1
       const probeCount = Math.max(0, attempt.probeEventCount)
-      probeRecords += probeCount
       if (attempt.effectiveColor === 'yellow') {
         byColor.yellow += 1
-        byColor.blue += Math.max(0, probeCount - 1)
+        byColor.blue += probeCount
+        probeRecords += probeCount + 1
       } else if (attempt.effectiveColor === 'indigo') {
         byColor.indigo += 1
         byColor.blue += Math.max(0, probeCount - 1)
+        probeRecords += probeCount
       } else {
         byColor.blue += probeCount
+        probeRecords += probeCount
       }
     } else {
       byColor[attempt.effectiveColor] += 1
@@ -273,9 +275,12 @@ export function spectrumRecordsForAttempt(attempt: FinalizedAttempt): ResultColo
 
   const probeCount = Math.max(0, attempt.probeEventCount)
   const records: ResultColor[] = ['green']
-  if (attempt.effectiveColor === 'yellow' || attempt.effectiveColor === 'indigo') {
+  if (attempt.effectiveColor === 'yellow') {
+    records.push(...Array.from({ length: probeCount }, () => 'blue' as const))
+    records.push('yellow')
+  } else if (attempt.effectiveColor === 'indigo') {
     records.push(...Array.from({ length: Math.max(0, probeCount - 1) }, () => 'blue' as const))
-    records.push(attempt.effectiveColor)
+    records.push('indigo')
   } else {
     records.push(...Array.from({ length: probeCount }, () => 'blue' as const))
   }

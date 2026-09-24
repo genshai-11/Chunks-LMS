@@ -116,6 +116,8 @@ export function TeacherTestsPage() {
           const testType: 'green' | 'red' = isGreen ? 'green' : 'red'
 
           for (const version of result.data.filter((v) => v.status === 'published')) {
+            const sections = await listTestSections(version.id)
+            if (!sections.ok || sections.data.length === 0) continue
             next.push({
               id: version.id,
               packageId: pkg.id,

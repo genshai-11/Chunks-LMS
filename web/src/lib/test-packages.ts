@@ -1622,7 +1622,6 @@ export async function createMiniTestVariantFromPackage(
             tc: srcItem.tc,
             lc: srcItem.lc,
             tl: srcItem.tl,
-            measured_cvr: srcItem.measured_cvr,
             source_metadata: {
               ...(srcItem.source_metadata ?? {}),
               derived_from_item_id: srcItem.id,

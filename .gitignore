@@ -21,6 +21,8 @@ web/.env
 # Local tooling / editor
 .DS_Store
 Thumbs.db
+.~lock.*
+.~lock.*#
 .vscode/
 .idea/
 
@@ -97,3 +99,4 @@ web/public/audio/intros/
 web/public/audio/sound-selection/
 .chunks-resourcce/
 .tmp/
+outputs/

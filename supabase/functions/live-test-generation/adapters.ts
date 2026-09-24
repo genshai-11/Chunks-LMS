@@ -297,5 +297,100 @@ export async function withAuditedRetries<
     }
   }
 
-  return { error: new Error("Retry loop exited unexpectedly"), attempts };
+return { error: new Error("Retry loop exited unexpectedly"), attempts };
+}
+
+export type GoogleCloudTtsConfig = {
+  apiKey: string;
+};
+
+export function createGoogleCloudTtsAdapter(
+  config: GoogleCloudTtsConfig,
+  fetchImpl: FetchLike = fetch,
+): LiveTestGenerationAdapter {
+  const apiKey = config.apiKey.trim();
+  if (!apiKey) {
+    throw new Error("Google Cloud TTS API key is required");
+  }
+
+  return {
+    async generateTestItem() {
+      throw new Error("Google Cloud TTS adapter does not support generateTestItem.");
+    },
+
+    async generateSpeech(input) {
+      const cleanVoice = input.voiceId.replace(/^(google|google-cloud)\//, "");
+      const languageCode = input.language === "vi" ? "vi-VN" : "en-US";
+
+      const isSsml =
+        input.text.trim().startsWith("<speak>") || input.text.includes("<break");
+      // Note: Journey voices (en-US-Journey-*) do not support SSML tags like <break>.
+      // If SSML is present and a Journey voice was requested, fallback to a Neural2 voice (e.g. 'en-US-Neural2-F').
+      let targetVoice = cleanVoice;
+      if (isSsml && targetVoice.includes("Journey")) {
+        targetVoice = input.language === "vi" ? "vi-VN-Neural2-A" : "en-US-Neural2-F";
+      }
+      const requestInput = isSsml
+        ? { ssml: input.text.trim().startsWith("<speak>") ? input.text : `<speak>${input.text}</speak>` }
+        : { text: input.text };
+
+      const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
+      const response = await fetchImpl(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          input: requestInput,
+          voice: {
+            languageCode,
+            name: targetVoice,
+          },
+          audioConfig: {
+            audioEncoding: "MP3",
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        let errorBody: unknown = null;
+        try {
+          errorBody = await response.json();
+        } catch {
+          errorBody = await response.text().catch(() => "");
+        }
+        throw new Error(
+          `Google Cloud TTS request failed (${response.status}): ${JSON.stringify(redactProviderMetadata(errorBody))}`,
+        );
+      }
+
+      const payload = (await response.json()) as { audioContent?: string };
+      if (!payload.audioContent) {
+        throw new Error("Google Cloud TTS response did not include audioContent");
+      }
+
+      const binaryString = atob(payload.audioContent);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      const metadata = redactProviderMetadata({
+        provider: "google-cloud-tts",
+        endpoint: "/v1/text:synthesize",
+        model: input.voiceId,
+        voiceName: targetVoice,
+        languageCode,
+        isSsml,
+        bytes: bytes.byteLength,
+      }) as Record<string, unknown>;
+
+      return {
+        bytes,
+        mimeType: "audio/mpeg",
+        format: "mp3",
+        providerMetadata: metadata,
+      };
+    },
+  };
 }

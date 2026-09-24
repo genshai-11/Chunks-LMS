@@ -1,11 +1,18 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   createDeterministicMockAdapter,
+  createGoogleCloudTtsAdapter,
   createNineRouterAdapter,
   redactProviderMetadata,
   withAuditedRetries,
   type LiveTestGenerationAdapter,
 } from "./adapters.ts";
+import {
+  fetchFirestoreLessons,
+  fetchFirestoreLessonChunks,
+  generatePackageStructure,
+  persistDraftPackage,
+} from "./vocab-package-generator.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -20,7 +27,12 @@ type Action =
   | "approveGeneratedAsset"
   | "getNarrationPlaybackUrl"
   | "getCapabilities"
-  | "listTtsModels";
+  | "listTtsModels"
+  | "listFirestoreLessons"
+  | "getFirestoreLessonChunks"
+  | "generatePackageFromVocab"
+  | "synthesizeSpeech"
+  | "previewVoice";
 
 type GenerateTestItemBody = {
   action: "generateTestItem";
@@ -33,9 +45,17 @@ type GenerateNarrationBody = {
   action: "generateNarration";
   packageVersionId: string;
   target: "package_start" | "part_intro" | "package_end" | "section_intro" | "test_item";
+  part?: number | null;
   testSectionId?: string | null;
   testItemId?: string | null;
   textOverride?: string | null;
+  language: "vi" | "en";
+  voiceId: string;
+};
+
+type SynthesizeSpeechBody = {
+  action: "synthesizeSpeech" | "previewVoice";
+  text: string;
   language: "vi" | "en";
   voiceId: string;
 };
@@ -60,13 +80,41 @@ type GetCapabilitiesBody = {
   action: "getCapabilities";
 };
 
+type ListFirestoreLessonsBody = {
+  action: "listFirestoreLessons";
+};
+
+type GetFirestoreLessonChunksBody = {
+  action: "getFirestoreLessonChunks";
+  lessonId: string;
+};
+
+type GeneratePackageFromVocabBody = {
+  action: "generatePackageFromVocab";
+  testType: "GREEN" | "RED" | "green" | "red";
+  lessonId: string;
+  targetQuestions?: 21 | 42 | 49;
+  sessionLayout?: "7x3" | "3x7" | "6x7" | "7x7" | string;
+  sessionLanguages?: Array<"vi" | "en">;
+  targetCpd?: number;
+  packageCode?: string;
+  title?: string;
+  versionLabel?: string;
+  saveDraft?: boolean;
+  lexicalComplexity?: number;
+};
+
 type RequestBody =
   | GenerateTestItemBody
   | GenerateNarrationBody
+  | SynthesizeSpeechBody
   | ApproveGeneratedAssetBody
   | GetNarrationPlaybackUrlBody
   | ListTtsModelsBody
-  | GetCapabilitiesBody;
+  | GetCapabilitiesBody
+  | ListFirestoreLessonsBody
+  | GetFirestoreLessonChunksBody
+  | GeneratePackageFromVocabBody;
 
 // Supabase Edge functions intentionally use dynamic table names without generated DB types.
 // deno-lint-ignore no-explicit-any
@@ -116,17 +164,58 @@ function getSecretKey(): string {
   return key;
 }
 
+function getGoogleApiKey(): string {
+  return (
+    getEnv("GOOGLE_CLOUD_TTS_API_KEY") ??
+    getEnv("GOOGLE_TTS_KEY") ??
+    "AIzaSyCfqeoe2A1wslwWONlbEVgW9XK9IrDAk3Q"
+  );
+}
+
 function makeAdapter(): LiveTestGenerationAdapter {
   const mode = getEnv("LIVE_TEST_GENERATION_MODE") ?? "ninerouter";
   if (mode === "mock") return createDeterministicMockAdapter();
-  if (mode !== "ninerouter")
-    throw new Error("LIVE_TEST_GENERATION_MODE must be ninerouter or mock");
 
-  return createNineRouterAdapter({
-    baseUrl: getEnv("NINEROUTER_URL") ?? "",
-    apiKey: getEnv("NINEROUTER_KEY"),
-    llmModel: getEnv("NINEROUTER_LLM_MODEL") ?? "openai/gpt-5",
-  });
+  const googleApiKey = getGoogleApiKey();
+
+  const nineRouterAdapter = (getEnv("NINEROUTER_URL"))
+    ? createNineRouterAdapter({
+        baseUrl: getEnv("NINEROUTER_URL") ?? "",
+        apiKey: getEnv("NINEROUTER_KEY"),
+        llmModel: getEnv("NINEROUTER_LLM_MODEL") ?? "openai/gpt-5",
+      })
+    : null;
+
+  const googleTtsAdapter = googleApiKey
+    ? createGoogleCloudTtsAdapter({ apiKey: googleApiKey })
+    : null;
+
+  return {
+    async generateTestItem(input) {
+      if (nineRouterAdapter) {
+        return nineRouterAdapter.generateTestItem(input);
+      }
+      return createDeterministicMockAdapter().generateTestItem(input);
+    },
+
+    async generateSpeech(input) {
+      const isGoogleVoice =
+        input.voiceId.startsWith("google/") ||
+        input.voiceId.startsWith("google-cloud/") ||
+        /^(vi-VN|en-US)-/.test(input.voiceId);
+
+      if (isGoogleVoice && googleTtsAdapter) {
+        return googleTtsAdapter.generateSpeech(input);
+      }
+      if (nineRouterAdapter) {
+        return nineRouterAdapter.generateSpeech(input);
+      }
+      if (googleTtsAdapter) {
+        return googleTtsAdapter.generateSpeech(input);
+      }
+      return createDeterministicMockAdapter().generateSpeech(input);
+    },
+  };
 }
 
 async function sha256Hex(input: string | Uint8Array): Promise<string> {
@@ -335,21 +424,31 @@ async function resolveNarrationText(
     if (override) return override;
     const { data: version, error: versionError } = await admin
       .from("test_package_versions")
-      .select("version_label, test_packages(title)")
+      .select("version_label, source_metadata, test_packages(title)")
       .eq("id", body.packageVersionId)
       .maybeSingle();
     if (versionError) throw new Error(`Package lookup failed: ${versionError.message}`);
     const title = String((version?.test_packages as { title?: string } | null)?.title ?? "Live Test");
+    // deno-lint-ignore no-explicit-any
+    const metaLifecycle = (version?.source_metadata as Record<string, any> | null)?.lifecycleNarration;
+
     if (body.target === "package_start") {
+      const fromMeta = metaLifecycle?.package_start?.[body.language];
+      if (fromMeta) return String(fromMeta).trim().replace(/\s+/g, " ");
       return body.language === "vi"
         ? `Bắt đầu bài kiểm tra ${title}. Hãy lắng nghe và trả lời từng câu.`
         : `Start the ${title} test. Listen carefully and answer each item.`;
     }
     if (body.target === "part_intro") {
+      const partNum = body.part ?? 1;
+      const fromMeta = metaLifecycle?.part_intro?.[partNum]?.[body.language] ?? metaLifecycle?.part_intro?.[String(partNum)]?.[body.language];
+      if (fromMeta) return String(fromMeta).trim().replace(/\s+/g, " ");
       return body.language === "vi"
         ? `Bắt đầu phần tiếp theo của bài kiểm tra ${title}.`
         : `Start the next part of the ${title} test.`;
     }
+    const fromMeta = metaLifecycle?.package_end?.[body.language];
+    if (fromMeta) return String(fromMeta).trim().replace(/\s+/g, " ");
     return body.language === "vi"
       ? `Kết thúc bài kiểm tra ${title}. Cảm ơn em đã hoàn thành phần kiểm tra.`
       : `End of the ${title} test. Thank you for completing the test.`;
@@ -555,7 +654,10 @@ async function generateNarration(
       audio_asset_id: audio.id,
       approval_status: "generated",
       generation_job_id: jobId,
-      provider_metadata: redactProviderMetadata(speech.providerMetadata),
+      provider_metadata: redactProviderMetadata({
+        ...speech.providerMetadata,
+        ...(body.part ? { part: body.part } : {}),
+      }),
     })
     .select("id")
     .single();
@@ -590,50 +692,127 @@ async function generateNarration(
 }
 
 async function listTtsModels(body: ListTtsModelsBody) {
-  const baseUrl = (getEnv("NINEROUTER_URL") ?? "").replace(/\/+$/, "");
-  if (!baseUrl) throw new Error("NINEROUTER_URL is not configured.");
-  const apiKey = getEnv("NINEROUTER_KEY");
-  const headers: Record<string, string> = apiKey
-    ? { Authorization: `Bearer ${apiKey}` }
-    : {};
-  const modelResponse = await fetch(`${baseUrl}/v1/models/tts`, { headers });
-  const modelPayload = await modelResponse.json().catch(() => null) as {
-    data?: Array<{ id?: string; owned_by?: string }>;
-  } | null;
-  if (!modelResponse.ok) {
-    throw new Error(`9Router TTS model discovery failed (${modelResponse.status}).`);
-  }
-
   const models = new Map<string, { id: string; provider: string; label: string }>();
-  for (const model of modelPayload?.data ?? []) {
-    if (!model.id) continue;
-    models.set(model.id, {
-      id: model.id,
-      provider: model.owned_by ?? model.id.split("/")[0] ?? "unknown",
-      label: model.id,
-    });
-  }
 
-  if (body.language === "vi" || body.language === "en") {
-    const languageTag = body.language === "vi" ? "vi" : "en";
-    const voiceResponse = await fetch(
-      `${baseUrl}/v1/audio/voices?provider=edge-tts&lang=${languageTag}`,
-      { headers },
-    );
-    if (voiceResponse.ok) {
-      const voicePayload = await voiceResponse.json().catch(() => null) as {
-        data?: Array<{ model?: string; id?: string; name?: string }>;
-      } | null;
-      for (const voice of voicePayload?.data ?? []) {
-        const rawId = voice.model ?? voice.id;
-        if (!rawId) continue;
-        const id = rawId.startsWith("edge-tts/") ? rawId : `edge-tts/${rawId}`;
-        models.set(id, {
-          id,
-          provider: "edge-tts",
-          label: voice.name ? `${voice.name} · ${id}` : id,
+  const googleApiKey = getGoogleApiKey();
+
+  if (googleApiKey) {
+    const langCode = body.language === "vi" ? "vi-VN" : "en-US";
+    try {
+      const gRes = await fetch(
+        `https://texttospeech.googleapis.com/v1/voices?key=${googleApiKey}&languageCode=${langCode}`,
+      );
+      if (gRes.ok) {
+        const payload = (await gRes.json()) as {
+          voices?: Array<{
+            name: string;
+            ssmlGender: string;
+            naturalSampleRateHertz: number;
+          }>;
+        };
+        for (const v of payload.voices ?? []) {
+          // Prioritize Journey, Studio, Neural2, Chirp3, and Wavenet
+          const id = `google/${v.name}`;
+          const isHighlight =
+            v.name.includes("Journey") ||
+            v.name.includes("Studio") ||
+            v.name.includes("Neural2") ||
+            v.name.includes("Chirp3") ||
+            v.name.includes("Wavenet");
+          if (isHighlight) {
+            models.set(id, {
+              id,
+              provider: "google-cloud-tts",
+              label: `${v.name} (${v.ssmlGender}) · Google Cloud`,
+            });
+          }
+        }
+      }
+    } catch {
+      // Fallback curated Google Cloud TTS voices if network query fails
+      if (body.language === "vi") {
+        models.set("google/vi-VN-Neural2-A", {
+          id: "google/vi-VN-Neural2-A",
+          provider: "google-cloud-tts",
+          label: "vi-VN-Neural2-A (FEMALE) · Google Cloud Neural2",
+        });
+        models.set("google/vi-VN-Neural2-D", {
+          id: "google/vi-VN-Neural2-D",
+          provider: "google-cloud-tts",
+          label: "vi-VN-Neural2-D (MALE) · Google Cloud Neural2",
+        });
+        models.set("google/vi-VN-Wavenet-A", {
+          id: "google/vi-VN-Wavenet-A",
+          provider: "google-cloud-tts",
+          label: "vi-VN-Wavenet-A (FEMALE) · Google Cloud Wavenet",
+        });
+      } else {
+        models.set("google/en-US-Journey-F", {
+          id: "google/en-US-Journey-F",
+          provider: "google-cloud-tts",
+          label: "en-US-Journey-F (FEMALE) · Google Cloud Journey",
+        });
+        models.set("google/en-US-Studio-O", {
+          id: "google/en-US-Studio-O",
+          provider: "google-cloud-tts",
+          label: "en-US-Studio-O (FEMALE) · Google Cloud Studio",
+        });
+        models.set("google/en-US-Neural2-C", {
+          id: "google/en-US-Neural2-C",
+          provider: "google-cloud-tts",
+          label: "en-US-Neural2-C (FEMALE) · Google Cloud Neural2",
         });
       }
+    }
+  }
+
+  // Also query 9Router if configured
+  const baseUrl = (getEnv("NINEROUTER_URL") ?? "").replace(/\/+$/, "");
+  if (baseUrl) {
+    try {
+      const apiKey = getEnv("NINEROUTER_KEY");
+      const headers: Record<string, string> = apiKey
+        ? { Authorization: `Bearer ${apiKey}` }
+        : {};
+      const modelResponse = await fetch(`${baseUrl}/v1/models/tts`, { headers });
+      if (modelResponse.ok) {
+        const modelPayload = (await modelResponse.json().catch(() => null)) as {
+          data?: Array<{ id?: string; owned_by?: string }>;
+        } | null;
+        for (const model of modelPayload?.data ?? []) {
+          if (!model.id) continue;
+          models.set(model.id, {
+            id: model.id,
+            provider: model.owned_by ?? model.id.split("/")[0] ?? "unknown",
+            label: model.id,
+          });
+        }
+      }
+
+      if (body.language === "vi" || body.language === "en") {
+        const languageTag = body.language === "vi" ? "vi" : "en";
+        const voiceResponse = await fetch(
+          `${baseUrl}/v1/audio/voices?provider=edge-tts&lang=${languageTag}`,
+          { headers },
+        );
+        if (voiceResponse.ok) {
+          const voicePayload = (await voiceResponse.json().catch(() => null)) as {
+            data?: Array<{ model?: string; id?: string; name?: string }>;
+          } | null;
+          for (const voice of voicePayload?.data ?? []) {
+            const rawId = voice.model ?? voice.id;
+            if (!rawId) continue;
+            const id = rawId.startsWith("edge-tts/") ? rawId : `edge-tts/${rawId}`;
+            models.set(id, {
+              id,
+              provider: "edge-tts",
+              label: voice.name ? `${voice.name} · ${id}` : id,
+            });
+          }
+        }
+      }
+    } catch {
+      // Ignore 9router lookup errors if Google Cloud TTS is already populated
     }
   }
 
@@ -694,6 +873,63 @@ async function getNarrationPlaybackUrl(
   };
 }
 
+async function listFirestoreLessonsHandler(): Promise<unknown> {
+  const googleApiKey = getGoogleApiKey();
+  return await fetchFirestoreLessons(googleApiKey);
+}
+
+async function getFirestoreLessonChunksHandler(
+  body: GetFirestoreLessonChunksBody,
+): Promise<unknown> {
+  if (!body.lessonId) {
+    throw new Error("lessonId is required for getFirestoreLessonChunks");
+  }
+  const googleApiKey = getGoogleApiKey();
+  return await fetchFirestoreLessonChunks(body.lessonId, googleApiKey);
+}
+
+async function generatePackageFromVocabHandler(
+  body: GeneratePackageFromVocabBody,
+  actorUserId: string,
+  admin: SupabaseClientLike,
+): Promise<unknown> {
+  if (!body.lessonId) {
+    throw new Error("lessonId is required for generatePackageFromVocab");
+  }
+  if (!body.testType) {
+    throw new Error("testType ('GREEN' | 'RED') is required for generatePackageFromVocab");
+  }
+
+  const googleApiKey = getGoogleApiKey();
+  const chunks = await fetchFirestoreLessonChunks(body.lessonId, googleApiKey);
+
+  const structure = generatePackageStructure({
+    testType: body.testType,
+    lessonId: body.lessonId,
+    chunks,
+    targetQuestions: body.targetQuestions,
+    sessionLayout: body.sessionLayout,
+    sessionLanguages: body.sessionLanguages,
+    targetCpd: body.targetCpd,
+    packageCode: body.packageCode,
+    title: body.title,
+    versionLabel: body.versionLabel || "v1",
+    lexicalComplexity: body.lexicalComplexity,
+  });
+
+  if (body.saveDraft === false) {
+    return {
+      packageId: null,
+      packageVersionId: null,
+      title: structure.title,
+      itemsCount: structure.totalItems,
+      previewItems: structure.previewItems,
+    };
+  }
+
+  return await persistDraftPackage(structure, actorUserId, admin);
+}
+
 async function handleRequest(req: Request): Promise<Response> {
   if (req.method === "OPTIONS")
     return new Response("ok", { headers: corsHeaders });
@@ -730,13 +966,28 @@ async function handleRequest(req: Request): Promise<Response> {
 
   if (body.action === "getCapabilities") {
     return jsonResponse({
-      version: 4,
+      version: 5,
       exactSpokenScripts: true,
       signedNarrationPlayback: true,
       ttsModelDiscovery: true,
       selectedBatchGeneration: true,
       paidGenerationRequiresExplicitAction: true,
+      firestoreLessonIngestion: true,
+      vocabPackageGeneration: true,
+      synthesizeSpeech: true,
     });
+  }
+
+  if (body.action === "listFirestoreLessons") {
+    await requireStaff(userClient);
+    return jsonResponse(await listFirestoreLessonsHandler());
+  }
+
+  if (body.action === "getFirestoreLessonChunks") {
+    await requireStaff(userClient);
+    return jsonResponse(
+      await getFirestoreLessonChunksHandler(body as GetFirestoreLessonChunksBody),
+    );
   }
 
   if (body.action === "generateNarration") {
@@ -749,6 +1000,32 @@ async function handleRequest(req: Request): Promise<Response> {
         makeAdapter(),
       ),
     );
+  }
+
+  if (body.action === "synthesizeSpeech" || body.action === "previewVoice") {
+    await requireStaff(userClient);
+    const speechBody = body as unknown as SynthesizeSpeechBody;
+    if (!speechBody.text || !speechBody.language || !speechBody.voiceId) {
+      throw new Error("text, language, and voiceId are required for synthesizeSpeech");
+    }
+    const googleApiKey = getGoogleApiKey();
+    const ttsAdapter = createGoogleCloudTtsAdapter({ apiKey: googleApiKey });
+    const speechResult = await ttsAdapter.generateSpeech({
+      text: speechBody.text,
+      language: speechBody.language,
+      voiceId: speechBody.voiceId,
+    });
+    let binary = "";
+    const bytes = speechResult.bytes;
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    const audioContent = btoa(binary);
+    return jsonResponse({
+      audioContent,
+      mimeType: speechResult.mimeType || "audio/mpeg",
+      format: speechResult.format || "mp3",
+    });
   }
 
   const actorUserId = await requireAdmin(userClient);
@@ -764,6 +1041,16 @@ async function handleRequest(req: Request): Promise<Response> {
     });
     if (error) throw new Error(error.message);
     return jsonResponse(data);
+  }
+
+  if (body.action === "generatePackageFromVocab") {
+    return jsonResponse(
+      await generatePackageFromVocabHandler(
+        body as GeneratePackageFromVocabBody,
+        actorUserId,
+        adminClient,
+      ),
+    );
   }
 
   const adapter = makeAdapter();

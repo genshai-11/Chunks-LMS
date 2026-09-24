@@ -138,17 +138,36 @@ The share of cool Spectrum Color measurement steps (Green + Blue + Indigo + Purp
 _Avoid_: Success score
 
 **CVR**:
-Semantic Complexity Value Rating for a Test Item prompt, calculated from Estimated TC × LC × TL.
+Semantic Complexity Value Rating for a Test Item prompt, calculated from `TC × TL × LC` (Unit: Ohm, $\Omega$).
+- **TC (Term Complexity)**: Number of chunks / semantic elements from resource (default 3 $\Omega$).
+- **TL (Topic Level / Time Latency)**: Vocabulary level progression (A1 to C1) and cognitive hesitation factor ($1.0 - 2.0$).
+- **LC (Length / Lexical Complexity)**: Word count density factor ($1.0 - 2.5$, where ~8 words $\approx 1.0$, 15 words $\approx 1.5$, 18-22 words $\approx 2.0$, capped at max 22 words).
 _Avoid_: Generic difficulty, final result
 
 **CCI**:
-Named current/intensity measurement for a Test Section. The canonical workbook maps `CCI.Ampe (A)` to CCI value and retains CCI ID, Name, description, and category. Legacy `Unit (Ohm)` mappings are obsolete.
+Named current/intensity measurement for a Test Section. The canonical workbook maps `CCI.Ampe (A)` to CCI value and retains CCI ID, Name, description, and category. Unit is Ample (Ampe, A), configured via full CRUD profiles. Legacy `Unit (Ohm)` mappings are obsolete.
 _Avoid_: CVR, manually derived score
 
 **CPD**:
-Derived live-test demand value calculated as CVR × CCI and reproducible from stored source measurements.
+Derived live-test demand value calculated as `CVR × CCI` (Unit: Volt, V) and reproducible from stored source measurements.
+Standard baseline targets: **12V** for Green Focus tests and **56V** for Red Awareness tests, or customizable on creation.
 Spectrum color factors normalize CPD contribution: Red `0.00`, Orange `0.17`, Yellow `0.33`, Green `0.50`, Blue `0.67`, Indigo `0.83`, Purple `1.00`.
 _Avoid_: Manually entered metric
+
+**Green Test (Focus Archetype)**:
+Live-test assessment measuring sustained focus, breath control, and complete sentence articulation.
+Each item is a single, complete, natural bilingual sentence. Sentences follow a strictly linear word count progression across 7 sessions (9-10w up to max 22w), continuous tempo ($TL=1.0$), with zero semantic trap pauses.
+_Avoid_: Fragmented hints, SSML break pauses
+
+**Red Test (Awareness Archetype)**:
+Live-test assessment measuring cognitive trap detection, awareness, and rapid recovery under semantic interference.
+Each item presents a sequence of multi-word collocations (zero single words, each hint $\ge 2$ words). The initial term is always anchored in the Chunks curriculum; subsequent hints scale difficulty via semantic divergence and lower word frequency while preserving grammatical type functions. Audio injects 650ms SSML semantic gaps between hints.
+_Avoid_: Single-word lists, complete smooth sentences
+
+**Test Audio Lifecycle & GCP TTS**:
+Full audio management covering package start, part intros (1–3), section intros, package end, and every test item. Uses the Google Cloud Text-to-Speech API endpoint (`https://texttospeech.googleapis.com/v1/text:synthesize`) with Neural2 voices (`vi-VN-Neural2-A` for Vietnamese, `en-US-Neural2-F` for English). Supports real-time playback review, single/batch regeneration, and custom audio upload overrides.
+_Avoid_: Client-side synthesis only, unverified audio assets
+
 
 ---
 

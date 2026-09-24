@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TypeSafe AI: Jev - Mô Hình Phân Loại "System 1" Đột Phá</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --paper: #f8f9fa;
+      --paper-card: #ffffff;
+      --ink: #1a1d24;
+      --muted: #4a5568;
+      --soft: #a0aec0;
+      --rule: #e2e8f0;
+      --accent: #eb6c36;
+      --accent-tint: rgba(235, 108, 54, 0.08);
+      --link: #2b6cb0;
+      --success: #10b981;
+      --success-tint: rgba(16, 185, 129, 0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #edf2f7;
+      color: var(--ink);
+      font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.6;
+      padding: 2.5rem 1rem;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1100px;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    /* Editorial Header */
+    .header-card {
+      background: var(--paper-card);
+      border: 1px solid var(--rule);
+      border-radius: 12px;
+      padding: 2.5rem;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    }
+    .eyebrow {
+      font-family: 'Geist Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.75rem;
+    }
+    h1 {
+      font-family: 'Instrument Serif', Georgia, serif;
+      font-size: 2.85rem;
+      font-weight: 400;
+      color: var(--ink);
+      line-height: 1.15;
+      margin-bottom: 1rem;
+    }
+    .lead {
+      font-size: 1.1rem;
+      color: var(--muted);
+      max-width: 860px;
+    }
+
+    /* Source Video Banner */
+    .source-banner {
+      background: #fff5f2;
+      border: 1px solid #fed7cc;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-top: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .source-info {
+      font-size: 0.9rem;
+      color: #9c4221;
+    }
+    .source-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: var(--accent);
+      color: #fff;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      text-decoration: none;
+      font-family: 'Geist Mono', monospace;
+      font-size: 0.8rem;
+      font-weight: 500;
+      transition: opacity 0.2s;
+    }
+    .source-btn:hover { opacity: 0.9; }
+
+    /* Diagram Section */
+    .diagram-card {
+      background: #f5f5f5;
+      border: 1px solid #d8dce2;
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+      overflow: hidden;
+    }
+    .diagram-title {
+      font-family: 'Geist Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 0.5rem;
+    }
+    svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    /* Breakdown Grids */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1.25rem;
+    }
+    @media (max-width: 820px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+
+    .info-card {
+      background: var(--paper-card);
+      border: 1px solid var(--rule);
+      border-radius: 10px;
+      padding: 1.75rem;
+    }
+    .info-card h3 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .info-card p, .info-card li {
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+    .info-card ul {
+      padding-left: 1.25rem;
+      margin-top: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    /* Comparison Table */
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      font-size: 0.9rem;
+    }
+    .compare-table th, .compare-table td {
+      padding: 0.85rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--rule);
+    }
+    .compare-table th {
+      background: #f7fafc;
+      font-family: 'Geist Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .compare-table tr:hover { background: #fafbfc; }
+
+    /* Code Snippet Box */
+    .code-box {
+      background: #1e293b;
+      color: #f8fafc;
+      border-radius: 8px;
+      padding: 1.25rem;
+      font-family: 'Geist Mono', monospace;
+      font-size: 0.82rem;
+      overflow-x: auto;
+      margin-top: 0.75rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-family: 'Geist Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+    .badge-accent { background: var(--accent-tint); color: var(--accent); }
+    .badge-green { background: var(--success-tint); color: var(--success); }
+
+    footer {
+      text-align: center;
+      font-family: 'Geist Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--soft);
+      padding: 1.5rem 0;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <header class="header-card">
+      <div class="eyebrow">FRONTIER AI ARCHITECTURE &bull; SYSTEM 1 CLASSIFICATION</div>
+      <h1>Jev: Mô Hình Phân Loại "System 1" Cực Tốc</h1>
+      <p class="lead">
+        Phân tích chuyên sâu về Jev &mdash; mô hình AI không sinh chữ (Non-Autoregressive) do TypeSafe AI (sáng lập bởi Diogo Almeida, cựu tác giả InstructGPT/RLHF tại OpenAI) phát triển. Được thiết kế như một "câu lệnh IF thông minh" có định kiểu tĩnh và độ trễ mili-giây cho hạ tầng phần mềm.
+      </p>
+
+      <div class="source-banner">
+        <div class="source-info">
+          <strong>Nguồn gốc phân tích:</strong> Kênh YouTube <em>Sam Witteveen</em> &bull; Video: <strong>"Jev - The Ultimate Classification Model?"</strong> (tại mốc 1:54s)
+        </div>
+        <a class="source-btn" href="https://www.youtube.com/watch?v=X117w2Rark8&t=114s" target="_blank" rel="noopener noreferrer">
+          <span>Xem Video Gốc</span> &rarr;
+        </a>
+      </div>
+    </header>
+
+    <!-- Visual Architecture Diagram (Generated via /diagram-design) -->
+    <section class="diagram-card">
+      <div class="diagram-title">
+        <span>EDITORIAL ARCHITECTURE &bull; SYSTEM 1 VS SYSTEM 2 WORKFLOW &bull; DATA FLOW TYPE</span>
+        <span>GEIST SANS &bull; GEIST MONO &bull; 980 &times; 560</span>
+      </div>
+
+      <svg viewBox="0 0 980 560" width="980" height="560" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/>
+          </marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#eb6c36"/>
+          </marker>
+          <marker id="arrow-green" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#10b981"/>
+          </marker>
+        </defs>
+
+        <!-- Paper Ground -->
+        <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+        <!-- ==================== CONNECTORS (Orthogonal r=8, Drawn Behind) ==================== -->
+        <!-- Input -> Jev Box -->
+        <path d="M 210 160 L 320 160" stroke="#4f5d75" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+        <rect x="232" y="148" width="66" height="14" rx="2" fill="#f5f5f5"/>
+        <text x="265" y="158" fill="#4f5d75" font-family="'Geist Mono', monospace" font-size="8" text-anchor="middle">Input State</text>
+
+        <!-- Jev Box -> Calibrated Confidence Router -->
+        <path d="M 570 160 L 670 160" stroke="#eb6c36" stroke-width="1.5" fill="none" marker-end="url(#arrow-accent)"/>
+        <rect x="585" y="148" width="70" height="14" rx="2" fill="#f5f5f5"/>
+        <text x="620" y="158" fill="#eb6c36" font-family="'Geist Mono', monospace" font-size="8" text-anchor="middle">Score &amp; Prob</text>
+
+        <!-- Router -> Branch 1: High Confidence (Auto Exec) -->
+        <path d="M 795 210 L 795 320" stroke="#10b981" stroke-width="1.5" fill="none" marker-end="url(#arrow-green)"/>
+        <rect x="802" y="255" width="88" height="14" rx="2" fill="#f5f5f5"/>
+        <text x="846" y="265" fill="#10b981" font-family="'Geist Mono', monospace" font-size="8" text-anchor="middle">Conf &ge; 0.90 (Auto)</text>
+
+        <!-- Router -> Branch 2: Medium Confidence (System 2 LLM) -->
+        <path d="M 670 185 L 530 185 L 530 320" stroke="#4f5d75" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+        <rect x="540" y="245" width="115" height="14" rx="2" fill="#f5f5f5"/>
+        <text x="597" y="255" fill="#4f5d75" font-family="'Geist Mono', monospace" font-size="8" text-anchor="middle">0.60 &le; Conf &lt; 0.90</text>
+
+        <!-- Router -> Branch 3: Low Confidence (Human Escalate) -->
+        <path d="M 670 195 L 260 195 L 260 320" stroke="#4f5d75" stroke-width="1.5" fill="none" stroke-dasharray="4,4" marker-end="url(#arrow)"/>
+        <rect x="270" y="245" width="95" height="14" rx="2" fill="#f5f5f5"/>
+        <text x="317" y="255" fill="#4f5d75" font-family="'Geist Mono', monospace" font-size="8" text-anchor="middle">Conf &lt; 0.60 (Human)</text>
+
+        <!-- ==================== NODES (Opaque Containers) ==================== -->
+
+        <!-- Node 1: Unstructured Input Source -->
+        <g transform="translate(40, 110)">
+          <rect width="170" height="100" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1.2"/>
+          <rect x="10" y="10" width="50" height="14" rx="2" fill="none" stroke="#4f5d75" stroke-width="0.8"/>
+          <text x="35" y="20" fill="#4f5d75" font-family="'Geist Mono', monospace" font-size="7" font-weight="600" text-anchor="middle">PAYLOAD</text>
+          <text x="10" y="52" fill="#2d3142" font-family="'Geist', sans-serif" font-size="13" font-weight="600">Dữ Liệu Thô</text>
+          <text x="10" y="70" fill="#4f5d75" font-family="'Geist Mono', monospace" font-size="9">Tickets / Logs / Prompts</text>
+          <text x="10" y="86" fill="#a0aec0" font-family="'Geist', sans-serif" font-size="10">Văn bản không cấu trúc</text>
+        </g>
+
+        <!-- Node 2: Focal Accent - JEV SYSTEM 1 ENGINE -->
+        <g transform="translate(320, 90)">
+          <rect width="250" height="140" rx="6" fill="rgba(235, 108, 54, 0.08)" stroke="#eb6c36" stroke-width="1.8"/>
+          <rect x="12" y="10" width="66" height="14" rx="2" fill="#eb6c36"/>
+          <text x="45" y="20" fill="#ffffff" font-family="'Geist Mono', monospace" font-size="7" font-weight="600" text-anchor="middle">SYSTEM 1</text>
+          <!-- Icon: Speed / Lightning -->
+          <g transform="translate(216, 10) scale(0.7)" stroke="#eb6c36" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+          </g>
+          <text x="12" y="50" fill="#2d3142" font-family="'Geist', sans-serif" font-size="15" font-weight="600">Jev Model (TypeSafe)</text>
+          <text x="12" y="70" fill="#eb6c36" font-family="'Geist Mono', monospace" font-size="9" font-weight="600">Non-Autoregressive &bull; 70-300ms</text>
+          <text x="12" y="90" fill="#4a5568" font-family="'Geist', sans-serif" font-size="10">&bull; Thuật toán RLCD (Calibrated Decisions)</text>
+          <text x="12" y="106" fill="#4a5568" font-family="'Geist', sans-serif" font-size="10">&bull; Typed Return: Choice | Score | Null</text>
+          <text x="12" y="122" fill="#4a5568" font-family="'Geist', sans-serif" font-size="10">&bull; Chi phí: $42 / 1 tỷ tokens ($0.042/M)</text>
+        </g>
+
+        <!-- Node 3: Decision Threshold Router -->
+        <g transform="translate(670, 110)">
+          <rect width="250" height="100" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1.2"/>
+          <rect x="12" y="10" width="62" height="14" rx="2" fill="none" stroke="#4f5d75" stroke-width="0.8"/>
+          <text x="43" y="20" fill="#4f5d75" font-family="'Geist Mono', monospace" font-size="7" font-weight="600" text-anchor="middle">RLCD GATE</text>
+          <text x="12" y="52" fill="#2d3142" font-family="'Geist', sans-serif" font-size="13" font-weight="600">Statistical Calibration</text>
+          <text x="12" y="70" fill="#4f5d75" font-family="'Geist Mono', monospace" font-size="9">Độ tin cậy toán học thực</text>
+          <text x="12" y="86" fill="#a0aec0" font-family="'Geist', sans-serif" font-size="10">Phân luồng an toàn tự động</text>
+        </g>
+
+        <!-- Lower Zone: Action Branches -->
+        <!-- Branch 1: Automated Fast Path -->
+        <g transform="translate(710, 320)">
+          <rect width="210" height="110" rx="6" fill="rgba(16, 185, 129, 0.08)" stroke="#10b981" stroke-width="1.4"/>
+          <rect x="10" y="10" width="56" height="14" rx="2" fill="#10b981"/>
+          <text x="38" y="20" fill="#ffffff" font-family="'Geist Mono', monospace" font-size="7" font-weight="600" text-anchor="middle">FAST-PATH</text>
+          <text x="10" y="48" fill="#2d3142" font-family="'Geist', sans-serif" font-size="13" font-weight="600">Thực Thi Tự Động</text>
+          <text x="10" y="68" fill="#10b981" font-family="'Geist Mono', monospace" font-size="9">Zero-Human Latency</text>
+          <text x="10" y="86" fill="#4a5568" font-family="'Geist', sans-serif" font-size="10">Routing, gán tag, lọc spam,</text>
+          <text x="10" y="100" fill="#4a5568" font-family="'Geist', sans-serif" font-size="10">reranking tức thì trong code.</text>
+        </g>
+
+        <!-- Branch 2: Slow Reasoning System 2 Path -->
+        <g transform="translate(420, 320)">
+          <rect width="220" height="110" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1.2"/>
+          <rect x="10" y="10" width="60" height="14" rx="2" fill="none" stroke="#4f5d75" stroke-width="0.8"/>
+          <text x="40" y="20" fill="#4f5d75" font-family="'Geist Mono', monospace" font-size="7" font-weight="600" text-anchor="middle">SYSTEM 2</text>
+          <text x="10" y="48" fill="#2d3142" font-family="'Geist', sans-serif" font-size="13" font-weight="600">Gọi LLM Suy Luận</text>
+          <text x="10" y="68" fill="#4f5d75" font-family="'Geist Mono', monospace" font-size="9">o1 / Claude Sonnet / GPT-4o</text>
+          <text x="10" y="86" fill="#a0aec0" font-family="'Geist', sans-serif" font-size="10">Chỉ dùng khi độ bất định vừa phải,</text>
+          <text x="10" y="100" fill="#a0aec0" font-family="'Geist', sans-serif" font-size="10">tiết kiệm 95% chi phí API LLM.</text>
+        </g>
+
+        <!-- Branch 3: Human Escalation Path -->
+        <g transform="translate(150, 320)">
+          <rect width="210" height="110" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1.2" stroke-dasharray="4,3"/>
+          <rect x="10" y="10" width="56" height="14" rx="2" fill="none" stroke="#4f5d75" stroke-width="0.8"/>
+          <text x="38" y="20" fill="#4f5d75" font-family="'Geist Mono', monospace" font-size="7" font-weight="600" text-anchor="middle">ESCALATE</text>
+          <text x="10" y="48" fill="#2d3142" font-family="'Geist', sans-serif" font-size="13" font-weight="600">Chuyển Con Người</text>
+          <text x="10" y="68" fill="#4f5d75" font-family="'Geist Mono', monospace" font-size="9">Human-In-The-Loop</text>
+          <text x="10" y="86" fill="#a0aec0" font-family="'Geist', sans-serif" font-size="10">Độ tin cậy thấp &rarr; chuyển duyệt</text>
+          <text x="10" y="100" fill="#a0aec0" font-family="'Geist', sans-serif" font-size="10">thủ công, chặn hoàn toàn rủi ro.</text>
+        </g>
+
+        <!-- Meta Footer inside SVG -->
+        <line x1="50" y1="490" x2="930" y2="490" stroke="#d8dce2" stroke-width="0.8"/>
+        <text x="50" y="514" fill="#a0aec0" font-family="'Geist Mono', monospace" font-size="8">
+          DIAGRAM-DESIGN SPECIFICATION &bull; REINFORCEMENT LEARNING FOR CALIBRATED DECISIONS (RLCD)
+        </text>
+        <text x="930" y="514" fill="#a0aec0" font-family="'Geist Mono', monospace" font-size="8" text-anchor="end">
+          FOUNDED BY DIOGO ALMEIDA (TYPESAFE AI) &bull; EXPLAINED BY SAM WITTEVEEN (YOUTUBE)
+        </text>
+      </svg>
+    </section>
+
+    <!-- Deep-Dive Breakdown -->
+    <div class="grid-2">
+      <!-- Card 1: Purpose & Why -->
+      <div class="info-card">
+        <h3>1. Mục Đích & Ý Nghĩa "Why Lại Có"</h3>
+        <p>
+          Trong cuốn sách nổi tiếng của Daniel Kahneman, tư duy con người chia làm 2 hệ thống: <strong>System 1</strong> (nhanh, trực giác, phản xạ chớp nhoáng) và <strong>System 2</strong> (chậm, logic, suy luận sâu).
+        </p>
+        <p style="margin-top: 0.6rem;">
+          Làn sóng AI hiện nay (như OpenAI o1/o3) dồn toàn lực cho <strong>System 2</strong> &mdash; suy nghĩ từng token mất 5&ndash;60 giây. Nhưng trong sản phẩm phần mềm thực tế, hơn 80% tác vụ chỉ là <em>phân loại, định tuyến, bắt lỗi hoặc kiểm duyệt</em>:
+        </p>
+        <ul>
+          <li><strong>Vấn đề của LLM truyền thống:</strong> Quá chậm (2&ndash;5 giây), đắt đỏ ($5&ndash;$30/M token), dễ vỡ cấu trúc JSON (hallucination), và xác suất tự tin thường là "ảo" (uncalibrated).</li>
+          <li><strong>Sự ra đời của Jev:</strong> Loại bỏ hoàn toàn tính năng chat và sinh văn bản tự do. Thay vào đó, nó hoạt động như một <strong>"câu lệnh IF thông minh định kiểu tĩnh"</strong> được nhúng trực tiếp vào codebase.</li>
+        </ul>
+      </div>
+
+      <!-- Card 2: Core Mechanics -->
+      <div class="info-card">
+        <h3>2. Cơ Chế Hoạt Động Cốt Lõi (Architecture)</h3>
+        <ul>
+          <li>
+            <strong>Non-Autoregressive &amp; Parallel Sampler:</strong> Không sinh từng token nối tiếp nhau. Xử lý toàn bộ context đầu vào trong <strong>1 lượt duy nhất (Single-pass)</strong> qua mạng nơ-ron, trả kết quả chỉ sau <strong>70&ndash;300ms</strong>.
+          </li>
+          <li>
+            <strong>3 Dạng Typed Queries duy nhất:</strong>
+            <ul style="margin-top: 0.3rem;">
+              <li><code>choice</code>: Chọn nhãn tối ưu trong danh sách tùy biến kèm điểm xác suất thực tế.</li>
+              <li><code>score</code>: Chấm điểm liên tục trên thang đo định nghĩa (ví dụ: urgency 1&ndash;10).</li>
+              <li><code>null</code> (Boolean): Câu hỏi Có/Không (Binary True/False).</li>
+            </ul>
+          </li>
+          <li>
+            <strong>Thuật toán RLCD (RL for Calibrated Decisions):</strong> Phát minh của Diogo Almeida. Đảm bảo nếu model nói <em>"Confidence 0.85"</em> thì trong 100 lần, nó thực sự chính xác đúng 85 lần &mdash; biến điểm số thành căn cứ toán học vững chắc cho code rẽ nhánh an toàn.
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Comparative Table -->
+    <div class="info-card">
+      <h3>3. So Sánh Chi Tiết: Jev vs LLM Truyền Thống (GPT-4o / Claude)</h3>
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>Tiêu chí</th>
+            <th>Mô Hình Sinh Chữ Truyền Thống (System 2 LLM)</th>
+            <th>TypeSafe AI: Jev (System 1)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Phương thức xử lý</strong></td>
+            <td>Autoregressive (Sinh từng token chữ nối đuôi nhau)</td>
+            <td><span class="badge badge-accent">Non-Autoregressive (Single Pass Parallel)</span></td>
+          </tr>
+          <tr>
+            <td><strong>Độ trễ (Latency)</strong></td>
+            <td>1,500ms &ndash; 15,000ms</td>
+            <td><span class="badge badge-green">70ms &ndash; 300ms</span></td>
+          </tr>
+          <tr>
+            <td><strong>Chi phí Input Token</strong></td>
+            <td>$2.50 &ndash; $30.00 / 1 triệu tokens</td>
+            <td><span class="badge badge-green">$0.042 / 1 triệu tokens ($42 / 1 tỷ)</span></td>
+          </tr>
+          <tr>
+            <td><strong>Chi phí Output Token</strong></td>
+            <td>Tính phí theo từng token sinh ra</td>
+            <td><span class="badge badge-green">HOÀN TOÀN MIỄN PHÍ ($0)</span></td>
+          </tr>
+          <tr>
+            <td><strong>Độ chuẩn xác số đo (Calibration)</strong></td>
+            <td>Kém (Confidence bị thổi phồng hoặc không tuyến tính)</td>
+            <td><span class="badge badge-accent">Rất cao (Huấn luyện chuyên biệt qua RLCD)</span></td>
+          </tr>
+          <tr>
+            <td><strong>Giao thức giao tiếp</strong></td>
+            <td>Chat văn bản / JSON Schema cần parse lại</td>
+            <td>Định kiểu tĩnh Type-safe (Choice / Score / Null)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Practical Applications & Code Example -->
+    <div class="info-card">
+      <h3>4. Cách Ứng Dụng Trong Hệ Thống Phần Mềm Thực Tế</h3>
+      <p>
+        Trong video, Sam Witteveen minh họa Jev như một hàm logic trong code. Thay vì dùng regex thô sơ hoặc gọi API OpenAI tốn kém, ta tích hợp Jev làm tầng lọc đầu tiên:
+      </p>
+
+      <div class="code-box">
+// Ví dụ mô phỏng tích hợp Jev trong hệ thống chăm sóc khách hàng:
+const evaluation = await jev.evaluate({
+  input: customerTicketText,
+  query: {
+    type: "choice",
+    options: ["billing_dispute", "technical_bug", "feature_request", "spam"]
+  }
+});
+
+// Nhờ thuật toán RLCD, confidence là số đo thống kê đáng tin cậy:
+if (evaluation.confidence >= 0.90) {
+  // Đường rẽ tốc độ cao: 70ms - tự động chuyển thẳng phòng ban
+  autoRouteTicket(evaluation.bestChoice);
+} else if (evaluation.confidence >= 0.60) {
+  // Bất định nhẹ: Chuyển sang mô hình System 2 (GPT-4o) phân tích sâu
+  callReasoningLLM(customerTicketText);
+} else {
+  // Độ tin cậy thấp: Chuyển chuyên viên con người kiểm tra
+  escalateToHumanSupport(customerTicketText);
+}
+      </div>
+
+      <div class="grid-3" style="margin-top: 1.25rem;">
+        <div>
+          <strong style="color: var(--ink); font-size: 0.95rem;">Support &amp; Triage</strong>
+          <p style="font-size: 0.88rem; margin-top: 0.3rem;">Phân loại hàng triệu ticket trong chớp mắt, gắn nhãn phòng ban và mức độ khẩn cấp (Urgency score).</p>
+        </div>
+        <div>
+          <strong style="color: var(--ink); font-size: 0.95rem;">RAG Reranking</strong>
+          <p style="font-size: 0.88rem; margin-top: 0.3rem;">Chấm điểm độ liên quan giữa câu hỏi và các đoạn chunk tài liệu trong 70ms trước khi đưa vào ngữ cảnh LLM.</p>
+        </div>
+        <div>
+          <strong style="color: var(--ink); font-size: 0.95rem;">Guardrails &amp; Security</strong>
+          <p style="font-size: 0.88rem; margin-top: 0.3rem;">Kiểm duyệt prompt injection, ngôn từ độc hại và rò rỉ dữ liệu nhạy cảm trước khi dữ liệu đi vào mạng nội bộ.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      Hệ Thống Trực Quan Hóa Tri Thức &bull; Được biên tập theo chuẩn /diagram-design &bull; Chunks-LMS
+    </footer>
+  </div>
+
+</body>
+</html>

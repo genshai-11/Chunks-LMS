@@ -113,7 +113,7 @@ function resolveProbe(
       snapshot: finalize(
         {
           ...snapshot,
-          probeCount: snapshot.probeCount + (snapshot.status === 'probe_open' ? 1 : 0),
+          probeCount: snapshot.probeCount,
         },
         'yellow',
         at,

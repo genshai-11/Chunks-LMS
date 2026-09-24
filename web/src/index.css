@@ -2034,7 +2034,7 @@
   }
 
   .observe-learner-rfc {
-    @apply inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] sm:text-xs font-mono font-bold tracking-tight rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20 align-middle;
+    @apply inline-flex items-center justify-between gap-1.5 min-w-[5.25rem] px-2.5 py-0.5 text-[10px] sm:text-xs font-mono font-bold tracking-tight rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20 align-middle;
   }
 
   .observe-learner-rfc svg {
@@ -2083,12 +2083,12 @@
   }
 
   .observe-metric-tooltip {
-    @apply pointer-events-none absolute left-1/2 top-[calc(100%+0.5rem)] z-50 hidden w-[min(18rem,82vw)] -translate-x-1/2 rounded-xl border border-white/10 bg-slate-950/95 px-3 py-2 text-left font-sans text-[11px] font-semibold leading-snug tracking-normal text-slate-100 shadow-2xl shadow-black/50 backdrop-blur;
+    @apply pointer-events-none absolute left-0 top-[calc(100%+0.5rem)] z-50 hidden max-w-[min(18rem,calc(100vw-2rem))] rounded-xl border border-white/10 bg-slate-950/95 px-3 py-2 text-left font-sans text-[11px] font-semibold leading-snug tracking-normal text-slate-100 shadow-2xl shadow-black/50 backdrop-blur;
   }
 
   .observe-metric-tooltip::before {
     content: '';
-    @apply absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-l border-t border-white/10 bg-slate-950;
+    @apply absolute -top-1 left-4 h-2 w-2 rotate-45 border-l border-t border-white/10 bg-slate-950;
   }
 
   .observe-has-tooltip:hover .observe-metric-tooltip,
@@ -4906,7 +4906,7 @@
     @apply m-0 max-w-sm text-[10px] leading-snug text-emerald-50/75;
   }
   .live-test-focus-card {
-    @apply mt-2 w-full max-w-xl rounded-2xl border border-indigo-300/20 bg-indigo-950/30 p-2.5 text-center shadow-lg sm:p-3;
+    @apply mt-1.5 w-full max-w-xl rounded-2xl border border-indigo-300/20 bg-indigo-950/30 p-2 text-center shadow-lg sm:p-2.5;
   }
   .live-test-dock-compact {
     @apply mt-2 max-w-full gap-2;
@@ -5030,20 +5030,20 @@
   .live-test-focus-card {
     @apply shrink-0;
     width: min(92vw, 34rem);
-    margin-top: clamp(0.2rem, 0.8dvh, 0.5rem) !important;
-    padding: clamp(0.45rem, 1.1dvh, 0.75rem) !important;
+    margin-top: clamp(0.15rem, 0.6dvh, 0.35rem) !important;
+    padding: clamp(0.35rem, 0.85dvh, 0.55rem) !important;
   }
   .live-test-focus-actions {
-    @apply grid grid-cols-[1fr_auto_1fr] items-center gap-2;
+    @apply grid grid-cols-[1fr_auto_1fr] items-center gap-1.5;
   }
   .live-test-focus-actions .ghost {
-    @apply min-h-8 justify-center rounded-xl px-2 py-1 text-[11px] font-bold;
+    @apply min-h-7 justify-center rounded-xl px-2 py-0.5 text-[11px] font-bold;
   }
   .live-test-wave-play {
-    @apply inline-flex min-h-9 items-center justify-center gap-1.5 rounded-2xl border border-indigo-300/25 bg-indigo-500/15 px-3 py-1 text-xs font-black text-indigo-100 shadow-none transition hover:bg-indigo-500/25;
+    @apply inline-flex min-h-8 items-center justify-center gap-1.5 rounded-2xl border border-indigo-300/25 bg-indigo-500/15 px-3 py-0.5 text-xs font-black text-indigo-100 shadow-none transition hover:bg-indigo-500/25;
   }
   .live-test-wave {
-    @apply flex h-4 items-end gap-0.5;
+    @apply flex h-3.5 items-end gap-0.5;
   }
   .live-test-wave i {
     @apply block w-0.5 rounded-full bg-indigo-200;
@@ -5058,22 +5058,22 @@
     50% { transform: scaleY(1); opacity: 1; }
   }
   .live-test-prompt-box {
-    @apply mt-1.5 rounded-2xl border border-white/10 bg-slate-950/45 px-3 py-2 text-center;
+    @apply mt-1 rounded-2xl border border-white/10 bg-slate-950/45 px-3 py-1.5 text-center;
   }
   .live-test-prompt-box p {
-    @apply m-0 text-[10px] font-bold uppercase tracking-[0.16em] text-indigo-200/80;
+    @apply m-0 text-[9px] font-bold uppercase tracking-[0.16em] text-indigo-200/80;
   }
   .live-test-prompt-box strong {
-    @apply mt-0.5 block text-sm leading-snug text-white sm:text-base;
+    @apply mt-0.5 block text-xs leading-snug text-white sm:text-sm;
   }
   .live-test-prompt-subtitle {
-    @apply mt-1 block text-xs font-normal leading-snug text-slate-300/90 sm:text-sm;
+    @apply mt-0.5 block text-[11px] font-normal leading-snug text-slate-300/90 sm:text-xs;
   }
   .live-test-cpd-row {
-    @apply mt-1.5 grid grid-cols-3 gap-1.5 font-mono text-[10px] sm:grid-cols-6;
+    @apply mt-1 grid grid-cols-3 gap-1 font-mono text-[9px] sm:grid-cols-6 sm:text-[10px];
   }
   .live-test-cpd-row span {
-    @apply rounded-lg bg-slate-900/70 px-2 py-1 text-slate-200;
+    @apply rounded-lg bg-slate-900/70 px-1.5 py-0.5 text-slate-200;
   }
   .live-test-cpd-row .metric-cvr {
     @apply bg-rose-950/70 font-bold text-rose-100;
@@ -5208,22 +5208,22 @@
     }
     .live-test-focus-card {
       width: min(100%, 24rem);
-      @apply rounded-xl px-2 py-2!;
+      @apply rounded-xl px-2 py-1.5!;
     }
     .live-test-focus-actions {
       @apply grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] gap-1.5;
     }
     .live-test-focus-actions .ghost {
-      @apply min-h-9 px-1 text-[0px];
+      @apply min-h-7.5 px-1 text-[0px];
     }
     .live-test-focus-actions .ghost svg {
       @apply h-4 w-4;
     }
     .live-test-wave-play {
-      @apply min-h-9 w-full justify-center px-2 text-[11px];
+      @apply min-h-7.5 w-full justify-center px-2 text-[11px];
     }
     .live-test-prompt-box {
-      @apply mt-1 rounded-xl px-2 py-1.5;
+      @apply mt-1 rounded-xl px-2 py-1;
     }
     .live-test-prompt-box strong {
       font-size: clamp(0.82rem, 3.8vw, 1rem) !important;

@@ -15,7 +15,6 @@ export function TeacherAnalysisPage() {
     setLedger,
     syncNow,
     metricSettings,
-    activeLearnerUserId,
   } = useAppState()
   const { classRow, course } = useTeacherClassContext()
 
@@ -125,7 +124,7 @@ export function TeacherAnalysisPage() {
           }))}
         emptyHint="Start a live session and finalize Focus / Awareness colors to populate this report."
         metricSettings={metricSettings}
-        learnerUserId={activeLearnerUserId ?? undefined}
+        learnerUserId={undefined}
         onDeleteSession={deleteSession}
         onEditSessionNumber={editSessionNumber}
       />

@@ -130,7 +130,7 @@ export function TeacherTestSetupPage() {
   const [sectionId, setSectionId] = useState(initialSectionId ?? '')
   const [selectedSectionIds, setSelectedSectionIds] = useState<Set<string>>(new Set())
   const [languageBySection, setLanguageBySection] = useState<Record<string, AudioLanguage>>({})
-  const [voiceId] = useState('gemini/gemini-2.5-flash-preview-tts')
+  const [voiceId] = useState('google/vi-VN-Neural2-A')
   const [autoPlaySessionIntro, setAutoPlaySessionIntro] = useState(() =>
     typeof window !== 'undefined'
       ? window.localStorage.getItem('chunks-lms:live-test-autoplay-intro') === 'true'
@@ -261,8 +261,9 @@ export function TeacherTestSetupPage() {
   }
 
   function audioPrepHref(section: TestSection, language: AudioLanguage) {
-    return `/admin/resources/audio?version=${packageVersionId}&section=${section.id}&language=${language}&voice=${encodeURIComponent(voiceId)}`
+    return `/admin/package-tests?tab=audio&version=${packageVersionId}&section=${section.id}&language=${language}&voice=${encodeURIComponent(voiceId)}`
   }
+
 
   async function generateAudioForTargets(
     targets: Array<{ section: TestSection; language: AudioLanguage }>,

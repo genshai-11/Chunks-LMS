@@ -2,15 +2,22 @@ import { describe, expect, it } from 'vitest'
 import {
   assertPackageVersionCanMutate,
   buildSectionQuestionPlan,
+  calculateCciFromCpd,
+  calculateCpd,
+  calculateCvr,
   calculateItemCpd,
+  calculateWordCountLc,
   createMeasurementOverrideSnapshot,
   createSectionMeasurementSnapshot,
   measuredCvr,
+  validateGreenSentence,
+  validateRedCollocations,
   type CciCategory,
   type TestItem,
   type TestPackageVersion,
   type TestSection,
 } from './test-package-catalog'
+
 
 const draftVersion: TestPackageVersion = {
   id: 'version-draft',
@@ -130,4 +137,68 @@ describe('test package catalog', () => {
     expect(calculateItemCpd(original)).toBe(60)
     expect(calculateItemCpd(override)).toBe(72)
   })
+
+  it('calculates CVR, CPD, and derived CCI correctly', () => {
+    // CVR = TC * LC * TL
+    expect(calculateCvr(2, 1.15, 2.0)).toBe(4.6)
+    expect(calculateCvr(3, 1.0, 1.0)).toBe(3.0)
+
+    // CPD = CVR * CCI
+    expect(calculateCpd(4.6, 12)).toBe(55.2)
+    expect(calculateCpd(2.0, 6)).toBe(12.0)
+
+    // CCI = targetCPD / CVR
+    expect(calculateCciFromCpd(56, 4.6)).toBe(12)
+    expect(calculateCciFromCpd(12, 2.0)).toBe(6)
+  })
+
+  it('calculates LC factor accurately according to sentence word counts', () => {
+    expect(calculateWordCountLc(8)).toBe(1.0)
+    expect(calculateWordCountLc(14)).toBe(1.4)
+    expect(calculateWordCountLc(17)).toBe(1.7)
+    expect(calculateWordCountLc(22)).toBe(2.0)
+    expect(calculateWordCountLc(25)).toBe(2.15)
+  })
+
+  it('validates Green test complete sentence length constraints', () => {
+    // Valid: 10 words (A2 session 1)
+    const validPrompt = 'Ngành thương mại điện tử cạnh tranh rất khốc liệt hôm nay.'
+    expect(validateGreenSentence(validPrompt).valid).toBe(true)
+
+    // Too short (< 8 words)
+    const shortPrompt = 'Thương mại điện tử.'
+    expect(validateGreenSentence(shortPrompt).valid).toBe(false)
+    expect(validateGreenSentence(shortPrompt).reason).toContain('too short')
+
+    // Too long (> 22 words)
+    const longPrompt =
+      'Một hai ba bốn năm sáu bảy tám chín mười mười một mười hai mười ba mười bốn mười lăm mười sáu mười bảy mười tám mười chín hai mươi hai mốt hai hai hai ba.'
+    expect(validateGreenSentence(longPrompt).valid).toBe(false)
+    expect(validateGreenSentence(longPrompt).reason).toContain('exceeds maximum')
+  })
+
+  it('validates Red test collocations enforce zero single words', () => {
+    // Valid: all collocations have >= 2 words
+    const validHints = [
+      { text: 'Ngành thương mại điện tử' },
+      { text: 'cạnh tranh khốc liệt' },
+    ]
+    expect(validateRedCollocations(validHints).valid).toBe(true)
+
+    // Invalid: contains single words like 'vốn' or 'nhanh'
+    const invalidHints = [
+      { text: 'Ngành thương mại điện tử' },
+      { text: 'vốn' },
+      { text: 'nhanh' },
+    ]
+    const result = validateRedCollocations(invalidHints)
+    expect(result.valid).toBe(false)
+    expect(result.singleWords).toEqual(['vốn', 'nhanh'])
+
+    // Empty hints array or whitespace
+    expect(validateRedCollocations([]).valid).toBe(false)
+    expect(validateRedCollocations([{ text: '   ' }]).valid).toBe(false)
+  })
 })
+
+

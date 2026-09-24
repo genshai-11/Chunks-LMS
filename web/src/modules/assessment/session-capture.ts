@@ -339,15 +339,17 @@ export function sessionColorSummary(state: CaptureSessionState): {
       primaryRecords += 1
       if (a.snapshot.enteredProbeFlow) {
         recordedByColor.green += 1
-        probeRecords += Math.max(0, a.snapshot.probeCount)
         if (c === 'yellow') {
           recordedByColor.yellow += 1
-          recordedByColor.blue += Math.max(0, a.snapshot.probeCount - 1)
+          recordedByColor.blue += Math.max(0, a.snapshot.probeCount)
+          probeRecords += Math.max(0, a.snapshot.probeCount) + 1
         } else if (c === 'indigo') {
           recordedByColor.indigo += 1
           recordedByColor.blue += Math.max(0, a.snapshot.probeCount - 1)
+          probeRecords += Math.max(0, a.snapshot.probeCount)
         } else {
           recordedByColor.blue += Math.max(0, a.snapshot.probeCount)
+          probeRecords += Math.max(0, a.snapshot.probeCount)
         }
       } else if (c) {
         recordedByColor[c] += 1

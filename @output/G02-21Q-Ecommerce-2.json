@@ -1,0 +1,719 @@
+{
+  "packageCode": "G02-21Q-Ecommerce-2",
+  "title": "G02-21Q-Ecommerce: E-commerce Market Dynamics & Shopping Reflex (Focus 12V)",
+  "slug": "g02-21q-ecommerce-2",
+  "description": "Green Mini Test (7x3 - 21 Questions) with natural, fluent complete sentences, TL=1.0, progressive CVR curve, target 12V CPD, and per-session TTS presets from Improv Set 05.",
+  "versionLabel": "v1",
+  "testType": "GREEN",
+  "targetQuestions": 21,
+  "sessionLayout": "7x3",
+  "targetCpd": 12,
+  "sessionLanguages": [
+    "en",
+    "en",
+    "en",
+    "vi",
+    "vi",
+    "vi",
+    "en"
+  ],
+  "lifecycleNarration": {
+    "package_start": {
+      "vi": "Chào mừng em đến với bài kiểm tra Green Test eCommerce (Focus). Lắng nghe và hoàn thiện các câu hoàn chỉnh song ngữ để đo lường độ Tập Trung và nhịp điệu phát âm.",
+      "en": "Welcome to the Green Test eCommerce assessment. Listen and articulate complete sentences to measure your Focus and speech rhythm."
+    },
+    "part_intro": {
+      "1": {
+        "vi": "Bắt đầu Phần 1: Các câu đơn giản thường nhật về mua sắm và thanh toán.",
+        "en": "Starting Part 1: Everyday simple sentences on retail and payments."
+      },
+      "2": {
+        "vi": "Bắt đầu Phần 2: Mở rộng các câu ghép với liên từ và nhịp điệu dồn dập.",
+        "en": "Starting Part 2: Compound sentences with connectives and steady tempo."
+      },
+      "3": {
+        "vi": "Bắt đầu Phần 3: Thử thách câu phức thương mại điện tử chuyên sâu và hơi thở liền mạch.",
+        "en": "Starting Part 3: Advanced complex sentences and sustained fluency."
+      }
+    },
+    "package_end": {
+      "vi": "Chúc mừng em đã hoàn thành toàn bộ bài kiểm tra Green Test eCommerce 21Q! Em đã thể hiện sự tập trung và lưu loát rất xuất sắc.",
+      "en": "Congratulations on completing the 21Q eCommerce Green Test! Excellent focus and continuous fluency."
+    }
+  },
+  "sections": [
+    {
+      "sectionOrder": 1,
+      "part": 1,
+      "title": "Session 1 • 2Ω (Focus Sentence)",
+      "targetCvrOhm": 2,
+      "cciAmpe": 6,
+      "cpd": 12,
+      "hintCount": 1,
+      "sessionLanguage": "en",
+      "voiceModel": "google/en-US-Neural2-F",
+      "introTextVi": "Session 1: Mức kháng trở 2 Ohm, cường độ 6 Ampe. Mục tiêu 12V CPD. Phát âm câu hoàn chỉnh trôi chảy.",
+      "introTextEn": "Session 1: Resistance 2 Ohm, current 6 Amps. Target 12V CPD. Articulate complete sentence fluently.",
+      "items": [
+        {
+          "itemOrder": 1,
+          "globalItemNumber": 1,
+          "chunkIds": [
+            "g02-chunk-1"
+          ],
+          "termVi": "Người tiêu dùng tùy hứng",
+          "termEn": "Impulsive shopper",
+          "promptVi": "Người mua tùy hứng thường chọn đồ theo cảm xúc.",
+          "promptEn": "An impulsive shopper often picks items based on pure emotion.",
+          "wordCountVi": 10,
+          "sentenceLevel": "A2 (Simple Sentence)",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 2,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 2,
+          "cvrBreakdown": {
+            "tc": 2,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 2,
+            "cci": 6,
+            "cpd": 12
+          }
+        },
+        {
+          "itemOrder": 2,
+          "globalItemNumber": 2,
+          "chunkIds": [
+            "g02-chunk-2"
+          ],
+          "termVi": "Thị trường sôi động",
+          "termEn": "Vibrant marketplace",
+          "promptVi": "Thị trường bán lẻ này tăng trưởng vô cùng nhanh.",
+          "promptEn": "This retail marketplace continues to grow at an extraordinary speed.",
+          "wordCountVi": 10,
+          "sentenceLevel": "A2 (Simple Sentence)",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 2,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 2,
+          "cvrBreakdown": {
+            "tc": 2,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 2,
+            "cci": 6,
+            "cpd": 12
+          }
+        },
+        {
+          "itemOrder": 3,
+          "globalItemNumber": 3,
+          "chunkIds": [
+            "g02-chunk-3"
+          ],
+          "termVi": "Quy trình thanh toán an toàn",
+          "termEn": "Secure checkout process",
+          "promptVi": "Quy trình thanh toán an toàn giúp bạn an tâm.",
+          "promptEn": "A secure checkout process helps you feel completely confident.",
+          "wordCountVi": 10,
+          "sentenceLevel": "A2 (Simple Sentence)",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 2,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 2,
+          "cvrBreakdown": {
+            "tc": 2,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 2,
+            "cci": 6,
+            "cpd": 12
+          }
+        }
+      ]
+    },
+    {
+      "sectionOrder": 2,
+      "part": 1,
+      "title": "Session 2 • 2Ω (Focus Sentence)",
+      "targetCvrOhm": 2,
+      "cciAmpe": 6,
+      "cpd": 12,
+      "hintCount": 1,
+      "sessionLanguage": "en",
+      "voiceModel": "google/en-US-Neural2-F",
+      "introTextVi": "Session 2: Mức kháng trở 2 Ohm, cường độ 6 Ampe. Mục tiêu 12V CPD. Phát âm câu hoàn chỉnh trôi chảy.",
+      "introTextEn": "Session 2: Resistance 2 Ohm, current 6 Amps. Target 12V CPD. Articulate complete sentence fluently.",
+      "items": [
+        {
+          "itemOrder": 1,
+          "globalItemNumber": 4,
+          "chunkIds": [
+            "g02-chunk-4"
+          ],
+          "termVi": "Theo dõi đơn hàng thời gian thực",
+          "termEn": "Track package in real time",
+          "promptVi": "Khách hàng dễ dàng theo dõi hành trình đơn trên điện thoại.",
+          "promptEn": "Customers can easily track their package journey on mobile phones.",
+          "wordCountVi": 12,
+          "sentenceLevel": "A2 (Simple Sentence)",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 2,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 2,
+          "cvrBreakdown": {
+            "tc": 2,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 2,
+            "cci": 6,
+            "cpd": 12
+          }
+        },
+        {
+          "itemOrder": 2,
+          "globalItemNumber": 5,
+          "chunkIds": [
+            "g02-chunk-5"
+          ],
+          "termVi": "Đánh giá sản phẩm uy tín",
+          "termEn": "Genuine product reviews",
+          "promptVi": "Đọc nhận xét thực tế giúp chọn được cửa hàng uy tín.",
+          "promptEn": "Reading genuine product reviews helps shoppers choose reputable online stores.",
+          "wordCountVi": 12,
+          "sentenceLevel": "A2 (Simple Sentence)",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 2,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 2,
+          "cvrBreakdown": {
+            "tc": 2,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 2,
+            "cci": 6,
+            "cpd": 12
+          }
+        },
+        {
+          "itemOrder": 3,
+          "globalItemNumber": 6,
+          "chunkIds": [
+            "g02-chunk-6"
+          ],
+          "termVi": "Mã giảm giá ưu đãi",
+          "termEn": "Discount voucher code",
+          "promptVi": "Đừng quên nhập mã giảm giá trước khi bạn xác nhận đơn.",
+          "promptEn": "Do not forget to apply your discount voucher before confirming your order.",
+          "wordCountVi": 12,
+          "sentenceLevel": "A2 (Simple Sentence)",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 2,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 2,
+          "cvrBreakdown": {
+            "tc": 2,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 2,
+            "cci": 6,
+            "cpd": 12
+          }
+        }
+      ]
+    },
+    {
+      "sectionOrder": 3,
+      "part": 2,
+      "title": "Session 3 • 3Ω (Focus Sentence)",
+      "targetCvrOhm": 3,
+      "cciAmpe": 4,
+      "cpd": 12,
+      "hintCount": 1,
+      "sessionLanguage": "en",
+      "voiceModel": "google/en-US-Neural2-F",
+      "introTextVi": "Session 3: Mức kháng trở 3 Ohm, cường độ 4 Ampe. Mục tiêu 12V CPD. Phát âm câu hoàn chỉnh trôi chảy.",
+      "introTextEn": "Session 3: Resistance 3 Ohm, current 4 Amps. Target 12V CPD. Articulate complete sentence fluently.",
+      "items": [
+        {
+          "itemOrder": 1,
+          "globalItemNumber": 7,
+          "chunkIds": [
+            "g02-chunk-7"
+          ],
+          "termVi": "Khách mua sắm tùy hứng",
+          "termEn": "Impulsive shoppers",
+          "promptVi": "Khách mua hàng rất thích quà tặng, nên cửa hàng tặng thêm quà nhỏ.",
+          "promptEn": "Shoppers love promotional gifts, so the shop added small freebies to orders.",
+          "wordCountVi": 14,
+          "sentenceLevel": "B1 (Compound Sentence)",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 3,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 3,
+          "cvrBreakdown": {
+            "tc": 3,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 3,
+            "cci": 4,
+            "cpd": 12
+          }
+        },
+        {
+          "itemOrder": 2,
+          "globalItemNumber": 8,
+          "chunkIds": [
+            "g02-chunk-8"
+          ],
+          "termVi": "Người dạo ngắm đồ",
+          "termEn": "Window shoppers",
+          "promptVi": "Nhiều người chỉ ngắm đồ ban ngày, nhưng lại đặt mua vào ban đêm.",
+          "promptEn": "Many people only browse items by day, but buy online at night.",
+          "wordCountVi": 14,
+          "sentenceLevel": "B1 (Compound Sentence)",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 3,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 3,
+          "cvrBreakdown": {
+            "tc": 3,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 3,
+            "cci": 4,
+            "cpd": 12
+          }
+        },
+        {
+          "itemOrder": 3,
+          "globalItemNumber": 9,
+          "chunkIds": [
+            "g02-chunk-9"
+          ],
+          "termVi": "Nền tảng mua sắm tích hợp",
+          "termEn": "Integrated shopping platform",
+          "promptVi": "Ứng dụng mua sắm tích hợp video giúp người mua tương tác dễ dàng.",
+          "promptEn": "The shopping application integrates live video, helping buyers interact very easily.",
+          "wordCountVi": 14,
+          "sentenceLevel": "B1 (Compound Sentence)",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 3,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 3,
+          "cvrBreakdown": {
+            "tc": 3,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 3,
+            "cci": 4,
+            "cpd": 12
+          }
+        }
+      ]
+    },
+    {
+      "sectionOrder": 4,
+      "part": 2,
+      "title": "Session 4 • 3Ω (Focus Sentence)",
+      "targetCvrOhm": 3,
+      "cciAmpe": 4,
+      "cpd": 12,
+      "hintCount": 1,
+      "sessionLanguage": "vi",
+      "voiceModel": "google/vi-VN-Neural2-A",
+      "introTextVi": "Session 4: Mức kháng trở 3 Ohm, cường độ 4 Ampe. Mục tiêu 12V CPD. Phát âm câu hoàn chỉnh trôi chảy.",
+      "introTextEn": "Session 4: Resistance 3 Ohm, current 4 Amps. Target 12V CPD. Articulate complete sentence fluently.",
+      "items": [
+        {
+          "itemOrder": 1,
+          "globalItemNumber": 10,
+          "chunkIds": [
+            "g02-chunk-10"
+          ],
+          "termVi": "Nhà phân phối bán sỉ",
+          "termEn": "Wholesale distributor",
+          "promptVi": "Nhà phân phối bán sỉ ưu tiên số lượng, nhưng vẫn giữ giá rất cạnh tranh.",
+          "promptEn": "The wholesale distributor prioritizes high volume, yet they still maintain very competitive pricing.",
+          "wordCountVi": 16,
+          "sentenceLevel": "B1 (Compound Sentence)",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 3,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 3,
+          "cvrBreakdown": {
+            "tc": 3,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 3,
+            "cci": 4,
+            "cpd": 12
+          }
+        },
+        {
+          "itemOrder": 2,
+          "globalItemNumber": 11,
+          "chunkIds": [
+            "g02-chunk-11"
+          ],
+          "termVi": "Tương tác trực tuyến đa kênh",
+          "termEn": "Interactive live session",
+          "promptVi": "Buổi tương tác trực tuyến rất đông, và cửa hàng đã bán sạch hết mọi thứ.",
+          "promptEn": "The interactive live stream was crowded, and the shop completely sold out of everything.",
+          "wordCountVi": 16,
+          "sentenceLevel": "B1 (Compound Sentence)",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 3,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 3,
+          "cvrBreakdown": {
+            "tc": 3,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 3,
+            "cci": 4,
+            "cpd": 12
+          }
+        },
+        {
+          "itemOrder": 3,
+          "globalItemNumber": 12,
+          "chunkIds": [
+            "g02-chunk-12"
+          ],
+          "termVi": "Thông báo giảm giá sốc",
+          "termEn": "Flash discount notification",
+          "promptVi": "Hệ thống vừa gửi thông báo giảm giá, do đó người mua lập tức mở app.",
+          "promptEn": "The system just sent discount notifications, so shoppers immediately opened the app.",
+          "wordCountVi": 16,
+          "sentenceLevel": "B1 (Compound Sentence)",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 3,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 3,
+          "cvrBreakdown": {
+            "tc": 3,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 3,
+            "cci": 4,
+            "cpd": 12
+          }
+        }
+      ]
+    },
+    {
+      "sectionOrder": 5,
+      "part": 3,
+      "title": "Session 5 • 4Ω (Focus Sentence)",
+      "targetCvrOhm": 4,
+      "cciAmpe": 3,
+      "cpd": 12,
+      "hintCount": 1,
+      "sessionLanguage": "vi",
+      "voiceModel": "google/vi-VN-Neural2-A",
+      "introTextVi": "Session 5: Mức kháng trở 4 Ohm, cường độ 3 Ampe. Mục tiêu 12V CPD. Phát âm câu hoàn chỉnh trôi chảy.",
+      "introTextEn": "Session 5: Resistance 4 Ohm, current 3 Amps. Target 12V CPD. Articulate complete sentence fluently.",
+      "items": [
+        {
+          "itemOrder": 1,
+          "globalItemNumber": 13,
+          "chunkIds": [
+            "g02-chunk-13"
+          ],
+          "termVi": "Cơn sốt mua sắm thương mại điện tử",
+          "termEn": "E-commerce shopping fever",
+          "promptVi": "Bởi vì các nhãn hàng tung ra nhiều khuyến mãi, lượng đơn hàng đã tăng vọt kỷ lục.",
+          "promptEn": "Because retail brands rolled out massive promotions, order volume skyrocketed to record highs.",
+          "wordCountVi": 18,
+          "sentenceLevel": "B2 (Complex Sentence)",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 4,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 4,
+          "cvrBreakdown": {
+            "tc": 4,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 4,
+            "cci": 3,
+            "cpd": 12
+          }
+        },
+        {
+          "itemOrder": 2,
+          "globalItemNumber": 14,
+          "chunkIds": [
+            "g02-chunk-14"
+          ],
+          "termVi": "Bảo mật dữ liệu thanh toán",
+          "termEn": "Payment data security",
+          "promptVi": "Nếu sàn không bảo mật dữ liệu khách hàng, họ sẽ mất niềm tin từ người tiêu dùng.",
+          "promptEn": "If platforms fail to secure customer data, they will lose the trust of modern consumers.",
+          "wordCountVi": 18,
+          "sentenceLevel": "B2 (Complex Sentence)",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 4,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 4,
+          "cvrBreakdown": {
+            "tc": 4,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 4,
+            "cci": 3,
+            "cpd": 12
+          }
+        },
+        {
+          "itemOrder": 3,
+          "globalItemNumber": 15,
+          "chunkIds": [
+            "g02-chunk-15"
+          ],
+          "termVi": "Tối ưu hóa hành trình khách hàng",
+          "termEn": "Customer journey optimization",
+          "promptVi": "Bằng cách gợi ý sản phẩm hợp sở thích, người bán có thể nâng cao giá trị đơn.",
+          "promptEn": "By recommending items matching buyer preferences, merchants can raise average order values.",
+          "wordCountVi": 18,
+          "sentenceLevel": "B2 (Complex Sentence)",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 4,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 4,
+          "cvrBreakdown": {
+            "tc": 4,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 4,
+            "cci": 3,
+            "cpd": 12
+          }
+        }
+      ]
+    },
+    {
+      "sectionOrder": 6,
+      "part": 3,
+      "title": "Session 6 • 4Ω (Focus Sentence)",
+      "targetCvrOhm": 4,
+      "cciAmpe": 3,
+      "cpd": 12,
+      "hintCount": 1,
+      "sessionLanguage": "vi",
+      "voiceModel": "google/vi-VN-Neural2-A",
+      "introTextVi": "Session 6: Mức kháng trở 4 Ohm, cường độ 3 Ampe. Mục tiêu 12V CPD. Phát âm câu hoàn chỉnh trôi chảy.",
+      "introTextEn": "Session 6: Resistance 4 Ohm, current 3 Amps. Target 12V CPD. Articulate complete sentence fluently.",
+      "items": [
+        {
+          "itemOrder": 1,
+          "globalItemNumber": 16,
+          "chunkIds": [
+            "g02-chunk-16"
+          ],
+          "termVi": "Chiến lược tiếp thị liên kết",
+          "termEn": "Affiliate marketing strategy",
+          "promptVi": "Dù thị trường cạnh tranh gay gắt, tiếp thị liên kết vẫn là đòn bẩy tăng trưởng doanh số mạnh.",
+          "promptEn": "Although market competition is fierce, affiliate marketing remains a powerful lever for sales growth.",
+          "wordCountVi": 20,
+          "sentenceLevel": "B2 (Complex Sentence)",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 4,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 4,
+          "cvrBreakdown": {
+            "tc": 4,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 4,
+            "cci": 3,
+            "cpd": 12
+          }
+        },
+        {
+          "itemOrder": 2,
+          "globalItemNumber": 17,
+          "chunkIds": [
+            "g02-chunk-17"
+          ],
+          "termVi": "Xử lý phản hồi tiêu cực",
+          "termEn": "Reputation management",
+          "promptVi": "Khi khách để lại đánh giá tiêu cực, nhân viên cần nhanh chóng giải quyết để bảo vệ uy tín.",
+          "promptEn": "When buyers leave negative feedback, staff must quickly resolve issues to protect brand reputation.",
+          "wordCountVi": 20,
+          "sentenceLevel": "B2 (Complex Sentence)",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 4,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 4,
+          "cvrBreakdown": {
+            "tc": 4,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 4,
+            "cci": 3,
+            "cpd": 12
+          }
+        },
+        {
+          "itemOrder": 3,
+          "globalItemNumber": 18,
+          "chunkIds": [
+            "g02-chunk-18"
+          ],
+          "termVi": "Cá nhân hóa trải nghiệm mua sắm",
+          "termEn": "Personalized shopping experience",
+          "promptVi": "Áp dụng công nghệ cá nhân hóa giỏ hàng không chỉ làm khách hài lòng, mà còn tiết kiệm tiền.",
+          "promptEn": "Employing smart personalization for shopping carts not only delights consumers, but also saves advertising budget.",
+          "wordCountVi": 20,
+          "sentenceLevel": "B2 (Complex Sentence)",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 4,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 4,
+          "cvrBreakdown": {
+            "tc": 4,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 4,
+            "cci": 3,
+            "cpd": 12
+          }
+        }
+      ]
+    },
+    {
+      "sectionOrder": 7,
+      "part": 3,
+      "title": "Session 7 • 6Ω (Focus Sentence)",
+      "targetCvrOhm": 6,
+      "cciAmpe": 2,
+      "cpd": 12,
+      "hintCount": 1,
+      "sessionLanguage": "en",
+      "voiceModel": "google/en-US-Neural2-F",
+      "introTextVi": "Session 7: Mức kháng trở 6 Ohm, cường độ 2 Ampe. Mục tiêu 12V CPD. Phát âm câu hoàn chỉnh trôi chảy.",
+      "introTextEn": "Session 7: Resistance 6 Ohm, current 2 Amps. Target 12V CPD. Articulate complete sentence fluently.",
+      "items": [
+        {
+          "itemOrder": 1,
+          "globalItemNumber": 19,
+          "chunkIds": [
+            "g02-chunk-19"
+          ],
+          "termVi": "Hệ sinh thái thanh toán tích hợp",
+          "termEn": "Seamless payment ecosystem",
+          "promptVi": "Nhờ hệ thống thanh toán tiện lợi cùng giao hàng hỏa tốc, các sàn đã thay đổi thói quen người mua sắm.",
+          "promptEn": "By establishing convenient payments alongside instant delivery, online platforms have reshaped consumer shopping habits.",
+          "wordCountVi": 22,
+          "sentenceLevel": "C1 (Advanced Sustained Fluency)",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 6,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 6,
+          "cvrBreakdown": {
+            "tc": 6,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 6,
+            "cci": 2,
+            "cpd": 12
+          }
+        },
+        {
+          "itemOrder": 2,
+          "globalItemNumber": 20,
+          "chunkIds": [
+            "g02-chunk-20"
+          ],
+          "termVi": "Bảo toàn biên lợi nhuận",
+          "termEn": "Profit margin preservation",
+          "promptVi": "Dù các đợt giảm giá mang lại lượng khách lớn, doanh nghiệp giỏi luôn chú trọng bảo toàn biên lợi nhuận.",
+          "promptEn": "Although discount waves attract large crowds, smart enterprises always focus on preserving their net profit margins.",
+          "wordCountVi": 21,
+          "sentenceLevel": "C1 (Advanced Sustained Fluency)",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 6,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 6,
+          "cvrBreakdown": {
+            "tc": 6,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 6,
+            "cci": 2,
+            "cpd": 12
+          }
+        },
+        {
+          "itemOrder": 3,
+          "globalItemNumber": 21,
+          "chunkIds": [
+            "g02-chunk-21"
+          ],
+          "termVi": "Bán lẻ đa kênh bền vững",
+          "termEn": "Sustainable omnichannel retailing",
+          "promptVi": "Trong thời đại số, kết hợp cửa hàng và sàn trực tuyến giúp thương hiệu phát triển bền vững dài lâu.",
+          "promptEn": "In the digital era, combining physical stores with online platforms helps retail brands grow sustainably long term.",
+          "wordCountVi": 21,
+          "sentenceLevel": "C1 (Advanced Sustained Fluency)",
+          "spokenScriptVi": null,
+          "spokenScriptEn": null,
+          "tc": 6,
+          "lc": 1,
+          "tl": 1,
+          "measuredCvr": 6,
+          "cvrBreakdown": {
+            "tc": 6,
+            "lc": 1,
+            "tl": 1,
+            "cvr": 6,
+            "cci": 2,
+            "cpd": 12
+          }
+        }
+      ]
+    }
+  ],
+  "totalItems": 21
+}

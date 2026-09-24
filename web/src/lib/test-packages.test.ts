@@ -431,6 +431,16 @@ describe('test-packages CRUD helpers', () => {
     for (const variant of insertedVariants) {
       expect(variant.audio_asset_id).toBeDefined()
       expect(variant.package_version_id).toBe('ver-mini-456')
+      if (variant.narration_target === 'test_item') {
+        expect(variant.test_section_id).toBeNull()
+        expect(variant.test_item_id).toBeDefined()
+      } else if (variant.narration_target === 'section_intro') {
+        expect(variant.test_section_id).toBeDefined()
+        expect(variant.test_item_id).toBeNull()
+      } else {
+        expect(variant.test_section_id).toBeNull()
+        expect(variant.test_item_id).toBeNull()
+      }
     }
   })
 })

@@ -1438,25 +1438,30 @@ export async function createMiniTestVariantFromPackage(
     // 5b. Self-healing check: clean up or handle existing orphaned package stubs with same slug
     const { data: existingPkgList } = await sb
       .from('test_packages')
-      .select('id, slug, test_package_versions(id, status, test_sections(id))')
+      .select('id, slug, test_package_versions(id, status, test_sections(id), narration_variants(id))')
       .eq('slug', miniCode)
 
     if (existingPkgList && existingPkgList.length > 0) {
       for (const exPkg of existingPkgList) {
         const versions = (exPkg as any).test_package_versions || []
-        const hasSections = versions.some((v: any) => v.test_sections && v.test_sections.length > 0)
-        if (hasSections) {
-          const completeVer = versions.find((v: any) => v.status === 'published') || versions[0]
+        const completeVer = versions.find(
+          (v: any) =>
+            v.test_sections &&
+            v.test_sections.length > 0 &&
+            (!shouldCopyAudio || (v.narration_variants && v.narration_variants.length > 0)),
+        )
+        if (completeVer) {
+          const pubVer = versions.find((v: any) => v.status === 'published' && v.id === completeVer.id) || completeVer
           return {
             ok: true,
             data: {
               package: mapTestPackage(exPkg),
-              version: mapTestPackageVersion(completeVer),
+              version: mapTestPackageVersion(pubVer),
               itemCount: sourceSections.length * questionsPerSection,
             },
           }
         } else {
-          // Empty orphaned stub from failed previous run -> archive its versions and free the slug
+          // Empty or incomplete stub (missing sections or missing audio) -> archive it so we can regenerate cleanly
           for (const v of versions) {
             try {
               if (v.status === 'draft') {
@@ -1657,7 +1662,7 @@ export async function createMiniTestVariantFromPackage(
         for (const v of itemVariants) {
           newVariantsToInsert.push({
             package_version_id: newVerRow.id,
-            test_section_id: map.newSectionId,
+            test_section_id: null, // Per narration_variants_target_shape_check: test_section_id must be null when narration_target is 'test_item'
             test_item_id: map.newItemId,
             narration_target: 'test_item',
             language: v.language,
@@ -1724,7 +1729,10 @@ export async function createMiniTestVariantFromPackage(
       }
 
       if (newVariantsToInsert.length > 0) {
-        await sb.from('narration_variants').insert(newVariantsToInsert)
+        const { error: variantInsertErr } = await sb.from('narration_variants').insert(newVariantsToInsert)
+        if (variantInsertErr) {
+          throw new Error(`Failed to copy audio narration variants: ${variantInsertErr.message}`)
+        }
       }
     }
 

@@ -466,7 +466,12 @@ async function mutateSnapshot(
     return localMutateAttempt(attempt, localCommand)
   }
   const row = result.data as DbSnapshot
-  return { ok: true, data: { ...attempt, snapshot: snapshotFromDb(row) } }
+  const snap = snapshotFromDb(row)
+  // Fail (Yellow) preserves the exact probeCount before resolve, even if remote RPC is unmigrated
+  if (localCommand.type === 'resolve_probe' && localCommand.outcome === 'fail') {
+    snap.probeCount = attempt.snapshot.probeCount
+  }
+  return { ok: true, data: { ...attempt, snapshot: snap } }
 }
 
 export async function recordLiveColor(

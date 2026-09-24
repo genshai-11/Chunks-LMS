@@ -1449,15 +1449,19 @@ export function TeacherTestRunPage() {
         setMessage(result.error)
         return
       }
+      const data = { ...result.data }
+      if (outcome === 'fail' && typeof probeCount === 'number') {
+        data.probeCount = probeCount
+      }
       if (outcome === 'continue') {
-        setMessage(`Chunks Number=${probeChunksNumber({ enteredProbeFlow: true, probeCount: result.data.probeCount }) ?? 1}`)
+        setMessage(`Chunks Number=${probeChunksNumber({ enteredProbeFlow: true, probeCount: data.probeCount }) ?? 1}`)
       } else {
         playReaction(outcome === 'fail' ? 'yellow' : 'indigo')
         setMessage('')
       }
       setItems((prev) =>
         prev.map((item) =>
-          item.id === currentItem.id ? withStandaloneSnapshot(item, result.data, true) : item,
+          item.id === currentItem.id ? withStandaloneSnapshot(item, data, true) : item,
         ),
       )
       if (isFinalOutstandingItem) await playEndAfterFinalScore()

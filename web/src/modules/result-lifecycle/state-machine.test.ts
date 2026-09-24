@@ -91,6 +91,27 @@ describe('result lifecycle state machine', () => {
     expect(indigo.snapshot.effectiveColor).toBe('indigo')
     expect(indigo.snapshot.probeCount).toBe(2) // did increment
     expect(probeChunksNumber(indigo.snapshot)).toBe(3) // n increments to 3!
+
+    // 3. User scenario: Green + Blue (continue) + Blue (continue) + Yellow (fail) -> n = 3 (NOT 4!)
+    let snap3 = createDraftSnapshot()
+    let c1 = applyLifecycleCommand(snap3, { type: 'record_provisional', color: 'green', at })
+    if (!c1.ok) throw new Error(c1.error)
+    expect(probeChunksNumber(c1.snapshot)).toBe(1) // Green: n=1
+
+    let c2 = applyLifecycleCommand(c1.snapshot, { type: 'resolve_probe', outcome: 'continue', at })
+    if (!c2.ok) throw new Error(c2.error)
+    expect(probeChunksNumber(c2.snapshot)).toBe(2) // 1st Blue (Continue): n=2
+
+    let c3 = applyLifecycleCommand(c2.snapshot, { type: 'resolve_probe', outcome: 'continue', at })
+    if (!c3.ok) throw new Error(c3.error)
+    expect(probeChunksNumber(c3.snapshot)).toBe(3) // 2nd Blue (Continue): n=3
+
+    let cYellow = applyLifecycleCommand(c3.snapshot, { type: 'resolve_probe', outcome: 'fail', at })
+    expect(cYellow.ok).toBe(true)
+    if (!cYellow.ok) return
+    expect(cYellow.snapshot.effectiveColor).toBe('yellow')
+    expect(cYellow.snapshot.probeCount).toBe(2) // did NOT increment on fail!
+    expect(probeChunksNumber(cYellow.snapshot)).toBe(3) // n MUST be 3, NEVER 4!
   })
 
   it('Continue is unlimited; probeCount tracks depth n without blocking', () => {

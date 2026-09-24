@@ -1319,3 +1319,39 @@ export async function updateTestPackageMetadata(
   if (error) throw new Error(error.message)
   clearRequestCache()
 }
+
+export async function updateTestItemContent(input: {
+  itemId: string
+  promptVi: string
+  promptEn: string
+  termVi?: string | null
+  termEn?: string | null
+  spokenScriptVi?: string | null
+  spokenScriptEn?: string | null
+  tc?: number | null
+  tl?: number | null
+  lc?: number | null
+  measuredCvr?: number | null
+}): Promise<Result<{ ok: boolean; itemId: string }>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+
+  const { error } = await sb.rpc('edit_test_item_text', {
+    p_item_id: input.itemId,
+    p_prompt_vi: input.promptVi,
+    p_prompt_en: input.promptEn,
+    p_term_vi: input.termVi ?? null,
+    p_term_en: input.termEn ?? null,
+    p_spoken_script_vi: input.spokenScriptVi ?? null,
+    p_spoken_script_en: input.spokenScriptEn ?? null,
+    p_tc: input.tc ?? null,
+    p_tl: input.tl ?? null,
+    p_lc: input.lc ?? null,
+    p_measured_cvr: input.measuredCvr ?? null,
+  })
+
+  if (error) return { ok: false, error: error.message }
+  clearRequestCache()
+  return { ok: true, data: { ok: true, itemId: input.itemId } }
+}
+

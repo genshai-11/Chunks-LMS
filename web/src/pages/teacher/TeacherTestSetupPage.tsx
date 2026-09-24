@@ -54,7 +54,21 @@ type AudioStatusSummary = {
 function defaultLanguageForSection(
   section: TestSection,
   languagePolicy?: unknown,
+  pkgType?: 'green' | 'red' | string | null,
+  sessionLanguages?: Array<'vi' | 'en'> | null,
 ): AudioLanguage {
+  // 1. Explicit sessionLanguages array from package version metadata
+  if (Array.isArray(sessionLanguages) && sessionLanguages[section.sectionOrder - 1]) {
+    return sessionLanguages[section.sectionOrder - 1]
+  }
+
+  // 2. Section specific metadata
+  const secMeta = (section as any).metadata || (section as any).sourceMetadata
+  if (secMeta?.sessionLanguage === 'vi' || secMeta?.sessionLanguage === 'en') {
+    return secMeta.sessionLanguage
+  }
+
+  // 3. Known language policies
   if (languagePolicy === 'alternating_vi_en') {
     return section.sectionOrder % 2 === 1 ? 'vi' : 'en'
   }
@@ -64,6 +78,14 @@ function defaultLanguageForSection(
   if (languagePolicy === 'green_test_49q') {
     return section.sectionOrder <= 3 || section.sectionOrder === 7 ? 'en' : 'vi'
   }
+
+  // 4. Archetype 7x3 defaults (Green: S1-S3 EN, S4-S7 VI; Red: S1-S3 VI, S4-S7 EN)
+  if ((pkgType || '').toLowerCase() === 'green') {
+    return section.sectionOrder <= 3 ? 'en' : 'vi'
+  } else if ((pkgType || '').toLowerCase() === 'red') {
+    return section.sectionOrder <= 3 ? 'vi' : 'en'
+  }
+
   return section.sectionOrder <= 4 ? 'vi' : 'en'
 }
 
@@ -124,6 +146,8 @@ export function TeacherTestSetupPage() {
   const { assignmentId, sectionId: initialSectionId } = useParams()
   const navigate = useNavigate()
   const [packageVersionId, setPackageVersionId] = useState('')
+  const [packageType, setPackageType] = useState<'green' | 'red' | null>(null)
+  const [packageSessionLanguages, setPackageSessionLanguages] = useState<Array<'vi' | 'en'> | null>(null)
   const [languagePolicy, setLanguagePolicy] = useState<unknown>(null)
   const [sections, setSections] = useState<TestSection[]>([])
   const [itemsBySection, setItemsBySection] = useState<Record<string, TestItem[]>>({})
@@ -182,6 +206,11 @@ export function TeacherTestSetupPage() {
       const versionResult = await getTestPackageVersion(assignment.packageVersionId)
       const nextLanguagePolicy = versionResult.ok ? versionResult.data?.sourceMetadata?.languagePolicy : null
       setLanguagePolicy(nextLanguagePolicy ?? null)
+      const sessionLanguages = (versionResult.ok ? versionResult.data?.sourceMetadata?.sessionLanguages : null) as Array<'vi' | 'en'> | null
+      setPackageSessionLanguages(sessionLanguages ?? null)
+      const rawType = versionResult.ok ? (versionResult.data?.sourceMetadata?.testType as string) : null
+      const pkgType = rawType ? (rawType.toLowerCase() as 'green' | 'red') : null
+      setPackageType(pkgType ?? null)
       const sectionResult = await listTestSections(assignment.packageVersionId)
       if (!sectionResult.ok) return setError(sectionResult.error)
       setSections(sectionResult.data)
@@ -192,7 +221,7 @@ export function TeacherTestSetupPage() {
       )
       setSelectedSectionIds(new Set(sectionResult.data.map((section) => section.id)))
       setLanguageBySection(
-        Object.fromEntries(sectionResult.data.map((section) => [section.id, defaultLanguageForSection(section, nextLanguagePolicy)])),
+        Object.fromEntries(sectionResult.data.map((section) => [section.id, defaultLanguageForSection(section, nextLanguagePolicy, pkgType, sessionLanguages)])),
       )
 
       const itemResults = await Promise.all(
@@ -325,7 +354,7 @@ export function TeacherTestSetupPage() {
   function pendingGenerationTargets() {
     return targetPreview
       .map((item) => {
-        const language = languageBySection[item.section.id] ?? defaultLanguageForSection(item.section, languagePolicy)
+        const language = languageBySection[item.section.id] ?? defaultLanguageForSection(item.section, languagePolicy, packageType, packageSessionLanguages)
         return { section: item.section, language }
       })
       .filter((target) => !audioSummaryBySection[target.section.id]?.[target.language]?.ready)
@@ -339,7 +368,7 @@ export function TeacherTestSetupPage() {
 
     const startedRunIds: string[] = []
     for (const item of targetPreview) {
-      const language = languageBySection[item.section.id] ?? defaultLanguageForSection(item.section, languagePolicy)
+      const language = languageBySection[item.section.id] ?? defaultLanguageForSection(item.section, languagePolicy, packageType, packageSessionLanguages)
       const run = await prepareStandaloneRun(assignmentId, item.section.id, language, voiceId)
       if (!run.ok) {
         setBusy(false)
@@ -491,7 +520,7 @@ export function TeacherTestSetupPage() {
                   <tbody>
                     {preview.map(({ section, itemCount }) => {
                       const selected = runMode === 'full' || (runMode === 'single' ? section.id === sectionId : selectedSectionIds.has(section.id))
-                      const language = languageBySection[section.id] ?? defaultLanguageForSection(section, languagePolicy)
+                      const language = languageBySection[section.id] ?? defaultLanguageForSection(section, languagePolicy, packageType, packageSessionLanguages)
                       const summary = audioSummaryBySection[section.id]
                       const currentSummary = summary?.[language]
                       const ready = currentSummary?.ready ?? false

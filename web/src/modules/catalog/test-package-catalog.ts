@@ -343,3 +343,22 @@ export function validateRedCollocations(
   }
 }
 
+export function extractPackageVoltage(
+  pkg: { code?: string | null; title?: string | null; slug?: string | null; sourceMetadata?: Record<string, unknown> | null },
+  fallbackType?: 'green' | 'red' | string | null,
+): number {
+  const meta = pkg?.sourceMetadata as Record<string, unknown> | undefined | null
+  const metaVolt = Number(meta?.targetVoltage ?? meta?.targetCpd)
+  if (!isNaN(metaVolt) && metaVolt > 0) return metaVolt
+
+  const str = `${pkg?.title || ''} ${pkg?.slug || ''} ${pkg?.code || ''}`
+  const match = str.match(/(?:^|[_\-\s])(\d+)V(?:[_\-\s]|$)/i)
+  if (match && match[1]) {
+    const parsed = Number(match[1])
+    if (!isNaN(parsed) && parsed > 0) return parsed
+  }
+
+  return (fallbackType || '').toLowerCase() === 'red' ? 56 : 12
+}
+
+

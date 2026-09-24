@@ -45,6 +45,7 @@ import {
   listTestPackageVersions,
   listTestPackages,
   listTestSections,
+  updateTestItemContent,
   updateTestPackageMetadata,
 } from '../../lib/test-packages'
 import {
@@ -53,6 +54,7 @@ import {
   calculateWordCountLc,
   countWords,
   detectPackageTestType,
+  extractPackageVoltage,
   validateGreenSentence,
   validateRedCollocations,
   type CciCategory,
@@ -266,6 +268,108 @@ export function AdminPackageTestsPage() {
     text: string
   } | null>(null)
 
+  // Session languages per package
+  const [sessionLanguages, setSessionLanguages] = useState<Record<string, 'vi' | 'en'>>({})
+
+  // Helper to get active language for a section
+  function getSectionLanguage(sec?: TestSection | null): 'vi' | 'en' {
+    if (!sec) return 'vi'
+    if (sessionLanguages[sec.id]) {
+      return sessionLanguages[sec.id]
+    }
+    const metaLangs = (selectedPackage?.version?.sourceMetadata as any)?.sessionLanguages
+    if (Array.isArray(metaLangs) && metaLangs[sec.sectionOrder - 1]) {
+      return metaLangs[sec.sectionOrder - 1]
+    }
+    const secMeta = (sec as any).metadata || (sec as any).sourceMetadata
+    if (secMeta?.sessionLanguage === 'vi' || secMeta?.sessionLanguage === 'en') {
+      return secMeta.sessionLanguage
+    }
+    if (selectedPackage?.testType === 'green') {
+      return sec.sectionOrder <= 3 ? 'en' : 'vi'
+    } else {
+      return sec.sectionOrder <= 3 ? 'vi' : 'en'
+    }
+  }
+
+  function handleToggleSectionLanguage(sectionId: string, currentLang: 'vi' | 'en') {
+    const nextLang = currentLang === 'vi' ? 'en' : 'vi'
+    setSessionLanguages((prev) => ({
+      ...prev,
+      [sectionId]: nextLang,
+    }))
+  }
+
+  // Editing Test Item Modal
+  const [editingItem, setEditingItem] = useState<TestItem | null>(null)
+  const [editPromptVi, setEditPromptVi] = useState('')
+  const [editPromptEn, setEditPromptEn] = useState('')
+  const [editTermVi, setEditTermVi] = useState('')
+  const [editTermEn, setEditTermEn] = useState('')
+  const [editSpokenVi, setEditSpokenVi] = useState('')
+  const [editSpokenEn, setEditSpokenEn] = useState('')
+  const [savingItem, setSavingItem] = useState(false)
+  const [regeneratingItemAudio, setRegeneratingItemAudio] = useState(false)
+
+  function handleOpenEditItem(item: TestItem) {
+    setEditingItem(item)
+    setEditPromptVi(item.promptVi || '')
+    setEditPromptEn(item.promptEn || '')
+    setEditTermVi(item.termVi || '')
+    setEditTermEn(item.termEn || '')
+    setEditSpokenVi(item.spokenScriptVi || item.promptVi || '')
+    setEditSpokenEn(item.spokenScriptEn || item.promptEn || '')
+  }
+
+  async function handleSaveItem(alsoRegenerateAudio = false) {
+    if (!editingItem || !selectedPackage?.version) return
+    setSavingItem(true)
+    if (alsoRegenerateAudio) setRegeneratingItemAudio(true)
+    try {
+      const res = await updateTestItemContent({
+        itemId: editingItem.id,
+        promptVi: editPromptVi.trim(),
+        promptEn: editPromptEn.trim(),
+        termVi: editTermVi.trim() || null,
+        termEn: editTermEn.trim() || null,
+        spokenScriptVi: editSpokenVi.trim() || editPromptVi.trim() || null,
+        spokenScriptEn: editSpokenEn.trim() || editPromptEn.trim() || null,
+      })
+
+      if (!res.ok) {
+        throw new Error(res.error)
+      }
+
+      if (alsoRegenerateAudio) {
+        const sec = selectedPackage.sections.find((s) => s.id === editingItem.sectionId)
+        const sessionLang = getSectionLanguage(sec)
+        const script = sessionLang === 'vi' ? editSpokenVi.trim() || editPromptVi.trim() : editSpokenEn.trim() || editPromptEn.trim()
+        const voice = sessionLang === 'vi' ? 'google/vi-VN-Neural2-A' : 'google/en-US-Neural2-F'
+
+        await generateNarration({
+          packageVersionId: selectedPackage.version.id,
+          target: 'test_item',
+          testSectionId: editingItem.sectionId,
+          testItemId: editingItem.id,
+          language: sessionLang,
+          voiceId: voice,
+          textOverride: script,
+        })
+        ok('Đã cập nhật câu hỏi và sinh mới audio Google Cloud TTS thành công!')
+      } else {
+        ok('Đã cập nhật nội dung câu hỏi thành công!')
+      }
+
+      setEditingItem(null)
+      await loadPackages()
+    } catch (e) {
+      err(e instanceof Error ? e.message : 'Cập nhật câu hỏi thất bại')
+    } finally {
+      setSavingItem(false)
+      setRegeneratingItemAudio(false)
+    }
+  }
+
   // CCI Profiles Tab State
   const [cciProfiles, setCciProfiles] = useState<CciProfile[]>([])
   const [selectedCciProfileId, setSelectedCciProfileId] = useState<string>('')
@@ -370,11 +474,7 @@ export function AdminPackageTestsPage() {
           }
 
           const testType = detectPackageTestType(pkg)
-          const targetVoltage = Number(
-            pkg.sourceMetadata?.targetVoltage ??
-              pkg.sourceMetadata?.targetCpd ??
-              (testType === 'red' ? 56 : 12),
-          )
+          const targetVoltage = extractPackageVoltage(pkg, testType)
           const questionCount =
             items.length || Number(pkg.sourceMetadata?.questionCount ?? 21)
 
@@ -1491,8 +1591,23 @@ export function AdminPackageTestsPage() {
                             </div>
                           </div>
 
-                          {/* Session Physics Badge */}
-                          <div className="flex items-center gap-2 text-[11px]">
+                          {/* Session Physics & Language Badge */}
+                          <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-100 border border-slate-200">
+                              <span className={`font-bold uppercase ${
+                                getSectionLanguage(sec) === 'en' ? 'text-blue-700' : 'text-emerald-700'
+                              }`}>
+                                {getSectionLanguage(sec).toUpperCase()} Audio
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleSectionLanguage(sec.id, getSectionLanguage(sec))}
+                                className="text-[10px] text-slate-500 hover:text-indigo-600 underline font-semibold transition-colors"
+                                title="Đổi ngôn ngữ cho session này"
+                              >
+                                Đổi sang {getSectionLanguage(sec) === 'en' ? 'VI' : 'EN'}
+                              </button>
+                            </div>
                             <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono">
                               CVR: {sec.targetCvrOhm ?? 3}Ω
                             </span>
@@ -1577,6 +1692,16 @@ export function AdminPackageTestsPage() {
                                     <div className="text-[10px] font-mono text-slate-400">
                                       TC: {item.tc ?? 2} • LC: {item.lc ?? 1} • TL: {item.tl ?? 1} • CVR: {item.measuredCvr ?? 3}Ω
                                     </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEditItem(item)}
+                                      className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-700 text-[11px] font-semibold flex items-center gap-1 transition-colors mt-0.5"
+                                      title="Chỉnh sửa nội dung câu hỏi"
+                                    >
+                                      <Pencil className="h-3 w-3" />
+                                      <span>Sửa câu</span>
+                                    </button>
                                   </div>
                                 </div>
                               </div>
@@ -1617,14 +1742,7 @@ export function AdminPackageTestsPage() {
                           const hintsList = !isGreen && item.promptVi ? item.promptVi.split('/') : []
                           const redValidation = !isGreen ? validateRedCollocations(hintsList) : null
 
-                          const lang: 'vi' | 'en' =
-                            selectedPackage.testType === 'green'
-                              ? sec && sec.sectionOrder <= 3
-                                ? 'en'
-                                : 'vi'
-                              : sec && sec.sectionOrder <= 3
-                                ? 'vi'
-                                : 'en'
+                          const lang: 'vi' | 'en' = getSectionLanguage(sec)
                           const script =
                             lang === 'vi'
                               ? item.spokenScriptVi || item.promptVi || ''
@@ -1679,19 +1797,29 @@ export function AdminPackageTestsPage() {
                                 )}
                               </td>
                               <td className="py-3 px-4 text-right whitespace-nowrap">
-                                <button
-                                  type="button"
-                                  onClick={() => void handlePlayItemAudio(`item_${item.id}`, script, lang)}
-                                  disabled={playingAudioKey === `item_${item.id}`}
-                                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
-                                  title="Nghe thử"
-                                >
-                                  {playingAudioKey === `item_${item.id}` ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : (
-                                    <Play className="h-3.5 w-3.5 fill-current" />
-                                  )}
-                                </button>
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => void handlePlayItemAudio(`item_${item.id}`, script, lang)}
+                                    disabled={playingAudioKey === `item_${item.id}`}
+                                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                                    title="Nghe thử"
+                                  >
+                                    {playingAudioKey === `item_${item.id}` ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <Play className="h-3.5 w-3.5 fill-current" />
+                                    )}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditItem(item)}
+                                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-700 transition-colors"
+                                    title="Chỉnh sửa nội dung câu hỏi"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           )
@@ -2179,14 +2307,7 @@ export function AdminPackageTestsPage() {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[320px] overflow-y-auto pr-1">
                       {selectedPackage.sections.map((sec) => {
-                        const secLang: 'vi' | 'en' =
-                          selectedPackage.testType === 'green'
-                            ? sec.sectionOrder <= 3
-                              ? 'en'
-                              : 'vi'
-                            : sec.sectionOrder <= 3
-                              ? 'vi'
-                              : 'en'
+                        const secLang: 'vi' | 'en' = getSectionLanguage(sec)
                         const secScript =
                           secLang === 'vi'
                             ? sec.introTextVi ||
@@ -2199,9 +2320,21 @@ export function AdminPackageTestsPage() {
                               <span className="font-bold text-xs text-slate-800">
                                 Session {sec.sectionOrder}: {sec.title}
                               </span>
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 uppercase">
-                                {secLang} · S{sec.sectionOrder}
-                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase border ${
+                                  secLang === 'en' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                }`}>
+                                  {secLang} · S{sec.sectionOrder}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleSectionLanguage(sec.id, secLang)}
+                                  className="text-[10px] text-slate-400 hover:text-indigo-600 underline font-semibold transition-colors"
+                                  title="Đổi ngôn ngữ cho session này"
+                                >
+                                  {secLang === 'en' ? 'Đổi VI' : 'Đổi EN'}
+                                </button>
+                              </div>
                             </div>
                             <p className="text-[11px] text-slate-600 line-clamp-1 italic">
                               "{secScript}"
@@ -2258,14 +2391,7 @@ export function AdminPackageTestsPage() {
                 <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto pr-2">
                   {selectedPackage.items.map((item) => {
                     const sec = selectedPackage.sections.find((s) => s.id === item.sectionId)
-                    const lang: 'vi' | 'en' =
-                      selectedPackage.testType === 'green'
-                        ? sec && sec.sectionOrder <= 3
-                          ? 'en'
-                          : 'vi'
-                        : sec && sec.sectionOrder <= 3
-                          ? 'vi'
-                          : 'en'
+                    const lang: 'vi' | 'en' = getSectionLanguage(sec)
                     const script =
                       lang === 'vi'
                         ? item.spokenScriptVi || item.promptVi || ''
@@ -2304,6 +2430,15 @@ export function AdminPackageTestsPage() {
                             ) : (
                               <Play className="h-3.5 w-3.5 fill-current" />
                             )}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditItem(item)}
+                            className="p-2 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-700 transition-colors"
+                            title="Chỉnh sửa câu hỏi & kịch bản"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
                           </button>
 
                           <button
@@ -3678,6 +3813,228 @@ export function AdminPackageTestsPage() {
           </div>
         </div>
       )}
+
+      {/* EDIT TEST ITEM MODAL */}
+      {editingItem && (() => {
+        const sec = selectedPackage?.sections.find((s) => s.id === editingItem.sectionId)
+        const secIndex = selectedPackage?.sections.findIndex((s) => s.id === editingItem.sectionId) ?? -1
+        const activeLang = getSectionLanguage(sec)
+        const isGreen = selectedPackage?.testType === 'green'
+        const activeText = activeLang === 'vi' ? editPromptVi : editPromptEn
+        const words = countWords(activeText)
+        const greenValidation = isGreen ? validateGreenSentence(activeText, { minWords: 8, maxWords: 22 }) : null
+        const redValidation = !isGreen ? validateRedCollocations([activeText]) : null
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto">
+            <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl shadow-2xl p-6 space-y-4 my-8 max-h-[90vh] flex flex-col">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-600 font-bold text-sm">
+                    Q{editingItem.itemOrder}
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                      Chỉnh sửa nội dung câu hỏi
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-normal">
+                        {sec ? `Session ${sec.sectionOrder || (secIndex + 1)}: ${sec.title}` : `Item #${editingItem.itemOrder}`}
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Sửa nội dung văn bản câu hỏi, kịch bản đọc và tạo lại âm thanh Google Cloud TTS chất lượng cao.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingItem(null)}
+                  className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Validation Status Banner */}
+              <div className={`p-3 rounded-xl border text-xs flex items-center justify-between ${
+                isGreen
+                  ? greenValidation?.valid
+                    ? 'bg-emerald-50/80 border-emerald-200 text-emerald-800'
+                    : 'bg-amber-50/80 border-amber-200 text-amber-800'
+                  : redValidation?.valid
+                  ? 'bg-emerald-50/80 border-emerald-200 text-emerald-800'
+                  : 'bg-amber-50/80 border-amber-200 text-amber-800'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <Info className="h-4 w-4 shrink-0" />
+                  <span>
+                    {isGreen ? (
+                      <>
+                        <strong>Green Archetype (8-22 từ):</strong> Hiện tại <strong>{words}</strong> từ theo ngữ cảnh{' '}
+                        <strong className="uppercase">{activeLang}</strong>. {greenValidation?.reason || 'Đạt chuẩn câu đơn hoàn chỉnh.'}
+                      </>
+                    ) : (
+                      <>
+                        <strong>Red Collocation:</strong> Hiện tại <strong>{words}</strong> từ. {redValidation?.reason || 'Đạt chuẩn cụm từ ghép.'}
+                      </>
+                    )}
+                  </span>
+                </div>
+                <span className="px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold bg-white border border-slate-200 shrink-0">
+                  Audio: {activeLang.toUpperCase()}
+                </span>
+              </div>
+
+              {/* Form inputs */}
+              <div className="space-y-4 overflow-y-auto pr-1 flex-1 text-xs">
+                {/* Vietnamese Prompt */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-semibold text-slate-700 flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+                      Nội dung câu hỏi Tiếng Việt (promptVi) *
+                    </label>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      {countWords(editPromptVi)} từ
+                    </span>
+                  </div>
+                  <textarea
+                    rows={2}
+                    value={editPromptVi}
+                    onChange={(e) => setEditPromptVi(e.target.value)}
+                    placeholder="Nhập câu tiếng Việt hoàn chỉnh..."
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 font-medium"
+                  />
+                </div>
+
+                {/* English Prompt */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-semibold text-slate-700 flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-blue-500"></span>
+                      Nội dung câu hỏi Tiếng Anh (promptEn) *
+                    </label>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      {countWords(editPromptEn)} từ
+                    </span>
+                  </div>
+                  <textarea
+                    rows={2}
+                    value={editPromptEn}
+                    onChange={(e) => setEditPromptEn(e.target.value)}
+                    placeholder="Enter complete English sentence..."
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 font-medium"
+                  />
+                </div>
+
+                {/* Terms / Vocabulary Targets */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Từ vựng mục tiêu VN (termVi)
+                    </label>
+                    <input
+                      type="text"
+                      value={editTermVi}
+                      onChange={(e) => setEditTermVi(e.target.value)}
+                      placeholder="VD: sở thích, thể thao..."
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Từ vựng mục tiêu EN (termEn)
+                    </label>
+                    <input
+                      type="text"
+                      value={editTermEn}
+                      onChange={(e) => setEditTermEn(e.target.value)}
+                      placeholder="e.g. leisure activities..."
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Spoken Scripts (Optional SSML/Audio Override) */}
+                <div className="pt-2 border-t border-slate-100 space-y-3">
+                  <div className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5">
+                    <Volume2 className="h-3.5 w-3.5" />
+                    KỊCH BẢN ĐỌC CHO GOOGLE CLOUD TTS (Tùy chọn ghi đè phát âm)
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-medium text-slate-600 mb-1">
+                        Kịch bản phát âm VN (mặc định = promptVi)
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={editSpokenVi}
+                        onChange={(e) => setEditSpokenVi(e.target.value)}
+                        placeholder="Để trống nếu đọc giống promptVi"
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-1.5 text-slate-700 text-xs font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-medium text-slate-600 mb-1">
+                        Kịch bản phát âm EN (mặc định = promptEn)
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={editSpokenEn}
+                        onChange={(e) => setEditSpokenEn(e.target.value)}
+                        placeholder="Để trống nếu đọc giống promptEn"
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-1.5 text-slate-700 text-xs font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
+                <span className="text-[11px] text-slate-500">
+                  TTS Voice: <code className="font-mono text-slate-700 font-semibold">{activeLang === 'vi' ? 'vi-VN-Neural2-A' : 'en-US-Neural2-F'}</code>
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="ghost text-xs"
+                    onClick={() => setEditingItem(null)}
+                    disabled={savingItem || regeneratingItemAudio}
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveItem(false)}
+                    disabled={savingItem || regeneratingItemAudio || !editPromptVi.trim() || !editPromptEn.trim()}
+                    className="px-4 py-2 text-xs font-semibold rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                  >
+                    {savingItem && !regeneratingItemAudio ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Save className="h-3.5 w-3.5" />
+                    )}
+                    Lưu Nội Dung
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveItem(true)}
+                    disabled={savingItem || regeneratingItemAudio || !editPromptVi.trim() || !editPromptEn.trim()}
+                    className="px-4 py-2 text-xs font-semibold rounded-xl bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-50 transition-colors flex items-center gap-1.5 shadow-sm"
+                  >
+                    {regeneratingItemAudio ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5" />
+                    )}
+                    Lưu & Sinh Lại Audio TTS
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* DELETE CONFIRMATION MODAL */}
       {deletingPackage && (

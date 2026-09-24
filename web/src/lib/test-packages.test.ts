@@ -243,8 +243,9 @@ describe('test-packages CRUD helpers', () => {
       if (table === 'test_packages') {
         return {
           select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              single: vi.fn(() =>
+            eq: vi.fn(() => {
+              const promise = Promise.resolve({ data: [], error: null }) as any
+              promise.single = vi.fn(() =>
                 Promise.resolve({
                   data: {
                     id: 'pkg-source',
@@ -256,8 +257,9 @@ describe('test-packages CRUD helpers', () => {
                   },
                   error: null,
                 }),
-              ),
-            })),
+              )
+              return promise
+            }),
           })),
           insert: vi.fn((row: any) => {
             insertedPackage = row
@@ -300,6 +302,21 @@ describe('test-packages CRUD helpers', () => {
             return {
               select: vi.fn(() => ({
                 single: vi.fn(() => Promise.resolve({ data: { id: 'ver-mini-456', ...row }, error: null })),
+              })),
+            }
+          }),
+          update: vi.fn((updates: any) => {
+            insertedVersion = { ...insertedVersion, ...updates }
+            return {
+              eq: vi.fn(() => ({
+                select: vi.fn(() => ({
+                  single: vi.fn(() =>
+                    Promise.resolve({
+                      data: { id: 'ver-mini-456', ...insertedVersion },
+                      error: null,
+                    }),
+                  ),
+                })),
               })),
             }
           }),

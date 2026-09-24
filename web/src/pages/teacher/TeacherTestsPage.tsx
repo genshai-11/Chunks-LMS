@@ -373,8 +373,8 @@ export function TeacherTestsPage() {
             </select>
           </label>
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">Package</span>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-bold text-slate-700">Package</span>
               <div className="flex items-center gap-1">
                 <button
                   type="button"
@@ -417,7 +417,7 @@ export function TeacherTestsPage() {
                 type="button"
                 data-testid="package-select-trigger"
                 onClick={() => setPackageDropdownOpen((prev) => !prev)}
-                className="w-full min-h-[42px] px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-left flex items-center justify-between gap-2 shadow-2xs hover:border-slate-400 focus:outline-hidden focus:ring-2 focus:ring-slate-900/10 cursor-pointer transition-all"
+                className="w-full min-h-[42px] px-3 py-2 rounded-xl border border-slate-300 bg-white text-left flex items-center justify-between gap-2 shadow-2xs hover:border-slate-400 focus:outline-hidden focus:ring-2 focus:ring-slate-900/10 cursor-pointer transition-all"
               >
                 {(() => {
                   const sel = versions.find((v) => v.id === versionId)
@@ -427,7 +427,7 @@ export function TeacherTestsPage() {
                   return (
                     <div className="flex items-center gap-2 min-w-0">
                       <span
-                        className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 ${
                           sel.testType === 'green'
                             ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                             : 'bg-rose-100 text-rose-800 border border-rose-200'
@@ -435,11 +435,11 @@ export function TeacherTestsPage() {
                       >
                         {sel.testType}
                       </span>
-                      <span className="font-mono font-bold text-xs text-slate-900 dark:text-white truncate">
+                      <span className="font-mono font-bold text-xs text-slate-900">
                         {sel.code}
                       </span>
                       <span
-                        className={`text-[10px] px-1.5 py-0.5 rounded-md font-semibold ${
+                        className={`text-[10px] px-1.5 py-0.5 rounded-md font-semibold shrink-0 ${
                           sel.kind === 'mini'
                             ? 'bg-amber-100 text-amber-800 border border-amber-200'
                             : 'bg-slate-100 text-slate-700 border border-slate-200'
@@ -451,7 +451,7 @@ export function TeacherTestsPage() {
                   )
                 })()}
                 <ChevronDown
-                  className={`h-4 w-4 text-slate-400 transition-transform ${
+                  className={`h-4 w-4 text-slate-400 shrink-0 transition-transform ${
                     packageDropdownOpen ? 'rotate-180' : ''
                   }`}
                 />
@@ -459,7 +459,7 @@ export function TeacherTestsPage() {
 
               {/* Styled Popover Dropdown List */}
               {packageDropdownOpen && (
-                <div className="absolute z-30 left-0 right-0 mt-1 max-h-64 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl p-1.5 space-y-1 animate-in fade-in duration-100">
+                <div className="absolute z-50 left-0 right-0 mt-1 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl p-1.5 space-y-1">
                   {selectableVersions.length === 0 ? (
                     <div className="p-3 text-center text-xs text-slate-400">
                       Không có bài test nào trong mục này.
@@ -475,19 +475,19 @@ export function TeacherTestsPage() {
                             setVersionId(v.id)
                             setPackageDropdownOpen(false)
                           }}
-                          className={`w-full px-2.5 py-2 rounded-lg text-left flex items-center justify-between text-xs transition-colors cursor-pointer ${
+                          className={`w-full px-3 py-2.5 rounded-lg text-left flex items-center justify-between text-xs transition-colors cursor-pointer ${
                             isSelected
-                              ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold'
-                              : 'hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300'
+                              ? 'bg-slate-100 text-slate-900 font-bold'
+                              : 'hover:bg-slate-50 text-slate-700'
                           }`}
                         >
-                          <div className="flex items-center gap-2 min-w-0">
+                          <div className="flex items-center gap-2.5 min-w-0">
                             <span
-                              className={`w-2 h-2 rounded-full shrink-0 ${
+                              className={`w-2.5 h-2.5 rounded-full shrink-0 ${
                                 v.testType === 'green' ? 'bg-emerald-500' : 'bg-rose-500'
                               }`}
                             />
-                            <span className="font-mono font-bold truncate">{v.code}</span>
+                            <span className="font-mono font-bold text-slate-900">{v.code}</span>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             <span
@@ -499,7 +499,7 @@ export function TeacherTestsPage() {
                             >
                               {v.kind === 'mini' ? '⚡ Mini · 21Q' : 'Standard · 49Q'}
                             </span>
-                            {isSelected ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : null}
+                            {isSelected ? <Check className="h-4 w-4 text-emerald-600 shrink-0" /> : null}
                           </div>
                         </button>
                       )
@@ -525,7 +525,7 @@ export function TeacherTestsPage() {
             </div>
           </div>
         </div>
-        {message ? <p className="meta text-slate-700 dark:text-slate-200">{message}</p> : null}
+        {message ? <p className="meta text-slate-600">{message}</p> : null}
         <button className="primary" onClick={() => void start()} disabled={!learnerId || !versionId}>
           <Play className="h-4 w-4" /> Create assignment
         </button>

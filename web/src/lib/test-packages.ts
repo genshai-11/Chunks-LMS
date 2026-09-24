@@ -1435,6 +1435,53 @@ export async function createMiniTestVariantFromPackage(
     const miniCode = (input.customCode?.trim() || `mini-${baseCode}`).toLowerCase()
     const miniTitle = input.customTitle?.trim() || `[Mini] ${sourcePkgRow.title.replace(/\s*·\s*LIVE\s*$/i, '')}`
 
+    // 5b. Self-healing check: clean up or handle existing orphaned package stubs with same slug
+    const { data: existingPkgList } = await sb
+      .from('test_packages')
+      .select('id, slug, test_package_versions(id, status, test_sections(id))')
+      .eq('slug', miniCode)
+
+    if (existingPkgList && existingPkgList.length > 0) {
+      for (const exPkg of existingPkgList) {
+        const versions = (exPkg as any).test_package_versions || []
+        const hasSections = versions.some((v: any) => v.test_sections && v.test_sections.length > 0)
+        if (hasSections) {
+          const completeVer = versions.find((v: any) => v.status === 'published') || versions[0]
+          return {
+            ok: true,
+            data: {
+              package: mapTestPackage(exPkg),
+              version: mapTestPackageVersion(completeVer),
+              itemCount: sourceSections.length * questionsPerSection,
+            },
+          }
+        } else {
+          // Empty orphaned stub from failed previous run -> archive its versions and free the slug
+          for (const v of versions) {
+            try {
+              if (v.status === 'draft') {
+                await sb.from('test_package_versions').delete().eq('id', v.id)
+              } else if (v.status === 'published') {
+                await sb
+                  .from('test_package_versions')
+                  .update({ status: 'archived', archived_at: new Date().toISOString() })
+                  .eq('id', v.id)
+              }
+            } catch {
+              // ignore cleanup error
+            }
+          }
+          await sb
+            .from('test_packages')
+            .update({
+              slug: `${exPkg.slug}-orphaned-${Date.now()}`,
+              archived_at: new Date().toISOString(),
+            })
+            .eq('id', exPkg.id)
+        }
+      }
+    }
+
     // 6. Create new test_packages row
     const { data: newPkgRow, error: pkgInsertErr } = await sb
       .from('test_packages')
@@ -1463,20 +1510,14 @@ export async function createMiniTestVariantFromPackage(
       return { ok: false, error: pkgInsertErr?.message || 'Failed to create mini package' }
     }
 
-    // 7. Create new test_package_versions row (published immediately for testing)
-    const derivedSnapshotHash =
-      sourceVerRow.snapshot_hash
-        ? `mini:${sourceVerRow.snapshot_hash}`
-        : `mini-snapshot-${newPkgRow.id}-${Date.now()}`
-
+    // 7. Create new test_package_versions row in DRAFT status
+    // Must be in draft mode so triggers allow test_sections, test_items, and narration_variants inserts!
     const { data: newVerRow, error: verInsertErr } = await sb
       .from('test_package_versions')
       .insert({
         package_id: newPkgRow.id,
         version_label: 'v1.0.0',
-        status: 'published',
-        published_at: new Date().toISOString(),
-        snapshot_hash: derivedSnapshotHash,
+        status: 'draft',
         source_metadata: {
           package_kind: 'mini',
           is_mini_test: true,
@@ -1489,6 +1530,11 @@ export async function createMiniTestVariantFromPackage(
       .single()
 
     if (verInsertErr || !newVerRow) {
+      try {
+        await sb.from('test_packages').delete().eq('id', newPkgRow.id)
+      } catch {
+        // ignore
+      }
       return { ok: false, error: verInsertErr?.message || 'Failed to create mini package version' }
     }
 
@@ -1683,12 +1729,33 @@ export async function createMiniTestVariantFromPackage(
       }
     }
 
+    // 10. Finalize: Publish the package version with its snapshot hash
+    const derivedSnapshotHash =
+      sourceVerRow.snapshot_hash
+        ? `mini:${sourceVerRow.snapshot_hash}`
+        : `mini-snapshot-${newPkgRow.id}-${Date.now()}`
+
+    const { data: publishedVerRow, error: publishErr } = await sb
+      .from('test_package_versions')
+      .update({
+        status: 'published',
+        published_at: new Date().toISOString(),
+        snapshot_hash: derivedSnapshotHash,
+      })
+      .eq('id', newVerRow.id)
+      .select()
+      .single()
+
+    if (publishErr || !publishedVerRow) {
+      throw new Error(publishErr?.message || 'Failed to publish mini package version')
+    }
+
     clearRequestCache('catalog')
     return {
       ok: true,
       data: {
         package: mapTestPackage(newPkgRow),
-        version: mapTestPackageVersion(newVerRow),
+        version: mapTestPackageVersion(publishedVerRow),
         itemCount: totalItemsCreated,
       },
     }

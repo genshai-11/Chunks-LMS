@@ -789,9 +789,9 @@ export function AdminPackageTestsPage() {
       const baseTitle = summary.pkg.title.replace(/\s*·\s*LIVE.*$/i, '').trim()
       const targetTitle = baseTitle.startsWith('[Mini]') ? baseTitle : `[Mini] ${baseTitle}`
 
-      // Check if already exists in packageSummaries
-      const alreadyExists = packageSummaries.some((s) => s.pkg.slug === targetSlug)
-      if (alreadyExists) {
+      // Check if already exists in packageSummaries and has questions
+      const existing = packageSummaries.find((s) => s.pkg.slug === targetSlug)
+      if (existing && existing.questionCount > 0) {
         skippedCount++
         continue
       }

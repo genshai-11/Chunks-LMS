@@ -102,7 +102,16 @@ function colorCounts(records: ResultRecord[]): Record<ResultColor, number> {
     ResultColor,
     number
   >
-  for (const r of records) c[r.effectiveColor] += 1
+  for (const r of records) {
+    const steps = spectrumRecordsForAttempt({
+      effectiveColor: r.effectiveColor,
+      enteredProbeFlow: r.enteredProbeFlow,
+      probeEventCount: r.probeEventCount,
+    })
+    for (const step of steps) {
+      c[step] += 1
+    }
+  }
   return c
 }
 
@@ -373,9 +382,15 @@ export function ProgressAnalysisView({
     (courseEnd ?? '2026-12-31').toString().slice(0, 10),
   )
   const [sessionId, setSessionId] = useState(learningSessions[0]?.id ?? '')
+  const learners = useMemo(
+    () => users.filter((u) => u.roles.includes('learner')),
+    [users],
+  )
+
   const [selectedLearnerIds, setSelectedLearnerIds] = useState<string[]>(() => {
-    if (mode === 'teacher') return []
-    return learnerUserId ? [learnerUserId] : []
+    if (learnerUserId) return [learnerUserId]
+    const firstLearner = users.find((u) => u.roles.includes('learner'))
+    return firstLearner ? [firstLearner.id] : []
   })
   const [whoOpen, setWhoOpen] = useState(false)
   const [columnsPanelOpen, setColumnsPanelOpen] = useState(false)
@@ -384,21 +399,17 @@ export function ProgressAnalysisView({
   const [editSessionNumberInput, setEditSessionNumberInput] = useState<string>('')
   
   useEffect(() => {
-    if (mode === 'teacher') {
-      setSelectedLearnerIds([])
-    } else {
-      setSelectedLearnerIds(learnerUserId ? [learnerUserId] : [])
+    if (learnerUserId) {
+      setSelectedLearnerIds([learnerUserId])
+    } else if (learners.length > 0 && selectedLearnerIds.length === 0) {
+      setSelectedLearnerIds([learners[0].id])
     }
-  }, [learnerUserId, mode])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [learnerUserId, learners])
 
   const [tab, setTab] = useState<
     'overview' | 'charts' | 'sessions' | 'learners' | 'history'
   >('overview')
-
-  const learners = useMemo(
-    () => users.filter((u) => u.roles.includes('learner')),
-    [users],
-  )
 
   const orderedSessions = useMemo(() => {
     return [...learningSessions].sort((a, b) => {
@@ -485,7 +496,10 @@ export function ProgressAnalysisView({
   }, [window, scopedLedger, courseId, classId, focusLearnerId, selectedLearnerIds])
 
   const counts = colorCounts(windowRecords)
-  const total = windowRecords.length
+  const total = useMemo(
+    () => SPECTRUM_COLORS.reduce((sum, color) => sum + counts[color], 0),
+    [counts],
+  )
 
   const pieData = useMemo(() => {
     return SPECTRUM_COLORS.map((color) => ({
@@ -599,8 +613,15 @@ export function ProgressAnalysisView({
         }
         map.set(r.learningSessionId, entry)
       }
-      entry.counts[r.effectiveColor] += 1
-      entry.total += 1
+      const steps = spectrumRecordsForAttempt({
+        effectiveColor: r.effectiveColor,
+        enteredProbeFlow: r.enteredProbeFlow,
+        probeEventCount: r.probeEventCount,
+      })
+      for (const step of steps) {
+        entry.counts[step] += 1
+        entry.total += 1
+      }
     }
     return map
   }, [scopedLedger, selectedLearnerIds])
@@ -627,8 +648,15 @@ export function ProgressAnalysisView({
         }
         map.set(r.learnerUserId, entry)
       }
-      entry.counts[r.effectiveColor] += 1
-      entry.total += 1
+      const steps = spectrumRecordsForAttempt({
+        effectiveColor: r.effectiveColor,
+        enteredProbeFlow: r.enteredProbeFlow,
+        probeEventCount: r.probeEventCount,
+      })
+      for (const step of steps) {
+        entry.counts[step] += 1
+        entry.total += 1
+      }
     }
     return map
   }, [scopedLedger])
@@ -1610,17 +1638,17 @@ export function ProgressAnalysisView({
                         <div className="flex items-center gap-2">
                           <MiniSpectrumBar
                             counts={learnerData.counts}
-                            total={row.attemptCount}
+                            total={learnerData.total}
                             className="w-24 h-2.5 shrink-0"
                           />
                           <span className="font-mono text-[10px] text-slate-400">
-                            {row.attemptCount > 0
+                            {learnerData.total > 0
                               ? `${pct(
                                   learnerData.counts.purple +
                                     learnerData.counts.indigo +
                                     learnerData.counts.blue +
                                     learnerData.counts.green,
-                                  row.attemptCount,
+                                  learnerData.total,
                                 )}% cool`
                               : ''}
                           </span>

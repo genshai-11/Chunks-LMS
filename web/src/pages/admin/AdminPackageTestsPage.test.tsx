@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { AdminPackageTestsPage, detectPackageTestType } from './AdminPackageTestsPage'
 import * as testPackagesLib from '../../lib/test-packages'
 import * as liveTestGenLib from '../../modules/catalog/live-test-generation'
+import * as supabaseLib from '../../lib/supabase'
 
 describe('AdminPackageTestsPage', { timeout: 20000 }, () => {
   it('renders package studio page header, tabs, and create button', async () => {
@@ -517,6 +518,170 @@ describe('AdminPackageTestsPage', { timeout: 20000 }, () => {
     await user.click(audioTableBtn)
     expect(screen.getByText(/Bảng tổng hợp toàn bộ tài sản âm thanh/i)).toBeInTheDocument()
     expect(screen.getByText(/Kịch bản phát âm \(Script\)/i)).toBeInTheDocument()
+  })
+
+  it('displays audio storage status badges and maps variants across Content and Audio tabs', async () => {
+    const user = userEvent.setup()
+
+    vi.spyOn(testPackagesLib, 'listTestPackages').mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'pkg-audio',
+          organizationId: 'org-1',
+          title: 'GREEN-TEST-AUDIO-DEMO',
+          slug: 'green-test-audio-demo',
+          description: 'Package with audio variants',
+          createdByUserId: null,
+          sourceMetadata: { testType: 'green', targetVoltage: 12, questionCount: 2 },
+          archivedAt: null,
+        },
+      ],
+    })
+
+    vi.spyOn(testPackagesLib, 'listTestPackageVersions').mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'ver-audio',
+          packageId: 'pkg-audio',
+          versionLabel: 'v1',
+          status: 'draft',
+          snapshotHash: null,
+          publishedAt: null,
+          sourceMetadata: {},
+        },
+      ],
+    })
+
+    vi.spyOn(testPackagesLib, 'listTestSections').mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'sec-audio-1',
+          packageVersionId: 'ver-audio',
+          sectionOrder: 1,
+          title: 'Session 1',
+          targetCvrOhm: 3.0,
+          introTextVi: 'Intro Section 1',
+          introTextEn: 'Intro Section 1',
+          cciProfileId: null,
+          cciCategoryId: null,
+        },
+      ],
+    })
+
+    vi.spyOn(testPackagesLib, 'listTestItems').mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'item-audio-1',
+          packageVersionId: 'ver-audio',
+          sectionId: 'sec-audio-1',
+          itemOrder: 1,
+          termVi: 'từ vựng 1',
+          termEn: 'vocab 1',
+          promptVi: 'Câu hỏi số 1 nội dung tiếng Việt.',
+          promptEn: 'Question number 1 English content.',
+          spokenScriptVi: 'Câu hỏi số 1 nội dung tiếng Việt.',
+          spokenScriptEn: 'Question number 1 English content.',
+          tc: 3.0,
+          lc: 1.0,
+          tl: 1.0,
+          measuredCvr: 3.0,
+        },
+        {
+          id: 'item-audio-2',
+          packageVersionId: 'ver-audio',
+          sectionId: 'sec-audio-1',
+          itemOrder: 2,
+          termVi: 'từ vựng 2',
+          termEn: 'vocab 2',
+          promptVi: 'Câu hỏi số 2 chưa lưu audio.',
+          promptEn: 'Question number 2 no audio yet.',
+          spokenScriptVi: 'Câu hỏi số 2 chưa lưu audio.',
+          spokenScriptEn: 'Question number 2 no audio yet.',
+          tc: 3.0,
+          lc: 1.0,
+          tl: 1.0,
+          measuredCvr: 3.0,
+        },
+      ],
+    })
+
+    const mockSupabase = {
+      from: vi.fn((table: string) => {
+        if (table === 'narration_variants') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockResolvedValue({
+              data: [
+                {
+                  id: 'var-item-1',
+                  narration_target: 'test_item',
+                  language: 'en',
+                  voice_id: 'google/en-US-Neural2-F',
+                  audio_asset_id: 'asset-1',
+                  approval_status: 'approved',
+                  test_item_id: 'item-audio-1',
+                  test_section_id: 'sec-audio-1',
+                  provider_metadata: null,
+                },
+                {
+                  id: 'var-pkg-start',
+                  narration_target: 'package_start',
+                  language: 'vi',
+                  voice_id: 'google/vi-VN-Neural2-A',
+                  audio_asset_id: 'asset-start',
+                  approval_status: 'approved',
+                  test_item_id: null,
+                  test_section_id: null,
+                  provider_metadata: null,
+                },
+              ],
+            }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockResolvedValue({ data: [] }),
+        }
+      }),
+    }
+
+    vi.spyOn(supabaseLib, 'getSupabase').mockReturnValue(mockSupabase as any)
+
+    render(
+      <MemoryRouter>
+        <AdminPackageTestsPage />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /GREEN-TEST-AUDIO-DEMO/i })).toBeInTheDocument()
+    })
+
+    // Content tab: verify accordion shows "Đã lưu audio" and "Chưa lưu audio"
+    const contentTab = screen.getByRole('button', { name: /Soạn thảo & Nội dung câu/i })
+    await user.click(contentTab)
+
+    await waitFor(() => {
+      const savedBadges = screen.getAllByText('Đã lưu audio')
+      const unsavedBadges = screen.getAllByText('Chưa lưu audio')
+      expect(savedBadges.length).toBeGreaterThanOrEqual(1)
+      expect(unsavedBadges.length).toBeGreaterThanOrEqual(1)
+    })
+
+    // Switch to Audio tab: verify badges display
+    const audioTab = screen.getByRole('button', { name: /Quản lý Audio & Review/i })
+    await user.click(audioTab)
+
+    await waitFor(() => {
+      const savedBadges = screen.getAllByText('Đã lưu audio')
+      const unsavedBadges = screen.getAllByText('Chưa lưu audio')
+      expect(savedBadges.length).toBeGreaterThanOrEqual(1)
+      expect(unsavedBadges.length).toBeGreaterThanOrEqual(1)
+    })
   })
 })
 

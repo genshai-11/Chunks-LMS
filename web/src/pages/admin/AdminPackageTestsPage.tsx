@@ -68,6 +68,7 @@ import {
   generateNarration,
   generatePackageFromVocab,
   getFirestoreLessonChunks,
+  getNarrationPlaybackUrl,
   listFirestoreLessons,
   playGoogleCloudTts,
   uploadNarrationAudio,
@@ -88,6 +89,17 @@ export type PackageSummary = {
   version: TestPackageVersion | null
   sections: TestSection[]
   items: TestItem[]
+  variants: Array<{
+    id: string
+    narration_target: string
+    language: string
+    voice_id: string
+    audio_asset_id: string | null
+    approval_status: string
+    test_item_id: string | null
+    test_section_id: string | null
+    provider_metadata?: any
+  }>
   testType: 'green' | 'red'
   targetVoltage: number
   questionCount: number
@@ -131,6 +143,73 @@ export function AdminPackageTestsPage() {
     }
     return packageSummaries[0] ?? null
   }, [packageSummaries, selectedVersionId])
+
+  const selectedVariants = useMemo(() => selectedPackage?.variants ?? [], [selectedPackage])
+
+  const itemVariantMap = useMemo(() => {
+    const map = new Map<string, (typeof selectedVariants)[0]>()
+    for (const v of selectedVariants) {
+      if (v.test_item_id && v.language) {
+        const key = `${v.test_item_id}_${v.language}`
+        const existing = map.get(key)
+        if (!existing || (v.approval_status === 'approved' && existing.approval_status !== 'approved')) {
+          map.set(key, v)
+        }
+      }
+    }
+    return map
+  }, [selectedVariants])
+
+  const sectionVariantMap = useMemo(() => {
+    const map = new Map<string, (typeof selectedVariants)[0]>()
+    for (const v of selectedVariants) {
+      if (v.test_section_id && v.language && (v.narration_target === 'section_intro' || !v.narration_target)) {
+        const key = `${v.test_section_id}_${v.language}`
+        const existing = map.get(key)
+        if (!existing || (v.approval_status === 'approved' && existing.approval_status !== 'approved')) {
+          map.set(key, v)
+        }
+      }
+    }
+    return map
+  }, [selectedVariants])
+
+  const partVariantMap = useMemo(() => {
+    const map = new Map<string, (typeof selectedVariants)[0]>()
+    for (const v of selectedVariants) {
+      if (v.narration_target === 'part_intro' && v.language) {
+        const part = v.provider_metadata?.part
+        if (part != null) {
+          const key = `${part}_${v.language}`
+          const existing = map.get(key)
+          if (!existing || (v.approval_status === 'approved' && existing.approval_status !== 'approved')) {
+            map.set(key, v)
+          }
+        }
+      }
+    }
+    return map
+  }, [selectedVariants])
+
+  const packageStartVariant = useCallback(
+    (lang: string) => {
+      const matching = selectedVariants.filter(
+        (v) => v.narration_target === 'package_start' && v.language === lang,
+      )
+      return matching.find((v) => v.approval_status === 'approved') ?? matching[0] ?? null
+    },
+    [selectedVariants],
+  )
+
+  const packageEndVariant = useCallback(
+    (lang: string) => {
+      const matching = selectedVariants.filter(
+        (v) => v.narration_target === 'package_end' && v.language === lang,
+      )
+      return matching.find((v) => v.approval_status === 'approved') ?? matching[0] ?? null
+    },
+    [selectedVariants],
+  )
 
   const selectPackage = (pkg: PackageSummary) => {
     if (!pkg.version) return
@@ -450,6 +529,17 @@ export function AdminPackageTestsPage() {
 
           let sections: TestSection[] = []
           let items: TestItem[] = []
+          let variants: Array<{
+            id: string
+            narration_target: string
+            language: string
+            voice_id: string
+            audio_asset_id: string | null
+            approval_status: string
+            test_item_id: string | null
+            test_section_id: string | null
+            provider_metadata?: any
+          }> = []
           let audioApproved = 0
 
           if (version) {
@@ -463,12 +553,15 @@ export function AdminPackageTestsPage() {
 
             const sb = getSupabase() as any
             if (sb) {
-              const { data: variants } = await sb
+              const { data: fetchedVariants } = await sb
                 .from('narration_variants')
-                .select('id, approval_status')
+                .select(
+                  'id, narration_target, language, voice_id, audio_asset_id, approval_status, test_item_id, test_section_id, provider_metadata',
+                )
                 .eq('package_version_id', version.id)
-              audioApproved = (variants ?? []).filter(
-                (v: any) => v.approval_status === 'approved',
+              variants = (fetchedVariants ?? []) as any
+              audioApproved = variants.filter(
+                (v) => v.approval_status === 'approved',
               ).length
             }
           }
@@ -500,6 +593,7 @@ export function AdminPackageTestsPage() {
             version,
             sections,
             items,
+            variants,
             testType,
             targetVoltage,
             questionCount,
@@ -731,9 +825,78 @@ export function AdminPackageTestsPage() {
     }
   }
 
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null)
+  const currentPlayKeyRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause()
+        currentAudioRef.current = null
+      }
+    }
+  }, [])
+
   // Inline Audio Playback for Item / Intro
-  async function handlePlayItemAudio(key: string, text: string, lang: 'vi' | 'en') {
+  async function handlePlayItemAudio(
+    key: string,
+    text: string,
+    lang: 'vi' | 'en',
+    options?: {
+      itemOrder?: number
+      variantId?: string | null
+      target?: 'test_item' | 'package_start' | 'part_intro' | 'section_intro' | 'package_end'
+    },
+  ) {
+    if (playingAudioKey === key) {
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause()
+        currentAudioRef.current = null
+      }
+      currentPlayKeyRef.current = null
+      setPlayingAudioKey(null)
+      return
+    }
+
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause()
+      currentAudioRef.current = null
+    }
+
+    currentPlayKeyRef.current = key
     setPlayingAudioKey(key)
+
+    const isCurrent = () => currentPlayKeyRef.current === key
+
+    const playAudioUrl = (url: string): Promise<void> => {
+      return new Promise((resolve, reject) => {
+        if (!isCurrent()) {
+          resolve()
+          return
+        }
+        const audio = new Audio(url)
+        currentAudioRef.current = audio
+        audio.onended = () => {
+          if (currentAudioRef.current === audio) {
+            currentAudioRef.current = null
+          }
+          resolve()
+        }
+        audio.onerror = (e) => {
+          if (currentAudioRef.current === audio) {
+            currentAudioRef.current = null
+          }
+          reject(new Error('Audio playback failed: ' + String(e)))
+        }
+        audio.play().catch((playErr) => {
+          if (currentAudioRef.current === audio) {
+            currentAudioRef.current = null
+          }
+          reject(playErr)
+        })
+      })
+    }
+
     try {
       const voice =
         audioVoiceLang === lang
@@ -741,11 +904,45 @@ export function AdminPackageTestsPage() {
           : lang === 'vi'
             ? 'google/vi-VN-Neural2-A'
             : 'google/en-US-Neural2-F'
-      await playGoogleCloudTts(text, lang, voice)
+
+      if (options?.itemOrder != null) {
+        // Play prefix audio /audio/number_${options.itemOrder}.wav first
+        try {
+          await playAudioUrl(`/audio/number_${options.itemOrder}.wav`)
+        } catch (prefixErr) {
+          console.warn('Prefix audio error or missing:', prefixErr)
+        }
+
+        if (!isCurrent()) return
+
+        // On prefix end:
+        if (options?.variantId) {
+          const playback = await getNarrationPlaybackUrl(options.variantId)
+          if (!isCurrent()) return
+          await playAudioUrl(playback.signedUrl)
+        } else {
+          ok('Đang phát preview TTS (chưa có audio trong gói)')
+          await playGoogleCloudTts(text, lang, voice)
+        }
+      } else {
+        // Intro audios (package_start, part_intro, section_intro, package_end) or non-item targets
+        if (options?.variantId) {
+          const playback = await getNarrationPlaybackUrl(options.variantId)
+          if (!isCurrent()) return
+          await playAudioUrl(playback.signedUrl)
+        } else {
+          await playGoogleCloudTts(text, lang, voice)
+        }
+      }
     } catch (e) {
-      err(e instanceof Error ? e.message : 'Phát âm thanh thất bại')
+      if (isCurrent()) {
+        err(e instanceof Error ? e.message : 'Phát âm thanh thất bại')
+      }
     } finally {
-      setPlayingAudioKey(null)
+      if (isCurrent()) {
+        currentPlayKeyRef.current = null
+        setPlayingAudioKey(null)
+      }
     }
   }
 
@@ -1631,6 +1828,14 @@ export function AdminPackageTestsPage() {
                             const hintsList = !isGreen && item.promptVi ? item.promptVi.split('/') : []
                             const redValidation = !isGreen ? validateRedCollocations(hintsList) : null
 
+                            const secLang: 'vi' | 'en' = getSectionLanguage(sec)
+                            const itemVariant = itemVariantMap.get(`${item.id}_${secLang}`)
+                            const isAudioApproved = itemVariant && itemVariant.approval_status === 'approved'
+                            const script =
+                              secLang === 'vi'
+                                ? item.spokenScriptVi || item.promptVi || ''
+                                : item.spokenScriptEn || item.promptEn || ''
+
                             return (
                               <div key={item.id} className="p-4 hover:bg-slate-50/50 transition-colors space-y-2">
                                 <div className="flex items-start justify-between gap-4">
@@ -1645,6 +1850,15 @@ export function AdminPackageTestsPage() {
                                       {item.termEn && (
                                         <span className="text-xs text-slate-400 font-medium">
                                           ({item.termEn})
+                                        </span>
+                                      )}
+                                      {isAudioApproved ? (
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+                                          Đã lưu audio
+                                        </span>
+                                      ) : (
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium">
+                                          Chưa lưu audio
                                         </span>
                                       )}
                                     </div>
@@ -1693,15 +1907,35 @@ export function AdminPackageTestsPage() {
                                       TC: {item.tc ?? 2} • LC: {item.lc ?? 1} • TL: {item.tl ?? 1} • CVR: {item.measuredCvr ?? 3}Ω
                                     </div>
 
-                                    <button
-                                      type="button"
-                                      onClick={() => handleOpenEditItem(item)}
-                                      className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-700 text-[11px] font-semibold flex items-center gap-1 transition-colors mt-0.5"
-                                      title="Chỉnh sửa nội dung câu hỏi"
-                                    >
-                                      <Pencil className="h-3 w-3" />
-                                      <span>Sửa câu</span>
-                                    </button>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          void handlePlayItemAudio(`item_${item.id}`, script, secLang, {
+                                            itemOrder: item.itemOrder,
+                                            variantId: itemVariant?.id,
+                                            target: 'test_item',
+                                          })
+                                        }
+                                        className="p-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                                        title={playingAudioKey === `item_${item.id}` ? 'Dừng phát' : 'Nghe thử'}
+                                      >
+                                        {playingAudioKey === `item_${item.id}` ? (
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <Play className="h-3 w-3 fill-current" />
+                                        )}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenEditItem(item)}
+                                        className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-700 text-[11px] font-semibold flex items-center gap-1 transition-colors"
+                                        title="Chỉnh sửa nội dung câu hỏi"
+                                      >
+                                        <Pencil className="h-3 w-3" />
+                                        <span>Sửa câu</span>
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -1743,6 +1977,8 @@ export function AdminPackageTestsPage() {
                           const redValidation = !isGreen ? validateRedCollocations(hintsList) : null
 
                           const lang: 'vi' | 'en' = getSectionLanguage(sec)
+                          const itemVariant = itemVariantMap.get(`${item.id}_${lang}`)
+                          const isAudioApproved = itemVariant && itemVariant.approval_status === 'approved'
                           const script =
                             lang === 'vi'
                               ? item.spokenScriptVi || item.promptVi || ''
@@ -1798,12 +2034,26 @@ export function AdminPackageTestsPage() {
                               </td>
                               <td className="py-3 px-4 text-right whitespace-nowrap">
                                 <div className="flex items-center justify-end gap-1.5">
+                                  {isAudioApproved ? (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+                                      Đã lưu audio
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium">
+                                      Chưa lưu audio
+                                    </span>
+                                  )}
                                   <button
                                     type="button"
-                                    onClick={() => void handlePlayItemAudio(`item_${item.id}`, script, lang)}
-                                    disabled={playingAudioKey === `item_${item.id}`}
+                                    onClick={() =>
+                                      void handlePlayItemAudio(`item_${item.id}`, script, lang, {
+                                        itemOrder: item.itemOrder,
+                                        variantId: itemVariant?.id,
+                                        target: 'test_item',
+                                      })
+                                    }
                                     className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
-                                    title="Nghe thử"
+                                    title={playingAudioKey === `item_${item.id}` ? 'Dừng phát' : 'Nghe thử'}
                                   >
                                     {playingAudioKey === `item_${item.id}` ? (
                                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -2118,9 +2368,20 @@ export function AdminPackageTestsPage() {
                   <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-xs text-slate-800">Lời Chào Đầu Bài (Package Start)</span>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                        package_start
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {packageStartVariant('vi')?.approval_status === 'approved' ? (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+                            Đã lưu audio
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium">
+                            Chưa lưu audio
+                          </span>
+                        )}
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          package_start
+                        </span>
+                      </div>
                     </div>
                     <p className="text-xs text-slate-600 italic">
                       "Chào mừng em đến với bài kiểm tra Chunks LMS. Lắng nghe cẩn thận và phát âm chính xác..."
@@ -2133,12 +2394,21 @@ export function AdminPackageTestsPage() {
                             'pkg_start',
                             'Chào mừng em đến với bài kiểm tra Chunks LMS. Lắng nghe cẩn thận và phát âm chính xác.',
                             'vi',
+                            {
+                              variantId: packageStartVariant('vi')?.id,
+                              target: 'package_start',
+                            },
                           )
                         }
                         className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 flex items-center gap-1 transition-colors"
+                        title={playingAudioKey === 'pkg_start' ? 'Dừng phát' : 'Nghe thử'}
                       >
-                        <Play className="h-3 w-3 fill-current" />
-                        <span>Nghe thử</span>
+                        {playingAudioKey === 'pkg_start' ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Play className="h-3 w-3 fill-current" />
+                        )}
+                        <span>{playingAudioKey === 'pkg_start' ? 'Đang phát' : 'Nghe thử'}</span>
                       </button>
                       <button
                         type="button"
@@ -2175,9 +2445,20 @@ export function AdminPackageTestsPage() {
                   <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-xs text-slate-800">Lời Chúc Mừng Kết Thúc (Package End)</span>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                        package_end
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {packageEndVariant('vi')?.approval_status === 'approved' ? (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+                            Đã lưu audio
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium">
+                            Chưa lưu audio
+                          </span>
+                        )}
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          package_end
+                        </span>
+                      </div>
                     </div>
                     <p className="text-xs text-slate-600 italic">
                       "Chúc mừng em đã hoàn thành toàn bộ bài kiểm tra. Em đã thể hiện sự tập trung và lưu loát rất xuất sắc!"
@@ -2190,12 +2471,21 @@ export function AdminPackageTestsPage() {
                             'pkg_end',
                             'Chúc mừng em đã hoàn thành toàn bộ bài kiểm tra. Em đã thể hiện sự tập trung và lưu loát rất xuất sắc!',
                             'vi',
+                            {
+                              variantId: packageEndVariant('vi')?.id,
+                              target: 'package_end',
+                            },
                           )
                         }
                         className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 flex items-center gap-1 transition-colors"
+                        title={playingAudioKey === 'pkg_end' ? 'Dừng phát' : 'Nghe thử'}
                       >
-                        <Play className="h-3 w-3 fill-current" />
-                        <span>Nghe thử</span>
+                        {playingAudioKey === 'pkg_end' ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Play className="h-3 w-3 fill-current" />
+                        )}
+                        <span>{playingAudioKey === 'pkg_end' ? 'Đang phát' : 'Nghe thử'}</span>
                       </button>
                       <button
                         type="button"
@@ -2241,6 +2531,8 @@ export function AdminPackageTestsPage() {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     {[1, 2, 3].map((p) => {
+                      const partVar = partVariantMap.get(`${p}_vi`)
+                      const isPartApproved = partVar && partVar.approval_status === 'approved'
                       const partScript =
                         p === 1
                           ? 'Phần 1 - Khởi động nhận thức. Lắng nghe cẩn thận và sẵn sàng phản hồi.'
@@ -2251,9 +2543,20 @@ export function AdminPackageTestsPage() {
                         <div key={p} className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="font-bold text-xs text-slate-800">Part {p} Intro</span>
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                              P{p}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              {isPartApproved ? (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+                                  Đã lưu audio
+                                </span>
+                              ) : (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium">
+                                  Chưa lưu audio
+                                </span>
+                              )}
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                P{p}
+                              </span>
+                            </div>
                           </div>
                           <p className="text-[11px] text-slate-600 line-clamp-2 italic">
                             "{partScript}"
@@ -2261,11 +2564,20 @@ export function AdminPackageTestsPage() {
                           <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-slate-200/60">
                             <button
                               type="button"
-                              onClick={() => void handlePlayItemAudio(`part_${p}`, partScript, 'vi')}
+                              onClick={() =>
+                                void handlePlayItemAudio(`part_${p}`, partScript, 'vi', {
+                                  variantId: partVar?.id,
+                                  target: 'part_intro',
+                                })
+                              }
                               className="px-2 py-1 text-[11px] font-semibold rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 flex items-center gap-1 transition-colors"
-                              title="Nghe thử"
+                              title={playingAudioKey === `part_${p}` ? 'Dừng phát' : 'Nghe thử'}
                             >
-                              <Play className="h-3 w-3 fill-current" />
+                              {playingAudioKey === `part_${p}` ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Play className="h-3 w-3 fill-current" />
+                              )}
                             </button>
                             <button
                               type="button"
@@ -2308,6 +2620,8 @@ export function AdminPackageTestsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[320px] overflow-y-auto pr-1">
                       {selectedPackage.sections.map((sec) => {
                         const secLang: 'vi' | 'en' = getSectionLanguage(sec)
+                        const secVar = sectionVariantMap.get(`${sec.id}_${secLang}`)
+                        const isSecApproved = secVar && secVar.approval_status === 'approved'
                         const secScript =
                           secLang === 'vi'
                             ? sec.introTextVi ||
@@ -2321,6 +2635,15 @@ export function AdminPackageTestsPage() {
                                 Session {sec.sectionOrder}: {sec.title}
                               </span>
                               <div className="flex items-center gap-1.5">
+                                {isSecApproved ? (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+                                    Đã lưu audio
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium">
+                                    Chưa lưu audio
+                                  </span>
+                                )}
                                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase border ${
                                   secLang === 'en' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                 }`}>
@@ -2342,11 +2665,20 @@ export function AdminPackageTestsPage() {
                             <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-slate-200/60">
                               <button
                                 type="button"
-                                onClick={() => void handlePlayItemAudio(`sec_${sec.id}`, secScript, secLang)}
+                                onClick={() =>
+                                  void handlePlayItemAudio(`sec_${sec.id}`, secScript, secLang, {
+                                    variantId: secVar?.id,
+                                    target: 'section_intro',
+                                  })
+                                }
                                 className="px-2 py-1 text-[11px] font-semibold rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 flex items-center gap-1 transition-colors"
-                                title="Nghe thử"
+                                title={playingAudioKey === `sec_${sec.id}` ? 'Dừng phát' : 'Nghe thử'}
                               >
-                                <Play className="h-3 w-3 fill-current" />
+                                {playingAudioKey === `sec_${sec.id}` ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Play className="h-3 w-3 fill-current" />
+                                )}
                               </button>
                               <button
                                 type="button"
@@ -2392,6 +2724,8 @@ export function AdminPackageTestsPage() {
                   {selectedPackage.items.map((item) => {
                     const sec = selectedPackage.sections.find((s) => s.id === item.sectionId)
                     const lang: 'vi' | 'en' = getSectionLanguage(sec)
+                    const itemVar = itemVariantMap.get(`${item.id}_${lang}`)
+                    const isItemApproved = itemVar && itemVar.approval_status === 'approved'
                     const script =
                       lang === 'vi'
                         ? item.spokenScriptVi || item.promptVi || ''
@@ -2410,6 +2744,15 @@ export function AdminPackageTestsPage() {
                             <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">
                               {lang}
                             </span>
+                            {isItemApproved ? (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+                                Đã lưu audio
+                              </span>
+                            ) : (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium">
+                                Chưa lưu audio
+                              </span>
+                            )}
                           </div>
                           <div className="text-xs text-slate-700 line-clamp-1 font-medium">
                             {script}
@@ -2420,10 +2763,15 @@ export function AdminPackageTestsPage() {
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <button
                             type="button"
-                            onClick={() => void handlePlayItemAudio(`item_${item.id}`, script, lang)}
-                            disabled={playingAudioKey === `item_${item.id}`}
+                            onClick={() =>
+                              void handlePlayItemAudio(`item_${item.id}`, script, lang, {
+                                itemOrder: item.itemOrder,
+                                variantId: itemVar?.id,
+                                target: 'test_item',
+                              })
+                            }
                             className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
-                            title="Nghe thử"
+                            title={playingAudioKey === `item_${item.id}` ? 'Dừng phát' : 'Nghe thử'}
                           >
                             {playingAudioKey === `item_${item.id}` ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -2483,11 +2831,15 @@ export function AdminPackageTestsPage() {
               part?: number
               sectionId?: string
               itemId?: string
+              itemOrder?: number
+              variantId?: string | null
+              isApproved?: boolean
             }
 
             const rows: FlatAudioRow[] = []
 
             // Package Start
+            const startVar = packageStartVariant('vi')
             rows.push({
               key: 'pkg_start',
               target: 'package_start',
@@ -2495,10 +2847,13 @@ export function AdminPackageTestsPage() {
               orderRef: 'START',
               lang: 'vi',
               text: 'Chào mừng em đến với bài kiểm tra Chunks LMS. Lắng nghe cẩn thận và phát âm chính xác.',
+              variantId: startVar?.id,
+              isApproved: startVar?.approval_status === 'approved',
             })
 
             // Part Intros (P1..P3)
             ;[1, 2, 3].forEach((p) => {
+              const partVar = partVariantMap.get(`${p}_vi`)
               const partScript =
                 p === 1
                   ? 'Phần 1 - Khởi động nhận thức. Lắng nghe cẩn thận và sẵn sàng phản hồi.'
@@ -2513,6 +2868,8 @@ export function AdminPackageTestsPage() {
                 lang: 'vi',
                 text: partScript,
                 part: p,
+                variantId: partVar?.id,
+                isApproved: partVar?.approval_status === 'approved',
               })
             })
 
@@ -2526,6 +2883,7 @@ export function AdminPackageTestsPage() {
                   : sec.sectionOrder <= 3
                     ? 'vi'
                     : 'en'
+              const secVar = sectionVariantMap.get(`${sec.id}_${secLang}`)
               const secScript =
                 secLang === 'vi'
                   ? sec.introTextVi ||
@@ -2540,6 +2898,8 @@ export function AdminPackageTestsPage() {
                 lang: secLang,
                 text: secScript,
                 sectionId: sec.id,
+                variantId: secVar?.id,
+                isApproved: secVar?.approval_status === 'approved',
               })
             })
 
@@ -2554,6 +2914,7 @@ export function AdminPackageTestsPage() {
                   : sec && sec.sectionOrder <= 3
                     ? 'vi'
                     : 'en'
+              const itemVar = itemVariantMap.get(`${item.id}_${lang}`)
               const script =
                 lang === 'vi'
                   ? item.spokenScriptVi || item.promptVi || ''
@@ -2567,10 +2928,14 @@ export function AdminPackageTestsPage() {
                 text: script,
                 sectionId: item.sectionId,
                 itemId: item.id,
+                itemOrder: item.itemOrder,
+                variantId: itemVar?.id,
+                isApproved: itemVar?.approval_status === 'approved',
               })
             })
 
             // Package End
+            const endVar = packageEndVariant('vi')
             rows.push({
               key: 'pkg_end',
               target: 'package_end',
@@ -2578,6 +2943,8 @@ export function AdminPackageTestsPage() {
               orderRef: 'END',
               lang: 'vi',
               text: 'Chúc mừng em đã hoàn thành toàn bộ bài kiểm tra. Em đã thể hiện sự tập trung và lưu loát rất xuất sắc!',
+              variantId: endVar?.id,
+              isApproved: endVar?.approval_status === 'approved',
             })
 
             return (
@@ -2597,6 +2964,7 @@ export function AdminPackageTestsPage() {
                         <th className="py-3 px-4 w-16">Ref</th>
                         <th className="py-3 px-4">Mục tiêu (Target)</th>
                         <th className="py-3 px-4">Tên tài sản</th>
+                        <th className="py-3 px-4">Trạng thái</th>
                         <th className="py-3 px-4 w-16">Ngôn ngữ</th>
                         <th className="py-3 px-4">Kịch bản phát âm (Script)</th>
                         <th className="py-3 px-4 text-right">Thao tác</th>
@@ -2617,6 +2985,17 @@ export function AdminPackageTestsPage() {
                             {row.label}
                           </td>
                           <td className="py-3 px-4 whitespace-nowrap">
+                            {row.isApproved ? (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+                                Đã lưu audio
+                              </span>
+                            ) : (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium">
+                                Chưa lưu audio
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 whitespace-nowrap">
                             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-200 text-slate-700">
                               {row.lang}
                             </span>
@@ -2628,10 +3007,15 @@ export function AdminPackageTestsPage() {
                             <div className="flex items-center justify-end gap-1.5">
                               <button
                                 type="button"
-                                onClick={() => void handlePlayItemAudio(row.key, row.text, row.lang)}
-                                disabled={playingAudioKey === row.key}
+                                onClick={() =>
+                                  void handlePlayItemAudio(row.key, row.text, row.lang, {
+                                    itemOrder: row.itemOrder,
+                                    variantId: row.variantId,
+                                    target: row.target,
+                                  })
+                                }
                                 className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
-                                title="Nghe thử"
+                                title={playingAudioKey === row.key ? 'Dừng phát' : 'Nghe thử'}
                               >
                                 {playingAudioKey === row.key ? (
                                   <Loader2 className="h-3.5 w-3.5 animate-spin" />

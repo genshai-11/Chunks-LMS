@@ -13,6 +13,7 @@ import {
   validateGreenSentence,
   validateRedCollocations,
   extractPackageVoltage,
+  detectPackageKind,
   type CciCategory,
   type TestItem,
   type TestPackageVersion,
@@ -220,6 +221,24 @@ describe('test package catalog', () => {
     // Fallbacks
     expect(extractPackageVoltage({ title: 'Standard Green' }, 'green')).toBe(12)
     expect(extractPackageVoltage({ title: 'Standard Red' }, 'red')).toBe(56)
+  })
+
+  it('detects package kind as standard vs mini accurately', () => {
+    // Explicit sourceMetadata.package_kind
+    expect(detectPackageKind({ sourceMetadata: { package_kind: 'mini' } })).toBe('mini')
+    expect(detectPackageKind({ sourceMetadata: { package_kind: 'standard' } })).toBe('standard')
+
+    // Title / code naming patterns
+    expect(detectPackageKind({ title: 'mini-G1-56V' })).toBe('mini')
+    expect(detectPackageKind({ title: 'G1-56V [MINI]' })).toBe('mini')
+    expect(detectPackageKind({ slug: 'mini-g1-56v-variant' })).toBe('mini')
+    expect(detectPackageKind({ title: 'Standard G1-56V Assessment' })).toBe('standard')
+
+    // Item count heuristic (<= 21 items -> mini, 49 items -> standard)
+    expect(detectPackageKind({ itemCount: 21 })).toBe('mini')
+    expect(detectPackageKind({ itemCount: 15 })).toBe('mini')
+    expect(detectPackageKind({ itemCount: 49 })).toBe('standard')
+    expect(detectPackageKind({ itemCount: 56 })).toBe('standard')
   })
 })
 

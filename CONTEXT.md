@@ -173,6 +173,13 @@ Full audio management covering package start, part intros (1–3), section intro
   3. **Lifecycle & Intro Audio Resolution**: Non-item audio targets (`package_start`, `part_intro`, `section_intro`, `package_end`) map to approved `narration_variants` records for the selected language, streaming signed URLs from storage or falling back to GCP TTS preview.
 _Avoid_: Client-side synthesis only, unverified audio assets, unchained raw prompt playback without ordinal prefixes
 
+**Mini-Test Variant & Zero-Waste Audio Reuse**:
+Compact 21-question assessment variants (7 sessions × 3 sampled questions) derived directly from canonical 49-question Standard tests.
+- **Zero-Waste Audio Guarantee**: Clones `narration_variants` records for all sampled questions and intros by referencing existing `audio_asset_id` pointers in Supabase Storage. This completely eliminates redundant Google Cloud TTS API synthesis costs and avoids duplicate audio file storage.
+- **Sampling Strategies**: Supports deterministic uniform sampling (`first`, `middle`, `last`) or balanced pseudo-random sampling across each session.
+- **Catalog & Test Filtering**: Categorized as `PackageKind = 'standard' | 'mini'`, allowing instant filtering across Admin Package Studio, Teacher Tests 1-1, and Test Run Setup.
+_Avoid_: Re-synthesizing TTS audio for mini-test variants, duplicating audio storage binaries, mixed question count mismatches.
+
 
 ---
 

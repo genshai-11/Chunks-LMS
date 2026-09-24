@@ -361,4 +361,27 @@ export function extractPackageVoltage(
   return (fallbackType || '').toLowerCase() === 'red' ? 56 : 12
 }
 
+export type PackageKind = 'standard' | 'mini'
+
+export function detectPackageKind(pkg: {
+  title?: string | null
+  slug?: string | null
+  sourceMetadata?: Record<string, unknown> | null
+  itemCount?: number | null
+}): PackageKind {
+  const meta = pkg?.sourceMetadata as Record<string, unknown> | undefined | null
+  if (meta?.package_kind === 'mini' || meta?.packageKind === 'mini' || meta?.is_mini_test === true) {
+    return 'mini'
+  }
+  const title = (pkg?.title ?? '').toLowerCase()
+  const slug = (pkg?.slug ?? '').toLowerCase()
+  if (slug.startsWith('mini-') || title.startsWith('mini-') || title.includes('[mini]')) {
+    return 'mini'
+  }
+  if (pkg?.itemCount != null && pkg.itemCount > 0 && pkg.itemCount <= 21) {
+    return 'mini'
+  }
+  return 'standard'
+}
+
 

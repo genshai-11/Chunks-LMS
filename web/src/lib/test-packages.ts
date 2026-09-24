@@ -1,14 +1,18 @@
 import { cacheKey, cachedQuery, clearRequestCache } from './request-cache'
 import { getSupabase } from './supabase'
-import type {
-  TestPackage,
-  TestPackageVersion,
-  TestSection,
-  TestItem,
-  SectionMeasurementSnapshot,
-  CciProfile,
-  CciCategory,
+import {
+  type TestPackage,
+  type TestPackageVersion,
+  type TestSection,
+  type TestItem,
+  type SectionMeasurementSnapshot,
+  type CciProfile,
+  type CciCategory,
+  type PackageKind,
+  detectPackageKind,
 } from '../modules/catalog/test-package-catalog'
+
+export { detectPackageKind, type PackageKind }
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: string }
 
@@ -1353,5 +1357,340 @@ export async function updateTestItemContent(input: {
   if (error) return { ok: false, error: error.message }
   clearRequestCache()
   return { ok: true, data: { ok: true, itemId: input.itemId } }
+}
+
+export type CreateMiniTestVariantInput = {
+  sourcePackageVersionId: string
+  customCode?: string
+  customTitle?: string
+  questionsPerSection?: number // defaults to 3
+  samplingStrategy?: 'random' | 'first' // defaults to 'random'
+  copyAudio?: boolean // defaults to true
+}
+
+export type CreateMiniTestVariantResult = {
+  package: TestPackage
+  version: TestPackageVersion
+  itemCount: number
+}
+
+export async function createMiniTestVariantFromPackage(
+  input: CreateMiniTestVariantInput,
+): Promise<Result<CreateMiniTestVariantResult>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+
+  try {
+    // 1. Fetch source version and its parent package
+    const { data: sourceVerRow, error: verErr } = await sb
+      .from('test_package_versions')
+      .select('*, test_packages(*)')
+      .eq('id', input.sourcePackageVersionId)
+      .single()
+
+    if (verErr || !sourceVerRow) {
+      return { ok: false, error: verErr?.message || 'Source package version not found' }
+    }
+
+    const sourcePkgRow = sourceVerRow.test_packages
+    if (!sourcePkgRow) {
+      return { ok: false, error: 'Source test package not found' }
+    }
+
+    // 2. Fetch sections for source version
+    const { data: sourceSections, error: secErr } = await sb
+      .from('test_sections')
+      .select('*')
+      .eq('package_version_id', input.sourcePackageVersionId)
+      .order('section_order', { ascending: true })
+
+    if (secErr || !sourceSections || sourceSections.length === 0) {
+      return { ok: false, error: secErr?.message || 'No sections found in source package' }
+    }
+
+    const sectionIds = sourceSections.map((s: any) => s.id)
+
+    // 3. Fetch items for those sections
+    const { data: sourceItems, error: itemErr } = await sb
+      .from('test_items')
+      .select('*')
+      .in('section_id', sectionIds)
+      .order('item_order', { ascending: true })
+
+    if (itemErr || !sourceItems || sourceItems.length === 0) {
+      return { ok: false, error: itemErr?.message || 'No items found in source package' }
+    }
+
+    // 4. Fetch narration variants for source version
+    const { data: sourceVariants } = await sb
+      .from('narration_variants')
+      .select('*')
+      .eq('package_version_id', input.sourcePackageVersionId)
+
+    const questionsPerSection = Math.max(1, input.questionsPerSection ?? 3)
+    const strategy = input.samplingStrategy ?? 'random'
+
+    // 5. Derive Mini package code and title
+    const baseCode = sourcePkgRow.slug || 'standard-test'
+    const miniCode = (input.customCode?.trim() || `mini-${baseCode}`).toLowerCase()
+    const miniTitle = input.customTitle?.trim() || `[Mini] ${sourcePkgRow.title.replace(/\s*·\s*LIVE\s*$/i, '')}`
+
+    // 6. Create new test_packages row
+    const { data: newPkgRow, error: pkgInsertErr } = await sb
+      .from('test_packages')
+      .insert({
+        organization_id: sourcePkgRow.organization_id,
+        title: miniTitle,
+        slug: miniCode,
+        description: `Mini-test variant (${sourceSections.length * questionsPerSection} questions) derived from ${sourcePkgRow.title}. Zero-waste audio reuse.`,
+        created_by_user_id: sourcePkgRow.created_by_user_id,
+        source_metadata: {
+          ...(sourcePkgRow.source_metadata ?? {}),
+          package_kind: 'mini',
+          is_mini_test: true,
+          derived_from_package_id: sourcePkgRow.id,
+          derived_from_version_id: sourceVerRow.id,
+          original_code: sourcePkgRow.slug,
+          total_items: sourceSections.length * questionsPerSection,
+          questions_per_section: questionsPerSection,
+          sampling_strategy: strategy,
+        },
+      })
+      .select()
+      .single()
+
+    if (pkgInsertErr || !newPkgRow) {
+      return { ok: false, error: pkgInsertErr?.message || 'Failed to create mini package' }
+    }
+
+    // 7. Create new test_package_versions row (published immediately for testing)
+    const { data: newVerRow, error: verInsertErr } = await sb
+      .from('test_package_versions')
+      .insert({
+        package_id: newPkgRow.id,
+        version_label: 'v1.0.0',
+        status: 'published',
+        published_at: new Date().toISOString(),
+        source_metadata: {
+          package_kind: 'mini',
+          is_mini_test: true,
+          derived_from_version_id: sourceVerRow.id,
+          total_items: sourceSections.length * questionsPerSection,
+          questions_per_section: questionsPerSection,
+        },
+      })
+      .select()
+      .single()
+
+    if (verInsertErr || !newVerRow) {
+      return { ok: false, error: verInsertErr?.message || 'Failed to create mini package version' }
+    }
+
+    // 8. Clone sections and sample items
+    let totalItemsCreated = 0
+    const shouldCopyAudio = input.copyAudio !== false
+    const itemMapping: Array<{ sourceItemId: string; newItemId: string; newSectionId: string }> = []
+    const sectionMapping: Array<{ sourceSectionId: string; newSectionId: string; sectionOrder: number }> = []
+
+    for (const sec of sourceSections) {
+      const { data: newSecRow, error: newSecErr } = await sb
+        .from('test_sections')
+        .insert({
+          package_version_id: newVerRow.id,
+          section_order: sec.section_order,
+          title: sec.title,
+          intro_text_vi: sec.intro_text_vi,
+          intro_text_en: sec.intro_text_en,
+          target_cvr_ohm: sec.target_cvr_ohm,
+          cci_profile_id: sec.cci_profile_id,
+          cci_category_id: sec.cci_category_id,
+          cci_snapshot: sec.cci_snapshot,
+        })
+        .select()
+        .single()
+
+      if (newSecErr || !newSecRow) {
+        throw new Error(newSecErr?.message || 'Failed to clone section')
+      }
+
+      sectionMapping.push({
+        sourceSectionId: sec.id,
+        newSectionId: newSecRow.id,
+        sectionOrder: sec.section_order,
+      })
+
+      // Also create snapshot record if available
+      if (sec.cci_profile_id && sec.cci_category_id) {
+        await sb.from('section_measurement_snapshots').insert({
+          test_section_id: newSecRow.id,
+          package_version_id: newVerRow.id,
+          target_cvr_ohm: sec.target_cvr_ohm ?? 3.0,
+          cci_profile_id: sec.cci_profile_id,
+          cci_category_id: sec.cci_category_id,
+          cci_category_label: sec.cci_snapshot?.label || `Section ${sec.section_order}`,
+          cci_value: sec.cci_snapshot?.value ?? 4,
+          snapshot_metadata: {
+            source: 'mini-test-generator',
+            derived_from_section_id: sec.id,
+            sectionOrder: sec.section_order,
+          },
+        })
+      }
+
+      // Filter items for this section
+      const itemsForSec = sourceItems.filter((i: any) => i.section_id === sec.id)
+      let sampledItems: any[] = []
+
+      if (strategy === 'first' || itemsForSec.length <= questionsPerSection) {
+        sampledItems = itemsForSec.slice(0, questionsPerSection)
+      } else {
+        // Random sampling without replacement
+        const shuffled = [...itemsForSec].sort(() => Math.random() - 0.5)
+        sampledItems = shuffled.slice(0, questionsPerSection)
+      }
+
+      // Insert sampled items with renumbered item_order
+      for (let idx = 0; idx < sampledItems.length; idx++) {
+        const srcItem = sampledItems[idx]
+        totalItemsCreated += 1
+        const newItemOrder = idx + 1
+
+        const { data: newItemRow, error: newItemErr } = await sb
+          .from('test_items')
+          .insert({
+            package_version_id: newVerRow.id,
+            section_id: newSecRow.id,
+            item_order: newItemOrder,
+            term_vi: srcItem.term_vi,
+            term_en: srcItem.term_en,
+            prompt_vi: srcItem.prompt_vi,
+            prompt_en: srcItem.prompt_en,
+            spoken_script_vi: srcItem.spoken_script_vi,
+            spoken_script_en: srcItem.spoken_script_en,
+            tc: srcItem.tc,
+            lc: srcItem.lc,
+            tl: srcItem.tl,
+            measured_cvr: srcItem.measured_cvr,
+            source_metadata: {
+              ...(srcItem.source_metadata ?? {}),
+              derived_from_item_id: srcItem.id,
+              original_item_order: srcItem.item_order,
+              total_order: totalItemsCreated,
+            },
+          })
+          .select()
+          .single()
+
+        if (newItemErr || !newItemRow) {
+          throw new Error(newItemErr?.message || 'Failed to clone test item')
+        }
+
+        itemMapping.push({
+          sourceItemId: srcItem.id,
+          newItemId: newItemRow.id,
+          newSectionId: newSecRow.id,
+        })
+      }
+    }
+
+    // 9. Zero-waste audio reuse: clone narration variants directly to existing audio_asset_id
+    if (shouldCopyAudio && sourceVariants && sourceVariants.length > 0) {
+      const newVariantsToInsert: any[] = []
+
+      // A. Item narration variants
+      for (const map of itemMapping) {
+        const itemVariants = sourceVariants.filter(
+          (v: any) => v.test_item_id === map.sourceItemId && v.audio_asset_id != null,
+        )
+
+        for (const v of itemVariants) {
+          newVariantsToInsert.push({
+            package_version_id: newVerRow.id,
+            test_section_id: map.newSectionId,
+            test_item_id: map.newItemId,
+            narration_target: 'test_item',
+            language: v.language,
+            voice_id: v.voice_id,
+            voice_label: v.voice_label,
+            source_text_hash: v.source_text_hash,
+            provider_metadata: v.provider_metadata ?? {},
+            approval_status: v.approval_status ?? 'approved',
+            audio_asset_id: v.audio_asset_id, // EXACT SAME Supabase Storage audio asset!
+            approved_at: v.approved_at ?? new Date().toISOString(),
+          })
+        }
+      }
+
+      // B. Section intro narration variants
+      for (const secMap of sectionMapping) {
+        const secVariants = sourceVariants.filter(
+          (v: any) =>
+            v.narration_target === 'section_intro' &&
+            v.test_section_id === secMap.sourceSectionId &&
+            v.audio_asset_id != null,
+        )
+
+        for (const v of secVariants) {
+          newVariantsToInsert.push({
+            package_version_id: newVerRow.id,
+            test_section_id: secMap.newSectionId,
+            test_item_id: null,
+            narration_target: 'section_intro',
+            language: v.language,
+            voice_id: v.voice_id,
+            voice_label: v.voice_label,
+            source_text_hash: v.source_text_hash,
+            provider_metadata: v.provider_metadata ?? {},
+            approval_status: v.approval_status ?? 'approved',
+            audio_asset_id: v.audio_asset_id,
+            approved_at: v.approved_at ?? new Date().toISOString(),
+          })
+        }
+      }
+
+      // C. Package start / end and part intro narration variants
+      const lifecycleVariants = sourceVariants.filter(
+        (v: any) =>
+          ['package_start', 'package_end', 'part_intro'].includes(v.narration_target) &&
+          v.audio_asset_id != null,
+      )
+
+      for (const v of lifecycleVariants) {
+        newVariantsToInsert.push({
+          package_version_id: newVerRow.id,
+          test_section_id: null,
+          test_item_id: null,
+          narration_target: v.narration_target,
+          language: v.language,
+          voice_id: v.voice_id,
+          voice_label: v.voice_label,
+          source_text_hash: v.source_text_hash,
+          provider_metadata: v.provider_metadata ?? {},
+          approval_status: v.approval_status ?? 'approved',
+          audio_asset_id: v.audio_asset_id,
+          approved_at: v.approved_at ?? new Date().toISOString(),
+        })
+      }
+
+      if (newVariantsToInsert.length > 0) {
+        await sb.from('narration_variants').insert(newVariantsToInsert)
+      }
+    }
+
+    clearRequestCache('catalog')
+    return {
+      ok: true,
+      data: {
+        package: mapTestPackage(newPkgRow),
+        version: mapTestPackageVersion(newVerRow),
+        itemCount: totalItemsCreated,
+      },
+    }
+  } catch (err: any) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    }
+  }
 }
 

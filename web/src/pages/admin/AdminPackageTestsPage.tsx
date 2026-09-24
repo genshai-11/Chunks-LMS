@@ -38,7 +38,9 @@ import {
   batchSaveCciCategories,
   createCciProfile,
   createDraftTestPackage,
+  createMiniTestVariantFromPackage,
   deleteTestPackage,
+  detectPackageKind,
   listCciCategories,
   listCciProfiles,
   listTestItems,
@@ -47,6 +49,7 @@ import {
   listTestSections,
   updateTestItemContent,
   updateTestPackageMetadata,
+  type PackageKind,
 } from '../../lib/test-packages'
 import {
   calculateCciFromCpd,
@@ -108,6 +111,7 @@ export type PackageSummary = {
   audioApprovedCount: number
   audioTotalCount: number
   isLegacyLive: boolean
+  packageKind: PackageKind
 }
 
 export function AdminPackageTestsPage() {
@@ -131,7 +135,16 @@ export function AdminPackageTestsPage() {
   const [packageSummaries, setPackageSummaries] = useState<PackageSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [filterTab, setFilterTab] = useState<FilterTab>('all')
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'standard' | 'mini'>('all')
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Mini-Test Generator Modal State
+  const [miniModalSummary, setMiniModalSummary] = useState<PackageSummary | null>(null)
+  const [miniCode, setMiniCode] = useState('')
+  const [miniTitle, setMiniTitle] = useState('')
+  const [miniSamplingStrategy, setMiniSamplingStrategy] = useState<'random' | 'first'>('random')
+  const [miniCopyAudio, setMiniCopyAudio] = useState(true)
+  const [creatingMini, setCreatingMini] = useState(false)
 
   // Active Selected Package
   const [selectedVersionState, setSelectedVersionState] = useState('')
@@ -588,6 +601,13 @@ export function AdminPackageTestsPage() {
           const isLegacyLive =
             pkg.title.includes('· LIVE') || version?.versionLabel === 'LIVE'
 
+          const packageKind = detectPackageKind({
+            title: pkg.title,
+            slug: pkg.slug,
+            sourceMetadata: pkg.sourceMetadata,
+            itemCount: items.length,
+          })
+
           return {
             pkg,
             version,
@@ -602,6 +622,7 @@ export function AdminPackageTestsPage() {
             audioApprovedCount: audioApproved,
             audioTotalCount: items.length,
             isLegacyLive,
+            packageKind,
           }
         }),
       )
@@ -679,6 +700,8 @@ export function AdminPackageTestsPage() {
     return packageSummaries.filter((summary) => {
       if (filterTab === 'green' && summary.testType !== 'green') return false
       if (filterTab === 'red' && summary.testType !== 'red') return false
+      if (categoryFilter === 'standard' && summary.packageKind !== 'standard') return false
+      if (categoryFilter === 'mini' && summary.packageKind !== 'mini') return false
 
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase()
@@ -695,7 +718,45 @@ export function AdminPackageTestsPage() {
       }
       return true
     })
-  }, [packageSummaries, filterTab, searchQuery])
+  }, [packageSummaries, filterTab, categoryFilter, searchQuery])
+
+  // Mini-Test Variant Handlers
+  function openCreateMiniModal(summary: PackageSummary) {
+    setMiniModalSummary(summary)
+    const baseSlug = summary.pkg.slug || 'test'
+    setMiniCode(baseSlug.startsWith('mini-') ? baseSlug : `mini-${baseSlug}`)
+    const baseTitle = summary.pkg.title.replace(/\s*·\s*LIVE\s*$/i, '')
+    setMiniTitle(baseTitle.startsWith('[Mini]') ? baseTitle : `[Mini] ${baseTitle}`)
+    setMiniSamplingStrategy('random')
+    setMiniCopyAudio(true)
+  }
+
+  async function handleCreateMiniTest(e: React.FormEvent) {
+    e.preventDefault()
+    if (!miniModalSummary?.version) return
+    setCreatingMini(true)
+    try {
+      const res = await createMiniTestVariantFromPackage({
+        sourcePackageVersionId: miniModalSummary.version.id,
+        customCode: miniCode,
+        customTitle: miniTitle,
+        questionsPerSection: 3,
+        samplingStrategy: miniSamplingStrategy,
+        copyAudio: miniCopyAudio,
+      })
+      if (!res.ok) throw new Error(res.error)
+      ok(`Đã tạo thành công biến thể Mini-test: "${res.data.package.title}" (${res.data.itemCount} câu)!`)
+      setMiniModalSummary(null)
+      await loadPackages()
+      if (res.data.version?.id) {
+        setSelectedVersionState(res.data.version.id)
+      }
+    } catch (errCause) {
+      err(errCause instanceof Error ? errCause.message : 'Tạo mini-test thất bại')
+    } finally {
+      setCreatingMini(false)
+    }
+  }
 
   // Handle AI Package Generation with custom CVR math and Ample
   async function handleGenerateAiPackage(e: React.FormEvent) {
@@ -1292,40 +1353,79 @@ export function AdminPackageTestsPage() {
           {/* Catalog Filter Bar */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
             {/* Filter Buttons */}
-            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200/60">
-              <button
-                type="button"
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  filterTab === 'all'
-                    ? 'bg-white text-slate-900 shadow-sm border border-slate-200/50'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-                onClick={() => setFilterTab('all')}
-              >
-                Tất cả ({packageSummaries.length})
-              </button>
-              <button
-                type="button"
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                  filterTab === 'green'
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'text-emerald-700 hover:bg-emerald-50'
-                }`}
-                onClick={() => setFilterTab('green')}
-              >
-                <span>Green Tests (Focus 12V)</span>
-              </button>
-              <button
-                type="button"
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                  filterTab === 'red'
-                    ? 'bg-rose-600 text-white shadow-sm'
-                    : 'text-rose-700 hover:bg-rose-50'
-                }`}
-                onClick={() => setFilterTab('red')}
-              >
-                <span>Red Tests (Awareness 56V)</span>
-              </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/60">
+                <button
+                  type="button"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    filterTab === 'all'
+                      ? 'bg-white text-slate-900 shadow-sm border border-slate-200/50'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  onClick={() => setFilterTab('all')}
+                >
+                  Tất cả ({packageSummaries.length})
+                </button>
+                <button
+                  type="button"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                    filterTab === 'green'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-emerald-700 hover:bg-emerald-50'
+                  }`}
+                  onClick={() => setFilterTab('green')}
+                >
+                  <span>Green Focus (12V)</span>
+                </button>
+                <button
+                  type="button"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                    filterTab === 'red'
+                      ? 'bg-rose-600 text-white shadow-sm'
+                      : 'text-rose-700 hover:bg-rose-50'
+                  }`}
+                  onClick={() => setFilterTab('red')}
+                >
+                  <span>Red Awareness (56V)</span>
+                </button>
+              </div>
+
+              {/* Category Filter: Standard vs Mini */}
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/60">
+                <button
+                  type="button"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    categoryFilter === 'all'
+                      ? 'bg-white text-slate-900 shadow-sm border border-slate-200/50'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  onClick={() => setCategoryFilter('all')}
+                >
+                  Mọi quy mô
+                </button>
+                <button
+                  type="button"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                    categoryFilter === 'standard'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-blue-700 hover:bg-blue-50'
+                  }`}
+                  onClick={() => setCategoryFilter('standard')}
+                >
+                  <span>Standard (49 câu)</span>
+                </button>
+                <button
+                  type="button"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                    categoryFilter === 'mini'
+                      ? 'bg-violet-600 text-white shadow-sm'
+                      : 'text-violet-700 hover:bg-violet-50'
+                  }`}
+                  onClick={() => setCategoryFilter('mini')}
+                >
+                  <span>Mini-test (21 câu)</span>
+                </button>
+              </div>
             </div>
 
             <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
@@ -1414,15 +1514,27 @@ export function AdminPackageTestsPage() {
                     <div className="space-y-3">
                       {/* Top Badges */}
                       <div className="flex items-center justify-between gap-2">
-                        <span
-                          className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${
-                            isGreen
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
-                              : 'bg-rose-50 text-rose-700 border border-rose-200/60'
-                          }`}
-                        >
-                          {isGreen ? 'GREEN FOCUS' : 'RED AWARENESS'} • {summary.targetVoltage}V
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span
+                            className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${
+                              isGreen
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                                : 'bg-rose-50 text-rose-700 border border-rose-200/60'
+                            }`}
+                          >
+                            {isGreen ? 'GREEN FOCUS' : 'RED AWARENESS'} • {summary.targetVoltage}V
+                          </span>
+
+                          {summary.packageKind === 'mini' ? (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-violet-50 text-violet-700 border border-violet-200/70">
+                              Mini · 21Q
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200/70">
+                              Standard · 49Q
+                            </span>
+                          )}
+                        </div>
 
                         <span className="text-[11px] font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
                           {summary.questionCount}Q
@@ -1472,17 +1584,17 @@ export function AdminPackageTestsPage() {
 
                     {/* Actions Toolbar */}
                     <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <button
                           type="button"
                           onClick={() => {
                             selectPackage(summary)
                             handleTabChange('content')
                           }}
-                          className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors flex items-center gap-1"
+                          className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors flex items-center gap-1"
                         >
                           <FileText className="h-3.5 w-3.5" />
-                          <span>Soạn nội dung</span>
+                          <span>Soạn</span>
                         </button>
 
                         <button
@@ -1491,11 +1603,24 @@ export function AdminPackageTestsPage() {
                             selectPackage(summary)
                             handleTabChange('audio')
                           }}
-                          className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors flex items-center gap-1"
+                          className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors flex items-center gap-1"
                         >
                           <Headphones className="h-3.5 w-3.5" />
                           <span>Audio</span>
                         </button>
+
+                        {summary.packageKind !== 'mini' && (
+                          <button
+                            type="button"
+                            data-testid="create-mini-btn"
+                            onClick={() => openCreateMiniModal(summary)}
+                            className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200/80 transition-colors flex items-center gap-1"
+                            title="Tạo biến thể Mini-test 21 câu từ gói này"
+                          >
+                            <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+                            <span>Tạo Mini</span>
+                          </button>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-1">
@@ -1567,15 +1692,27 @@ export function AdminPackageTestsPage() {
                             <div className="text-[11px] font-mono text-slate-400 mt-0.5">{summary.pkg.slug}</div>
                           </td>
                           <td className="py-3.5 px-4 whitespace-nowrap">
-                            <span
-                              className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${
-                                isGreen
-                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
-                                  : 'bg-rose-50 text-rose-700 border border-rose-200/60'
-                              }`}
-                            >
-                              {isGreen ? 'GREEN FOCUS' : 'RED AWARENESS'} • {summary.targetVoltage}V
-                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span
+                                className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
+                                  isGreen
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                                    : 'bg-rose-50 text-rose-700 border border-rose-200/60'
+                                }`}
+                              >
+                                {isGreen ? 'GREEN FOCUS' : 'RED AWARENESS'} • {summary.targetVoltage}V
+                              </span>
+
+                              {summary.packageKind === 'mini' ? (
+                                <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-violet-50 text-violet-700 border border-violet-200/70">
+                                  Mini
+                                </span>
+                              ) : (
+                                <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200/70">
+                                  Standard
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="py-3.5 px-4 whitespace-nowrap">
                             <span className="font-bold text-slate-800">{summary.sections.length}</span>{' '}
@@ -1631,6 +1768,17 @@ export function AdminPackageTestsPage() {
                                 <Headphones className="h-3.5 w-3.5" />
                                 <span className="hidden md:inline">Audio</span>
                               </button>
+                              {summary.packageKind !== 'mini' && (
+                                <button
+                                  type="button"
+                                  onClick={() => openCreateMiniModal(summary)}
+                                  className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200/80 transition-colors flex items-center gap-1"
+                                  title="Tạo biến thể Mini-test 21 câu"
+                                >
+                                  <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+                                  <span className="hidden md:inline">Tạo Mini</span>
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => setPreviewPackage(summary)}
@@ -4453,6 +4601,141 @@ export function AdminPackageTestsPage() {
                 {deleting ? 'Đang xóa...' : 'Đồng Ý Xóa Vĩnh Viễn'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* MINI-TEST VARIANT GENERATOR MODAL */}
+      {miniModalSummary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg shadow-2xl p-6 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-amber-600">
+                <Sparkles className="h-5 w-5" />
+                <h3 className="text-base font-bold text-slate-900">Tạo Biến Thể Mini-Test (21 câu)</h3>
+              </div>
+              <button
+                type="button"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                onClick={() => setMiniModalSummary(null)}
+                disabled={creatingMini}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-amber-50/70 border border-amber-200/70 rounded-xl text-xs text-amber-800 space-y-1">
+              <div className="font-bold flex items-center gap-1.5">
+                <span>⚡ Zero-Waste Audio & Data Reuse</span>
+              </div>
+              <p className="text-[11px] text-amber-700 leading-relaxed">
+                Tạo bài test thu gọn 21 câu (3 câu/session × 7 sessions) từ gói gốc{' '}
+                <strong>{miniModalSummary.pkg.title.replace(/\s*·\s*LIVE\s*$/i, '')}</strong>. Tự động liên kết các file audio đã lưu trong Supabase Storage, 100% sẵn sàng kiểm tra 1-1 mà không tốn chi phí gọi Google Cloud TTS.
+              </p>
+            </div>
+
+            <form onSubmit={handleCreateMiniTest} className="space-y-4 text-xs">
+              <div className="space-y-1.5">
+                <label className="block font-semibold text-slate-700">Mã gói Mini-Test (Slug)</label>
+                <input
+                  type="text"
+                  required
+                  value={miniCode}
+                  onChange={(e) => setMiniCode(e.target.value)}
+                  placeholder="e.g. mini-g1-56v"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-mono text-xs focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block font-semibold text-slate-700">Tiêu đề bài test</label>
+                <input
+                  type="text"
+                  required
+                  value={miniTitle}
+                  onChange={(e) => setMiniTitle(e.target.value)}
+                  placeholder="e.g. [Mini] G1-56V Focus Test"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block font-semibold text-slate-700">Chiến lược lấy mẫu câu hỏi (3 câu / session)</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                    miniSamplingStrategy === 'random'
+                      ? 'border-amber-400 bg-amber-50/50 text-amber-900 font-semibold'
+                      : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="samplingStrategy"
+                      checked={miniSamplingStrategy === 'random'}
+                      onChange={() => setMiniSamplingStrategy('random')}
+                      className="text-amber-600"
+                    />
+                    <span>3 câu ngẫu nhiên</span>
+                  </label>
+
+                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                    miniSamplingStrategy === 'first'
+                      ? 'border-amber-400 bg-amber-50/50 text-amber-900 font-semibold'
+                      : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="samplingStrategy"
+                      checked={miniSamplingStrategy === 'first'}
+                      onChange={() => setMiniSamplingStrategy('first')}
+                      className="text-amber-600"
+                    />
+                    <span>3 câu đầu mỗi session</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
+                <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={miniCopyAudio}
+                    onChange={(e) => setMiniCopyAudio(e.target.checked)}
+                    className="rounded text-amber-600 focus:ring-amber-500"
+                  />
+                  <span>Tự động liên kết toàn bộ audio đã lưu (Zero-waste audio)</span>
+                </label>
+                <p className="text-[11px] text-slate-500 mt-1 pl-5">
+                  Tất cả audio câu hỏi và intro có sẵn sẽ được ánh xạ trực tiếp sang gói Mini-test. Bạn có thể thay đổi hoặc tải lên audio intro riêng sau.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  className="ghost text-xs"
+                  onClick={() => setMiniModalSummary(null)}
+                  disabled={creatingMini}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingMini || !miniCode.trim() || !miniTitle.trim()}
+                  className="px-4 py-2 text-xs font-bold rounded-xl bg-amber-600 hover:bg-amber-700 text-white disabled:opacity-50 transition-colors flex items-center gap-1.5 shadow-sm"
+                >
+                  {creatingMini ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Đang tạo Mini-Test...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4" />
+                      <span>Tạo Mini-Test Ngay</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

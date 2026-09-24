@@ -5294,10 +5294,10 @@
     @apply mb-3 grid gap-2 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-8;
   }
   .standalone-metric-card {
-    @apply rounded-xl border border-slate-800 bg-slate-950 p-3 text-slate-100 shadow-sm;
+    @apply rounded-xl border border-slate-200 bg-white p-3 text-slate-800 shadow-xs transition-all;
   }
   .standalone-metric-card span {
-    @apply mt-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400;
+    @apply mt-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500;
   }
   .standalone-metric-card.metric-percent-c span,
   .standalone-metric-card.metric-avg-x span {
@@ -5305,10 +5305,10 @@
     text-transform: none;
   }
   .standalone-metric-card strong {
-    @apply mt-0.5 block font-display text-xl font-black text-white;
+    @apply mt-0.5 block font-display text-xl font-black text-slate-900;
   }
   .standalone-chart-wrap {
-    @apply h-[min(56dvh,28rem)] min-h-[18rem] rounded-2xl border border-slate-800 bg-slate-950 p-3;
+    @apply h-[min(56dvh,28rem)] min-h-[18rem] rounded-2xl border border-slate-100 bg-slate-50/50 p-3;
   }
   .standalone-chart-wrap.is-short {
     @apply h-[min(44dvh,22rem)] min-h-[16rem];

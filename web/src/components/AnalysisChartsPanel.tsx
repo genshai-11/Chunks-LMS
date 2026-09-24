@@ -601,48 +601,58 @@ export function AnalysisChartsPanel({
 
   return (
     <div className="test-analysis-page text-left">
-      {/* Live Classroom KPI Stat Grid */}
-      <div className="standalone-analysis-grid mb-4">
-        <div
-          className="standalone-metric-card metric-rfc cursor-default"
-          title={`Struggle (RFC) = Warm records / N_total = ${summary.warmSteps} / ${summary.totalRecords}. Lower is better.`}
-        >
-          <Activity className="h-5 w-5 text-red-500" />
-          <span>Struggle (RFC)</span>
-          <strong className="text-red-500">{summary.rfc.toFixed(1)}%</strong>
-        </div>
+      {/* Live Classroom KPI Stat Grid - Synchronized with Metric Filter */}
+      {visibleMetricCount > 0 ? (
+        <div className="standalone-analysis-grid mb-4">
+          {metricVisibility.rfc ? (
+            <div
+              className="standalone-metric-card metric-rfc cursor-default"
+              title={`Struggle (RFC) = Warm records / N_total = ${summary.warmSteps} / ${summary.totalRecords}. Lower is better.`}
+            >
+              <Activity className="h-5 w-5 text-red-500" />
+              <span>Struggle (RFC)</span>
+              <strong className="text-red-500">{summary.rfc.toFixed(1)}%</strong>
+            </div>
+          ) : null}
 
-        <div
-          className={`standalone-metric-card metric-avg-x is-${summary.avgXColor} cursor-default`}
-          style={{
-            borderColor: `${COLOR_HEX[summary.avgXColor]}55`,
-            boxShadow: `0 0 16px -4px ${COLOR_HEX[summary.avgXColor]}33`,
-          }}
-          title={`Avg %x = sum(%x) / N_total = ${summary.sumPercentX.toFixed(1)}% / ${summary.totalRecords} = ${summary.avgPercentX.toFixed(1)}% (${COLOR_LABELS[summary.avgXColor]} band). Higher is better.`}
-        >
-          <Target className="h-5 w-5" style={{ color: COLOR_HEX[summary.avgXColor] }} />
-          <span>%c (Avg %x)</span>
-          <strong style={{ color: COLOR_HEX[summary.avgXColor] }}>{summary.avgPercentX.toFixed(1)}%</strong>
-        </div>
+          {metricVisibility.percentC ? (
+            <div
+              className={`standalone-metric-card metric-avg-x is-${summary.avgXColor} cursor-default`}
+              style={{
+                borderColor: `${COLOR_HEX[summary.avgXColor]}55`,
+                boxShadow: `0 0 16px -4px ${COLOR_HEX[summary.avgXColor]}33`,
+              }}
+              title={`Avg %x = sum(%x) / N_total = ${summary.sumPercentX.toFixed(1)}% / ${summary.totalRecords} = ${summary.avgPercentX.toFixed(1)}% (${COLOR_LABELS[summary.avgXColor]} band). Higher is better.`}
+            >
+              <Target className="h-5 w-5" style={{ color: COLOR_HEX[summary.avgXColor] }} />
+              <span>%c (Avg %x)</span>
+              <strong style={{ color: COLOR_HEX[summary.avgXColor] }}>{summary.avgPercentX.toFixed(1)}%</strong>
+            </div>
+          ) : null}
 
-        <div
-          className="standalone-metric-card cursor-default"
-          title={`Finalized attempts in current filter: ${summary.sampleSize}.`}
-        >
-          <BarChart3 className="h-5 w-5 text-slate-400" />
-          <span>Sample size</span>
-          <strong>{summary.sampleSize}</strong>
-        </div>
+          {metricVisibility.chunks ? (
+            <div
+              className="standalone-metric-card cursor-default"
+              title={`Finalized attempts in current filter: ${summary.sampleSize}.`}
+            >
+              <BarChart3 className="h-5 w-5 text-slate-400" />
+              <span>Sample size / Chunks</span>
+              <strong>{summary.sampleSize}</strong>
+            </div>
+          ) : null}
 
-        <div
-          className="standalone-metric-card cursor-default"
-          title={`Total spectrum color records (primary + probe events): ${summary.totalRecords}.`}
-        >
-          <Layers className="h-5 w-5 text-indigo-500" />
-          <span>N_total records</span>
-          <strong>{summary.totalRecords}</strong>
+          {metricVisibility.probeDepth ? (
+            <div
+              className="standalone-metric-card cursor-default"
+              title={`Total spectrum color records (primary + probe events): ${summary.totalRecords}.`}
+            >
+              <Layers className="h-5 w-5 text-indigo-500" />
+              <span>Probe events / N_total</span>
+              <strong>{summary.totalRecords}</strong>
+            </div>
+          ) : null}
         </div>
-      </div>
+      ) : null}
 
       {/* Chart Workbench Toolbar & Filters */}
       <div className="test-analysis-workbench">
@@ -997,10 +1007,10 @@ export function AnalysisChartsPanel({
                 actions={chartActions('sessionPercentC')}
                 collapsible={false}
               >
-                {/* Controls toolbar */}
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2.5 border-b border-slate-100 dark:border-white/10 text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-500 font-medium">Nhóm:</span>
+                {/* Minimal clean light controls toolbar */}
+                <div className="flex items-center justify-between gap-2 mb-2 pb-1 text-xs">
+                  <div className="flex items-center gap-1.5 text-slate-500">
+                    <span className="text-[11px] font-medium text-slate-400">Gộp:</span>
                     <select
                       value={sessionGroupMode === 'day' ? 'day' : String(dynamicChunkSize)}
                       onChange={(e) => {
@@ -1012,24 +1022,24 @@ export function AnalysisChartsPanel({
                           setDynamicChunkSize(Number(val))
                         }
                       }}
-                      className="px-2 py-1 rounded-lg text-xs bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-medium cursor-pointer"
+                      className="bg-transparent text-slate-700 font-semibold text-xs py-0.5 px-1 rounded hover:bg-slate-100 transition-colors cursor-pointer border-0 outline-none"
                     >
-                      <option value="10">Gộp 10 câu (Mặc định)</option>
-                      <option value="5">Gộp 5 câu</option>
-                      <option value="15">Gộp 15 câu</option>
-                      <option value="20">Gộp 20 câu</option>
+                      <option value="10">10 câu (Mặc định)</option>
+                      <option value="5">5 câu</option>
+                      <option value="15">15 câu</option>
+                      <option value="20">20 câu</option>
                       <option value="day">Theo ngày (D1..DN)</option>
                     </select>
                   </div>
 
-                  <div className="flex items-center p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                  <div className="inline-flex items-center gap-0.5 p-0.5 rounded-lg bg-slate-100 text-slate-500">
                     <button
                       type="button"
                       title="Biểu đồ cột (Bar)"
-                      className={`p-1.5 rounded-md transition-all cursor-pointer ${
+                      className={`p-1 rounded-md transition-all cursor-pointer ${
                         sessionChartType === 'bar'
-                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                          : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                          ? 'bg-white text-slate-900 shadow-xs font-semibold'
+                          : 'hover:text-slate-800'
                       }`}
                       onClick={() => setSessionChartType('bar')}
                     >
@@ -1038,10 +1048,10 @@ export function AnalysisChartsPanel({
                     <button
                       type="button"
                       title="Biểu đồ đường (Line)"
-                      className={`p-1.5 rounded-md transition-all cursor-pointer ${
+                      className={`p-1 rounded-md transition-all cursor-pointer ${
                         sessionChartType === 'line'
-                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                          : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                          ? 'bg-white text-slate-900 shadow-xs font-semibold'
+                          : 'hover:text-slate-800'
                       }`}
                       onClick={() => setSessionChartType('line')}
                     >
@@ -1050,10 +1060,10 @@ export function AnalysisChartsPanel({
                     <button
                       type="button"
                       title="Danh sách (List)"
-                      className={`p-1.5 rounded-md transition-all cursor-pointer ${
+                      className={`p-1 rounded-md transition-all cursor-pointer ${
                         sessionChartType === 'list'
-                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                          : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                          ? 'bg-white text-slate-900 shadow-xs font-semibold'
+                          : 'hover:text-slate-800'
                       }`}
                       onClick={() => setSessionChartType('list')}
                     >
@@ -1064,22 +1074,22 @@ export function AnalysisChartsPanel({
 
                 <div className={`standalone-chart-wrap${chartUi.sessionPercentC.expanded ? ' h-[26rem]' : ''}`}>
                   {sessionChartType === 'list' ? (
-                    <div className="overflow-x-auto max-h-full">
+                    <div className="overflow-x-auto max-h-full rounded-xl bg-white border border-slate-100">
                       <table className="w-full text-left text-xs border-collapse">
                         <thead>
-                          <tr className="border-b border-slate-200 dark:border-white/10 text-slate-500 font-semibold">
-                            <th className="pb-2 px-3">STT / Phiên</th>
-                            {metricVisibility.percentC ? <th className="pb-2 px-3">%c (Avg %x)</th> : null}
-                            {metricVisibility.rfc ? <th className="pb-2 px-3">RFC</th> : null}
-                            {metricVisibility.chunks ? <th className="pb-2 px-3">Chunks</th> : null}
-                            {metricVisibility.probeDepth ? <th className="pb-2 px-3">Probe Depth</th> : null}
-                            <th className="pb-2 px-3">Số câu hỏi</th>
+                          <tr className="border-b border-slate-100 bg-slate-50/75 text-slate-500 font-semibold">
+                            <th className="py-2 px-3">STT / Phiên</th>
+                            {metricVisibility.percentC ? <th className="py-2 px-3">%c (Avg %x)</th> : null}
+                            {metricVisibility.rfc ? <th className="py-2 px-3">RFC</th> : null}
+                            {metricVisibility.chunks ? <th className="py-2 px-3">Chunks</th> : null}
+                            {metricVisibility.probeDepth ? <th className="py-2 px-3">Probe Depth</th> : null}
+                            <th className="py-2 px-3">Số câu hỏi</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                        <tbody className="divide-y divide-slate-100 text-slate-700">
                           {sessionPercentCBuckets.map((b, idx) => (
-                            <tr key={b.id ?? idx} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
-                              <td className="py-2.5 px-3 font-medium text-slate-800 dark:text-slate-200">
+                            <tr key={b.id ?? idx} className="hover:bg-slate-50/80 transition-colors">
+                              <td className="py-2.5 px-3 font-medium text-slate-900">
                                 {b.label}
                               </td>
                               {metricVisibility.percentC ? (
@@ -1107,16 +1117,16 @@ export function AnalysisChartsPanel({
                                 </td>
                               ) : null}
                               {metricVisibility.chunks ? (
-                                <td className="py-2.5 px-3 font-mono font-semibold text-sky-500">
+                                <td className="py-2.5 px-3 font-mono font-semibold text-sky-600">
                                   {b.chunks}
                                 </td>
                               ) : null}
                               {metricVisibility.probeDepth ? (
-                                <td className="py-2.5 px-3 font-mono font-semibold text-purple-500">
+                                <td className="py-2.5 px-3 font-mono font-semibold text-purple-600">
                                   {b.probeDepth.toFixed(1)}
                                 </td>
                               ) : null}
-                              <td className="py-2.5 px-3 font-mono text-slate-600 dark:text-slate-400">
+                              <td className="py-2.5 px-3 font-mono text-slate-500">
                                 {b.questionCount} câu
                               </td>
                             </tr>

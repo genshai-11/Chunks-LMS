@@ -1,11 +1,18 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { BarChart3, ClipboardCheck, ExternalLink, Play, RotateCcw, Trash2, UserRound } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { PageHeader } from '../../components/PageHeader'
 import { EmptyState, Panel } from '../../components/ui'
 import { listActiveLearners } from '../../modules/roster/service'
 import { useAppState } from '../../state/useAppState'
-import { listTestItems, listTestPackages, listTestPackageVersions, listTestSections } from '../../lib/test-packages'
+import {
+  detectPackageKind,
+  listTestItems,
+  listTestPackages,
+  listTestPackageVersions,
+  listTestSections,
+  type PackageKind,
+} from '../../lib/test-packages'
 import {
   createStandaloneAssignment,
   deleteStandaloneAssignment,
@@ -33,7 +40,8 @@ export function TeacherTestsPage() {
   const learners = listActiveLearners(roster)
   const [learnerId, setLearnerId] = useState('')
   const [versionId, setVersionId] = useState('')
-  const [versions, setVersions] = useState<Array<{ id: string; label: string }>>([])
+  const [packageCategoryTab, setPackageCategoryTab] = useState<'all' | 'standard' | 'mini'>('all')
+  const [versions, setVersions] = useState<Array<{ id: string; label: string; kind: PackageKind }>>([])
   const [message, setMessage] = useState('')
   const [assignments, setAssignments] = useState<StandaloneTestAssignmentRow[]>([])
   const [busyAssignmentId, setBusyAssignmentId] = useState<string | null>(null)
@@ -53,12 +61,18 @@ export function TeacherTestsPage() {
     void (async () => {
       const packages = await listTestPackages()
       if (!packages.ok) return
-      const next: Array<{ id: string; label: string }> = []
+      const next: Array<{ id: string; label: string; kind: PackageKind }> = []
       for (const pkg of packages.data) {
         const result = await listTestPackageVersions(pkg.id)
         if (result.ok) {
+          const kind = detectPackageKind(pkg)
+          const kindBadge = kind === 'mini' ? '[Mini · 21Q]' : '[Standard · 49Q]'
           for (const version of result.data.filter((v) => v.status === 'published')) {
-            next.push({ id: version.id, label: `${pkg.title} · ${version.versionLabel}` })
+            next.push({
+              id: version.id,
+              label: `${pkg.title} · ${version.versionLabel} ${kindBadge}`,
+              kind,
+            })
           }
         }
       }
@@ -115,7 +129,15 @@ export function TeacherTestsPage() {
 
   const filteredAssignments = assignments.filter((assignment) => {
     if (assignmentStatusFilter !== 'all' && assignment.status !== assignmentStatusFilter) return false
-    if (assignmentPackageFilter !== 'all' && assignment.packageVersionId !== assignmentPackageFilter) return false
+    if (assignmentPackageFilter === 'standard') {
+      const v = versions.find((ver) => ver.id === assignment.packageVersionId)
+      if (v?.kind !== 'standard') return false
+    } else if (assignmentPackageFilter === 'mini') {
+      const v = versions.find((ver) => ver.id === assignment.packageVersionId)
+      if (v?.kind !== 'mini') return false
+    } else if (assignmentPackageFilter !== 'all' && assignment.packageVersionId !== assignmentPackageFilter) {
+      return false
+    }
     const q = assignmentLearnerSearch.trim().toLowerCase()
     if (!q) return true
     const learnerName = learners.find((learner) => learner.id === assignment.learnerUserId)?.displayName ?? ''
@@ -240,6 +262,15 @@ export function TeacherTestsPage() {
   }
   const packageLabel = (versionId: string) =>
     versions.find((version) => version.id === versionId)?.label ?? 'Unknown package'
+
+  const assignmentKind = (verId: string): PackageKind =>
+    versions.find((v) => v.id === verId)?.kind ?? 'standard'
+
+  const selectableVersions = useMemo(() => {
+    if (packageCategoryTab === 'all') return versions
+    return versions.filter((v) => v.kind === packageCategoryTab)
+  }, [versions, packageCategoryTab])
+
   const progressLabel = (assignmentId: string) => {
     const progress = assignmentProgress[assignmentId] ?? {
       assignmentId,
@@ -279,10 +310,47 @@ export function TeacherTestsPage() {
             </select>
           </label>
           <label>
-            Package
+            <div className="flex items-center justify-between mb-1">
+              <span>Package</span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all ${
+                    packageCategoryTab === 'all'
+                      ? 'bg-slate-800 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                  onClick={() => setPackageCategoryTab('all')}
+                >
+                  Tất cả
+                </button>
+                <button
+                  type="button"
+                  className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all ${
+                    packageCategoryTab === 'standard'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                  }`}
+                  onClick={() => setPackageCategoryTab('standard')}
+                >
+                  Standard (49Q)
+                </button>
+                <button
+                  type="button"
+                  className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all ${
+                    packageCategoryTab === 'mini'
+                      ? 'bg-violet-600 text-white'
+                      : 'bg-violet-50 text-violet-700 hover:bg-violet-100'
+                  }`}
+                  onClick={() => setPackageCategoryTab('mini')}
+                >
+                  Mini (21Q)
+                </button>
+              </div>
+            </div>
             <select value={versionId} onChange={(event) => setVersionId(event.target.value)}>
               <option value="">Select published package</option>
-              {versions.map((version) => (
+              {selectableVersions.map((version) => (
                 <option key={version.id} value={version.id}>
                   {version.label}
                 </option>
@@ -354,6 +422,8 @@ export function TeacherTestsPage() {
                   onChange={(event) => setAssignmentPackageFilter(event.target.value)}
                 >
                   <option value="all">All packages</option>
+                  <option value="standard">Standard tests (49Q)</option>
+                  <option value="mini">Mini-tests (21Q)</option>
                   {versions.map((version) => (
                     <option key={version.id} value={version.id}>
                       {version.label}
@@ -422,8 +492,17 @@ export function TeacherTestsPage() {
                         {learners.find((learner) => learner.id === assignment.learnerUserId)?.displayName ??
                           assignment.learnerUserId}
                       </strong>
-                      <div className="test-assignment-meta">
-                        {packageLabel(assignment.packageVersionId)}
+                      <div className="test-assignment-meta flex items-center gap-1.5 mt-0.5">
+                        <span>{packageLabel(assignment.packageVersionId)}</span>
+                        {assignmentKind(assignment.packageVersionId) === 'mini' ? (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700 border border-violet-200">
+                            Mini · 21Q
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200">
+                            Standard · 49Q
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td>

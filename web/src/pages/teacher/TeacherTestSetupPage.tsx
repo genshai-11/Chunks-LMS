@@ -18,6 +18,8 @@ import { PageHeader } from '../../components/PageHeader'
 import { EmptyState, Panel } from '../../components/ui'
 import {
   getTestPackageVersion,
+  detectPackageKind,
+  type PackageKind,
   listSectionNarrationReview,
   listTestItems,
   listTestSections,
@@ -146,6 +148,7 @@ export function TeacherTestSetupPage() {
   const { assignmentId, sectionId: initialSectionId } = useParams()
   const navigate = useNavigate()
   const [packageVersionId, setPackageVersionId] = useState('')
+  const [packageKind, setPackageKind] = useState<PackageKind>('standard')
   const [packageType, setPackageType] = useState<'green' | 'red' | null>(null)
   const [packageSessionLanguages, setPackageSessionLanguages] = useState<Array<'vi' | 'en'> | null>(null)
   const [languagePolicy, setLanguagePolicy] = useState<unknown>(null)
@@ -204,6 +207,9 @@ export function TeacherTestSetupPage() {
       if (!assignment) return setError('Standalone assignment not found')
       setPackageVersionId(assignment.packageVersionId)
       const versionResult = await getTestPackageVersion(assignment.packageVersionId)
+      if (versionResult.ok && versionResult.data) {
+        setPackageKind(detectPackageKind({ sourceMetadata: versionResult.data.sourceMetadata }))
+      }
       const nextLanguagePolicy = versionResult.ok ? versionResult.data?.sourceMetadata?.languagePolicy : null
       setLanguagePolicy(nextLanguagePolicy ?? null)
       const sessionLanguages = (versionResult.ok ? versionResult.data?.sourceMetadata?.sessionLanguages : null) as Array<'vi' | 'en'> | null
@@ -406,16 +412,33 @@ export function TeacherTestSetupPage() {
     <div className="test-setup-page">
       <PageHeader
         icon={ClipboardPlus}
-        kicker="Teacher · Tests 1-1"
+        kicker={packageKind === 'mini' ? 'Teacher · Mini-Test 1-1 (21 câu)' : 'Teacher · Tests 1-1'}
         title="Run setup"
         subtitle="Review sessions, languages, item count, and audio readiness before entering the Live Test room."
+        actions={
+          packageKind === 'mini' ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200 shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+              ⚡ Mini-Test · 21 câu (3Q/session)
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+              Standard Test · 49 câu
+            </span>
+          )
+        }
       />
       <Flash message={message} error={error} />
 
       <Panel
         icon={ClipboardPlus}
-        title="Prepare Test Run"
-        description="Choose Single Session or flexible Multi-Session groups such as Session 1–4 VI and Session 5–8 EN."
+        title={packageKind === 'mini' ? 'Prepare Mini-Test Run (21 câu)' : 'Prepare Test Run'}
+        description={
+          packageKind === 'mini'
+            ? 'Phiên bản đánh giá nhanh Mini-test 21 câu (3 câu/session) lấy ngẫu nhiên từ bộ Standard gốc.'
+            : 'Choose Single Session or flexible Multi-Session groups such as Session 1–4 VI and Session 5–8 EN.'
+        }
         collapsible={false}
       >
         <div className="btn-row mt-4 test-setup-start-row">
@@ -454,7 +477,13 @@ export function TeacherTestSetupPage() {
             <div className="test-setup-stats">
               <div><Layers3 className="h-4 w-4 text-indigo-500" /><span>Sessions</span><strong>{targetPreview.length || preview.length}</strong></div>
               <div><ListChecks className="h-4 w-4 text-green-500" /><span>Items</span><strong>{totalItemCount || packageItemCount}</strong></div>
-              <div><Gauge className="h-4 w-4 text-yellow-500" /><span>Mode</span><strong>{runMode}</strong></div>
+              <div>
+                <Gauge className="h-4 w-4 text-yellow-500" />
+                <span>Loại bài</span>
+                <strong className={packageKind === 'mini' ? 'text-purple-600 capitalize' : 'text-blue-600 capitalize'}>
+                  {packageKind === 'mini' ? 'Mini (21Q)' : 'Standard'}
+                </strong>
+              </div>
             </div>
 
             <div className="test-run-mode-picker">

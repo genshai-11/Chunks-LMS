@@ -76,8 +76,8 @@ describe('AdminPackageTestsPage', { timeout: 20000 }, () => {
     })
 
     // Filter tabs
-    expect(screen.getByRole('button', { name: /Green Tests/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Red Tests/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Green Focus/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Red Awareness/i })).toBeInTheDocument()
   })
 
   it('opens Create Package Test modal when clicking Create Package Test button', async () => {
@@ -289,7 +289,7 @@ describe('AdminPackageTestsPage', { timeout: 20000 }, () => {
       expect(screen.getByRole('heading', { name: /GREEN-TEST-FOCUS-12V/i })).toBeInTheDocument()
     })
 
-    const contentBtn = screen.getByRole('button', { name: /Soạn nội dung/i })
+    const contentBtn = screen.getByRole('button', { name: /Soạn thảo & Nội dung/i })
     await user.click(contentBtn)
 
     await waitFor(() => {
@@ -681,6 +681,111 @@ describe('AdminPackageTestsPage', { timeout: 20000 }, () => {
       const unsavedBadges = screen.getAllByText('Chưa lưu audio')
       expect(savedBadges.length).toBeGreaterThanOrEqual(1)
       expect(unsavedBadges.length).toBeGreaterThanOrEqual(1)
+    })
+  })
+
+  it('supports category filtering (Standard vs Mini) and opens Create Mini modal', async () => {
+    const user = userEvent.setup()
+
+    vi.spyOn(testPackagesLib, 'listTestPackages').mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'pkg-std-1',
+          organizationId: 'org-1',
+          title: 'G1-56V-ECOMMERCE · LIVE',
+          slug: 'g1-56v-ecommerce',
+          description: 'Standard 49 questions test',
+          createdByUserId: null,
+          sourceMetadata: { package_kind: 'standard', total_items: 49 },
+          archivedAt: null,
+        },
+        {
+          id: 'pkg-mini-1',
+          organizationId: 'org-1',
+          title: '[Mini] G1-56V-ECOMMERCE',
+          slug: 'mini-g1-56v-ecommerce',
+          description: 'Mini variant 21 questions',
+          createdByUserId: null,
+          sourceMetadata: { package_kind: 'mini', total_items: 21 },
+          archivedAt: null,
+        },
+      ],
+    })
+
+    vi.spyOn(testPackagesLib, 'listTestPackageVersions').mockResolvedValue({
+      ok: true,
+      data: [
+        {
+          id: 'ver-std-1',
+          packageId: 'pkg-std-1',
+          versionLabel: 'v1.0.0',
+          status: 'published',
+          snapshotHash: null,
+          publishedAt: '2026-09-24T00:00:00Z',
+          sourceMetadata: { package_kind: 'standard', total_items: 49 },
+        },
+        {
+          id: 'ver-mini-1',
+          packageId: 'pkg-mini-1',
+          versionLabel: 'v1.0.0',
+          status: 'published',
+          snapshotHash: null,
+          publishedAt: '2026-09-24T00:00:00Z',
+          sourceMetadata: { package_kind: 'mini', total_items: 21 },
+        },
+      ],
+    })
+
+    vi.spyOn(testPackagesLib, 'listTestSections').mockResolvedValue({
+      ok: true,
+      data: [],
+    })
+
+    render(
+      <MemoryRouter>
+        <AdminPackageTestsPage />
+      </MemoryRouter>,
+    )
+
+    // Wait for packages to load
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /^G1-56V-ECOMMERCE$/i })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: /\[Mini\] G1-56V-ECOMMERCE/i })).toBeInTheDocument()
+    })
+
+    // Verify Category Filter Tabs exist
+    expect(screen.getByRole('button', { name: /Standard \(49 câu\)/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Mini-test \(21 câu\)/i })).toBeInTheDocument()
+
+    // Filter by Mini-test only
+    const miniFilterBtn = screen.getByRole('button', { name: /Mini-test \(21 câu\)/i })
+    await user.click(miniFilterBtn)
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /\[Mini\] G1-56V-ECOMMERCE/i })).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: /^G1-56V-ECOMMERCE$/i })).not.toBeInTheDocument()
+    })
+
+    // Filter by Standard only
+    const standardFilterBtn = screen.getByRole('button', { name: /Standard \(49 câu\)/i })
+    await user.click(standardFilterBtn)
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /^G1-56V-ECOMMERCE$/i })).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: /\[Mini\] G1-56V-ECOMMERCE/i })).not.toBeInTheDocument()
+    })
+
+    // Verify "Tạo Mini" button is visible for the standard package
+    const createMiniBtn = await screen.findByTestId('create-mini-btn')
+    expect(createMiniBtn).toBeInTheDocument()
+
+    // Click "Tạo Mini" to open modal
+    await user.click(createMiniBtn)
+
+    await waitFor(() => {
+      expect(screen.getByText(/⚡ Zero-Waste Audio & Data Reuse/i)).toBeInTheDocument()
+      expect(screen.getByPlaceholderText(/mini-g1-56v/i)).toBeInTheDocument()
     })
   })
 })

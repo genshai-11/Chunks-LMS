@@ -149,7 +149,7 @@ const SUMMARY_TILE_LABEL_CLASS: Record<ResultColor, string> = {
 const RAIL_W_KEY = 'chunks-lms:live-test-rail-w'
 const RAIL_MIN = 168
 const RAIL_MAX = 460
-const RAIL_DEFAULT = 244
+const RAIL_DEFAULT = 342
 const RAIL_COLLAPSED = 48
 const AUDIO_AUTOPLAY_ITEMS_KEY = 'chunks-lms:live-test-autoplay-items'
 const AUDIO_AUTOPLAY_INTRO_KEY = 'chunks-lms:live-test-autoplay-intro'
@@ -292,7 +292,9 @@ function formatVolt(value: unknown): string {
 
 function readSavedRailWidth(): number {
   try {
-    const n = Number(window.localStorage.getItem(RAIL_W_KEY))
+    const raw = window.localStorage.getItem(RAIL_W_KEY)
+    if (!raw || raw === '244') return RAIL_DEFAULT
+    const n = Number(raw)
     if (Number.isFinite(n)) return Math.min(RAIL_MAX, Math.max(RAIL_MIN, n))
   } catch {
     /* ignore */
@@ -394,7 +396,7 @@ export function TeacherTestRunPage() {
   const [mapOpen, setMapOpen] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(min-width: 640px)').matches : true,
   )
-  const [railWidth, setRailWidth] = useState(RAIL_DEFAULT)
+  const [railWidth, setRailWidth] = useState(readSavedRailWidth)
   const [resizing, setResizing] = useState(false)
   const railWidthRef = useRef(railWidth)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -2060,23 +2062,11 @@ export function TeacherTestRunPage() {
       <main className="observe-stage observe-stage-tight live-test-stage">
         {!isSummaryShown ? (
           <>
-            <div className="observe-stage-hero live-test-stage-hero">
-              <div className="observe-phone-avatar"><UserAvatar name={learnerName} avatarUrl={learnerAvatarUrl} size="md" /></div>
-              <h1 className="observe-learner observe-learner-solo live-test-learner-title">
-                <span>{learnerName}</span>
-                <button
-                  type="button"
-                  className="live-test-title-audio"
-                  onClick={() => void playCurrentItemAudio(true)}
-                  title="Play current item audio"
-                  aria-label="Play current item audio"
-                >
-                  <Volume2 className="h-3.5 w-3.5" />
-                </button>
-              </h1>
-
-              {showKeys ? <p className="observe-depth-inline live-test-shortcuts">Shortcuts: 0 Red · 1 Orange · 2 Green · 3 Purple · H map · ? keys</p> : null}
-            </div>
+            {showKeys ? (
+              <p className="observe-depth-inline live-test-shortcuts text-center my-0.5">
+                Shortcuts: 0 Red · 1 Orange · 2 Green · 3 Purple · H map · ? keys
+              </p>
+            ) : null}
 
             {reaction ? (
               <div key={reaction.id} className={`observe-react observe-react-${reaction.kind}`} aria-hidden>

@@ -2083,12 +2083,12 @@
   }
 
   .observe-metric-tooltip {
-    @apply pointer-events-none absolute left-1/2 top-[calc(100%+0.5rem)] z-50 hidden w-[min(18rem,82vw)] -translate-x-1/2 rounded-xl border border-white/10 bg-slate-950/95 px-3 py-2 text-left font-sans text-[11px] font-semibold leading-snug tracking-normal text-slate-100 shadow-2xl shadow-black/50 backdrop-blur;
+    @apply pointer-events-none absolute left-0 top-[calc(100%+0.5rem)] z-50 hidden max-w-[min(18rem,calc(100vw-2rem))] rounded-xl border border-white/10 bg-slate-950/95 px-3 py-2 text-left font-sans text-[11px] font-semibold leading-snug tracking-normal text-slate-100 shadow-2xl shadow-black/50 backdrop-blur;
   }
 
   .observe-metric-tooltip::before {
     content: '';
-    @apply absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-l border-t border-white/10 bg-slate-950;
+    @apply absolute -top-1 left-4 h-2 w-2 rotate-45 border-l border-t border-white/10 bg-slate-950;
   }
 
   .observe-has-tooltip:hover .observe-metric-tooltip,

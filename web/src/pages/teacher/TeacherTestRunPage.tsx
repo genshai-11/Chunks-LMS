@@ -8,6 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import {
+  Activity,
   BarChart3,
   Check,
   CheckCircle2,
@@ -29,6 +30,7 @@ import {
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { UserAvatar } from '../../components/UserAvatar'
+import { ScreenTooltip } from '../../components/ScreenTooltip'
 import { EmptyState, Panel } from '../../components/ui'
 import { PROBE_ACTIONS } from '../../modules/assessment/probe-actions'
 import { probeChunksNumber } from '../../modules/assessment/probe-metrics'
@@ -1592,6 +1594,7 @@ export function TeacherTestRunPage() {
     return {
       ...spectrum.byColor,
       finalized,
+      warmSteps: spectrum.warmSteps,
       nTotal,
       rfc,
       rac,
@@ -1602,7 +1605,6 @@ export function TeacherTestRunPage() {
       avgPercentXTitle: `Avg %x = sum(%x) / N_total = ${sumPercentX.toFixed(1)}% / ${nTotal} = ${avgPercentX.toFixed(1)}% (Band: ${COLOR_LABEL[avgXColor]}).\n• Colors: Red (0%), Orange (17%), Yellow (34%), Green (50%), Blue (67%), Indigo (84%), Violet (100%).`,
       rfcTitle: `RFC = warm records / N_total = ${spectrum.warmSteps} / ${nTotal}. Warm = Red + Orange + Yellow.`,
       racTitle: `${racMetricLabel} = Avg %x = sum(%x) / N_total = ${sumPercentX.toFixed(1)}% / ${nTotal} = ${avgPercentX.toFixed(1)}%.`,
-      legacyRacTitle: `Legacy RAC = cool records / N_total = ${spectrum.coolSteps} / ${nTotal}. Cool = Green + Blue + Indigo + Purple. When N_total > 0, legacy RAC = 100 - RFC.`,
       totalTitle: `N_total = primary records + probe records = ${spectrum.primaryRecords} + ${spectrum.probeRecords} = ${nTotal}.`,
       cpdTitle: `Max CPD is the highest achieved CPD among finalized items. Achieved CPD = CVR x CCI x color factor.`,
       avgCpd,
@@ -1732,33 +1734,90 @@ export function TeacherTestRunPage() {
             <>
               <p className="observe-rail-name">{learnerName}</p>
               <div className="observe-meta-row live-test-rail-meta">
-                <span className="observe-learner-rfc observe-has-tooltip is-rfc justify-between min-w-[5.25rem]" tabIndex={0} aria-label={summaryMetrics.rfcTitle}>
-                  <span>RFC</span>
-                  <span className="font-mono font-bold text-right ml-1.5">{summaryMetrics.rfc}%</span>
-                  <span className="observe-metric-tooltip" role="tooltip">{summaryMetrics.rfcTitle} Lower RFC means less observed struggle.</span>
-                </span>
-                <span className="observe-learner-rfc observe-has-tooltip is-percent-c justify-between min-w-[5.25rem]" tabIndex={0} aria-label={summaryMetrics.racTitle}>
-                  <span>{racMetricLabel}</span>
-                  <span className="font-mono font-bold text-right ml-1.5">{summaryMetrics.rac}%</span>
-                  <span className="observe-metric-tooltip" role="tooltip">{summaryMetrics.racTitle}</span>
-                </span>
-                <span
-                  className={`observe-learner-rfc observe-has-tooltip is-avg-x is-${summaryMetrics.avgXColor}`}
-                  style={{
-                    borderColor: `${COLOR_HEX[summaryMetrics.avgXColor]}4d`,
-                    backgroundColor: `${COLOR_HEX[summaryMetrics.avgXColor]}1f`,
-                    color: COLOR_HEX[summaryMetrics.avgXColor],
-                  }}
-                  tabIndex={0}
-                  aria-label={summaryMetrics.legacyRacTitle}
+                <ScreenTooltip
+                  width={280}
+                  ariaLabel={summaryMetrics.rfcTitle}
+                  content={
+                    <>
+                      <span className="observe-tooltip-header">
+                        <span>Learner Struggle (RFC)</span>
+                        <span className="font-mono text-amber-300 font-bold">{summaryMetrics.rfc}%</span>
+                      </span>
+                      <span className="observe-tooltip-divider" />
+                      <span className="observe-tooltip-body">
+                        <span className="observe-tooltip-row">
+                          <span className="observe-tooltip-key">Warm steps / N_total:</span>
+                          <span className="observe-tooltip-val">{summaryMetrics.warmSteps} / {summaryMetrics.nTotal}</span>
+                        </span>
+                        <span className="observe-tooltip-note">
+                          {summaryMetrics.rfcTitle} Lower RFC means less observed struggle.
+                        </span>
+                      </span>
+                    </>
+                  }
                 >
-                  Legacy RAC {summaryMetrics.legacyRac}%
-                  <span className="observe-metric-tooltip" role="tooltip">{summaryMetrics.legacyRacTitle}</span>
-                </span>
-                <span className="observe-learner-rfc observe-has-tooltip is-cpd" tabIndex={0} aria-label={summaryMetrics.cpdTitle}>
-                  Max CPD {formatVolt(summaryMetrics.maxCpd)}
-                  <span className="observe-metric-tooltip" role="tooltip">{summaryMetrics.cpdTitle}</span>
-                </span>
+                  <span className="observe-learner-rfc is-rfc justify-between min-w-[5.25rem]">
+                    <span className="inline-flex items-center gap-1">
+                      <Activity className="h-3 w-3 shrink-0" aria-hidden />
+                      <span>RFC</span>
+                    </span>
+                    <span className="font-mono font-bold text-right ml-1.5">{summaryMetrics.rfc}%</span>
+                  </span>
+                </ScreenTooltip>
+                <ScreenTooltip
+                  width={280}
+                  ariaLabel={summaryMetrics.racTitle}
+                  content={
+                    <>
+                      <span className="observe-tooltip-header">
+                        <span>Learner Focus ({racMetricLabel})</span>
+                        <span className="font-mono text-emerald-300 font-bold">{summaryMetrics.rac}%</span>
+                      </span>
+                      <span className="observe-tooltip-divider" />
+                      <span className="observe-tooltip-body">
+                        <span className="observe-tooltip-row">
+                          <span className="observe-tooltip-key">Formula:</span>
+                          <span className="observe-tooltip-val">Avg %x over N_total</span>
+                        </span>
+                        <span className="observe-tooltip-note">
+                          {summaryMetrics.racTitle}
+                        </span>
+                      </span>
+                    </>
+                  }
+                >
+                  <span className="observe-learner-rfc is-percent-c justify-between min-w-[5.25rem]">
+                    <span>{racMetricLabel}</span>
+                    <span className="font-mono font-bold text-right ml-1.5">{summaryMetrics.rac}%</span>
+                  </span>
+                </ScreenTooltip>
+                <ScreenTooltip
+                  width={280}
+                  ariaLabel={summaryMetrics.cpdTitle}
+                  content={
+                    <>
+                      <span className="observe-tooltip-header">
+                        <span>Peak Observed CPD</span>
+                        <span className="font-mono text-cyan-300 font-bold">{formatVolt(summaryMetrics.maxCpd)}</span>
+                      </span>
+                      <span className="observe-tooltip-divider" />
+                      <span className="observe-tooltip-body">
+                        <span className="observe-tooltip-row">
+                          <span className="observe-tooltip-key">Calculation:</span>
+                          <span className="observe-tooltip-val">CVR × CCI × factor</span>
+                        </span>
+                        <span className="observe-tooltip-note">
+                          {summaryMetrics.cpdTitle}
+                        </span>
+                      </span>
+                    </>
+                  }
+                >
+                  <span className="observe-learner-rfc is-cpd justify-between min-w-[5.25rem]">
+                    <span>Max CPD</span>
+                    <span className="font-mono font-bold text-right ml-1.5">{formatVolt(summaryMetrics.maxCpd)}</span>
+                  </span>
+                </ScreenTooltip>
               </div>
               <p className="observe-rail-n">{completedCount}/{items.length} scored</p>
             </>
@@ -2090,26 +2149,6 @@ export function TeacherTestRunPage() {
                   <span className="live-test-wave" aria-hidden><i /><i /><i /><i /></span>
                   <span>{audioState === 'error' ? 'Retry' : audioState === 'playing' ? 'Playing' : 'Play'}</span>
                 </button>
-                <div className="inline-flex items-center rounded-lg bg-slate-800/80 p-0.5 text-xs font-medium border border-slate-700/60" role="group" aria-label="Audio playback speed">
-                  {[0.75, 1, 1.25].map((rate) => (
-                    <button
-                      key={rate}
-                      type="button"
-                      className={`px-2 py-0.5 rounded text-xs transition-colors ${audioRate === rate ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
-                      onClick={() => {
-                        setAudioRate(rate)
-                        try {
-                          window.localStorage.setItem(AUDIO_RATE_KEY, String(rate))
-                        } catch {
-                          /* ignore */
-                        }
-                      }}
-                      title={`Tốc độ đọc ${rate}x`}
-                    >
-                      {rate}x
-                    </button>
-                  ))}
-                </div>
                 <button type="button" className="ghost" disabled={selectedIndex === items.length - 1} onClick={() => setSelectedIndex((prev) => Math.min(items.length - 1, prev + 1))}>
                   Next <ChevronRight className="h-4 w-4" />
                 </button>
@@ -2147,13 +2186,9 @@ export function TeacherTestRunPage() {
                 ))}
               </div>
 
-              <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-900 p-4 text-xs font-mono text-white shadow-inner sm:grid-cols-3 lg:grid-cols-6">
+              <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-900 p-4 text-xs font-mono text-white shadow-inner sm:grid-cols-3 lg:grid-cols-5">
                 <div title={summaryMetrics.rfcTitle}><span className="text-slate-400">RFC </span><strong className="text-red-400">{summaryMetrics.rfc}%</strong></div>
                 <div title={summaryMetrics.racTitle}><span className="text-slate-400">{racMetricLabel} </span><strong className="text-emerald-400">{summaryMetrics.rac}%</strong></div>
-                <div title={summaryMetrics.legacyRacTitle}>
-                  <span className="text-slate-400">Legacy RAC </span>
-                  <strong style={{ color: COLOR_HEX[summaryMetrics.avgXColor] }}>{summaryMetrics.legacyRac}%</strong>
-                </div>
                 <div><span className="text-slate-400">CPD min </span><strong className="text-blue-300">{formatVolt(summaryMetrics.minCpd)}</strong></div>
                 <div><span className="text-slate-400">CPD max </span><strong className="text-blue-300">{formatVolt(summaryMetrics.maxCpd)}</strong></div>
                 <div><span className="text-slate-400">CPD avg </span><strong className="text-blue-300">{formatVolt(summaryMetrics.avgCpd)}</strong></div>

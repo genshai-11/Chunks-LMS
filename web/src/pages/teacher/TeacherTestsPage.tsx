@@ -361,60 +361,73 @@ export function TeacherTestsPage() {
         description="Select exactly one active Learner and a published canonical package."
         collapsible={false}
       >
-        <div className="form-grid">
-          <label>
-            Learner
-            <select value={learnerId} onChange={(event) => setLearnerId(event.target.value)}>
-              <option value="">Select Learner</option>
-              {learners.map((learner) => (
-                <option key={learner.id} value={learner.id}>
-                  {learner.displayName}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-bold text-slate-700">Package</span>
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/60">
-                <button
-                  type="button"
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                    packageKindFilter === 'all'
-                      ? 'bg-white text-slate-900 shadow-2xs border border-slate-200/50'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                  onClick={() => setPackageKindFilter('all')}
-                >
-                  Tất cả
-                </button>
-                <button
-                  type="button"
-                  className={`px-3 py-1 rounded-lg text-xs transition-all cursor-pointer ${
-                    packageKindFilter === 'standard'
-                      ? 'bg-indigo-600 text-white shadow-2xs font-semibold'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-                  }`}
-                  onClick={() => setPackageKindFilter('standard')}
-                >
-                  📦 Standard (49 câu)
-                </button>
-                <button
-                  type="button"
-                  className={`px-3 py-1 rounded-lg text-xs transition-all cursor-pointer ${
-                    packageKindFilter === 'mini'
-                      ? 'bg-amber-600 text-white shadow-2xs font-semibold'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-                  }`}
-                  onClick={() => setPackageKindFilter('mini')}
-                >
-                  ⚡ Mini-test (21 câu)
-                </button>
-              </div>
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
+            <span className="text-xs font-bold text-slate-700">Loại bài test:</span>
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/60">
+              <button
+                type="button"
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  packageKindFilter === 'all'
+                    ? 'bg-white text-slate-900 shadow-2xs border border-slate-200/50'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                onClick={() => setPackageKindFilter('all')}
+              >
+                Tất cả
+              </button>
+              <button
+                type="button"
+                className={`px-3 py-1 rounded-lg text-xs transition-all cursor-pointer ${
+                  packageKindFilter === 'standard'
+                    ? 'bg-indigo-600 text-white shadow-2xs font-semibold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                }`}
+                onClick={() => setPackageKindFilter('standard')}
+              >
+                Standard (49 câu)
+              </button>
+              <button
+                type="button"
+                className={`px-3 py-1 rounded-lg text-xs transition-all cursor-pointer ${
+                  packageKindFilter === 'mini'
+                    ? 'bg-amber-600 text-white shadow-2xs font-semibold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                }`}
+                onClick={() => setPackageKindFilter('mini')}
+              >
+                ⚡ Mini-test (21 câu)
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="learner-select" className="text-xs font-bold text-slate-700">
+                Learner
+              </label>
+              <select
+                id="learner-select"
+                aria-label="Learner"
+                value={learnerId}
+                onChange={(event) => setLearnerId(event.target.value)}
+                className="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-900 font-bold text-xs shadow-2xs hover:border-slate-400 focus:outline-hidden focus:ring-2 focus:ring-slate-900/10 transition-all cursor-pointer"
+              >
+                <option value="">Select Learner</option>
+                {learners.map((learner) => (
+                  <option key={learner.id} value={learner.id} className="py-1 font-semibold text-slate-800">
+                    {learner.displayName}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <div className="relative">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="package-select" className="text-xs font-bold text-slate-700">
+                Package
+              </label>
               <select
+                id="package-select"
                 aria-label="Package"
                 value={versionId}
                 onChange={(event) => setVersionId(event.target.value)}
@@ -423,41 +436,41 @@ export function TeacherTestsPage() {
                 <option value="">Select published package</option>
                 {selectableVersions.map((v) => (
                   <option key={v.id} value={v.id} className="py-1 font-semibold text-slate-800">
-                    {v.kind === 'mini' ? '⚡ ' : '📦 '} {v.label} ({v.kind === 'mini' ? 'Mini · 21 câu' : 'Standard · 49 câu'})
+                    {v.testType === 'green' ? '🟢 ' : '🔴 '} {v.label} ({v.kind === 'mini' ? 'Mini · 21 câu' : 'Standard · 49 câu'})
                   </option>
                 ))}
               </select>
-            </div>
 
-            {(() => {
-              const sel = versions.find((v) => v.id === versionId)
-              if (!sel) return null
-              return (
-                <div className="flex flex-wrap items-center gap-2 pt-1.5 text-xs">
-                  <span
-                    className={`px-2 py-0.5 rounded-md font-bold uppercase text-[10px] tracking-wider shrink-0 ${
-                      sel.testType === 'green'
-                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                        : 'bg-rose-100 text-rose-800 border border-rose-200'
-                    }`}
-                  >
-                    {sel.testType} test
-                  </span>
-                  <span className="font-mono font-bold text-slate-900">
-                    {sel.label}
-                  </span>
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded-md font-semibold shrink-0 ${
-                      sel.kind === 'mini'
-                        ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                        : 'bg-slate-100 text-slate-700 border border-slate-200'
-                    }`}
-                  >
-                    {sel.kind === 'mini' ? '⚡ Mini · 21 câu hỏi (7 session x 3 câu)' : '📦 Standard · 49 câu hỏi (7 session x 7 câu)'}
-                  </span>
-                </div>
-              )
-            })()}
+              {(() => {
+                const sel = versions.find((v) => v.id === versionId)
+                if (!sel) return null
+                return (
+                  <div className="flex flex-wrap items-center gap-2 pt-1.5 text-xs">
+                    <span
+                      className={`px-2 py-0.5 rounded-md font-bold uppercase text-[10px] tracking-wider shrink-0 ${
+                        sel.testType === 'green'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          : 'bg-rose-100 text-rose-800 border border-rose-200'
+                      }`}
+                    >
+                      {sel.testType} test
+                    </span>
+                    <span className="font-mono font-bold text-slate-900">
+                      {sel.label}
+                    </span>
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-md font-semibold shrink-0 ${
+                        sel.kind === 'mini'
+                          ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                          : 'bg-slate-100 text-slate-700 border border-slate-200'
+                      }`}
+                    >
+                      {sel.kind === 'mini' ? '⚡ Mini · 21 câu hỏi (7 session x 3 câu)' : 'Standard · 49 câu hỏi (7 session x 7 câu)'}
+                    </span>
+                  </div>
+                )
+              })()}
+            </div>
           </div>
         </div>
         {message ? <p className="meta text-slate-600">{message}</p> : null}

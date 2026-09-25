@@ -1,16 +1,22 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   BarChart3,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ClipboardCheck,
   ExternalLink,
   Play,
   RotateCcw,
+  Search,
   Trash2,
   UserRound,
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { PageHeader } from '../../components/PageHeader'
 import { EmptyState, Panel } from '../../components/ui'
+import { UserAvatar } from '../../components/UserAvatar'
 import { listActiveLearners } from '../../modules/roster/service'
 import { useAppState } from '../../state/useAppState'
 import {
@@ -59,6 +65,10 @@ export function TeacherTestsPage() {
   const navigate = useNavigate()
   const learners = listActiveLearners(roster)
   const [learnerId, setLearnerId] = useState('')
+  const [isLearnerMenuOpen, setIsLearnerMenuOpen] = useState(false)
+  const [learnerSearch, setLearnerSearch] = useState('')
+  const learnerDropdownRef = useRef<HTMLDivElement>(null)
+
   const [versionId, setVersionId] = useState('')
   const [packageKindFilter, setPackageKindFilter] = useState<'all' | 'standard' | 'mini'>('all')
   const [versions, setVersions] = useState<SelectablePackageVersion[]>([])
@@ -70,6 +80,9 @@ export function TeacherTestsPage() {
   const [assignmentLearnerSearch, setAssignmentLearnerSearch] = useState('')
   const [assignmentPackageFilter, setAssignmentPackageFilter] = useState('all')
   const [assignmentProgress, setAssignmentProgress] = useState<Record<string, StandaloneAssignmentProgress>>({})
+
+  const [pageSize, setPageSize] = useState<number>(10)
+  const [currentPage, setCurrentPage] = useState<number>(1)
 
   const loadAssignments = useCallback(async () => {
     const result = await listStandaloneAssignments()
@@ -179,6 +192,39 @@ export function TeacherTestsPage() {
       cancelled = true
     }
   }, [assignments])
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (learnerDropdownRef.current && !learnerDropdownRef.current.contains(event.target as Node)) {
+        setIsLearnerMenuOpen(false)
+      }
+    }
+    if (isLearnerMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isLearnerMenuOpen])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [assignmentLearnerSearch, assignmentPackageFilter, assignmentStatusFilter, pageSize])
+
+  const selectedLearner = useMemo(
+    () => learners.find((l) => l.id === learnerId),
+    [learners, learnerId],
+  )
+
+  const filteredLearners = useMemo(() => {
+    const term = learnerSearch.trim().toLowerCase()
+    if (!term) return learners
+    return learners.filter(
+      (l) =>
+        l.displayName.toLowerCase().includes(term) ||
+        (l.email && l.email.toLowerCase().includes(term)),
+    )
+  }, [learners, learnerSearch])
 
   const filteredAssignments = assignments.filter((assignment) => {
     if (assignmentStatusFilter !== 'all' && assignment.status !== assignmentStatusFilter) return false
@@ -305,9 +351,19 @@ export function TeacherTestsPage() {
     await loadAssignments()
   }
 
-  const visibleAssignmentIds = filteredAssignments.map((assignment) => assignment.id)
-  const visibleSelectedCount = visibleAssignmentIds.filter((id) => selectedAssignmentIds.has(id)).length
-  const allSelected = visibleAssignmentIds.length > 0 && visibleSelectedCount === visibleAssignmentIds.length
+  const totalAssignments = filteredAssignments.length
+  const totalPages = Math.max(1, Math.ceil(totalAssignments / pageSize))
+  const safePage = Math.min(currentPage, totalPages)
+  const startIndex = (safePage - 1) * pageSize
+  const endIndex = Math.min(startIndex + pageSize, totalAssignments)
+  const paginatedAssignments = filteredAssignments.slice(startIndex, endIndex)
+
+  const pageAssignmentIds = paginatedAssignments.map((assignment) => assignment.id)
+  const allPageSelected = pageAssignmentIds.length > 0 && pageAssignmentIds.every((id) => selectedAssignmentIds.has(id))
+  const allFilteredSelected = filteredAssignments.length > 0 && filteredAssignments.every((a) => selectedAssignmentIds.has(a.id))
+  const selectedCount = Array.from(selectedAssignmentIds).filter((id) =>
+    assignments.some((a) => a.id === id)
+  ).length
   const statusBadgeClass = (status: string) => {
     if (status === 'completed') return 'badge completed'
     if (status === 'active') return 'badge success'
@@ -406,20 +462,112 @@ export function TeacherTestsPage() {
               <label htmlFor="learner-select" className="text-xs font-bold text-slate-700">
                 Learner
               </label>
-              <select
-                id="learner-select"
-                aria-label="Learner"
-                value={learnerId}
-                onChange={(event) => setLearnerId(event.target.value)}
-                className="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-900 font-bold text-xs shadow-2xs hover:border-slate-400 focus:outline-hidden focus:ring-2 focus:ring-slate-900/10 transition-all cursor-pointer"
-              >
-                <option value="">Select Learner</option>
-                {learners.map((learner) => (
-                  <option key={learner.id} value={learner.id} className="py-1 font-semibold text-slate-800">
-                    {learner.displayName}
-                  </option>
-                ))}
-              </select>
+              <div ref={learnerDropdownRef} className="relative">
+                <select
+                  id="learner-select"
+                  aria-label="Learner"
+                  value={learnerId}
+                  onChange={(event) => setLearnerId(event.target.value)}
+                  className="sr-only"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                >
+                  <option value="">Select Learner</option>
+                  {learners.map((learner) => (
+                    <option key={learner.id} value={learner.id}>
+                      {learner.displayName}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  type="button"
+                  onClick={() => setIsLearnerMenuOpen((prev) => !prev)}
+                  aria-haspopup="listbox"
+                  aria-expanded={isLearnerMenuOpen}
+                  className="w-full min-h-[44px] px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-slate-900 font-bold text-xs shadow-2xs hover:border-slate-400 focus:outline-hidden focus:ring-2 focus:ring-slate-900/10 transition-all flex items-center justify-between cursor-pointer"
+                >
+                  {selectedLearner ? (
+                    <span className="flex items-center gap-2 truncate">
+                      <UserAvatar name={selectedLearner.displayName} avatarUrl={selectedLearner.avatarUrl} size="sm" />
+                      <span className="truncate">{selectedLearner.displayName}</span>
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2 text-slate-400 font-normal">
+                      <UserRound className="h-4 w-4" /> Chọn học viên...
+                    </span>
+                  )}
+                  <ChevronDown className={`h-4 w-4 text-slate-400 shrink-0 transition-transform ${isLearnerMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isLearnerMenuOpen && (
+                  <div className="absolute z-30 left-0 right-0 top-full mt-1.5 bg-white rounded-xl shadow-xl border border-slate-200/90 p-2 overflow-hidden">
+                    <div className="relative mb-1.5">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                      <input
+                        type="text"
+                        className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-slate-900/10 focus:bg-white text-slate-900 font-medium placeholder:text-slate-400"
+                        placeholder="Tìm học viên theo tên..."
+                        value={learnerSearch}
+                        onChange={(e) => setLearnerSearch(e.target.value)}
+                        autoFocus
+                      />
+                    </div>
+                    <div className="max-h-60 overflow-y-auto space-y-0.5">
+                      <button
+                        type="button"
+                        className={`w-full px-2.5 py-1.5 rounded-lg text-left text-xs font-medium flex items-center justify-between transition-colors cursor-pointer ${
+                          !learnerId
+                            ? 'bg-slate-100 text-slate-900 font-bold'
+                            : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                        }`}
+                        onClick={() => {
+                          setLearnerId('')
+                          setIsLearnerMenuOpen(false)
+                          setLearnerSearch('')
+                        }}
+                      >
+                        <span className="flex items-center gap-2">
+                          <UserRound className="h-4 w-4 text-slate-400" />
+                          <span>Select Learner</span>
+                        </span>
+                        {!learnerId && <Check className="h-3.5 w-3.5 text-indigo-600" />}
+                      </button>
+                      {filteredLearners.length === 0 ? (
+                        <div className="px-3 py-3 text-center text-xs text-slate-400 font-normal">
+                          Không tìm thấy học viên
+                        </div>
+                      ) : (
+                        filteredLearners.map((learner) => {
+                          const isSelected = learner.id === learnerId
+                          return (
+                            <button
+                              key={learner.id}
+                              type="button"
+                              className={`w-full px-2.5 py-1.5 rounded-lg text-left text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                                isSelected
+                                  ? 'bg-indigo-50/80 text-indigo-950 font-bold'
+                                  : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900 font-medium'
+                              }`}
+                              onClick={() => {
+                                setLearnerId(learner.id)
+                                setIsLearnerMenuOpen(false)
+                                setLearnerSearch('')
+                              }}
+                            >
+                              <span className="flex items-center gap-2 truncate">
+                                <UserAvatar name={learner.displayName} avatarUrl={learner.avatarUrl} size="sm" />
+                                <span className="truncate">{learner.displayName}</span>
+                              </span>
+                              {isSelected && <Check className="h-3.5 w-3.5 text-indigo-600 shrink-0" />}
+                            </button>
+                          )
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -489,26 +637,22 @@ export function TeacherTestsPage() {
               type="button"
               className="ghost"
               onClick={() => {
-                if (allSelected) {
-                  setSelectedAssignmentIds((current) => {
-                    const next = new Set(current)
-                    for (const id of visibleAssignmentIds) next.delete(id)
-                    return next
-                  })
+                if (allFilteredSelected) {
+                  setSelectedAssignmentIds(new Set())
                 } else {
-                  setSelectedAssignmentIds((current) => new Set([...current, ...visibleAssignmentIds]))
+                  setSelectedAssignmentIds(new Set(filteredAssignments.map((a) => a.id)))
                 }
               }}
             >
-              {allSelected ? 'Clear' : 'Select all'}
+              {allFilteredSelected ? 'Clear' : 'Select all'}
             </button>
             <button
               type="button"
               className="ghost danger"
               onClick={() => void removeSelectedAssignments()}
-              disabled={visibleSelectedCount === 0 || busyAssignmentId !== null}
+              disabled={selectedCount === 0 || busyAssignmentId !== null}
             >
-              <Trash2 className="h-4 w-4" /> Delete selected {visibleSelectedCount ? `(${visibleSelectedCount})` : ''}
+              <Trash2 className="h-4 w-4" /> Delete selected {selectedCount ? `(${selectedCount})` : ''}
             </button>
           </div>
         ) : null}
@@ -563,26 +707,27 @@ export function TeacherTestsPage() {
             {filteredAssignments.length === 0 ? (
               <EmptyState icon={ClipboardCheck} title="No assignments match filters" description="Clear search or switch filters." />
             ) : (
-              <div className="table-wrap">
+              <>
+                <div className="table-wrap">
                 <table>
               <thead>
                 <tr>
                   <th className="w-10">
                     <input
                       type="checkbox"
-                      checked={allSelected}
+                      checked={allPageSelected}
                       onChange={() => {
-                        if (allSelected) {
-                          setSelectedAssignmentIds((current) => {
-                            const next = new Set(current)
-                            for (const id of visibleAssignmentIds) next.delete(id)
-                            return next
-                          })
-                        } else {
-                          setSelectedAssignmentIds((current) => new Set([...current, ...visibleAssignmentIds]))
-                        }
+                        setSelectedAssignmentIds((current) => {
+                          const next = new Set(current)
+                          if (allPageSelected) {
+                            for (const id of pageAssignmentIds) next.delete(id)
+                          } else {
+                            for (const id of pageAssignmentIds) next.add(id)
+                          }
+                          return next
+                        })
                       }}
-                      aria-label={allSelected ? 'Clear selected assignments' : 'Select all assignments'}
+                      aria-label={allPageSelected ? 'Clear selected assignments on this page' : 'Select all assignments on this page'}
                     />
                   </th>
                   <th>Learner</th>
@@ -592,7 +737,7 @@ export function TeacherTestsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredAssignments.map((assignment) => (
+                {paginatedAssignments.map((assignment) => (
                   <tr key={assignment.id} className={selectedAssignmentIds.has(assignment.id) ? 'is-selected' : ''}>
                     <td>
                       <input
@@ -663,6 +808,51 @@ export function TeacherTestsPage() {
               </tbody>
             </table>
               </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-slate-50/80 border border-slate-200/90 rounded-xl text-xs text-slate-600">
+                <div className="font-medium text-slate-600">
+                  Hiển thị <strong className="text-slate-900">{totalAssignments === 0 ? 0 : startIndex + 1}–{endIndex}</strong> trên <strong className="text-slate-900">{totalAssignments}</strong> bài test
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500 font-medium">Hiển thị</span>
+                  <select
+                    aria-label="Số bài test mỗi trang"
+                    value={pageSize}
+                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    className="px-2.5 py-1 rounded-lg border border-slate-300 bg-white text-slate-800 font-bold text-xs shadow-2xs hover:border-slate-400 focus:outline-hidden focus:ring-2 focus:ring-slate-900/10 cursor-pointer"
+                  >
+                    <option value={10}>10 bài / trang</option>
+                    <option value={25}>25 bài / trang</option>
+                    <option value={50}>50 bài / trang</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={safePage <= 1}
+                    aria-label="Trang trước"
+                    className="p-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span className="px-2 font-bold text-slate-800">
+                    Trang {safePage} / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={safePage >= totalPages}
+                    aria-label="Trang sau"
+                    className="p-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </>
             )}
           </>
         )}

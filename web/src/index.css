@@ -5883,12 +5883,26 @@
   .tests-page .panel {
     @apply border-slate-200 bg-white shadow-sm;
   }
-  .tests-page .panel-header,
-  .tests-page .panel-body-inner {
-    @apply bg-white text-slate-900;
+  .tests-page .panel-header {
+    @apply bg-white text-slate-900 px-5 py-3.5 min-h-[52px];
+  }
+  .tests-page .panel-header-main {
+    @apply px-0 gap-3;
+  }
+  .tests-page .panel-toggle {
+    @apply px-0;
+  }
+  .tests-page .panel-icon {
+    @apply h-8 w-8 rounded-xl;
+  }
+  .tests-page .panel-title {
+    @apply text-sm font-bold text-slate-900;
+  }
+  .tests-page .panel-desc {
+    @apply text-xs text-slate-500 mt-0.5;
   }
   .tests-page .panel-body-inner {
-    @apply space-y-4 px-5 pb-5 pt-4 text-sm font-medium leading-relaxed text-slate-800;
+    @apply bg-white text-slate-800 space-y-5 px-6 pb-6 pt-5 text-sm font-medium leading-relaxed;
   }
   .tests-page .panel-body-inner table,
   .tests-page .panel-body-inner tbody,
@@ -5897,10 +5911,6 @@
   .tests-page .panel-body-inner th {
     @apply text-slate-800;
   }
-  .tests-page .panel-title {
-    @apply text-slate-900 font-bold;
-  }
-  .tests-page .panel-desc,
   .tests-page .meta,
   .tests-page .text-slate-600,
   .tests-page .text-slate-700,

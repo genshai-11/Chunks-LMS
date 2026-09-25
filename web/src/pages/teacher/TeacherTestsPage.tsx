@@ -21,7 +21,6 @@ import { listActiveLearners } from '../../modules/roster/service'
 import { useAppState } from '../../state/useAppState'
 import {
   detectPackageKind,
-  listTestItems,
   listTestPackages,
   listTestPackageVersions,
   listTestSections,
@@ -30,7 +29,7 @@ import {
 import {
   createStandaloneAssignment,
   deleteStandaloneAssignment,
-  getStandaloneAssignmentProgress,
+  getBatchStandaloneAssignmentProgress,
   listStandaloneAssignments,
   listStandaloneRuns,
   type StandaloneAssignmentProgress,
@@ -47,17 +46,6 @@ export interface SelectablePackageVersion {
   kind: PackageKind
   testType: 'green' | 'red'
   questionCount: number
-}
-
-async function packageQuestionCount(packageVersionId: string): Promise<number> {
-  const sections = await listTestSections(packageVersionId)
-  if (!sections.ok) return 0
-  let total = 0
-  for (const section of sections.data) {
-    const items = await listTestItems(section.id)
-    if (items.ok) total += items.data.length
-  }
-  return total
 }
 
 export function TeacherTestsPage() {
@@ -158,40 +146,7 @@ export function TeacherTestsPage() {
     })
   }, [assignments])
 
-  useEffect(() => {
-    let cancelled = false
-    const activeAssignments = assignments.filter((assignment) => assignment.status === 'active')
-    if (activeAssignments.length === 0) {
-      setAssignmentProgress({})
-      return
-    }
 
-    void (async () => {
-      const packageTotals = new Map<string, number>()
-      const next: Record<string, StandaloneAssignmentProgress> = {}
-      for (const assignment of activeAssignments) {
-        let totalQuestions = packageTotals.get(assignment.packageVersionId)
-        if (totalQuestions == null) {
-          totalQuestions = await packageQuestionCount(assignment.packageVersionId)
-          packageTotals.set(assignment.packageVersionId, totalQuestions)
-        }
-        const progress = await getStandaloneAssignmentProgress(assignment.id)
-        next[assignment.id] = {
-          assignmentId: assignment.id,
-          completedQuestions: progress.ok ? progress.data.completedQuestions : 0,
-          totalQuestions: Math.max(progress.ok ? progress.data.totalQuestions : 0, totalQuestions),
-        }
-        if (!cancelled) {
-          setAssignmentProgress((current) => ({ ...current, [assignment.id]: next[assignment.id]! }))
-        }
-      }
-      if (!cancelled) setAssignmentProgress(next)
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [assignments])
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -226,27 +181,29 @@ export function TeacherTestsPage() {
     )
   }, [learners, learnerSearch])
 
-  const filteredAssignments = assignments.filter((assignment) => {
-    if (assignmentStatusFilter !== 'all' && assignment.status !== assignmentStatusFilter) return false
-    if (assignmentPackageFilter === 'standard') {
-      const v = versions.find((ver) => ver.id === assignment.packageVersionId)
-      if (v?.kind !== 'standard') return false
-    } else if (assignmentPackageFilter === 'mini') {
-      const v = versions.find((ver) => ver.id === assignment.packageVersionId)
-      if (v?.kind !== 'mini') return false
-    } else if (assignmentPackageFilter !== 'all' && assignment.packageVersionId !== assignmentPackageFilter) {
-      return false
-    }
-    const q = assignmentLearnerSearch.trim().toLowerCase()
-    if (!q) return true
-    const learnerName = learners.find((learner) => learner.id === assignment.learnerUserId)?.displayName ?? ''
-    const learnerEmail = learners.find((learner) => learner.id === assignment.learnerUserId)?.email ?? ''
-    return (
-      learnerName.toLowerCase().includes(q) ||
-      learnerEmail.toLowerCase().includes(q) ||
-      assignment.learnerUserId.toLowerCase().includes(q)
-    )
-  })
+  const filteredAssignments = useMemo(() => {
+    return assignments.filter((assignment) => {
+      if (assignmentStatusFilter !== 'all' && assignment.status !== assignmentStatusFilter) return false
+      if (assignmentPackageFilter === 'standard') {
+        const v = versions.find((ver) => ver.id === assignment.packageVersionId)
+        if (v?.kind !== 'standard') return false
+      } else if (assignmentPackageFilter === 'mini') {
+        const v = versions.find((ver) => ver.id === assignment.packageVersionId)
+        if (v?.kind !== 'mini') return false
+      } else if (assignmentPackageFilter !== 'all' && assignment.packageVersionId !== assignmentPackageFilter) {
+        return false
+      }
+      const q = assignmentLearnerSearch.trim().toLowerCase()
+      if (!q) return true
+      const learnerName = learners.find((learner) => learner.id === assignment.learnerUserId)?.displayName ?? ''
+      const learnerEmail = learners.find((learner) => learner.id === assignment.learnerUserId)?.email ?? ''
+      return (
+        learnerName.toLowerCase().includes(q) ||
+        learnerEmail.toLowerCase().includes(q) ||
+        assignment.learnerUserId.toLowerCase().includes(q)
+      )
+    })
+  }, [assignments, assignmentStatusFilter, assignmentPackageFilter, versions, assignmentLearnerSearch, learners])
 
   async function start() {
     if (!learnerId || !versionId) {
@@ -356,7 +313,48 @@ export function TeacherTestsPage() {
   const safePage = Math.min(currentPage, totalPages)
   const startIndex = (safePage - 1) * pageSize
   const endIndex = Math.min(startIndex + pageSize, totalAssignments)
-  const paginatedAssignments = filteredAssignments.slice(startIndex, endIndex)
+  const paginatedAssignments = useMemo(
+    () => filteredAssignments.slice(startIndex, endIndex),
+    [filteredAssignments, startIndex, endIndex],
+  )
+
+  useEffect(() => {
+    let cancelled = false
+    const activePageAssignments = paginatedAssignments.filter((a) => a.status === 'active')
+    const missingAssignments = activePageAssignments.filter((a) => !assignmentProgress[a.id])
+
+    if (missingAssignments.length === 0) return
+
+    void (async () => {
+      const missingIds = missingAssignments.map((a) => a.id)
+      const res = await getBatchStandaloneAssignmentProgress(missingIds)
+      if (cancelled || !res.ok) return
+
+      const updates: Record<string, StandaloneAssignmentProgress> = {}
+      for (const assignment of missingAssignments) {
+        const prog = res.data[assignment.id]
+        const version = versions.find((v) => v.id === assignment.packageVersionId)
+        const baseline = version?.questionCount ?? (version?.kind === 'mini' ? 21 : 49)
+        const completedQuestions = prog?.completedQuestions ?? 0
+        const totalQuestions =
+          prog && prog.totalQuestions > 0 ? Math.max(prog.totalQuestions, baseline) : baseline
+
+        updates[assignment.id] = {
+          assignmentId: assignment.id,
+          completedQuestions,
+          totalQuestions,
+        }
+      }
+
+      if (!cancelled) {
+        setAssignmentProgress((prev) => ({ ...prev, ...updates }))
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [paginatedAssignments, assignmentProgress, versions])
 
   const pageAssignmentIds = paginatedAssignments.map((assignment) => assignment.id)
   const allPageSelected = pageAssignmentIds.length > 0 && pageAssignmentIds.every((id) => selectedAssignmentIds.has(id))

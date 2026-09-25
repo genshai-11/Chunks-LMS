@@ -384,21 +384,90 @@ export async function getStandaloneAssignmentAnalysis(assignmentId: string): Pro
   }
 }
 
+export async function getBatchStandaloneAssignmentProgress(
+  assignmentIds: string[],
+): Promise<Result<Record<string, StandaloneAssignmentProgress>>> {
+  if (assignmentIds.length === 0) return { ok: true, data: {} }
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+
+  // 1. Fetch runs for all requested assignments in 1 query
+  const { data: runs, error: runsErr } = await sb
+    .from('standalone_test_runs')
+    .select('id, assignment_id')
+    .in('assignment_id', assignmentIds)
+
+  if (runsErr) return { ok: false, error: runsErr.message }
+  if (!runs || runs.length === 0) {
+    const emptyResult: Record<string, StandaloneAssignmentProgress> = {}
+    for (const id of assignmentIds) {
+      emptyResult[id] = { assignmentId: id, completedQuestions: 0, totalQuestions: 0 }
+    }
+    return { ok: true, data: emptyResult }
+  }
+
+  const runToAssignment = new Map<string, string>()
+  const runIds: string[] = []
+  for (const r of runs) {
+    runToAssignment.set(r.id, r.assignment_id)
+    runIds.push(r.id)
+  }
+
+  // 2. Fetch run items count in 1 lightweight query (only id, run_id - NO heavy prompt joins)
+  const { data: runItems, error: itemsErr } = await sb
+    .from('standalone_test_run_items')
+    .select('id, run_id')
+    .in('run_id', runIds)
+
+  if (itemsErr) return { ok: false, error: itemsErr.message }
+
+  // 3. Fetch completed attempts in 1 query (only run_id and snapshot status)
+  const { data: attempts, error: attemptsErr } = await sb
+    .from('standalone_test_attempts')
+    .select('run_id, standalone_test_attempt_snapshots(status)')
+    .in('run_id', runIds)
+
+  if (attemptsErr) return { ok: false, error: attemptsErr.message }
+
+  const totals = new Map<string, number>()
+  const completed = new Map<string, number>()
+  for (const id of assignmentIds) {
+    totals.set(id, 0)
+    completed.set(id, 0)
+  }
+
+  for (const item of runItems ?? []) {
+    const aId = runToAssignment.get(item.run_id)
+    if (aId) totals.set(aId, (totals.get(aId) ?? 0) + 1)
+  }
+
+  for (const att of attempts ?? []) {
+    const snapshot = (att as any)?.standalone_test_attempt_snapshots
+    const status = Array.isArray(snapshot) ? snapshot[0]?.status : snapshot?.status
+    if (['finalized', 'corrected'].includes(status)) {
+      const aId = runToAssignment.get(att.run_id)
+      if (aId) completed.set(aId, (completed.get(aId) ?? 0) + 1)
+    }
+  }
+
+  const result: Record<string, StandaloneAssignmentProgress> = {}
+  for (const id of assignmentIds) {
+    result[id] = {
+      assignmentId: id,
+      completedQuestions: completed.get(id) ?? 0,
+      totalQuestions: totals.get(id) ?? 0,
+    }
+  }
+  return { ok: true, data: result }
+}
+
 export async function getStandaloneAssignmentProgress(
   assignmentId: string,
 ): Promise<Result<StandaloneAssignmentProgress>> {
-  const runs = await listStandaloneRuns(assignmentId)
-  if (!runs.ok) return runs
-  let completedQuestions = 0
-  let totalQuestions = 0
-  for (const runRow of runs.data) {
-    const items = await listStandaloneRunItems(runRow.id)
-    if (!items.ok) return items
-    totalQuestions += items.data.length
-    completedQuestions += items.data.filter((item) => {
-      const snapshot = (item as any)?.standalone_test_attempts?.[0]?.standalone_test_attempt_snapshots
-      return ['finalized', 'corrected'].includes(snapshot?.status)
-    }).length
+  const batch = await getBatchStandaloneAssignmentProgress([assignmentId])
+  if (!batch.ok) return batch
+  return {
+    ok: true,
+    data: batch.data[assignmentId] ?? { assignmentId, completedQuestions: 0, totalQuestions: 0 },
   }
-  return { ok: true, data: { assignmentId, completedQuestions, totalQuestions } }
 }

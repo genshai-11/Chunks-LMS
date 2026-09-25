@@ -60,7 +60,7 @@ export function TeacherTestsPage() {
   const learners = listActiveLearners(roster)
   const [learnerId, setLearnerId] = useState('')
   const [versionId, setVersionId] = useState('')
-  const [packageTypeTab, setPackageTypeTab] = useState<'all' | 'green' | 'red'>('all')
+  const [packageKindFilter, setPackageKindFilter] = useState<'all' | 'standard' | 'mini'>('all')
   const [versions, setVersions] = useState<SelectablePackageVersion[]>([])
   const [message, setMessage] = useState('')
   const [assignments, setAssignments] = useState<StandaloneTestAssignmentRow[]>([])
@@ -320,9 +320,9 @@ export function TeacherTestsPage() {
     versions.find((v) => v.id === verId)?.kind ?? 'standard'
 
   const selectableVersions = useMemo(() => {
-    if (packageTypeTab === 'all') return versions
-    return versions.filter((v) => v.testType === packageTypeTab)
-  }, [versions, packageTypeTab])
+    if (packageKindFilter === 'all') return versions
+    return versions.filter((v) => v.kind === packageKindFilter)
+  }, [versions, packageKindFilter])
 
   useEffect(() => {
     if (selectableVersions.length > 0) {
@@ -330,6 +330,8 @@ export function TeacherTestsPage() {
       if (!exists) {
         setVersionId(selectableVersions[0].id)
       }
+    } else {
+      setVersionId('')
     }
   }, [selectableVersions, versionId])
 
@@ -378,37 +380,35 @@ export function TeacherTestsPage() {
                 <button
                   type="button"
                   className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                    packageTypeTab === 'all'
-                      ? 'bg-white text-slate-900 shadow-sm border border-slate-200/50'
+                    packageKindFilter === 'all'
+                      ? 'bg-white text-slate-900 shadow-2xs border border-slate-200/50'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
-                  onClick={() => setPackageTypeTab('all')}
+                  onClick={() => setPackageKindFilter('all')}
                 >
                   Tất cả
                 </button>
                 <button
                   type="button"
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                    packageTypeTab === 'green'
-                      ? 'bg-emerald-600 text-white shadow-sm'
-                      : 'text-emerald-700 hover:bg-emerald-50'
+                  className={`px-3 py-1 rounded-lg text-xs transition-all cursor-pointer ${
+                    packageKindFilter === 'standard'
+                      ? 'bg-indigo-600 text-white shadow-2xs font-semibold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
                   }`}
-                  onClick={() => setPackageTypeTab('green')}
+                  onClick={() => setPackageKindFilter('standard')}
                 >
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                  <span>Green test</span>
+                  📦 Standard (49 câu)
                 </button>
                 <button
                   type="button"
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                    packageTypeTab === 'red'
-                      ? 'bg-rose-600 text-white shadow-sm'
-                      : 'text-rose-700 hover:bg-rose-50'
+                  className={`px-3 py-1 rounded-lg text-xs transition-all cursor-pointer ${
+                    packageKindFilter === 'mini'
+                      ? 'bg-amber-600 text-white shadow-2xs font-semibold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
                   }`}
-                  onClick={() => setPackageTypeTab('red')}
+                  onClick={() => setPackageKindFilter('mini')}
                 >
-                  <span className="w-2 h-2 rounded-full bg-rose-400" />
-                  <span>Red test</span>
+                  ⚡ Mini-test (21 câu)
                 </button>
               </div>
             </div>
@@ -423,8 +423,7 @@ export function TeacherTestsPage() {
                 <option value="">Select published package</option>
                 {selectableVersions.map((v) => (
                   <option key={v.id} value={v.id} className="py-1 font-semibold text-slate-800">
-                    {v.kind === 'mini' ? '⚡ ' : '📦 '}
-                    {v.label} ({v.kind === 'mini' ? 'Mini · 21 câu' : 'Standard · 49 câu'})
+                    {v.kind === 'mini' ? '⚡ ' : '📦 '} {v.label} ({v.kind === 'mini' ? 'Mini · 21 câu' : 'Standard · 49 câu'})
                   </option>
                 ))}
               </select>

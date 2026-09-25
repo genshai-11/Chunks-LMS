@@ -13,7 +13,7 @@ import {
   type StandaloneAssignmentProgress,
   type StandaloneTestAssignmentRow,
 } from '../../lib/standalone-tests'
-import { listTestPackages, listTestPackageVersions } from '../../lib/test-packages'
+import { listSelectablePackageVersions } from '../../lib/test-packages'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import { updateUserProfile, endEnrollment, enrollLearner } from '../../modules/roster/service'
 import {
@@ -123,17 +123,11 @@ export function TeacherLearnerProfilePage() {
       }
 
       let packageLabel = 'Package test'
-      const packages = await listTestPackages()
-      if (packages.ok) {
-        for (const pkg of packages.data) {
-          const versions = await listTestPackageVersions(pkg.id)
-          const version = versions.ok
-            ? versions.data.find((candidate) => candidate.id === latest.packageVersionId)
-            : null
-          if (version) {
-            packageLabel = `${pkg.title} · ${version.versionLabel}`
-            break
-          }
+      const selectable = await listSelectablePackageVersions()
+      if (selectable.ok) {
+        const found = selectable.data.find((v) => v.id === latest.packageVersionId)
+        if (found) {
+          packageLabel = `${found.label} · ${found.versionLabel}`
         }
       }
 

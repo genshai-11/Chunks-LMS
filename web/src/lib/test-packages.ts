@@ -200,6 +200,147 @@ export async function updateTestPackage(input: {
   return { ok: true, data: mapTestPackage(data) }
 }
 
+export type SelectablePackageVersion = {
+  id: string
+  packageId: string
+  code: string
+  label: string
+  title: string
+  versionLabel: string
+  kind: PackageKind
+  testType: 'green' | 'red'
+  questionCount: number
+}
+
+export async function listSelectablePackageVersions(): Promise<Result<SelectablePackageVersion[]>> {
+  return cachedQuery(
+    cacheKey(['catalog', 'selectable-published-versions']),
+    async () => {
+      const sb = client()
+      if (!sb) return { ok: false, error: 'Supabase is not configured' }
+
+      // 1 single query using PostgREST embedding:
+      // Fetch packages with published versions and their section IDs
+      const { data, error } = await sb
+        .from('test_packages')
+        .select(`
+          id,
+          title,
+          slug,
+          source_metadata,
+          archived_at,
+          test_package_versions (
+            id,
+            version_label,
+            status,
+            test_sections (
+              id
+            )
+          )
+        `)
+        .is('archived_at', null)
+        .order('title')
+
+      if (error) {
+        // Fallback: If nested embedding has schema issue, fetch packages and published versions in 2 batch queries
+        const { data: pkgs, error: pErr } = await sb
+          .from('test_packages')
+          .select('id, title, slug, source_metadata')
+          .is('archived_at', null)
+          .order('title')
+        if (pErr) return { ok: false, error: pErr.message }
+
+        const { data: vers, error: vErr } = await sb
+          .from('test_package_versions')
+          .select('id, package_id, version_label, status, test_sections(id)')
+          .eq('status', 'published')
+        if (vErr) return { ok: false, error: vErr.message }
+
+        const pkgMap = new Map<string, any>(((pkgs as any[]) ?? []).map((p: any) => [p.id, p]))
+        const fallbackList: SelectablePackageVersion[] = []
+
+        for (const ver of (vers as any[]) ?? []) {
+          const pkg = pkgMap.get(ver.package_id)
+          if (!pkg || pkg.source_metadata?.is_active === false) continue
+          const sections = (ver as any).test_sections ?? []
+          if (sections.length === 0) continue
+
+          const kind = detectPackageKind(pkg)
+          const rawTitle = (pkg.title || '').replace(/\s*·\s*LIVE.*$/i, '').trim()
+          const isMini = kind === 'mini' || rawTitle.toLowerCase().includes('[mini]') || (pkg.slug || '').startsWith('mini-')
+          const baseCode = rawTitle.replace(/^\[Mini\]\s*/i, '').replace(/^mini-/i, '').trim()
+          const cleanLabel = isMini ? `${baseCode} [Mini]` : baseCode
+          const isGreen = baseCode.toLowerCase().startsWith('g') || baseCode.toLowerCase().includes('green')
+          const testType: 'green' | 'red' = isGreen ? 'green' : 'red'
+
+          fallbackList.push({
+            id: ver.id,
+            packageId: pkg.id,
+            code: baseCode,
+            label: cleanLabel,
+            title: cleanLabel,
+            versionLabel: ver.version_label,
+            kind: isMini ? 'mini' : 'standard',
+            testType,
+            questionCount: isMini ? 21 : 49,
+          })
+        }
+
+        fallbackList.sort((a, b) => {
+          if (a.testType !== b.testType) return a.testType === 'green' ? -1 : 1
+          if (a.code !== b.code) return a.code.localeCompare(b.code)
+          if (a.kind !== b.kind) return a.kind === 'standard' ? -1 : 1
+          return 0
+        })
+
+        return { ok: true, data: fallbackList }
+      }
+
+      const list: SelectablePackageVersion[] = []
+      for (const pkg of (data as any[]) ?? []) {
+        if (pkg.source_metadata?.is_active === false) continue
+
+        const versions = (pkg as any).test_package_versions ?? []
+        const kind = detectPackageKind(pkg)
+        const rawTitle = (pkg.title || '').replace(/\s*·\s*LIVE.*$/i, '').trim()
+        const isMini = kind === 'mini' || rawTitle.toLowerCase().includes('[mini]') || (pkg.slug || '').startsWith('mini-')
+        const baseCode = rawTitle.replace(/^\[Mini\]\s*/i, '').replace(/^mini-/i, '').trim()
+        const cleanLabel = isMini ? `${baseCode} [Mini]` : baseCode
+        const isGreen = baseCode.toLowerCase().startsWith('g') || baseCode.toLowerCase().includes('green')
+        const testType: 'green' | 'red' = isGreen ? 'green' : 'red'
+
+        for (const version of versions) {
+          if (version.status !== 'published') continue
+          const sections = version.test_sections ?? []
+          if (sections.length === 0) continue
+
+          list.push({
+            id: version.id,
+            packageId: pkg.id,
+            code: baseCode,
+            label: cleanLabel,
+            title: cleanLabel,
+            versionLabel: version.version_label,
+            kind: isMini ? 'mini' : 'standard',
+            testType,
+            questionCount: isMini ? 21 : 49,
+          })
+        }
+      }
+
+      list.sort((a, b) => {
+        if (a.testType !== b.testType) return a.testType === 'green' ? -1 : 1
+        if (a.code !== b.code) return a.code.localeCompare(b.code)
+        if (a.kind !== b.kind) return a.kind === 'standard' ? -1 : 1
+        return 0
+      })
+
+      return { ok: true, data: list }
+    },
+    { ttlMs: 5 * 60_000, persist: true },
+  )
+}
+
 export async function listTestPackageVersions(
   packageId: string,
 ): Promise<Result<TestPackageVersion[]>> {
@@ -219,6 +360,7 @@ export async function listTestPackageVersions(
     { ttlMs: 5 * 60_000, persist: true },
   )
 }
+
 
 export type TestPackagePublicationReadiness = {
   packageVersionId: string

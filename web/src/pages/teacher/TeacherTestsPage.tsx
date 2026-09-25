@@ -20,11 +20,10 @@ import { UserAvatar } from '../../components/UserAvatar'
 import { listActiveLearners } from '../../modules/roster/service'
 import { useAppState } from '../../state/useAppState'
 import {
-  detectPackageKind,
-  listTestPackages,
-  listTestPackageVersions,
+  listSelectablePackageVersions,
   listTestSections,
   type PackageKind,
+  type SelectablePackageVersion,
 } from '../../lib/test-packages'
 import {
   createStandaloneAssignment,
@@ -35,18 +34,6 @@ import {
   type StandaloneAssignmentProgress,
   type StandaloneTestAssignmentRow,
 } from '../../lib/standalone-tests'
-
-export interface SelectablePackageVersion {
-  id: string
-  packageId: string
-  code: string
-  label: string
-  title: string
-  versionLabel: string
-  kind: PackageKind
-  testType: 'green' | 'red'
-  questionCount: number
-}
 
 export function TeacherTestsPage() {
   const { roster } = useAppState()
@@ -79,60 +66,23 @@ export function TeacherTestsPage() {
   }, [])
 
   useEffect(() => {
+    let cancelled = false
     void (async () => {
-      const packages = await listTestPackages()
-      if (!packages.ok) return
-      const next: SelectablePackageVersion[] = []
-      for (const pkg of packages.data) {
-        // Filter out packages toggled OFF by Admin
-        if (pkg.sourceMetadata?.is_active === false) continue
-
-        const result = await listTestPackageVersions(pkg.id)
-        if (result.ok) {
-          const kind = detectPackageKind(pkg)
-          // Strip · LIVE and trailing suffixes (e.g. " · LIVE", " · LIVE-56V", " · LIVE-31V")
-          const rawTitle = pkg.title.replace(/\s*·\s*LIVE.*$/i, '').trim()
-          const isMini = kind === 'mini' || rawTitle.toLowerCase().includes('[mini]') || pkg.slug.startsWith('mini-')
-          
-          // Clean base test code (e.g. G1-56V-0826, R1-56V-0826)
-          const baseCode = rawTitle.replace(/^\[Mini\]\s*/i, '').replace(/^mini-/i, '').trim()
-          
-          // Display name:
-          // Standard: "G1-56V-0826"
-          // Mini: "G1-56V-0826 [Mini]"
-          const cleanLabel = isMini ? `${baseCode} [Mini]` : baseCode
-
-          const isGreen =
-            baseCode.toLowerCase().startsWith('g') ||
-            baseCode.toLowerCase().includes('green')
-          const testType: 'green' | 'red' = isGreen ? 'green' : 'red'
-
-          for (const version of result.data.filter((v) => v.status === 'published')) {
-            const sections = await listTestSections(version.id)
-            if (!sections.ok || sections.data.length === 0) continue
-            next.push({
-              id: version.id,
-              packageId: pkg.id,
-              code: baseCode,
-              label: cleanLabel,
-              title: cleanLabel,
-              versionLabel: version.versionLabel,
-              kind: isMini ? 'mini' : 'standard',
-              testType,
-              questionCount: isMini ? 21 : 49,
-            })
-          }
-        }
+      const res = await listSelectablePackageVersions()
+      if (cancelled) return
+      if (!res.ok) {
+        setMessage(res.error)
+        return
       }
-      next.sort((a, b) => {
-        if (a.testType !== b.testType) return a.testType === 'green' ? -1 : 1
-        if (a.code !== b.code) return a.code.localeCompare(b.code)
-        if (a.kind !== b.kind) return a.kind === 'standard' ? -1 : 1
-        return 0
+      setVersions(res.data)
+      setVersionId((current) => {
+        if (current && res.data.some((v) => v.id === current)) return current
+        return res.data[0]?.id ?? ''
       })
-      setVersions(next)
-      setVersionId(next[0]?.id ?? '')
     })()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {

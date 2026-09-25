@@ -162,6 +162,24 @@ export async function listTestPackages(): Promise<Result<TestPackage[]>> {
   )
 }
 
+export async function getTestPackage(packageId: string): Promise<Result<TestPackage | null>> {
+  return cachedQuery(
+    cacheKey(['catalog', 'package', packageId]),
+    async () => {
+      const sb = client()
+      if (!sb) return { ok: false, error: 'Supabase is not configured' }
+      const { data, error } = await sb
+        .from('test_packages')
+        .select('*')
+        .eq('id', packageId)
+        .maybeSingle()
+      if (error) return { ok: false, error: error.message }
+      return { ok: true, data: data ? mapTestPackage(data) : null }
+    },
+    { ttlMs: 5 * 60_000, persist: true },
+  )
+}
+
 export async function updateTestPackage(input: {
   packageId: string
   title: string
@@ -1324,6 +1342,39 @@ export async function updateTestPackageMetadata(
   clearRequestCache()
 }
 
+export async function toggleTestPackageActive(
+  packageId: string,
+  isActive: boolean,
+): Promise<Result<void>> {
+  const sb = client()
+  if (!sb) return { ok: false, error: 'Supabase is not configured' }
+
+  const { data: pkgRow, error: fetchErr } = await sb
+    .from('test_packages')
+    .select('source_metadata')
+    .eq('id', packageId)
+    .maybeSingle()
+
+  if (fetchErr) return { ok: false, error: fetchErr.message }
+
+  const nextMeta = {
+    ...(pkgRow?.source_metadata || {}),
+    is_active: isActive,
+  }
+
+  const { error: updateErr } = await sb
+    .from('test_packages')
+    .update({
+      source_metadata: nextMeta,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', packageId)
+
+  if (updateErr) return { ok: false, error: updateErr.message }
+  clearRequestCache()
+  return { ok: true, data: undefined }
+}
+
 export async function updateTestItemContent(input: {
   itemId: string
   promptVi: string
@@ -1427,6 +1478,12 @@ export async function createMiniTestVariantFromPackage(
       .select('*')
       .eq('package_version_id', input.sourcePackageVersionId)
 
+    // 4b. Fetch measurement snapshots for source version
+    const { data: sourceSnapshots } = await sb
+      .from('section_measurement_snapshots')
+      .select('*')
+      .eq('package_version_id', input.sourcePackageVersionId)
+
     const questionsPerSection = Math.max(1, input.questionsPerSection ?? 3)
     const strategy = input.samplingStrategy ?? 'random'
 
@@ -1524,6 +1581,7 @@ export async function createMiniTestVariantFromPackage(
         version_label: 'v1.0.0',
         status: 'draft',
         source_metadata: {
+          ...(sourceVerRow.source_metadata ?? {}),
           package_kind: 'mini',
           is_mini_test: true,
           derived_from_version_id: sourceVerRow.id,
@@ -1562,6 +1620,10 @@ export async function createMiniTestVariantFromPackage(
           cci_profile_id: sec.cci_profile_id,
           cci_category_id: sec.cci_category_id,
           cci_snapshot: sec.cci_snapshot,
+          metadata: {
+            ...(sec.metadata ?? sec.source_metadata ?? {}),
+            derived_from_section_id: sec.id,
+          },
         })
         .select()
         .single()
@@ -1576,8 +1638,25 @@ export async function createMiniTestVariantFromPackage(
         sectionOrder: sec.section_order,
       })
 
-      // Also create snapshot record if available
-      if (sec.cci_profile_id && sec.cci_category_id) {
+      // Clone section_measurement_snapshots from source snapshot or create from section attributes
+      const matchingSnap = (sourceSnapshots || []).find((s: any) => s.test_section_id === sec.id)
+      if (matchingSnap) {
+        await sb.from('section_measurement_snapshots').insert({
+          test_section_id: newSecRow.id,
+          package_version_id: newVerRow.id,
+          target_cvr_ohm: matchingSnap.target_cvr_ohm,
+          cci_profile_id: matchingSnap.cci_profile_id,
+          cci_category_id: matchingSnap.cci_category_id,
+          cci_category_label: matchingSnap.cci_category_label,
+          cci_value: matchingSnap.cci_value,
+          snapshot_metadata: {
+            ...(matchingSnap.snapshot_metadata ?? {}),
+            source: 'mini-test-generator',
+            derived_from_snapshot_id: matchingSnap.id,
+            sectionOrder: sec.section_order,
+          },
+        })
+      } else if (sec.cci_profile_id && sec.cci_category_id) {
         await sb.from('section_measurement_snapshots').insert({
           test_section_id: newSecRow.id,
           package_version_id: newVerRow.id,
@@ -1660,6 +1739,8 @@ export async function createMiniTestVariantFromPackage(
         )
 
         for (const v of itemVariants) {
+          const status = v.approval_status ?? 'approved'
+          const isApproved = status === 'approved'
           newVariantsToInsert.push({
             package_version_id: newVerRow.id,
             test_section_id: null, // Per narration_variants_target_shape_check: test_section_id must be null when narration_target is 'test_item'
@@ -1670,9 +1751,9 @@ export async function createMiniTestVariantFromPackage(
             voice_label: v.voice_label,
             source_text_hash: v.source_text_hash,
             provider_metadata: v.provider_metadata ?? {},
-            approval_status: v.approval_status ?? 'approved',
+            approval_status: status,
             audio_asset_id: v.audio_asset_id, // EXACT SAME Supabase Storage audio asset!
-            approved_at: v.approved_at ?? new Date().toISOString(),
+            approved_at: isApproved ? (v.approved_at ?? new Date().toISOString()) : null,
           })
         }
       }
@@ -1687,6 +1768,8 @@ export async function createMiniTestVariantFromPackage(
         )
 
         for (const v of secVariants) {
+          const status = v.approval_status ?? 'approved'
+          const isApproved = status === 'approved'
           newVariantsToInsert.push({
             package_version_id: newVerRow.id,
             test_section_id: secMap.newSectionId,
@@ -1697,9 +1780,9 @@ export async function createMiniTestVariantFromPackage(
             voice_label: v.voice_label,
             source_text_hash: v.source_text_hash,
             provider_metadata: v.provider_metadata ?? {},
-            approval_status: v.approval_status ?? 'approved',
+            approval_status: status,
             audio_asset_id: v.audio_asset_id,
-            approved_at: v.approved_at ?? new Date().toISOString(),
+            approved_at: isApproved ? (v.approved_at ?? new Date().toISOString()) : null,
           })
         }
       }
@@ -1712,6 +1795,8 @@ export async function createMiniTestVariantFromPackage(
       )
 
       for (const v of lifecycleVariants) {
+        const status = v.approval_status ?? 'approved'
+        const isApproved = status === 'approved'
         newVariantsToInsert.push({
           package_version_id: newVerRow.id,
           test_section_id: null,
@@ -1722,9 +1807,9 @@ export async function createMiniTestVariantFromPackage(
           voice_label: v.voice_label,
           source_text_hash: v.source_text_hash,
           provider_metadata: v.provider_metadata ?? {},
-          approval_status: v.approval_status ?? 'approved',
+          approval_status: status,
           audio_asset_id: v.audio_asset_id,
-          approved_at: v.approved_at ?? new Date().toISOString(),
+          approved_at: isApproved ? (v.approved_at ?? new Date().toISOString()) : null,
         })
       }
 

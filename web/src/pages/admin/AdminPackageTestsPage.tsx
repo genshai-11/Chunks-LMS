@@ -47,6 +47,7 @@ import {
   listTestPackageVersions,
   listTestPackages,
   listTestSections,
+  toggleTestPackageActive,
   updateTestItemContent,
   updateTestPackageMetadata,
   type PackageKind,
@@ -112,6 +113,7 @@ export type PackageSummary = {
   audioTotalCount: number
   isLegacyLive: boolean
   packageKind: PackageKind
+  isActive: boolean
 }
 
 export function AdminPackageTestsPage() {
@@ -371,6 +373,26 @@ export function AdminPackageTestsPage() {
     if (sessionLanguages[sec.id]) {
       return sessionLanguages[sec.id]
     }
+
+    // 1. Direct from section_intro audio variant established in the package
+    const introVar = selectedVariants.find(
+      (v) =>
+        v.test_section_id === sec.id &&
+        v.narration_target === 'section_intro' &&
+        v.audio_asset_id != null &&
+        (v.language === 'vi' || v.language === 'en'),
+    )
+    if (introVar?.language === 'vi' || introVar?.language === 'en') {
+      return introVar.language as 'vi' | 'en'
+    }
+
+    // 2. Language plan in version source_metadata (e.g. { "1": "en", "2": "en", ... })
+    const langPlan = (selectedPackage?.version?.sourceMetadata as any)?.languagePlan
+    if (langPlan) {
+      const planVal = langPlan[String(sec.sectionOrder)] || langPlan[sec.sectionOrder]
+      if (planVal === 'vi' || planVal === 'en') return planVal
+    }
+
     const metaLangs = (selectedPackage?.version?.sourceMetadata as any)?.sessionLanguages
     if (Array.isArray(metaLangs) && metaLangs[sec.sectionOrder - 1]) {
       return metaLangs[sec.sectionOrder - 1]
@@ -380,7 +402,7 @@ export function AdminPackageTestsPage() {
       return secMeta.sessionLanguage
     }
     if (selectedPackage?.testType === 'green') {
-      return sec.sectionOrder <= 3 ? 'en' : 'vi'
+      return sec.sectionOrder <= 3 || sec.sectionOrder === 7 ? 'en' : 'vi'
     } else {
       return sec.sectionOrder <= 3 ? 'vi' : 'en'
     }
@@ -625,6 +647,7 @@ export function AdminPackageTestsPage() {
             audioTotalCount: items.length,
             isLegacyLive,
             packageKind,
+            isActive: pkg.sourceMetadata?.is_active !== false,
           }
         }),
       )
@@ -934,6 +957,27 @@ export function AdminPackageTestsPage() {
       err(e instanceof Error ? e.message : 'Xóa gói bài test thất bại')
     } finally {
       setDeleting(false)
+    }
+  }
+
+  // Handle Package Active/Inactive Toggle (Show/Hide in Teacher Tests 1-1)
+  async function handleTogglePackageActive(summary: PackageSummary) {
+    const nextState = !summary.isActive
+    setPackageSummaries((prev) =>
+      prev.map((s) => (s.pkg.id === summary.pkg.id ? { ...s, isActive: nextState } : s)),
+    )
+    const res = await toggleTestPackageActive(summary.pkg.id, nextState)
+    if (res.ok) {
+      ok(
+        nextState
+          ? `Đã BẬT gói "${summary.pkg.title}" (Hiển thị ở mục Tests 1-1)`
+          : `Đã TẮT gói "${summary.pkg.title}" (Ẩn khỏi mục Tests 1-1)`,
+      )
+    } else {
+      err(res.error || 'Cập nhật trạng thái thất bại')
+      setPackageSummaries((prev) =>
+        prev.map((s) => (s.pkg.id === summary.pkg.id ? { ...s, isActive: !nextState } : s)),
+      )
     }
   }
 
@@ -1615,9 +1659,35 @@ export function AdminPackageTestsPage() {
                           )}
                         </div>
 
-                        <span className="text-[11px] font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
-                          {summary.questionCount}Q
-                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              void handleTogglePackageActive(summary)
+                            }}
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold transition-all cursor-pointer ${
+                              summary.isActive
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-200'
+                                : 'bg-slate-100 text-slate-500 border border-slate-300 hover:bg-slate-200'
+                            }`}
+                            title={
+                              summary.isActive
+                                ? 'Gói đang BẬT cho Tests 1-1 (bấm để tắt)'
+                                : 'Gói đang TẮT cho Tests 1-1 (bấm để bật)'
+                            }
+                          >
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                summary.isActive ? 'bg-emerald-500' : 'bg-slate-400'
+                              }`}
+                            />
+                            <span>{summary.isActive ? '1-1 ON' : '1-1 OFF'}</span>
+                          </button>
+                          <span className="text-[11px] font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
+                            {summary.questionCount}Q
+                          </span>
+                        </div>
                       </div>
 
                       {/* Title & Description */}
@@ -1752,6 +1822,7 @@ export function AdminPackageTestsPage() {
                       <th className="py-3.5 px-4">Cấu trúc đề</th>
                       <th className="py-3.5 px-4">Kháng trở CVR (Ω)</th>
                       <th className="py-3.5 px-4">Tiến độ Audio</th>
+                      <th className="py-3.5 px-4 text-center">Tests 1-1</th>
                       <th className="py-3.5 px-4 text-right">Thao tác</th>
                     </tr>
                   </thead>
@@ -1820,6 +1891,29 @@ export function AdminPackageTestsPage() {
                                 {summary.audioApprovedCount}/{summary.audioTotalCount} ({audioRatio}%)
                               </span>
                             </div>
+                          </td>
+                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => void handleTogglePackageActive(summary)}
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
+                                summary.isActive
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-200'
+                                  : 'bg-slate-100 text-slate-500 border border-slate-300 hover:bg-slate-200'
+                              }`}
+                              title={
+                                summary.isActive
+                                  ? 'Gói đang BẬT cho Tests 1-1 (bấm để tắt)'
+                                  : 'Gói đang TẮT cho Tests 1-1 (bấm để bật)'
+                              }
+                            >
+                              <span
+                                className={`w-2 h-2 rounded-full ${
+                                  summary.isActive ? 'bg-emerald-500' : 'bg-slate-400'
+                                }`}
+                              />
+                              <span>{summary.isActive ? 'ON' : 'OFF'}</span>
+                            </button>
                           </td>
                           <td className="py-3.5 px-4 text-right whitespace-nowrap">
                             <div className="flex items-center justify-end gap-1.5">

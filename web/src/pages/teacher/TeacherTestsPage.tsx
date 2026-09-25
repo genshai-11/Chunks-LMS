@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   BarChart3,
-  Check,
-  ChevronDown,
   ClipboardCheck,
   ExternalLink,
   Play,
@@ -62,9 +60,7 @@ export function TeacherTestsPage() {
   const learners = listActiveLearners(roster)
   const [learnerId, setLearnerId] = useState('')
   const [versionId, setVersionId] = useState('')
-  const [packageCategoryTab, setPackageCategoryTab] = useState<'all' | 'standard' | 'mini'>('all')
-  const [packageDropdownOpen, setPackageDropdownOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [packageTypeTab, setPackageTypeTab] = useState<'all' | 'green' | 'red'>('all')
   const [versions, setVersions] = useState<SelectablePackageVersion[]>([])
   const [message, setMessage] = useState('')
   const [assignments, setAssignments] = useState<StandaloneTestAssignmentRow[]>([])
@@ -82,37 +78,32 @@ export function TeacherTestsPage() {
   }, [])
 
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setPackageDropdownOpen(false)
-      }
-    }
-    if (packageDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [packageDropdownOpen])
-
-  useEffect(() => {
     void (async () => {
       const packages = await listTestPackages()
       if (!packages.ok) return
       const next: SelectablePackageVersion[] = []
       for (const pkg of packages.data) {
+        // Filter out packages toggled OFF by Admin
+        if (pkg.sourceMetadata?.is_active === false) continue
+
         const result = await listTestPackageVersions(pkg.id)
         if (result.ok) {
           const kind = detectPackageKind(pkg)
-          let cleanCode = pkg.title.replace(/\s*·\s*LIVE.*$/i, '').trim()
-          if (kind === 'mini' && cleanCode.startsWith('[Mini]')) {
-            cleanCode = 'mini-' + cleanCode.replace(/^\[Mini\]\s*/i, '').trim()
-          } else if (kind === 'mini' && !cleanCode.startsWith('mini-')) {
-            cleanCode = 'mini-' + cleanCode
-          }
+          // Strip · LIVE and trailing suffixes (e.g. " · LIVE", " · LIVE-56V", " · LIVE-31V")
+          const rawTitle = pkg.title.replace(/\s*·\s*LIVE.*$/i, '').trim()
+          const isMini = kind === 'mini' || rawTitle.toLowerCase().includes('[mini]') || pkg.slug.startsWith('mini-')
+          
+          // Clean base test code (e.g. G1-56V-0826, R1-56V-0826)
+          const baseCode = rawTitle.replace(/^\[Mini\]\s*/i, '').replace(/^mini-/i, '').trim()
+          
+          // Display name:
+          // Standard: "G1-56V-0826"
+          // Mini: "G1-56V-0826 [Mini]"
+          const cleanLabel = isMini ? `${baseCode} [Mini]` : baseCode
 
           const isGreen =
-            cleanCode.toLowerCase().startsWith('g') ||
-            cleanCode.toLowerCase().startsWith('mini-g') ||
-            cleanCode.toLowerCase().includes('green')
+            baseCode.toLowerCase().startsWith('g') ||
+            baseCode.toLowerCase().includes('green')
           const testType: 'green' | 'red' = isGreen ? 'green' : 'red'
 
           for (const version of result.data.filter((v) => v.status === 'published')) {
@@ -121,17 +112,23 @@ export function TeacherTestsPage() {
             next.push({
               id: version.id,
               packageId: pkg.id,
-              code: cleanCode,
-              label: cleanCode,
-              title: cleanCode,
+              code: baseCode,
+              label: cleanLabel,
+              title: cleanLabel,
               versionLabel: version.versionLabel,
-              kind,
+              kind: isMini ? 'mini' : 'standard',
               testType,
-              questionCount: kind === 'mini' ? 21 : 49,
+              questionCount: isMini ? 21 : 49,
             })
           }
         }
       }
+      next.sort((a, b) => {
+        if (a.testType !== b.testType) return a.testType === 'green' ? -1 : 1
+        if (a.code !== b.code) return a.code.localeCompare(b.code)
+        if (a.kind !== b.kind) return a.kind === 'standard' ? -1 : 1
+        return 0
+      })
       setVersions(next)
       setVersionId(next[0]?.id ?? '')
     })()
@@ -323,9 +320,9 @@ export function TeacherTestsPage() {
     versions.find((v) => v.id === verId)?.kind ?? 'standard'
 
   const selectableVersions = useMemo(() => {
-    if (packageCategoryTab === 'all') return versions
-    return versions.filter((v) => v.kind === packageCategoryTab)
-  }, [versions, packageCategoryTab])
+    if (packageTypeTab === 'all') return versions
+    return versions.filter((v) => v.testType === packageTypeTab)
+  }, [versions, packageTypeTab])
 
   useEffect(() => {
     if (selectableVersions.length > 0) {
@@ -375,156 +372,94 @@ export function TeacherTestsPage() {
             </select>
           </label>
           <div>
-            <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-bold text-slate-700">Package</span>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/60">
                 <button
                   type="button"
-                  className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
-                    packageCategoryTab === 'all'
-                      ? 'bg-slate-800 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    packageTypeTab === 'all'
+                      ? 'bg-white text-slate-900 shadow-sm border border-slate-200/50'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
-                  onClick={() => setPackageCategoryTab('all')}
+                  onClick={() => setPackageTypeTab('all')}
                 >
                   Tất cả
                 </button>
                 <button
                   type="button"
-                  className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
-                    packageCategoryTab === 'standard'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    packageTypeTab === 'green'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-emerald-700 hover:bg-emerald-50'
                   }`}
-                  onClick={() => setPackageCategoryTab('standard')}
+                  onClick={() => setPackageTypeTab('green')}
                 >
-                  Standard (49Q)
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                  <span>Green test</span>
                 </button>
                 <button
                   type="button"
-                  className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
-                    packageCategoryTab === 'mini'
-                      ? 'bg-violet-600 text-white'
-                      : 'bg-violet-50 text-violet-700 hover:bg-violet-100'
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    packageTypeTab === 'red'
+                      ? 'bg-rose-600 text-white shadow-sm'
+                      : 'text-rose-700 hover:bg-rose-50'
                   }`}
-                  onClick={() => setPackageCategoryTab('mini')}
+                  onClick={() => setPackageTypeTab('red')}
                 >
-                  Mini (21Q)
+                  <span className="w-2 h-2 rounded-full bg-rose-400" />
+                  <span>Red test</span>
                 </button>
               </div>
             </div>
 
-            <div className="relative" ref={dropdownRef}>
-              <button
-                type="button"
-                data-testid="package-select-trigger"
-                onClick={() => setPackageDropdownOpen((prev) => !prev)}
-                className="w-full min-h-[42px] px-3 py-2 rounded-xl border border-slate-300 bg-white text-left flex items-center justify-between gap-2 shadow-2xs hover:border-slate-400 focus:outline-hidden focus:ring-2 focus:ring-slate-900/10 cursor-pointer transition-all"
-              >
-                {(() => {
-                  const sel = versions.find((v) => v.id === versionId)
-                  if (!sel) {
-                    return <span className="text-slate-400 text-xs">Select published package</span>
-                  }
-                  return (
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span
-                        className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 ${
-                          sel.testType === 'green'
-                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                            : 'bg-rose-100 text-rose-800 border border-rose-200'
-                        }`}
-                      >
-                        {sel.testType}
-                      </span>
-                      <span className="font-mono font-bold text-xs text-slate-900">
-                        {sel.code}
-                      </span>
-                      <span
-                        className={`text-[10px] px-1.5 py-0.5 rounded-md font-semibold shrink-0 ${
-                          sel.kind === 'mini'
-                            ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                            : 'bg-slate-100 text-slate-700 border border-slate-200'
-                        }`}
-                      >
-                        {sel.kind === 'mini' ? '⚡ 21Q' : '49Q'}
-                      </span>
-                    </div>
-                  )
-                })()}
-                <ChevronDown
-                  className={`h-4 w-4 text-slate-400 shrink-0 transition-transform ${
-                    packageDropdownOpen ? 'rotate-180' : ''
-                  }`}
-                />
-              </button>
-
-              {/* Styled Popover Dropdown List */}
-              {packageDropdownOpen && (
-                <div className="absolute z-50 left-0 right-0 mt-1 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl p-1.5 space-y-1">
-                  {selectableVersions.length === 0 ? (
-                    <div className="p-3 text-center text-xs text-slate-400">
-                      Không có bài test nào trong mục này.
-                    </div>
-                  ) : (
-                    selectableVersions.map((v) => {
-                      const isSelected = v.id === versionId
-                      return (
-                        <button
-                          key={v.id}
-                          type="button"
-                          onClick={() => {
-                            setVersionId(v.id)
-                            setPackageDropdownOpen(false)
-                          }}
-                          className={`w-full px-3 py-2.5 rounded-lg text-left flex items-center justify-between text-xs transition-colors cursor-pointer ${
-                            isSelected
-                              ? 'bg-slate-100 text-slate-900 font-bold'
-                              : 'hover:bg-slate-50 text-slate-700'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <span
-                              className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                                v.testType === 'green' ? 'bg-emerald-500' : 'bg-rose-500'
-                              }`}
-                            />
-                            <span className="font-mono font-bold text-slate-900">{v.code}</span>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span
-                              className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
-                                v.kind === 'mini'
-                                  ? 'bg-amber-50 text-amber-700 border border-amber-200/80'
-                                  : 'bg-slate-100 text-slate-600 border border-slate-200'
-                              }`}
-                            >
-                              {v.kind === 'mini' ? '⚡ Mini · 21Q' : 'Standard · 49Q'}
-                            </span>
-                            {isSelected ? <Check className="h-4 w-4 text-emerald-600 shrink-0" /> : null}
-                          </div>
-                        </button>
-                      )
-                    })
-                  )}
-                </div>
-              )}
-
-              {/* Native accessible select for form integration and automated tests */}
+            <div className="relative">
               <select
-                className="sr-only"
                 aria-label="Package"
                 value={versionId}
                 onChange={(event) => setVersionId(event.target.value)}
+                className="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-900 font-bold text-xs shadow-2xs hover:border-slate-400 focus:outline-hidden focus:ring-2 focus:ring-slate-900/10 transition-all cursor-pointer"
               >
                 <option value="">Select published package</option>
-                {selectableVersions.map((version) => (
-                  <option key={version.id} value={version.id}>
-                    {version.label}
+                {selectableVersions.map((v) => (
+                  <option key={v.id} value={v.id} className="py-1 font-semibold text-slate-800">
+                    {v.testType === 'green' ? '🟢 ' : '🔴 '}
+                    {v.label}
+                    {v.kind === 'mini' ? ' (⚡ Mini · 21 câu)' : ' (Standard · 49 câu)'}
                   </option>
                 ))}
               </select>
             </div>
+
+            {(() => {
+              const sel = versions.find((v) => v.id === versionId)
+              if (!sel) return null
+              return (
+                <div className="flex flex-wrap items-center gap-2 pt-1.5 text-xs">
+                  <span
+                    className={`px-2 py-0.5 rounded-md font-bold uppercase text-[10px] tracking-wider shrink-0 ${
+                      sel.testType === 'green'
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                        : 'bg-rose-100 text-rose-800 border border-rose-200'
+                    }`}
+                  >
+                    {sel.testType} test
+                  </span>
+                  <span className="font-mono font-bold text-slate-900">
+                    {sel.label}
+                  </span>
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded-md font-semibold shrink-0 ${
+                      sel.kind === 'mini'
+                        ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                        : 'bg-slate-100 text-slate-700 border border-slate-200'
+                    }`}
+                  >
+                    {sel.kind === 'mini' ? '⚡ Mini · 21 câu hỏi (7 session x 3 câu)' : 'Standard · 49 câu hỏi (7 session x 7 câu)'}
+                  </span>
+                </div>
+              )
+            })()}
           </div>
         </div>
         {message ? <p className="meta text-slate-600">{message}</p> : null}

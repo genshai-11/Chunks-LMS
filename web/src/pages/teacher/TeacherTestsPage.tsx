@@ -423,9 +423,8 @@ export function TeacherTestsPage() {
                 <option value="">Select published package</option>
                 {selectableVersions.map((v) => (
                   <option key={v.id} value={v.id} className="py-1 font-semibold text-slate-800">
-                    {v.testType === 'green' ? '🟢 ' : '🔴 '}
-                    {v.label}
-                    {v.kind === 'mini' ? ' (⚡ Mini · 21 câu)' : ' (Standard · 49 câu)'}
+                    {v.kind === 'mini' ? '⚡ ' : '📦 '}
+                    {v.label} ({v.kind === 'mini' ? 'Mini · 21 câu' : 'Standard · 49 câu'})
                   </option>
                 ))}
               </select>
@@ -455,7 +454,7 @@ export function TeacherTestsPage() {
                         : 'bg-slate-100 text-slate-700 border border-slate-200'
                     }`}
                   >
-                    {sel.kind === 'mini' ? '⚡ Mini · 21 câu hỏi (7 session x 3 câu)' : 'Standard · 49 câu hỏi (7 session x 7 câu)'}
+                    {sel.kind === 'mini' ? '⚡ Mini · 21 câu hỏi (7 session x 3 câu)' : '📦 Standard · 49 câu hỏi (7 session x 7 câu)'}
                   </span>
                 </div>
               )

@@ -38,14 +38,19 @@ import {
   batchSaveCciCategories,
   createCciProfile,
   createDraftTestPackage,
+  createMiniTestVariantFromPackage,
   deleteTestPackage,
+  detectPackageKind,
   listCciCategories,
   listCciProfiles,
   listTestItems,
   listTestPackageVersions,
   listTestPackages,
   listTestSections,
+  toggleTestPackageActive,
+  updateTestItemContent,
   updateTestPackageMetadata,
+  type PackageKind,
 } from '../../lib/test-packages'
 import {
   calculateCciFromCpd,
@@ -53,6 +58,7 @@ import {
   calculateWordCountLc,
   countWords,
   detectPackageTestType,
+  extractPackageVoltage,
   validateGreenSentence,
   validateRedCollocations,
   type CciCategory,
@@ -66,6 +72,7 @@ import {
   generateNarration,
   generatePackageFromVocab,
   getFirestoreLessonChunks,
+  getNarrationPlaybackUrl,
   listFirestoreLessons,
   playGoogleCloudTts,
   uploadNarrationAudio,
@@ -86,6 +93,17 @@ export type PackageSummary = {
   version: TestPackageVersion | null
   sections: TestSection[]
   items: TestItem[]
+  variants: Array<{
+    id: string
+    narration_target: string
+    language: string
+    voice_id: string
+    audio_asset_id: string | null
+    approval_status: string
+    test_item_id: string | null
+    test_section_id: string | null
+    provider_metadata?: any
+  }>
   testType: 'green' | 'red'
   targetVoltage: number
   questionCount: number
@@ -94,6 +112,8 @@ export type PackageSummary = {
   audioApprovedCount: number
   audioTotalCount: number
   isLegacyLive: boolean
+  packageKind: PackageKind
+  isActive: boolean
 }
 
 export function AdminPackageTestsPage() {
@@ -117,7 +137,18 @@ export function AdminPackageTestsPage() {
   const [packageSummaries, setPackageSummaries] = useState<PackageSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [filterTab, setFilterTab] = useState<FilterTab>('all')
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'standard' | 'mini'>('all')
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Mini-Test Generator Modal State
+  const [miniModalSummary, setMiniModalSummary] = useState<PackageSummary | null>(null)
+  const [miniCode, setMiniCode] = useState('')
+  const [miniTitle, setMiniTitle] = useState('')
+  const [miniSamplingStrategy, setMiniSamplingStrategy] = useState<'random' | 'first'>('random')
+  const [miniCopyAudio, setMiniCopyAudio] = useState(true)
+  const [creatingMini, setCreatingMini] = useState(false)
+  const [batchCreatingMini, setBatchCreatingMini] = useState(false)
+  const [batchProgress, setBatchProgress] = useState<string | null>(null)
 
   // Active Selected Package
   const [selectedVersionState, setSelectedVersionState] = useState('')
@@ -129,6 +160,73 @@ export function AdminPackageTestsPage() {
     }
     return packageSummaries[0] ?? null
   }, [packageSummaries, selectedVersionId])
+
+  const selectedVariants = useMemo(() => selectedPackage?.variants ?? [], [selectedPackage])
+
+  const itemVariantMap = useMemo(() => {
+    const map = new Map<string, (typeof selectedVariants)[0]>()
+    for (const v of selectedVariants) {
+      if (v.test_item_id && v.language) {
+        const key = `${v.test_item_id}_${v.language}`
+        const existing = map.get(key)
+        if (!existing || (v.approval_status === 'approved' && existing.approval_status !== 'approved')) {
+          map.set(key, v)
+        }
+      }
+    }
+    return map
+  }, [selectedVariants])
+
+  const sectionVariantMap = useMemo(() => {
+    const map = new Map<string, (typeof selectedVariants)[0]>()
+    for (const v of selectedVariants) {
+      if (v.test_section_id && v.language && (v.narration_target === 'section_intro' || !v.narration_target)) {
+        const key = `${v.test_section_id}_${v.language}`
+        const existing = map.get(key)
+        if (!existing || (v.approval_status === 'approved' && existing.approval_status !== 'approved')) {
+          map.set(key, v)
+        }
+      }
+    }
+    return map
+  }, [selectedVariants])
+
+  const partVariantMap = useMemo(() => {
+    const map = new Map<string, (typeof selectedVariants)[0]>()
+    for (const v of selectedVariants) {
+      if (v.narration_target === 'part_intro' && v.language) {
+        const part = v.provider_metadata?.part
+        if (part != null) {
+          const key = `${part}_${v.language}`
+          const existing = map.get(key)
+          if (!existing || (v.approval_status === 'approved' && existing.approval_status !== 'approved')) {
+            map.set(key, v)
+          }
+        }
+      }
+    }
+    return map
+  }, [selectedVariants])
+
+  const packageStartVariant = useCallback(
+    (lang: string) => {
+      const matching = selectedVariants.filter(
+        (v) => v.narration_target === 'package_start' && v.language === lang,
+      )
+      return matching.find((v) => v.approval_status === 'approved') ?? matching[0] ?? null
+    },
+    [selectedVariants],
+  )
+
+  const packageEndVariant = useCallback(
+    (lang: string) => {
+      const matching = selectedVariants.filter(
+        (v) => v.narration_target === 'package_end' && v.language === lang,
+      )
+      return matching.find((v) => v.approval_status === 'approved') ?? matching[0] ?? null
+    },
+    [selectedVariants],
+  )
 
   const selectPackage = (pkg: PackageSummary) => {
     if (!pkg.version) return
@@ -266,6 +364,128 @@ export function AdminPackageTestsPage() {
     text: string
   } | null>(null)
 
+  // Session languages per package
+  const [sessionLanguages, setSessionLanguages] = useState<Record<string, 'vi' | 'en'>>({})
+
+  // Helper to get active language for a section
+  function getSectionLanguage(sec?: TestSection | null): 'vi' | 'en' {
+    if (!sec) return 'vi'
+    if (sessionLanguages[sec.id]) {
+      return sessionLanguages[sec.id]
+    }
+
+    // 1. Direct from section_intro audio variant established in the package
+    const introVar = selectedVariants.find(
+      (v) =>
+        v.test_section_id === sec.id &&
+        v.narration_target === 'section_intro' &&
+        v.audio_asset_id != null &&
+        (v.language === 'vi' || v.language === 'en'),
+    )
+    if (introVar?.language === 'vi' || introVar?.language === 'en') {
+      return introVar.language as 'vi' | 'en'
+    }
+
+    // 2. Language plan in version source_metadata (e.g. { "1": "en", "2": "en", ... })
+    const langPlan = (selectedPackage?.version?.sourceMetadata as any)?.languagePlan
+    if (langPlan) {
+      const planVal = langPlan[String(sec.sectionOrder)] || langPlan[sec.sectionOrder]
+      if (planVal === 'vi' || planVal === 'en') return planVal
+    }
+
+    const metaLangs = (selectedPackage?.version?.sourceMetadata as any)?.sessionLanguages
+    if (Array.isArray(metaLangs) && metaLangs[sec.sectionOrder - 1]) {
+      return metaLangs[sec.sectionOrder - 1]
+    }
+    const secMeta = (sec as any).metadata || (sec as any).sourceMetadata
+    if (secMeta?.sessionLanguage === 'vi' || secMeta?.sessionLanguage === 'en') {
+      return secMeta.sessionLanguage
+    }
+    if (selectedPackage?.testType === 'green') {
+      return sec.sectionOrder <= 3 || sec.sectionOrder === 7 ? 'en' : 'vi'
+    } else {
+      return sec.sectionOrder <= 3 ? 'vi' : 'en'
+    }
+  }
+
+  function handleToggleSectionLanguage(sectionId: string, currentLang: 'vi' | 'en') {
+    const nextLang = currentLang === 'vi' ? 'en' : 'vi'
+    setSessionLanguages((prev) => ({
+      ...prev,
+      [sectionId]: nextLang,
+    }))
+  }
+
+  // Editing Test Item Modal
+  const [editingItem, setEditingItem] = useState<TestItem | null>(null)
+  const [editPromptVi, setEditPromptVi] = useState('')
+  const [editPromptEn, setEditPromptEn] = useState('')
+  const [editTermVi, setEditTermVi] = useState('')
+  const [editTermEn, setEditTermEn] = useState('')
+  const [editSpokenVi, setEditSpokenVi] = useState('')
+  const [editSpokenEn, setEditSpokenEn] = useState('')
+  const [savingItem, setSavingItem] = useState(false)
+  const [regeneratingItemAudio, setRegeneratingItemAudio] = useState(false)
+
+  function handleOpenEditItem(item: TestItem) {
+    setEditingItem(item)
+    setEditPromptVi(item.promptVi || '')
+    setEditPromptEn(item.promptEn || '')
+    setEditTermVi(item.termVi || '')
+    setEditTermEn(item.termEn || '')
+    setEditSpokenVi(item.spokenScriptVi || item.promptVi || '')
+    setEditSpokenEn(item.spokenScriptEn || item.promptEn || '')
+  }
+
+  async function handleSaveItem(alsoRegenerateAudio = false) {
+    if (!editingItem || !selectedPackage?.version) return
+    setSavingItem(true)
+    if (alsoRegenerateAudio) setRegeneratingItemAudio(true)
+    try {
+      const res = await updateTestItemContent({
+        itemId: editingItem.id,
+        promptVi: editPromptVi.trim(),
+        promptEn: editPromptEn.trim(),
+        termVi: editTermVi.trim() || null,
+        termEn: editTermEn.trim() || null,
+        spokenScriptVi: editSpokenVi.trim() || editPromptVi.trim() || null,
+        spokenScriptEn: editSpokenEn.trim() || editPromptEn.trim() || null,
+      })
+
+      if (!res.ok) {
+        throw new Error(res.error)
+      }
+
+      if (alsoRegenerateAudio) {
+        const sec = selectedPackage.sections.find((s) => s.id === editingItem.sectionId)
+        const sessionLang = getSectionLanguage(sec)
+        const script = sessionLang === 'vi' ? editSpokenVi.trim() || editPromptVi.trim() : editSpokenEn.trim() || editPromptEn.trim()
+        const voice = sessionLang === 'vi' ? 'google/vi-VN-Neural2-A' : 'google/en-US-Neural2-F'
+
+        await generateNarration({
+          packageVersionId: selectedPackage.version.id,
+          target: 'test_item',
+          testSectionId: editingItem.sectionId,
+          testItemId: editingItem.id,
+          language: sessionLang,
+          voiceId: voice,
+          textOverride: script,
+        })
+        ok('Đã cập nhật câu hỏi và sinh mới audio Google Cloud TTS thành công!')
+      } else {
+        ok('Đã cập nhật nội dung câu hỏi thành công!')
+      }
+
+      setEditingItem(null)
+      await loadPackages()
+    } catch (e) {
+      err(e instanceof Error ? e.message : 'Cập nhật câu hỏi thất bại')
+    } finally {
+      setSavingItem(false)
+      setRegeneratingItemAudio(false)
+    }
+  }
+
   // CCI Profiles Tab State
   const [cciProfiles, setCciProfiles] = useState<CciProfile[]>([])
   const [selectedCciProfileId, setSelectedCciProfileId] = useState<string>('')
@@ -346,6 +566,17 @@ export function AdminPackageTestsPage() {
 
           let sections: TestSection[] = []
           let items: TestItem[] = []
+          let variants: Array<{
+            id: string
+            narration_target: string
+            language: string
+            voice_id: string
+            audio_asset_id: string | null
+            approval_status: string
+            test_item_id: string | null
+            test_section_id: string | null
+            provider_metadata?: any
+          }> = []
           let audioApproved = 0
 
           if (version) {
@@ -359,22 +590,21 @@ export function AdminPackageTestsPage() {
 
             const sb = getSupabase() as any
             if (sb) {
-              const { data: variants } = await sb
+              const { data: fetchedVariants } = await sb
                 .from('narration_variants')
-                .select('id, approval_status')
+                .select(
+                  'id, narration_target, language, voice_id, audio_asset_id, approval_status, test_item_id, test_section_id, provider_metadata',
+                )
                 .eq('package_version_id', version.id)
-              audioApproved = (variants ?? []).filter(
-                (v: any) => v.approval_status === 'approved',
+              variants = (fetchedVariants ?? []) as any
+              audioApproved = variants.filter(
+                (v) => v.approval_status === 'approved',
               ).length
             }
           }
 
           const testType = detectPackageTestType(pkg)
-          const targetVoltage = Number(
-            pkg.sourceMetadata?.targetVoltage ??
-              pkg.sourceMetadata?.targetCpd ??
-              (testType === 'red' ? 56 : 12),
-          )
+          const targetVoltage = extractPackageVoltage(pkg, testType)
           const questionCount =
             items.length || Number(pkg.sourceMetadata?.questionCount ?? 21)
 
@@ -395,11 +625,19 @@ export function AdminPackageTestsPage() {
           const isLegacyLive =
             pkg.title.includes('· LIVE') || version?.versionLabel === 'LIVE'
 
+          const packageKind = detectPackageKind({
+            title: pkg.title,
+            slug: pkg.slug,
+            sourceMetadata: pkg.sourceMetadata,
+            itemCount: items.length,
+          })
+
           return {
             pkg,
             version,
             sections,
             items,
+            variants,
             testType,
             targetVoltage,
             questionCount,
@@ -408,6 +646,8 @@ export function AdminPackageTestsPage() {
             audioApprovedCount: audioApproved,
             audioTotalCount: items.length,
             isLegacyLive,
+            packageKind,
+            isActive: pkg.sourceMetadata?.is_active !== false,
           }
         }),
       )
@@ -485,6 +725,8 @@ export function AdminPackageTestsPage() {
     return packageSummaries.filter((summary) => {
       if (filterTab === 'green' && summary.testType !== 'green') return false
       if (filterTab === 'red' && summary.testType !== 'red') return false
+      if (categoryFilter === 'standard' && summary.packageKind !== 'standard') return false
+      if (categoryFilter === 'mini' && summary.packageKind !== 'mini') return false
 
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase()
@@ -501,7 +743,110 @@ export function AdminPackageTestsPage() {
       }
       return true
     })
-  }, [packageSummaries, filterTab, searchQuery])
+  }, [packageSummaries, filterTab, categoryFilter, searchQuery])
+
+  // Mini-Test Variant Handlers
+  function openCreateMiniModal(summary: PackageSummary) {
+    setMiniModalSummary(summary)
+    const baseSlug = summary.pkg.slug || 'test'
+    setMiniCode(baseSlug.startsWith('mini-') ? baseSlug : `mini-${baseSlug}`)
+    const baseTitle = summary.pkg.title.replace(/\s*·\s*LIVE\s*$/i, '')
+    setMiniTitle(baseTitle.startsWith('[Mini]') ? baseTitle : `[Mini] ${baseTitle}`)
+    setMiniSamplingStrategy('random')
+    setMiniCopyAudio(true)
+  }
+
+  async function handleCreateMiniTest(e: React.FormEvent) {
+    e.preventDefault()
+    if (!miniModalSummary?.version) return
+    setCreatingMini(true)
+    try {
+      const res = await createMiniTestVariantFromPackage({
+        sourcePackageVersionId: miniModalSummary.version.id,
+        customCode: miniCode,
+        customTitle: miniTitle,
+        questionsPerSection: 3,
+        samplingStrategy: miniSamplingStrategy,
+        copyAudio: miniCopyAudio,
+      })
+      if (!res.ok) throw new Error(res.error)
+      ok(`Đã tạo thành công biến thể Mini-test: "${res.data.package.title}" (${res.data.itemCount} câu)!`)
+      setMiniModalSummary(null)
+      await loadPackages()
+      if (res.data.version?.id) {
+        setSelectedVersionState(res.data.version.id)
+      }
+    } catch (errCause) {
+      err(errCause instanceof Error ? errCause.message : 'Tạo mini-test thất bại')
+    } finally {
+      setCreatingMini(false)
+    }
+  }
+
+  async function handleBatchCreateMiniTests() {
+    const standardPackages = packageSummaries.filter(
+      (s) => s.packageKind === 'standard' && s.version,
+    )
+    if (standardPackages.length === 0) {
+      err('Không tìm thấy gói Standard test nào để tạo biến thể mini.')
+      return
+    }
+
+    if (
+      !window.confirm(
+        `Xác nhận tự động tạo ${standardPackages.length} bài Mini-Test (21 câu / zero-waste audio reuse) tương ứng với các gói Standard hiện có?`,
+      )
+    ) {
+      return
+    }
+
+    setBatchCreatingMini(true)
+    let createdCount = 0
+    let skippedCount = 0
+    const errors: string[] = []
+
+    for (let i = 0; i < standardPackages.length; i++) {
+      const summary = standardPackages[i]
+      const baseSlug = summary.pkg.slug || 'standard'
+      const targetSlug = baseSlug.startsWith('mini-') ? baseSlug : `mini-${baseSlug}`
+      const baseTitle = summary.pkg.title.replace(/\s*·\s*LIVE.*$/i, '').trim()
+      const targetTitle = baseTitle.startsWith('[Mini]') ? baseTitle : `[Mini] ${baseTitle}`
+
+      // Check if already exists in packageSummaries and has questions
+      const existing = packageSummaries.find((s) => s.pkg.slug === targetSlug)
+      if (existing && existing.questionCount > 0) {
+        skippedCount++
+        continue
+      }
+
+      setBatchProgress(`Đang tạo (${i + 1}/${standardPackages.length}): ${targetSlug}...`)
+
+      const res = await createMiniTestVariantFromPackage({
+        sourcePackageVersionId: summary.version!.id,
+        customCode: targetSlug,
+        customTitle: targetTitle,
+        samplingStrategy: 'random',
+        questionsPerSection: 3,
+        copyAudio: true,
+      })
+
+      if (res.ok) {
+        createdCount++
+      } else {
+        errors.push(`${summary.pkg.title}: ${res.error}`)
+      }
+    }
+
+    setBatchCreatingMini(false)
+    setBatchProgress(null)
+
+    if (errors.length > 0) {
+      err(`Hoàn tất tạo ${createdCount} gói. Có lỗi: ${errors.join(', ')}`)
+    } else {
+      ok(`Đã tạo thành công ${createdCount} bài Mini-Test mới! (Đã bỏ qua ${skippedCount} gói đã tồn tại)`)
+    }
+    await loadPackages()
+  }
 
   // Handle AI Package Generation with custom CVR math and Ample
   async function handleGenerateAiPackage(e: React.FormEvent) {
@@ -615,6 +960,27 @@ export function AdminPackageTestsPage() {
     }
   }
 
+  // Handle Package Active/Inactive Toggle (Show/Hide in Teacher Tests 1-1)
+  async function handleTogglePackageActive(summary: PackageSummary) {
+    const nextState = !summary.isActive
+    setPackageSummaries((prev) =>
+      prev.map((s) => (s.pkg.id === summary.pkg.id ? { ...s, isActive: nextState } : s)),
+    )
+    const res = await toggleTestPackageActive(summary.pkg.id, nextState)
+    if (res.ok) {
+      ok(
+        nextState
+          ? `Đã BẬT gói "${summary.pkg.title}" (Hiển thị ở mục Tests 1-1)`
+          : `Đã TẮT gói "${summary.pkg.title}" (Ẩn khỏi mục Tests 1-1)`,
+      )
+    } else {
+      err(res.error || 'Cập nhật trạng thái thất bại')
+      setPackageSummaries((prev) =>
+        prev.map((s) => (s.pkg.id === summary.pkg.id ? { ...s, isActive: !nextState } : s)),
+      )
+    }
+  }
+
   // Inline Test Voice Playback
   async function handleTestVoice() {
     const sample =
@@ -631,9 +997,78 @@ export function AdminPackageTestsPage() {
     }
   }
 
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null)
+  const currentPlayKeyRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause()
+        currentAudioRef.current = null
+      }
+    }
+  }, [])
+
   // Inline Audio Playback for Item / Intro
-  async function handlePlayItemAudio(key: string, text: string, lang: 'vi' | 'en') {
+  async function handlePlayItemAudio(
+    key: string,
+    text: string,
+    lang: 'vi' | 'en',
+    options?: {
+      itemOrder?: number
+      variantId?: string | null
+      target?: 'test_item' | 'package_start' | 'part_intro' | 'section_intro' | 'package_end'
+    },
+  ) {
+    if (playingAudioKey === key) {
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause()
+        currentAudioRef.current = null
+      }
+      currentPlayKeyRef.current = null
+      setPlayingAudioKey(null)
+      return
+    }
+
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause()
+      currentAudioRef.current = null
+    }
+
+    currentPlayKeyRef.current = key
     setPlayingAudioKey(key)
+
+    const isCurrent = () => currentPlayKeyRef.current === key
+
+    const playAudioUrl = (url: string): Promise<void> => {
+      return new Promise((resolve, reject) => {
+        if (!isCurrent()) {
+          resolve()
+          return
+        }
+        const audio = new Audio(url)
+        currentAudioRef.current = audio
+        audio.onended = () => {
+          if (currentAudioRef.current === audio) {
+            currentAudioRef.current = null
+          }
+          resolve()
+        }
+        audio.onerror = (e) => {
+          if (currentAudioRef.current === audio) {
+            currentAudioRef.current = null
+          }
+          reject(new Error('Audio playback failed: ' + String(e)))
+        }
+        audio.play().catch((playErr) => {
+          if (currentAudioRef.current === audio) {
+            currentAudioRef.current = null
+          }
+          reject(playErr)
+        })
+      })
+    }
+
     try {
       const voice =
         audioVoiceLang === lang
@@ -641,11 +1076,45 @@ export function AdminPackageTestsPage() {
           : lang === 'vi'
             ? 'google/vi-VN-Neural2-A'
             : 'google/en-US-Neural2-F'
-      await playGoogleCloudTts(text, lang, voice)
+
+      if (options?.itemOrder != null) {
+        // Play prefix audio /audio/number_${options.itemOrder}.wav first
+        try {
+          await playAudioUrl(`/audio/number_${options.itemOrder}.wav`)
+        } catch (prefixErr) {
+          console.warn('Prefix audio error or missing:', prefixErr)
+        }
+
+        if (!isCurrent()) return
+
+        // On prefix end:
+        if (options?.variantId) {
+          const playback = await getNarrationPlaybackUrl(options.variantId)
+          if (!isCurrent()) return
+          await playAudioUrl(playback.signedUrl)
+        } else {
+          ok('Đang phát preview TTS (chưa có audio trong gói)')
+          await playGoogleCloudTts(text, lang, voice)
+        }
+      } else {
+        // Intro audios (package_start, part_intro, section_intro, package_end) or non-item targets
+        if (options?.variantId) {
+          const playback = await getNarrationPlaybackUrl(options.variantId)
+          if (!isCurrent()) return
+          await playAudioUrl(playback.signedUrl)
+        } else {
+          await playGoogleCloudTts(text, lang, voice)
+        }
+      }
     } catch (e) {
-      err(e instanceof Error ? e.message : 'Phát âm thanh thất bại')
+      if (isCurrent()) {
+        err(e instanceof Error ? e.message : 'Phát âm thanh thất bại')
+      }
     } finally {
-      setPlayingAudioKey(null)
+      if (isCurrent()) {
+        currentPlayKeyRef.current = null
+        setPlayingAudioKey(null)
+      }
     }
   }
 
@@ -995,39 +1464,90 @@ export function AdminPackageTestsPage() {
           {/* Catalog Filter Bar */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
             {/* Filter Buttons */}
-            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200/60">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/60">
+                <button
+                  type="button"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    filterTab === 'all'
+                      ? 'bg-white text-slate-900 shadow-sm border border-slate-200/50'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  onClick={() => setFilterTab('all')}
+                >
+                  Tất cả ({packageSummaries.length})
+                </button>
+                <button
+                  type="button"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                    filterTab === 'green'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-emerald-700 hover:bg-emerald-50'
+                  }`}
+                  onClick={() => setFilterTab('green')}
+                >
+                  <span>Green test</span>
+                </button>
+                <button
+                  type="button"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                    filterTab === 'red'
+                      ? 'bg-rose-600 text-white shadow-sm'
+                      : 'text-rose-700 hover:bg-rose-50'
+                  }`}
+                  onClick={() => setFilterTab('red')}
+                >
+                  <span>Red test</span>
+                </button>
+              </div>
+
+              {/* Category Filter: Standard vs Mini */}
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/60">
+                <button
+                  type="button"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    categoryFilter === 'all'
+                      ? 'bg-white text-slate-900 shadow-sm border border-slate-200/50'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  onClick={() => setCategoryFilter('all')}
+                >
+                  Mọi quy mô
+                </button>
+                <button
+                  type="button"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                    categoryFilter === 'standard'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-blue-700 hover:bg-blue-50'
+                  }`}
+                  onClick={() => setCategoryFilter('standard')}
+                >
+                  <span>Standard (49 câu)</span>
+                </button>
+                <button
+                  type="button"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                    categoryFilter === 'mini'
+                      ? 'bg-violet-600 text-white shadow-sm'
+                      : 'text-violet-700 hover:bg-violet-50'
+                  }`}
+                  onClick={() => setCategoryFilter('mini')}
+                >
+                  <span>Mini-test (21 câu)</span>
+                </button>
+              </div>
+
+              {/* Batch Mini Generator Action */}
               <button
                 type="button"
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  filterTab === 'all'
-                    ? 'bg-white text-slate-900 shadow-sm border border-slate-200/50'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-                onClick={() => setFilterTab('all')}
+                onClick={() => void handleBatchCreateMiniTests()}
+                disabled={batchCreatingMini}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50 shrink-0"
+                title="Tự động tạo các biến thể Mini-test 21 câu từ tất cả các gói Standard test"
               >
-                Tất cả ({packageSummaries.length})
-              </button>
-              <button
-                type="button"
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                  filterTab === 'green'
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'text-emerald-700 hover:bg-emerald-50'
-                }`}
-                onClick={() => setFilterTab('green')}
-              >
-                <span>Green Tests (Focus 12V)</span>
-              </button>
-              <button
-                type="button"
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                  filterTab === 'red'
-                    ? 'bg-rose-600 text-white shadow-sm'
-                    : 'text-rose-700 hover:bg-rose-50'
-                }`}
-                onClick={() => setFilterTab('red')}
-              >
-                <span>Red Tests (Awareness 56V)</span>
+                <Sparkles className="h-3.5 w-3.5 text-slate-950" />
+                <span>{batchCreatingMini ? (batchProgress || 'Đang tạo...') : '⚡ Tạo 8 bài Mini-test'}</span>
               </button>
             </div>
 
@@ -1117,19 +1637,57 @@ export function AdminPackageTestsPage() {
                     <div className="space-y-3">
                       {/* Top Badges */}
                       <div className="flex items-center justify-between gap-2">
-                        <span
-                          className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${
-                            isGreen
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
-                              : 'bg-rose-50 text-rose-700 border border-rose-200/60'
-                          }`}
-                        >
-                          {isGreen ? 'GREEN FOCUS' : 'RED AWARENESS'} • {summary.targetVoltage}V
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span
+                            className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${
+                              isGreen
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                                : 'bg-rose-50 text-rose-700 border border-rose-200/60'
+                            }`}
+                          >
+                            {isGreen ? 'GREEN FOCUS' : 'RED AWARENESS'} • {summary.targetVoltage}V
+                          </span>
 
-                        <span className="text-[11px] font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
-                          {summary.questionCount}Q
-                        </span>
+                          {summary.packageKind === 'mini' ? (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-violet-50 text-violet-700 border border-violet-200/70">
+                              Mini · 21Q
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200/70">
+                              Standard · 49Q
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              void handleTogglePackageActive(summary)
+                            }}
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold transition-all cursor-pointer ${
+                              summary.isActive
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-200'
+                                : 'bg-slate-100 text-slate-500 border border-slate-300 hover:bg-slate-200'
+                            }`}
+                            title={
+                              summary.isActive
+                                ? 'Gói đang BẬT cho Tests 1-1 (bấm để tắt)'
+                                : 'Gói đang TẮT cho Tests 1-1 (bấm để bật)'
+                            }
+                          >
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                summary.isActive ? 'bg-emerald-500' : 'bg-slate-400'
+                              }`}
+                            />
+                            <span>{summary.isActive ? '1-1 ON' : '1-1 OFF'}</span>
+                          </button>
+                          <span className="text-[11px] font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
+                            {summary.questionCount}Q
+                          </span>
+                        </div>
                       </div>
 
                       {/* Title & Description */}
@@ -1175,17 +1733,17 @@ export function AdminPackageTestsPage() {
 
                     {/* Actions Toolbar */}
                     <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <button
                           type="button"
                           onClick={() => {
                             selectPackage(summary)
                             handleTabChange('content')
                           }}
-                          className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors flex items-center gap-1"
+                          className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors flex items-center gap-1"
                         >
                           <FileText className="h-3.5 w-3.5" />
-                          <span>Soạn nội dung</span>
+                          <span>Soạn</span>
                         </button>
 
                         <button
@@ -1194,11 +1752,24 @@ export function AdminPackageTestsPage() {
                             selectPackage(summary)
                             handleTabChange('audio')
                           }}
-                          className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors flex items-center gap-1"
+                          className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors flex items-center gap-1"
                         >
                           <Headphones className="h-3.5 w-3.5" />
                           <span>Audio</span>
                         </button>
+
+                        {summary.packageKind !== 'mini' && (
+                          <button
+                            type="button"
+                            data-testid="create-mini-btn"
+                            onClick={() => openCreateMiniModal(summary)}
+                            className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200/80 transition-colors flex items-center gap-1"
+                            title="Tạo biến thể Mini-test 21 câu từ gói này"
+                          >
+                            <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+                            <span>Tạo Mini</span>
+                          </button>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-1">
@@ -1251,6 +1822,7 @@ export function AdminPackageTestsPage() {
                       <th className="py-3.5 px-4">Cấu trúc đề</th>
                       <th className="py-3.5 px-4">Kháng trở CVR (Ω)</th>
                       <th className="py-3.5 px-4">Tiến độ Audio</th>
+                      <th className="py-3.5 px-4 text-center">Tests 1-1</th>
                       <th className="py-3.5 px-4 text-right">Thao tác</th>
                     </tr>
                   </thead>
@@ -1270,15 +1842,27 @@ export function AdminPackageTestsPage() {
                             <div className="text-[11px] font-mono text-slate-400 mt-0.5">{summary.pkg.slug}</div>
                           </td>
                           <td className="py-3.5 px-4 whitespace-nowrap">
-                            <span
-                              className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${
-                                isGreen
-                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
-                                  : 'bg-rose-50 text-rose-700 border border-rose-200/60'
-                              }`}
-                            >
-                              {isGreen ? 'GREEN FOCUS' : 'RED AWARENESS'} • {summary.targetVoltage}V
-                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span
+                                className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
+                                  isGreen
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                                    : 'bg-rose-50 text-rose-700 border border-rose-200/60'
+                                }`}
+                              >
+                                {isGreen ? 'GREEN FOCUS' : 'RED AWARENESS'} • {summary.targetVoltage}V
+                              </span>
+
+                              {summary.packageKind === 'mini' ? (
+                                <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-violet-50 text-violet-700 border border-violet-200/70">
+                                  Mini
+                                </span>
+                              ) : (
+                                <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200/70">
+                                  Standard
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="py-3.5 px-4 whitespace-nowrap">
                             <span className="font-bold text-slate-800">{summary.sections.length}</span>{' '}
@@ -1308,6 +1892,29 @@ export function AdminPackageTestsPage() {
                               </span>
                             </div>
                           </td>
+                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => void handleTogglePackageActive(summary)}
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
+                                summary.isActive
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-200'
+                                  : 'bg-slate-100 text-slate-500 border border-slate-300 hover:bg-slate-200'
+                              }`}
+                              title={
+                                summary.isActive
+                                  ? 'Gói đang BẬT cho Tests 1-1 (bấm để tắt)'
+                                  : 'Gói đang TẮT cho Tests 1-1 (bấm để bật)'
+                              }
+                            >
+                              <span
+                                className={`w-2 h-2 rounded-full ${
+                                  summary.isActive ? 'bg-emerald-500' : 'bg-slate-400'
+                                }`}
+                              />
+                              <span>{summary.isActive ? 'ON' : 'OFF'}</span>
+                            </button>
+                          </td>
                           <td className="py-3.5 px-4 text-right whitespace-nowrap">
                             <div className="flex items-center justify-end gap-1.5">
                               <button
@@ -1334,6 +1941,17 @@ export function AdminPackageTestsPage() {
                                 <Headphones className="h-3.5 w-3.5" />
                                 <span className="hidden md:inline">Audio</span>
                               </button>
+                              {summary.packageKind !== 'mini' && (
+                                <button
+                                  type="button"
+                                  onClick={() => openCreateMiniModal(summary)}
+                                  className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200/80 transition-colors flex items-center gap-1"
+                                  title="Tạo biến thể Mini-test 21 câu"
+                                >
+                                  <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+                                  <span className="hidden md:inline">Tạo Mini</span>
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => setPreviewPackage(summary)}
@@ -1491,8 +2109,23 @@ export function AdminPackageTestsPage() {
                             </div>
                           </div>
 
-                          {/* Session Physics Badge */}
-                          <div className="flex items-center gap-2 text-[11px]">
+                          {/* Session Physics & Language Badge */}
+                          <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-100 border border-slate-200">
+                              <span className={`font-bold uppercase ${
+                                getSectionLanguage(sec) === 'en' ? 'text-blue-700' : 'text-emerald-700'
+                              }`}>
+                                {getSectionLanguage(sec).toUpperCase()} Audio
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleSectionLanguage(sec.id, getSectionLanguage(sec))}
+                                className="text-[10px] text-slate-500 hover:text-indigo-600 underline font-semibold transition-colors"
+                                title="Đổi ngôn ngữ cho session này"
+                              >
+                                Đổi sang {getSectionLanguage(sec) === 'en' ? 'VI' : 'EN'}
+                              </button>
+                            </div>
                             <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono">
                               CVR: {sec.targetCvrOhm ?? 3}Ω
                             </span>
@@ -1516,6 +2149,14 @@ export function AdminPackageTestsPage() {
                             const hintsList = !isGreen && item.promptVi ? item.promptVi.split('/') : []
                             const redValidation = !isGreen ? validateRedCollocations(hintsList) : null
 
+                            const secLang: 'vi' | 'en' = getSectionLanguage(sec)
+                            const itemVariant = itemVariantMap.get(`${item.id}_${secLang}`)
+                            const isAudioApproved = itemVariant && itemVariant.approval_status === 'approved'
+                            const script =
+                              secLang === 'vi'
+                                ? item.spokenScriptVi || item.promptVi || ''
+                                : item.spokenScriptEn || item.promptEn || ''
+
                             return (
                               <div key={item.id} className="p-4 hover:bg-slate-50/50 transition-colors space-y-2">
                                 <div className="flex items-start justify-between gap-4">
@@ -1530,6 +2171,15 @@ export function AdminPackageTestsPage() {
                                       {item.termEn && (
                                         <span className="text-xs text-slate-400 font-medium">
                                           ({item.termEn})
+                                        </span>
+                                      )}
+                                      {isAudioApproved ? (
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+                                          Đã lưu audio
+                                        </span>
+                                      ) : (
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium">
+                                          Chưa lưu audio
                                         </span>
                                       )}
                                     </div>
@@ -1577,6 +2227,36 @@ export function AdminPackageTestsPage() {
                                     <div className="text-[10px] font-mono text-slate-400">
                                       TC: {item.tc ?? 2} • LC: {item.lc ?? 1} • TL: {item.tl ?? 1} • CVR: {item.measuredCvr ?? 3}Ω
                                     </div>
+
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          void handlePlayItemAudio(`item_${item.id}`, script, secLang, {
+                                            itemOrder: item.itemOrder,
+                                            variantId: itemVariant?.id,
+                                            target: 'test_item',
+                                          })
+                                        }
+                                        className="p-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                                        title={playingAudioKey === `item_${item.id}` ? 'Dừng phát' : 'Nghe thử'}
+                                      >
+                                        {playingAudioKey === `item_${item.id}` ? (
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <Play className="h-3 w-3 fill-current" />
+                                        )}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenEditItem(item)}
+                                        className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-700 text-[11px] font-semibold flex items-center gap-1 transition-colors"
+                                        title="Chỉnh sửa nội dung câu hỏi"
+                                      >
+                                        <Pencil className="h-3 w-3" />
+                                        <span>Sửa câu</span>
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -1617,14 +2297,9 @@ export function AdminPackageTestsPage() {
                           const hintsList = !isGreen && item.promptVi ? item.promptVi.split('/') : []
                           const redValidation = !isGreen ? validateRedCollocations(hintsList) : null
 
-                          const lang: 'vi' | 'en' =
-                            selectedPackage.testType === 'green'
-                              ? sec && sec.sectionOrder <= 3
-                                ? 'en'
-                                : 'vi'
-                              : sec && sec.sectionOrder <= 3
-                                ? 'vi'
-                                : 'en'
+                          const lang: 'vi' | 'en' = getSectionLanguage(sec)
+                          const itemVariant = itemVariantMap.get(`${item.id}_${lang}`)
+                          const isAudioApproved = itemVariant && itemVariant.approval_status === 'approved'
                           const script =
                             lang === 'vi'
                               ? item.spokenScriptVi || item.promptVi || ''
@@ -1679,19 +2354,43 @@ export function AdminPackageTestsPage() {
                                 )}
                               </td>
                               <td className="py-3 px-4 text-right whitespace-nowrap">
-                                <button
-                                  type="button"
-                                  onClick={() => void handlePlayItemAudio(`item_${item.id}`, script, lang)}
-                                  disabled={playingAudioKey === `item_${item.id}`}
-                                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
-                                  title="Nghe thử"
-                                >
-                                  {playingAudioKey === `item_${item.id}` ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {isAudioApproved ? (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+                                      Đã lưu audio
+                                    </span>
                                   ) : (
-                                    <Play className="h-3.5 w-3.5 fill-current" />
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium">
+                                      Chưa lưu audio
+                                    </span>
                                   )}
-                                </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      void handlePlayItemAudio(`item_${item.id}`, script, lang, {
+                                        itemOrder: item.itemOrder,
+                                        variantId: itemVariant?.id,
+                                        target: 'test_item',
+                                      })
+                                    }
+                                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                                    title={playingAudioKey === `item_${item.id}` ? 'Dừng phát' : 'Nghe thử'}
+                                  >
+                                    {playingAudioKey === `item_${item.id}` ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <Play className="h-3.5 w-3.5 fill-current" />
+                                    )}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditItem(item)}
+                                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-700 transition-colors"
+                                    title="Chỉnh sửa nội dung câu hỏi"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           )
@@ -1990,9 +2689,20 @@ export function AdminPackageTestsPage() {
                   <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-xs text-slate-800">Lời Chào Đầu Bài (Package Start)</span>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                        package_start
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {packageStartVariant('vi')?.approval_status === 'approved' ? (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+                            Đã lưu audio
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium">
+                            Chưa lưu audio
+                          </span>
+                        )}
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          package_start
+                        </span>
+                      </div>
                     </div>
                     <p className="text-xs text-slate-600 italic">
                       "Chào mừng em đến với bài kiểm tra Chunks LMS. Lắng nghe cẩn thận và phát âm chính xác..."
@@ -2005,12 +2715,21 @@ export function AdminPackageTestsPage() {
                             'pkg_start',
                             'Chào mừng em đến với bài kiểm tra Chunks LMS. Lắng nghe cẩn thận và phát âm chính xác.',
                             'vi',
+                            {
+                              variantId: packageStartVariant('vi')?.id,
+                              target: 'package_start',
+                            },
                           )
                         }
                         className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 flex items-center gap-1 transition-colors"
+                        title={playingAudioKey === 'pkg_start' ? 'Dừng phát' : 'Nghe thử'}
                       >
-                        <Play className="h-3 w-3 fill-current" />
-                        <span>Nghe thử</span>
+                        {playingAudioKey === 'pkg_start' ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Play className="h-3 w-3 fill-current" />
+                        )}
+                        <span>{playingAudioKey === 'pkg_start' ? 'Đang phát' : 'Nghe thử'}</span>
                       </button>
                       <button
                         type="button"
@@ -2047,9 +2766,20 @@ export function AdminPackageTestsPage() {
                   <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-xs text-slate-800">Lời Chúc Mừng Kết Thúc (Package End)</span>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                        package_end
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {packageEndVariant('vi')?.approval_status === 'approved' ? (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+                            Đã lưu audio
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium">
+                            Chưa lưu audio
+                          </span>
+                        )}
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          package_end
+                        </span>
+                      </div>
                     </div>
                     <p className="text-xs text-slate-600 italic">
                       "Chúc mừng em đã hoàn thành toàn bộ bài kiểm tra. Em đã thể hiện sự tập trung và lưu loát rất xuất sắc!"
@@ -2062,12 +2792,21 @@ export function AdminPackageTestsPage() {
                             'pkg_end',
                             'Chúc mừng em đã hoàn thành toàn bộ bài kiểm tra. Em đã thể hiện sự tập trung và lưu loát rất xuất sắc!',
                             'vi',
+                            {
+                              variantId: packageEndVariant('vi')?.id,
+                              target: 'package_end',
+                            },
                           )
                         }
                         className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 flex items-center gap-1 transition-colors"
+                        title={playingAudioKey === 'pkg_end' ? 'Dừng phát' : 'Nghe thử'}
                       >
-                        <Play className="h-3 w-3 fill-current" />
-                        <span>Nghe thử</span>
+                        {playingAudioKey === 'pkg_end' ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Play className="h-3 w-3 fill-current" />
+                        )}
+                        <span>{playingAudioKey === 'pkg_end' ? 'Đang phát' : 'Nghe thử'}</span>
                       </button>
                       <button
                         type="button"
@@ -2113,6 +2852,8 @@ export function AdminPackageTestsPage() {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     {[1, 2, 3].map((p) => {
+                      const partVar = partVariantMap.get(`${p}_vi`)
+                      const isPartApproved = partVar && partVar.approval_status === 'approved'
                       const partScript =
                         p === 1
                           ? 'Phần 1 - Khởi động nhận thức. Lắng nghe cẩn thận và sẵn sàng phản hồi.'
@@ -2123,9 +2864,20 @@ export function AdminPackageTestsPage() {
                         <div key={p} className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="font-bold text-xs text-slate-800">Part {p} Intro</span>
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                              P{p}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              {isPartApproved ? (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+                                  Đã lưu audio
+                                </span>
+                              ) : (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium">
+                                  Chưa lưu audio
+                                </span>
+                              )}
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                P{p}
+                              </span>
+                            </div>
                           </div>
                           <p className="text-[11px] text-slate-600 line-clamp-2 italic">
                             "{partScript}"
@@ -2133,11 +2885,20 @@ export function AdminPackageTestsPage() {
                           <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-slate-200/60">
                             <button
                               type="button"
-                              onClick={() => void handlePlayItemAudio(`part_${p}`, partScript, 'vi')}
+                              onClick={() =>
+                                void handlePlayItemAudio(`part_${p}`, partScript, 'vi', {
+                                  variantId: partVar?.id,
+                                  target: 'part_intro',
+                                })
+                              }
                               className="px-2 py-1 text-[11px] font-semibold rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 flex items-center gap-1 transition-colors"
-                              title="Nghe thử"
+                              title={playingAudioKey === `part_${p}` ? 'Dừng phát' : 'Nghe thử'}
                             >
-                              <Play className="h-3 w-3 fill-current" />
+                              {playingAudioKey === `part_${p}` ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Play className="h-3 w-3 fill-current" />
+                              )}
                             </button>
                             <button
                               type="button"
@@ -2179,14 +2940,9 @@ export function AdminPackageTestsPage() {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[320px] overflow-y-auto pr-1">
                       {selectedPackage.sections.map((sec) => {
-                        const secLang: 'vi' | 'en' =
-                          selectedPackage.testType === 'green'
-                            ? sec.sectionOrder <= 3
-                              ? 'en'
-                              : 'vi'
-                            : sec.sectionOrder <= 3
-                              ? 'vi'
-                              : 'en'
+                        const secLang: 'vi' | 'en' = getSectionLanguage(sec)
+                        const secVar = sectionVariantMap.get(`${sec.id}_${secLang}`)
+                        const isSecApproved = secVar && secVar.approval_status === 'approved'
                         const secScript =
                           secLang === 'vi'
                             ? sec.introTextVi ||
@@ -2199,9 +2955,30 @@ export function AdminPackageTestsPage() {
                               <span className="font-bold text-xs text-slate-800">
                                 Session {sec.sectionOrder}: {sec.title}
                               </span>
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 uppercase">
-                                {secLang} · S{sec.sectionOrder}
-                              </span>
+                              <div className="flex items-center gap-1.5">
+                                {isSecApproved ? (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+                                    Đã lưu audio
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium">
+                                    Chưa lưu audio
+                                  </span>
+                                )}
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase border ${
+                                  secLang === 'en' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                }`}>
+                                  {secLang} · S{sec.sectionOrder}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleSectionLanguage(sec.id, secLang)}
+                                  className="text-[10px] text-slate-400 hover:text-indigo-600 underline font-semibold transition-colors"
+                                  title="Đổi ngôn ngữ cho session này"
+                                >
+                                  {secLang === 'en' ? 'Đổi VI' : 'Đổi EN'}
+                                </button>
+                              </div>
                             </div>
                             <p className="text-[11px] text-slate-600 line-clamp-1 italic">
                               "{secScript}"
@@ -2209,11 +2986,20 @@ export function AdminPackageTestsPage() {
                             <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-slate-200/60">
                               <button
                                 type="button"
-                                onClick={() => void handlePlayItemAudio(`sec_${sec.id}`, secScript, secLang)}
+                                onClick={() =>
+                                  void handlePlayItemAudio(`sec_${sec.id}`, secScript, secLang, {
+                                    variantId: secVar?.id,
+                                    target: 'section_intro',
+                                  })
+                                }
                                 className="px-2 py-1 text-[11px] font-semibold rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 flex items-center gap-1 transition-colors"
-                                title="Nghe thử"
+                                title={playingAudioKey === `sec_${sec.id}` ? 'Dừng phát' : 'Nghe thử'}
                               >
-                                <Play className="h-3 w-3 fill-current" />
+                                {playingAudioKey === `sec_${sec.id}` ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Play className="h-3 w-3 fill-current" />
+                                )}
                               </button>
                               <button
                                 type="button"
@@ -2258,14 +3044,9 @@ export function AdminPackageTestsPage() {
                 <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto pr-2">
                   {selectedPackage.items.map((item) => {
                     const sec = selectedPackage.sections.find((s) => s.id === item.sectionId)
-                    const lang: 'vi' | 'en' =
-                      selectedPackage.testType === 'green'
-                        ? sec && sec.sectionOrder <= 3
-                          ? 'en'
-                          : 'vi'
-                        : sec && sec.sectionOrder <= 3
-                          ? 'vi'
-                          : 'en'
+                    const lang: 'vi' | 'en' = getSectionLanguage(sec)
+                    const itemVar = itemVariantMap.get(`${item.id}_${lang}`)
+                    const isItemApproved = itemVar && itemVar.approval_status === 'approved'
                     const script =
                       lang === 'vi'
                         ? item.spokenScriptVi || item.promptVi || ''
@@ -2284,6 +3065,15 @@ export function AdminPackageTestsPage() {
                             <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">
                               {lang}
                             </span>
+                            {isItemApproved ? (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+                                Đã lưu audio
+                              </span>
+                            ) : (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium">
+                                Chưa lưu audio
+                              </span>
+                            )}
                           </div>
                           <div className="text-xs text-slate-700 line-clamp-1 font-medium">
                             {script}
@@ -2294,16 +3084,30 @@ export function AdminPackageTestsPage() {
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <button
                             type="button"
-                            onClick={() => void handlePlayItemAudio(`item_${item.id}`, script, lang)}
-                            disabled={playingAudioKey === `item_${item.id}`}
+                            onClick={() =>
+                              void handlePlayItemAudio(`item_${item.id}`, script, lang, {
+                                itemOrder: item.itemOrder,
+                                variantId: itemVar?.id,
+                                target: 'test_item',
+                              })
+                            }
                             className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
-                            title="Nghe thử"
+                            title={playingAudioKey === `item_${item.id}` ? 'Dừng phát' : 'Nghe thử'}
                           >
                             {playingAudioKey === `item_${item.id}` ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
                             ) : (
                               <Play className="h-3.5 w-3.5 fill-current" />
                             )}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditItem(item)}
+                            className="p-2 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-700 transition-colors"
+                            title="Chỉnh sửa câu hỏi & kịch bản"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
                           </button>
 
                           <button
@@ -2348,11 +3152,15 @@ export function AdminPackageTestsPage() {
               part?: number
               sectionId?: string
               itemId?: string
+              itemOrder?: number
+              variantId?: string | null
+              isApproved?: boolean
             }
 
             const rows: FlatAudioRow[] = []
 
             // Package Start
+            const startVar = packageStartVariant('vi')
             rows.push({
               key: 'pkg_start',
               target: 'package_start',
@@ -2360,10 +3168,13 @@ export function AdminPackageTestsPage() {
               orderRef: 'START',
               lang: 'vi',
               text: 'Chào mừng em đến với bài kiểm tra Chunks LMS. Lắng nghe cẩn thận và phát âm chính xác.',
+              variantId: startVar?.id,
+              isApproved: startVar?.approval_status === 'approved',
             })
 
             // Part Intros (P1..P3)
             ;[1, 2, 3].forEach((p) => {
+              const partVar = partVariantMap.get(`${p}_vi`)
               const partScript =
                 p === 1
                   ? 'Phần 1 - Khởi động nhận thức. Lắng nghe cẩn thận và sẵn sàng phản hồi.'
@@ -2378,6 +3189,8 @@ export function AdminPackageTestsPage() {
                 lang: 'vi',
                 text: partScript,
                 part: p,
+                variantId: partVar?.id,
+                isApproved: partVar?.approval_status === 'approved',
               })
             })
 
@@ -2391,6 +3204,7 @@ export function AdminPackageTestsPage() {
                   : sec.sectionOrder <= 3
                     ? 'vi'
                     : 'en'
+              const secVar = sectionVariantMap.get(`${sec.id}_${secLang}`)
               const secScript =
                 secLang === 'vi'
                   ? sec.introTextVi ||
@@ -2405,6 +3219,8 @@ export function AdminPackageTestsPage() {
                 lang: secLang,
                 text: secScript,
                 sectionId: sec.id,
+                variantId: secVar?.id,
+                isApproved: secVar?.approval_status === 'approved',
               })
             })
 
@@ -2419,6 +3235,7 @@ export function AdminPackageTestsPage() {
                   : sec && sec.sectionOrder <= 3
                     ? 'vi'
                     : 'en'
+              const itemVar = itemVariantMap.get(`${item.id}_${lang}`)
               const script =
                 lang === 'vi'
                   ? item.spokenScriptVi || item.promptVi || ''
@@ -2432,10 +3249,14 @@ export function AdminPackageTestsPage() {
                 text: script,
                 sectionId: item.sectionId,
                 itemId: item.id,
+                itemOrder: item.itemOrder,
+                variantId: itemVar?.id,
+                isApproved: itemVar?.approval_status === 'approved',
               })
             })
 
             // Package End
+            const endVar = packageEndVariant('vi')
             rows.push({
               key: 'pkg_end',
               target: 'package_end',
@@ -2443,6 +3264,8 @@ export function AdminPackageTestsPage() {
               orderRef: 'END',
               lang: 'vi',
               text: 'Chúc mừng em đã hoàn thành toàn bộ bài kiểm tra. Em đã thể hiện sự tập trung và lưu loát rất xuất sắc!',
+              variantId: endVar?.id,
+              isApproved: endVar?.approval_status === 'approved',
             })
 
             return (
@@ -2462,6 +3285,7 @@ export function AdminPackageTestsPage() {
                         <th className="py-3 px-4 w-16">Ref</th>
                         <th className="py-3 px-4">Mục tiêu (Target)</th>
                         <th className="py-3 px-4">Tên tài sản</th>
+                        <th className="py-3 px-4">Trạng thái</th>
                         <th className="py-3 px-4 w-16">Ngôn ngữ</th>
                         <th className="py-3 px-4">Kịch bản phát âm (Script)</th>
                         <th className="py-3 px-4 text-right">Thao tác</th>
@@ -2482,6 +3306,17 @@ export function AdminPackageTestsPage() {
                             {row.label}
                           </td>
                           <td className="py-3 px-4 whitespace-nowrap">
+                            {row.isApproved ? (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+                                Đã lưu audio
+                              </span>
+                            ) : (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium">
+                                Chưa lưu audio
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 whitespace-nowrap">
                             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-200 text-slate-700">
                               {row.lang}
                             </span>
@@ -2493,10 +3328,15 @@ export function AdminPackageTestsPage() {
                             <div className="flex items-center justify-end gap-1.5">
                               <button
                                 type="button"
-                                onClick={() => void handlePlayItemAudio(row.key, row.text, row.lang)}
-                                disabled={playingAudioKey === row.key}
+                                onClick={() =>
+                                  void handlePlayItemAudio(row.key, row.text, row.lang, {
+                                    itemOrder: row.itemOrder,
+                                    variantId: row.variantId,
+                                    target: row.target,
+                                  })
+                                }
                                 className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
-                                title="Nghe thử"
+                                title={playingAudioKey === row.key ? 'Dừng phát' : 'Nghe thử'}
                               >
                                 {playingAudioKey === row.key ? (
                                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -3222,7 +4062,7 @@ export function AdminPackageTestsPage() {
                     >
                       <div className="font-bold text-emerald-800 flex items-center gap-1.5">
                         <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                        <span>Green Focus Test (12V)</span>
+                        <span>Green Focus Test</span>
                       </div>
                       <p className="text-[11px] text-slate-500 mt-1">
                         1 câu hoàn chỉnh tự nhiên, đếm từ lũy tiến 9-10w đến 22w max. Continuous rhythm ($TL=1.0$).
@@ -3240,7 +4080,7 @@ export function AdminPackageTestsPage() {
                     >
                       <div className="font-bold text-rose-800 flex items-center gap-1.5">
                         <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-                        <span>Red Awareness Test (56V)</span>
+                        <span>Red Awareness Test</span>
                       </div>
                       <p className="text-[11px] text-slate-500 mt-1">
                         Chuỗi collocations (Zero single words, $\ge 2$ từ), anchor từ Chunks, khoảng lặng SSML 650ms.
@@ -3679,6 +4519,228 @@ export function AdminPackageTestsPage() {
         </div>
       )}
 
+      {/* EDIT TEST ITEM MODAL */}
+      {editingItem && (() => {
+        const sec = selectedPackage?.sections.find((s) => s.id === editingItem.sectionId)
+        const secIndex = selectedPackage?.sections.findIndex((s) => s.id === editingItem.sectionId) ?? -1
+        const activeLang = getSectionLanguage(sec)
+        const isGreen = selectedPackage?.testType === 'green'
+        const activeText = activeLang === 'vi' ? editPromptVi : editPromptEn
+        const words = countWords(activeText)
+        const greenValidation = isGreen ? validateGreenSentence(activeText, { minWords: 8, maxWords: 22 }) : null
+        const redValidation = !isGreen ? validateRedCollocations([activeText]) : null
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto">
+            <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl shadow-2xl p-6 space-y-4 my-8 max-h-[90vh] flex flex-col">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-600 font-bold text-sm">
+                    Q{editingItem.itemOrder}
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                      Chỉnh sửa nội dung câu hỏi
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-normal">
+                        {sec ? `Session ${sec.sectionOrder || (secIndex + 1)}: ${sec.title}` : `Item #${editingItem.itemOrder}`}
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Sửa nội dung văn bản câu hỏi, kịch bản đọc và tạo lại âm thanh Google Cloud TTS chất lượng cao.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingItem(null)}
+                  className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Validation Status Banner */}
+              <div className={`p-3 rounded-xl border text-xs flex items-center justify-between ${
+                isGreen
+                  ? greenValidation?.valid
+                    ? 'bg-emerald-50/80 border-emerald-200 text-emerald-800'
+                    : 'bg-amber-50/80 border-amber-200 text-amber-800'
+                  : redValidation?.valid
+                  ? 'bg-emerald-50/80 border-emerald-200 text-emerald-800'
+                  : 'bg-amber-50/80 border-amber-200 text-amber-800'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <Info className="h-4 w-4 shrink-0" />
+                  <span>
+                    {isGreen ? (
+                      <>
+                        <strong>Green Archetype (8-22 từ):</strong> Hiện tại <strong>{words}</strong> từ theo ngữ cảnh{' '}
+                        <strong className="uppercase">{activeLang}</strong>. {greenValidation?.reason || 'Đạt chuẩn câu đơn hoàn chỉnh.'}
+                      </>
+                    ) : (
+                      <>
+                        <strong>Red Collocation:</strong> Hiện tại <strong>{words}</strong> từ. {redValidation?.reason || 'Đạt chuẩn cụm từ ghép.'}
+                      </>
+                    )}
+                  </span>
+                </div>
+                <span className="px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold bg-white border border-slate-200 shrink-0">
+                  Audio: {activeLang.toUpperCase()}
+                </span>
+              </div>
+
+              {/* Form inputs */}
+              <div className="space-y-4 overflow-y-auto pr-1 flex-1 text-xs">
+                {/* Vietnamese Prompt */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-semibold text-slate-700 flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+                      Nội dung câu hỏi Tiếng Việt (promptVi) *
+                    </label>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      {countWords(editPromptVi)} từ
+                    </span>
+                  </div>
+                  <textarea
+                    rows={2}
+                    value={editPromptVi}
+                    onChange={(e) => setEditPromptVi(e.target.value)}
+                    placeholder="Nhập câu tiếng Việt hoàn chỉnh..."
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 font-medium"
+                  />
+                </div>
+
+                {/* English Prompt */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-semibold text-slate-700 flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-blue-500"></span>
+                      Nội dung câu hỏi Tiếng Anh (promptEn) *
+                    </label>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      {countWords(editPromptEn)} từ
+                    </span>
+                  </div>
+                  <textarea
+                    rows={2}
+                    value={editPromptEn}
+                    onChange={(e) => setEditPromptEn(e.target.value)}
+                    placeholder="Enter complete English sentence..."
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 font-medium"
+                  />
+                </div>
+
+                {/* Terms / Vocabulary Targets */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Từ vựng mục tiêu VN (termVi)
+                    </label>
+                    <input
+                      type="text"
+                      value={editTermVi}
+                      onChange={(e) => setEditTermVi(e.target.value)}
+                      placeholder="VD: sở thích, thể thao..."
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Từ vựng mục tiêu EN (termEn)
+                    </label>
+                    <input
+                      type="text"
+                      value={editTermEn}
+                      onChange={(e) => setEditTermEn(e.target.value)}
+                      placeholder="e.g. leisure activities..."
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Spoken Scripts (Optional SSML/Audio Override) */}
+                <div className="pt-2 border-t border-slate-100 space-y-3">
+                  <div className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5">
+                    <Volume2 className="h-3.5 w-3.5" />
+                    KỊCH BẢN ĐỌC CHO GOOGLE CLOUD TTS (Tùy chọn ghi đè phát âm)
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-medium text-slate-600 mb-1">
+                        Kịch bản phát âm VN (mặc định = promptVi)
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={editSpokenVi}
+                        onChange={(e) => setEditSpokenVi(e.target.value)}
+                        placeholder="Để trống nếu đọc giống promptVi"
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-1.5 text-slate-700 text-xs font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-medium text-slate-600 mb-1">
+                        Kịch bản phát âm EN (mặc định = promptEn)
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={editSpokenEn}
+                        onChange={(e) => setEditSpokenEn(e.target.value)}
+                        placeholder="Để trống nếu đọc giống promptEn"
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-1.5 text-slate-700 text-xs font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
+                <span className="text-[11px] text-slate-500">
+                  TTS Voice: <code className="font-mono text-slate-700 font-semibold">{activeLang === 'vi' ? 'vi-VN-Neural2-A' : 'en-US-Neural2-F'}</code>
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="ghost text-xs"
+                    onClick={() => setEditingItem(null)}
+                    disabled={savingItem || regeneratingItemAudio}
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveItem(false)}
+                    disabled={savingItem || regeneratingItemAudio || !editPromptVi.trim() || !editPromptEn.trim()}
+                    className="px-4 py-2 text-xs font-semibold rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                  >
+                    {savingItem && !regeneratingItemAudio ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Save className="h-3.5 w-3.5" />
+                    )}
+                    Lưu Nội Dung
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveItem(true)}
+                    disabled={savingItem || regeneratingItemAudio || !editPromptVi.trim() || !editPromptEn.trim()}
+                    className="px-4 py-2 text-xs font-semibold rounded-xl bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-50 transition-colors flex items-center gap-1.5 shadow-sm"
+                  >
+                    {regeneratingItemAudio ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5" />
+                    )}
+                    Lưu & Sinh Lại Audio TTS
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* DELETE CONFIRMATION MODAL */}
       {deletingPackage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
@@ -3712,6 +4774,141 @@ export function AdminPackageTestsPage() {
                 {deleting ? 'Đang xóa...' : 'Đồng Ý Xóa Vĩnh Viễn'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* MINI-TEST VARIANT GENERATOR MODAL */}
+      {miniModalSummary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg shadow-2xl p-6 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-amber-600">
+                <Sparkles className="h-5 w-5" />
+                <h3 className="text-base font-bold text-slate-900">Tạo Biến Thể Mini-Test (21 câu)</h3>
+              </div>
+              <button
+                type="button"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                onClick={() => setMiniModalSummary(null)}
+                disabled={creatingMini}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-amber-50/70 border border-amber-200/70 rounded-xl text-xs text-amber-800 space-y-1">
+              <div className="font-bold flex items-center gap-1.5">
+                <span>⚡ Zero-Waste Audio & Data Reuse</span>
+              </div>
+              <p className="text-[11px] text-amber-700 leading-relaxed">
+                Tạo bài test thu gọn 21 câu (3 câu/session × 7 sessions) từ gói gốc{' '}
+                <strong>{miniModalSummary.pkg.title.replace(/\s*·\s*LIVE\s*$/i, '')}</strong>. Tự động liên kết các file audio đã lưu trong Supabase Storage, 100% sẵn sàng kiểm tra 1-1 mà không tốn chi phí gọi Google Cloud TTS.
+              </p>
+            </div>
+
+            <form onSubmit={handleCreateMiniTest} className="space-y-4 text-xs">
+              <div className="space-y-1.5">
+                <label className="block font-semibold text-slate-700">Mã gói Mini-Test (Slug)</label>
+                <input
+                  type="text"
+                  required
+                  value={miniCode}
+                  onChange={(e) => setMiniCode(e.target.value)}
+                  placeholder="e.g. mini-g1-56v"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-mono text-xs focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block font-semibold text-slate-700">Tiêu đề bài test</label>
+                <input
+                  type="text"
+                  required
+                  value={miniTitle}
+                  onChange={(e) => setMiniTitle(e.target.value)}
+                  placeholder="e.g. [Mini] G1-56V Focus Test"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block font-semibold text-slate-700">Chiến lược lấy mẫu câu hỏi (3 câu / session)</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                    miniSamplingStrategy === 'random'
+                      ? 'border-amber-400 bg-amber-50/50 text-amber-900 font-semibold'
+                      : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="samplingStrategy"
+                      checked={miniSamplingStrategy === 'random'}
+                      onChange={() => setMiniSamplingStrategy('random')}
+                      className="text-amber-600"
+                    />
+                    <span>3 câu ngẫu nhiên</span>
+                  </label>
+
+                  <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                    miniSamplingStrategy === 'first'
+                      ? 'border-amber-400 bg-amber-50/50 text-amber-900 font-semibold'
+                      : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="samplingStrategy"
+                      checked={miniSamplingStrategy === 'first'}
+                      onChange={() => setMiniSamplingStrategy('first')}
+                      className="text-amber-600"
+                    />
+                    <span>3 câu đầu mỗi session</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80">
+                <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={miniCopyAudio}
+                    onChange={(e) => setMiniCopyAudio(e.target.checked)}
+                    className="rounded text-amber-600 focus:ring-amber-500"
+                  />
+                  <span>Tự động liên kết toàn bộ audio đã lưu (Zero-waste audio)</span>
+                </label>
+                <p className="text-[11px] text-slate-500 mt-1 pl-5">
+                  Tất cả audio câu hỏi và intro có sẵn sẽ được ánh xạ trực tiếp sang gói Mini-test. Bạn có thể thay đổi hoặc tải lên audio intro riêng sau.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  className="ghost text-xs"
+                  onClick={() => setMiniModalSummary(null)}
+                  disabled={creatingMini}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingMini || !miniCode.trim() || !miniTitle.trim()}
+                  className="px-4 py-2 text-xs font-bold rounded-xl bg-amber-600 hover:bg-amber-700 text-white disabled:opacity-50 transition-colors flex items-center gap-1.5 shadow-sm"
+                >
+                  {creatingMini ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Đang tạo Mini-Test...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4" />
+                      <span>Tạo Mini-Test Ngay</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -17,12 +17,16 @@ import { Flash } from '../../components/Flash'
 import { PageHeader } from '../../components/PageHeader'
 import { EmptyState, Panel } from '../../components/ui'
 import {
+  getTestPackage,
   getTestPackageVersion,
+  detectPackageKind,
+  type PackageKind,
   listSectionNarrationReview,
   listTestItems,
   listTestSections,
   type NarrationReviewRecord,
 } from '../../lib/test-packages'
+import { getSupabase } from '../../lib/supabase'
 import type { TestItem, TestSection } from '../../modules/catalog/test-package-catalog'
 import {
   audioReadiness,
@@ -54,7 +58,36 @@ type AudioStatusSummary = {
 function defaultLanguageForSection(
   section: TestSection,
   languagePolicy?: unknown,
+  pkgType?: 'green' | 'red' | string | null,
+  sessionLanguages?: Array<'vi' | 'en'> | null,
+  sectionIntroLang?: 'vi' | 'en' | null,
+  languagePlan?: Record<string, 'vi' | 'en'> | null,
 ): AudioLanguage {
+  // 1. Direct from section_intro audio variant established in the package
+  if (sectionIntroLang === 'vi' || sectionIntroLang === 'en') {
+    return sectionIntroLang
+  }
+
+  // 2. Language plan in version source_metadata (e.g. { "1": "en", "2": "en", ... })
+  if (languagePlan) {
+    const planLang = languagePlan[String(section.sectionOrder)] || languagePlan[section.sectionOrder]
+    if (planLang === 'vi' || planLang === 'en') {
+      return planLang
+    }
+  }
+
+  // 3. Explicit sessionLanguages array from package version metadata
+  if (Array.isArray(sessionLanguages) && sessionLanguages[section.sectionOrder - 1]) {
+    return sessionLanguages[section.sectionOrder - 1]
+  }
+
+  // 4. Section specific metadata
+  const secMeta = (section as any).metadata || (section as any).sourceMetadata
+  if (secMeta?.sessionLanguage === 'vi' || secMeta?.sessionLanguage === 'en') {
+    return secMeta.sessionLanguage
+  }
+
+  // 5. Known language policies
   if (languagePolicy === 'alternating_vi_en') {
     return section.sectionOrder % 2 === 1 ? 'vi' : 'en'
   }
@@ -64,6 +97,14 @@ function defaultLanguageForSection(
   if (languagePolicy === 'green_test_49q') {
     return section.sectionOrder <= 3 || section.sectionOrder === 7 ? 'en' : 'vi'
   }
+
+  // 6. Archetype 7x3 defaults (Green: S1-S3 EN, S4-S6 VI, S7 EN; Red: S1-S3 VI, S4-S7 EN)
+  if ((pkgType || '').toLowerCase() === 'green') {
+    return section.sectionOrder <= 3 || section.sectionOrder === 7 ? 'en' : 'vi'
+  } else if ((pkgType || '').toLowerCase() === 'red') {
+    return section.sectionOrder <= 3 ? 'vi' : 'en'
+  }
+
   return section.sectionOrder <= 4 ? 'vi' : 'en'
 }
 
@@ -124,6 +165,9 @@ export function TeacherTestSetupPage() {
   const { assignmentId, sectionId: initialSectionId } = useParams()
   const navigate = useNavigate()
   const [packageVersionId, setPackageVersionId] = useState('')
+  const [packageKind, setPackageKind] = useState<PackageKind>('standard')
+  const [packageType, setPackageType] = useState<'green' | 'red' | null>(null)
+  const [packageSessionLanguages, setPackageSessionLanguages] = useState<Array<'vi' | 'en'> | null>(null)
   const [languagePolicy, setLanguagePolicy] = useState<unknown>(null)
   const [sections, setSections] = useState<TestSection[]>([])
   const [itemsBySection, setItemsBySection] = useState<Record<string, TestItem[]>>({})
@@ -180,8 +224,48 @@ export function TeacherTestSetupPage() {
       if (!assignment) return setError('Standalone assignment not found')
       setPackageVersionId(assignment.packageVersionId)
       const versionResult = await getTestPackageVersion(assignment.packageVersionId)
-      const nextLanguagePolicy = versionResult.ok ? versionResult.data?.sourceMetadata?.languagePolicy : null
+      if (versionResult.ok && versionResult.data) {
+        setPackageKind(detectPackageKind({ sourceMetadata: versionResult.data.sourceMetadata }))
+      }
+      const meta = versionResult.ok ? (versionResult.data?.sourceMetadata as Record<string, any>) : null
+      const languagePlan = meta?.languagePlan as Record<string, 'vi' | 'en'> | null
+      const nextLanguagePolicy = meta?.languagePolicy ?? null
       setLanguagePolicy(nextLanguagePolicy ?? null)
+      const sessionLanguages = (meta?.sessionLanguages ?? null) as Array<'vi' | 'en'> | null
+      setPackageSessionLanguages(sessionLanguages ?? null)
+      let pkgType: 'green' | 'red' | null = null
+      if (meta?.testType === 'green' || meta?.testType === 'red') {
+        pkgType = meta.testType
+      } else if (versionResult.ok && versionResult.data?.packageId) {
+        const pkgRes = await getTestPackage(versionResult.data.packageId)
+        if (pkgRes.ok && pkgRes.data) {
+          const title = pkgRes.data.title.toLowerCase()
+          pkgType = title.includes('green') ? 'green' : title.includes('red') ? 'red' : null
+        }
+      }
+      setPackageType(pkgType)
+
+      // Query section_intro narration variants to get exact established language per session
+      const sb = getSupabase()
+      const sectionIntroLangs: Record<string, 'vi' | 'en'> = {}
+      if (sb) {
+        const { data: secVars } = await (sb as any)
+          .from('narration_variants')
+          .select('test_section_id, language')
+          .eq('package_version_id', assignment.packageVersionId)
+          .eq('narration_target', 'section_intro')
+          .eq('approval_status', 'approved')
+          .not('audio_asset_id', 'is', null)
+
+        if (Array.isArray(secVars)) {
+          for (const v of secVars) {
+            if (v.test_section_id && (v.language === 'vi' || v.language === 'en')) {
+              sectionIntroLangs[v.test_section_id] = v.language
+            }
+          }
+        }
+      }
+
       const sectionResult = await listTestSections(assignment.packageVersionId)
       if (!sectionResult.ok) return setError(sectionResult.error)
       setSections(sectionResult.data)
@@ -192,7 +276,19 @@ export function TeacherTestSetupPage() {
       )
       setSelectedSectionIds(new Set(sectionResult.data.map((section) => section.id)))
       setLanguageBySection(
-        Object.fromEntries(sectionResult.data.map((section) => [section.id, defaultLanguageForSection(section, nextLanguagePolicy)])),
+        Object.fromEntries(
+          sectionResult.data.map((section) => [
+            section.id,
+            defaultLanguageForSection(
+              section,
+              nextLanguagePolicy,
+              pkgType,
+              sessionLanguages,
+              sectionIntroLangs[section.id],
+              languagePlan,
+            ),
+          ]),
+        ),
       )
 
       const itemResults = await Promise.all(
@@ -325,7 +421,7 @@ export function TeacherTestSetupPage() {
   function pendingGenerationTargets() {
     return targetPreview
       .map((item) => {
-        const language = languageBySection[item.section.id] ?? defaultLanguageForSection(item.section, languagePolicy)
+        const language = languageBySection[item.section.id] ?? defaultLanguageForSection(item.section, languagePolicy, packageType, packageSessionLanguages)
         return { section: item.section, language }
       })
       .filter((target) => !audioSummaryBySection[target.section.id]?.[target.language]?.ready)
@@ -339,7 +435,7 @@ export function TeacherTestSetupPage() {
 
     const startedRunIds: string[] = []
     for (const item of targetPreview) {
-      const language = languageBySection[item.section.id] ?? defaultLanguageForSection(item.section, languagePolicy)
+      const language = languageBySection[item.section.id] ?? defaultLanguageForSection(item.section, languagePolicy, packageType, packageSessionLanguages)
       const run = await prepareStandaloneRun(assignmentId, item.section.id, language, voiceId)
       if (!run.ok) {
         setBusy(false)
@@ -377,16 +473,33 @@ export function TeacherTestSetupPage() {
     <div className="test-setup-page">
       <PageHeader
         icon={ClipboardPlus}
-        kicker="Teacher · Tests 1-1"
+        kicker={packageKind === 'mini' ? 'Teacher · Mini-Test 1-1 (21 câu)' : 'Teacher · Tests 1-1'}
         title="Run setup"
         subtitle="Review sessions, languages, item count, and audio readiness before entering the Live Test room."
+        actions={
+          packageKind === 'mini' ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200 shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+              ⚡ Mini-Test · 21 câu (3Q/session)
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+              Standard Test · 49 câu
+            </span>
+          )
+        }
       />
       <Flash message={message} error={error} />
 
       <Panel
         icon={ClipboardPlus}
-        title="Prepare Test Run"
-        description="Choose Single Session or flexible Multi-Session groups such as Session 1–4 VI and Session 5–8 EN."
+        title={packageKind === 'mini' ? 'Prepare Mini-Test Run (21 câu)' : 'Prepare Test Run'}
+        description={
+          packageKind === 'mini'
+            ? 'Phiên bản đánh giá nhanh Mini-test 21 câu (3 câu/session) lấy ngẫu nhiên từ bộ Standard gốc.'
+            : 'Choose Single Session or flexible Multi-Session groups such as Session 1–4 VI and Session 5–8 EN.'
+        }
         collapsible={false}
       >
         <div className="btn-row mt-4 test-setup-start-row">
@@ -425,7 +538,13 @@ export function TeacherTestSetupPage() {
             <div className="test-setup-stats">
               <div><Layers3 className="h-4 w-4 text-indigo-500" /><span>Sessions</span><strong>{targetPreview.length || preview.length}</strong></div>
               <div><ListChecks className="h-4 w-4 text-green-500" /><span>Items</span><strong>{totalItemCount || packageItemCount}</strong></div>
-              <div><Gauge className="h-4 w-4 text-yellow-500" /><span>Mode</span><strong>{runMode}</strong></div>
+              <div>
+                <Gauge className="h-4 w-4 text-yellow-500" />
+                <span>Loại bài</span>
+                <strong className={packageKind === 'mini' ? 'text-purple-600 capitalize' : 'text-blue-600 capitalize'}>
+                  {packageKind === 'mini' ? 'Mini (21Q)' : 'Standard'}
+                </strong>
+              </div>
             </div>
 
             <div className="test-run-mode-picker">
@@ -491,7 +610,7 @@ export function TeacherTestSetupPage() {
                   <tbody>
                     {preview.map(({ section, itemCount }) => {
                       const selected = runMode === 'full' || (runMode === 'single' ? section.id === sectionId : selectedSectionIds.has(section.id))
-                      const language = languageBySection[section.id] ?? defaultLanguageForSection(section, languagePolicy)
+                      const language = languageBySection[section.id] ?? defaultLanguageForSection(section, languagePolicy, packageType, packageSessionLanguages)
                       const summary = audioSummaryBySection[section.id]
                       const currentSummary = summary?.[language]
                       const ready = currentSummary?.ready ?? false

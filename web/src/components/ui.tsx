@@ -108,21 +108,27 @@ export function Panel({
         ) : null}
       </div>
 
-      <AnimatePresence initial={false}>
-        {expanded ? (
-          <motion.div
-            id={bodyId}
-            key="panel-body"
-            className="panel-body"
-            initial={collapsible ? { height: 0, opacity: 0 } : false}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
-          >
-            <div className="panel-body-inner">{children}</div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+      {collapsible ? (
+        <AnimatePresence initial={false}>
+          {expanded ? (
+            <motion.div
+              id={bodyId}
+              key="panel-body"
+              className="panel-body"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+            >
+              <div className="panel-body-inner">{children}</div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      ) : (
+        <div id={bodyId} className="panel-body">
+          <div className="panel-body-inner">{children}</div>
+        </div>
+      )}
     </section>
   )
 }

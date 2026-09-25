@@ -12,6 +12,8 @@ import {
   measuredCvr,
   validateGreenSentence,
   validateRedCollocations,
+  extractPackageVoltage,
+  detectPackageKind,
   type CciCategory,
   type TestItem,
   type TestPackageVersion,
@@ -199,6 +201,46 @@ describe('test package catalog', () => {
     expect(validateRedCollocations([]).valid).toBe(false)
     expect(validateRedCollocations([{ text: '   ' }]).valid).toBe(false)
   })
+
+  it('extracts package voltage accurately from name, title, code, or metadata', () => {
+    // Explicit metadata
+    expect(extractPackageVoltage({ title: 'G1-Custom', sourceMetadata: { targetVoltage: 24 } })).toBe(24)
+    expect(extractPackageVoltage({ title: 'G1-Custom', sourceMetadata: { targetCpd: 48 } })).toBe(48)
+
+    // Extracted from title/name (user examples: G1-56V-0826 -> 56V, G3-31V-0826 -> 31V)
+    expect(extractPackageVoltage({ title: 'G1-56V-0826' }, 'green')).toBe(56)
+    expect(extractPackageVoltage({ title: 'G2-56V-0826' }, 'green')).toBe(56)
+    expect(extractPackageVoltage({ title: 'G3-31V-0826' }, 'green')).toBe(31)
+    expect(extractPackageVoltage({ title: 'G4-31V-0826' }, 'green')).toBe(31)
+    expect(extractPackageVoltage({ title: 'R1-56V-0826' }, 'red')).toBe(56)
+    expect(extractPackageVoltage({ title: 'R3-31V-0826' }, 'red')).toBe(31)
+    expect(extractPackageVoltage({ title: 'R4-31V-0826' }, 'red')).toBe(31)
+    expect(extractPackageVoltage({ slug: 'g1-56v-ecommerce' }, 'green')).toBe(56)
+    expect(extractPackageVoltage({ code: 'G1-12V-SAMPLE' })).toBe(12)
+
+    // Fallbacks
+    expect(extractPackageVoltage({ title: 'Standard Green' }, 'green')).toBe(12)
+    expect(extractPackageVoltage({ title: 'Standard Red' }, 'red')).toBe(56)
+  })
+
+  it('detects package kind as standard vs mini accurately', () => {
+    // Explicit sourceMetadata.package_kind
+    expect(detectPackageKind({ sourceMetadata: { package_kind: 'mini' } })).toBe('mini')
+    expect(detectPackageKind({ sourceMetadata: { package_kind: 'standard' } })).toBe('standard')
+
+    // Title / code naming patterns
+    expect(detectPackageKind({ title: 'mini-G1-56V' })).toBe('mini')
+    expect(detectPackageKind({ title: 'G1-56V [MINI]' })).toBe('mini')
+    expect(detectPackageKind({ slug: 'mini-g1-56v-variant' })).toBe('mini')
+    expect(detectPackageKind({ title: 'Standard G1-56V Assessment' })).toBe('standard')
+
+    // Item count heuristic (<= 21 items -> mini, 49 items -> standard)
+    expect(detectPackageKind({ itemCount: 21 })).toBe('mini')
+    expect(detectPackageKind({ itemCount: 15 })).toBe('mini')
+    expect(detectPackageKind({ itemCount: 49 })).toBe('standard')
+    expect(detectPackageKind({ itemCount: 56 })).toBe('standard')
+  })
 })
+
 
 

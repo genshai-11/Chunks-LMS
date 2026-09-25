@@ -67,6 +67,21 @@ Main specs live under `openspec/specs/` (7 capabilities). No active change by de
 - CI/CD: `.github/workflows/ci.yml`, `cd.yml`
 - **Ship:** [`docs/ops/production-runbook.md`](docs/ops/production-runbook.md)
 
+## System Architecture & Module Map
+
+| Module / Path | Domain Purpose | Data Flows & Key Artifacts |
+|---|---|---|
+| [`modules/catalog`](file:///C:/Users/gensh/Desktop/CHUNKS/PROJECT/Chunks-LMS/web/src/modules/catalog) | Test packages, versions, sections, test items, CVR physics calculation ($TC \times LC \times TL$), CCI profiles/curves, AI live test generator, and Mini-Test Variant Generator (`createMiniTestVariantFromPackage`). | Firestore vocab / input prompts → `test_packages`, `test_package_versions`, `test_sections`, `test_items`, `cci_profiles` → feeds Scheduling and Assessment. |
+| [`modules/assessment`](file:///C:/Users/gensh/Desktop/CHUNKS/PROJECT/Chunks-LMS/web/src/modules/assessment) | Live observation runtime, scoring logic (Green/Orange/Red), probe workflows (`enteredProbeFlow`, `probeCount`), and dual UI modes (learner-first / question-first). | Teacher scoring inputs → live state machine → `assessments`, `assessment_probes` (immutable observation stream). |
+| [`modules/result-lifecycle`](file:///C:/Users/gensh/Desktop/CHUNKS/PROJECT/Chunks-LMS/web/src/modules/result-lifecycle) | Lifecycle state transitions: submission, finalization, corrections, and revocations. Guarantees result immutability and audit trails. | Assessment events → Finalize / Correct → `finalized_results`, `result_corrections` → only finalized data flows downstream. |
+| [`modules/metrics`](file:///C:/Users/gensh/Desktop/CHUNKS/PROJECT/Chunks-LMS/web/src/modules/metrics) | Focus and Awareness metrics calculation, probe indicators (`n count`, `n depth`, `n depth max`, `n depth avg`), CVR/CCI analytics, and cohort rollups. | `finalized_results` → calculation engine (`calculateMetrics`, `n_*` aggregations) → Teacher & Admin analysis dashboards. |
+| [`modules/roster`](file:///C:/Users/gensh/Desktop/CHUNKS/PROJECT/Chunks-LMS/web/src/modules/roster) | Learner trees, cohorts, programs, classes, student enrollments, and seating charts. | Staff management CRUD → `learners`, `classes`, `programs`, `learner_enrollments` → drives learner selection in sessions. |
+| [`modules/scheduling`](file:///C:/Users/gensh/Desktop/CHUNKS/PROJECT/Chunks-LMS/web/src/modules/scheduling) | Session planning, session lifecycle states (`draft`, `active`, `completed`), session kinds (`regular`, `pretest`, `posttest`), and seat assignments. | Roster learners + Catalog test packages → `sessions`, `session_learners` → initializes Assessment runtime. |
+| [`modules/sync`](file:///C:/Users/gensh/Desktop/CHUNKS/PROJECT/Chunks-LMS/web/src/modules/sync) | Offline queueing, optimistic local storage, network resilience, conflict resolution, and background sync to Supabase. | Local mutation queue (IndexedDB/localStorage) → online detector → idempotent batch replay to Supabase tables. |
+| [`auth`](file:///C:/Users/gensh/Desktop/CHUNKS/PROJECT/Chunks-LMS/web/src/auth) | Staff authentication (Supabase Auth), persistent session management, role verification (`admin`, `teacher` via `staff_roles`), and route guards. | `auth.users` → `staff_roles` → `StaffSessionContext` / `StaffGate` → UI workspace gating (Admin vs Teacher). |
+| [`lib/test-packages`](file:///C:/Users/gensh/Desktop/CHUNKS/PROJECT/Chunks-LMS/web/src/lib/test-packages.ts) | Data access layer & API client for test packages, sections, items, CCI categories, narration generation, and zero-waste mini-test variants. | UI / Studio → Supabase RPC & client queries, Edge functions (`generate-narration`, `get-playback-url`) → `narration_variants`. |
+| [`lib/standalone-tests`](file:///C:/Users/gensh/Desktop/CHUNKS/PROJECT/Chunks-LMS/web/src/lib/standalone-tests.ts) | Standalone test run execution, local test runners, audio playback chaining, and offline/isolated test evaluation. | Test package snapshot → standalone runner → 2-step prefix chaining audio playback (`/audio/number_{order}.wav` + variant) → evaluation. |
+
 ## V1 identity (product decision)
 
 **No organization membership product for now.**

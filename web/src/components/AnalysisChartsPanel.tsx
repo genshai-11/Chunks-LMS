@@ -9,11 +9,13 @@ import {
   GripVertical,
   Layers,
   LineChart as LineChartIcon,
+  List,
   Maximize2,
   Minimize2,
   PieChart as PieChartIcon,
   RotateCcw,
   Target,
+  TrendingUp,
   X,
 } from 'lucide-react'
 import {
@@ -72,6 +74,7 @@ export type Props = {
 }
 
 export type ChartKey = 'tube' | 'mix' | 'sessionPercentC' | 'distribution'
+export type SessionChartType = 'bar' | 'line' | 'list'
 export type ChartUiState = Record<ChartKey, { showLabels: boolean; expanded: boolean; hidden: boolean }>
 
 const DEFAULT_CHART_UI: ChartUiState = {
@@ -155,7 +158,24 @@ export function AnalysisChartsPanel({
   const [draggingChart, setDraggingChart] = useState<ChartKey | null>(null)
   const [sessionGroupMode, setSessionGroupMode] = useState<'dynamic' | 'day'>('dynamic')
   const [dynamicChunkSize, setDynamicChunkSize] = useState<number>(10)
-  const [sessionChartType, setSessionChartType] = useState<'bar' | 'line'>('bar')
+  const [sessionChartType, setSessionChartType] = useState<SessionChartType>('bar')
+  const [metricVisibility, setMetricVisibility] = useState({
+    rfc: true,
+    percentC: true,
+    chunks: true,
+    probeDepth: true,
+  })
+
+  const visibleMetricCount = useMemo(() => {
+    return Object.values(metricVisibility).filter(Boolean).length
+  }, [metricVisibility])
+
+  const toggleMetric = (key: keyof typeof metricVisibility) => {
+    setMetricVisibility((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }))
+  }
   const filterCardRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
@@ -354,6 +374,8 @@ export function AnalysisChartsPanel({
         bandColor: ResultColor
         questionCount: number
         rfc: number
+        chunks: number
+        probeDepth: number
       }[] = []
 
       const totalAttempts = sorted.length
@@ -364,6 +386,14 @@ export function AnalysisChartsPanel({
         const startQ = i * size + 1
         const endQ = Math.min((i + 1) * size, totalAttempts)
         const bucketAttempts = sorted.slice(i * size, endQ)
+
+        const probed = bucketAttempts.filter((a) => a.enteredProbeFlow)
+        const chunksNumbers = probed.map((a) => Math.max(1, a.probeEventCount + 1))
+        const chunks = probed.length
+        const probeDepth =
+          probed.length > 0
+            ? Number((chunksNumbers.reduce((s, v) => s + v, 0) / probed.length).toFixed(1))
+            : 0
 
         const spectrum = calculateSpectrumStepBreakdown(
           bucketAttempts.map((a) => ({
@@ -385,6 +415,8 @@ export function AnalysisChartsPanel({
           bandColor,
           questionCount: bucketAttempts.length,
           rfc,
+          chunks,
+          probeDepth,
         })
       }
 
@@ -407,6 +439,15 @@ export function AnalysisChartsPanel({
           (ls) => ls.sessionNumber === session || (ls.sessionNumber == null && session === 1),
         )
         const label = sessionLabel(session, sOpt?.startedAt, totalDays)
+
+        const probed = bucketAttempts.filter((a) => a.enteredProbeFlow)
+        const chunksNumbers = probed.map((a) => Math.max(1, a.probeEventCount + 1))
+        const chunks = probed.length
+        const probeDepth =
+          probed.length > 0
+            ? Number((chunksNumbers.reduce((s, v) => s + v, 0) / probed.length).toFixed(1))
+            : 0
+
         const spectrum = calculateSpectrumStepBreakdown(
           bucketAttempts.map((a) => ({
             effectiveColor: a.color,
@@ -427,6 +468,8 @@ export function AnalysisChartsPanel({
           bandColor,
           questionCount: bucketAttempts.length,
           rfc,
+          chunks,
+          probeDepth,
         }
       })
     }
@@ -434,18 +477,19 @@ export function AnalysisChartsPanel({
 
   // Spectrum pie distribution
   const colorDistribution = useMemo(() => {
-    const total = Math.max(chartAttempts.length, 1)
+    const allRecords = recordTubeRows.flatMap((row) => row.records)
+    const total = Math.max(allRecords.length, 1)
     return SPECTRUM_COLORS.map((color) => {
-      const count = chartAttempts.filter((a) => a.color === color).length
+      const count = allRecords.filter((rec) => rec.color === color).length
       return {
         color,
         name: COLOR_LABELS[color],
         count,
-        percent: chartAttempts.length ? Math.round((count / total) * 100) : 0,
+        percent: allRecords.length ? Math.round((count / total) * 100) : 0,
         fill: COLOR_HEX[color],
       }
     })
-  }, [chartAttempts])
+  }, [recordTubeRows])
 
   const selectedColorGroup = useMemo(() => {
     const selected = new Set(selectedColors)
@@ -557,48 +601,58 @@ export function AnalysisChartsPanel({
 
   return (
     <div className="test-analysis-page text-left">
-      {/* Live Classroom KPI Stat Grid */}
-      <div className="standalone-analysis-grid mb-4">
-        <div
-          className="standalone-metric-card metric-rfc cursor-default"
-          title={`Struggle (RFC) = Warm records / N_total = ${summary.warmSteps} / ${summary.totalRecords}. Lower is better.`}
-        >
-          <Activity className="h-5 w-5 text-red-500" />
-          <span>Struggle (RFC)</span>
-          <strong className="text-red-500">{summary.rfc.toFixed(1)}%</strong>
-        </div>
+      {/* Live Classroom KPI Stat Grid - Synchronized with Metric Filter */}
+      {visibleMetricCount > 0 ? (
+        <div className="standalone-analysis-grid mb-4">
+          {metricVisibility.rfc ? (
+            <div
+              className="standalone-metric-card metric-rfc cursor-default"
+              title={`Struggle (RFC) = Warm records / N_total = ${summary.warmSteps} / ${summary.totalRecords}. Lower is better.`}
+            >
+              <Activity className="h-5 w-5 text-red-500" />
+              <span>Struggle (RFC)</span>
+              <strong className="text-red-500">{summary.rfc.toFixed(1)}%</strong>
+            </div>
+          ) : null}
 
-        <div
-          className={`standalone-metric-card metric-avg-x is-${summary.avgXColor} cursor-default`}
-          style={{
-            borderColor: `${COLOR_HEX[summary.avgXColor]}55`,
-            boxShadow: `0 0 16px -4px ${COLOR_HEX[summary.avgXColor]}33`,
-          }}
-          title={`Avg %x = sum(%x) / N_total = ${summary.sumPercentX.toFixed(1)}% / ${summary.totalRecords} = ${summary.avgPercentX.toFixed(1)}% (${COLOR_LABELS[summary.avgXColor]} band). Higher is better.`}
-        >
-          <Target className="h-5 w-5" style={{ color: COLOR_HEX[summary.avgXColor] }} />
-          <span>%c (Avg %x)</span>
-          <strong style={{ color: COLOR_HEX[summary.avgXColor] }}>{summary.avgPercentX.toFixed(1)}%</strong>
-        </div>
+          {metricVisibility.percentC ? (
+            <div
+              className={`standalone-metric-card metric-avg-x is-${summary.avgXColor} cursor-default`}
+              style={{
+                borderColor: `${COLOR_HEX[summary.avgXColor]}55`,
+                boxShadow: `0 0 16px -4px ${COLOR_HEX[summary.avgXColor]}33`,
+              }}
+              title={`Avg %x = sum(%x) / N_total = ${summary.sumPercentX.toFixed(1)}% / ${summary.totalRecords} = ${summary.avgPercentX.toFixed(1)}% (${COLOR_LABELS[summary.avgXColor]} band). Higher is better.`}
+            >
+              <Target className="h-5 w-5" style={{ color: COLOR_HEX[summary.avgXColor] }} />
+              <span>%c (Avg %x)</span>
+              <strong style={{ color: COLOR_HEX[summary.avgXColor] }}>{summary.avgPercentX.toFixed(1)}%</strong>
+            </div>
+          ) : null}
 
-        <div
-          className="standalone-metric-card cursor-default"
-          title={`Finalized attempts in current filter: ${summary.sampleSize}.`}
-        >
-          <BarChart3 className="h-5 w-5 text-slate-400" />
-          <span>Sample size</span>
-          <strong>{summary.sampleSize}</strong>
-        </div>
+          {metricVisibility.chunks ? (
+            <div
+              className="standalone-metric-card cursor-default"
+              title={`Finalized attempts in current filter: ${summary.sampleSize}.`}
+            >
+              <BarChart3 className="h-5 w-5 text-slate-400" />
+              <span>Sample size / Chunks</span>
+              <strong>{summary.sampleSize}</strong>
+            </div>
+          ) : null}
 
-        <div
-          className="standalone-metric-card cursor-default"
-          title={`Total spectrum color records (primary + probe events): ${summary.totalRecords}.`}
-        >
-          <Layers className="h-5 w-5 text-indigo-500" />
-          <span>N_total records</span>
-          <strong>{summary.totalRecords}</strong>
+          {metricVisibility.probeDepth ? (
+            <div
+              className="standalone-metric-card cursor-default"
+              title={`Total spectrum color records (primary + probe events): ${summary.totalRecords}.`}
+            >
+              <Layers className="h-5 w-5 text-indigo-500" />
+              <span>Probe events / N_total</span>
+              <strong>{summary.totalRecords}</strong>
+            </div>
+          ) : null}
         </div>
-      </div>
+      ) : null}
 
       {/* Chart Workbench Toolbar & Filters */}
       <div className="test-analysis-workbench">
@@ -693,6 +747,69 @@ export function AnalysisChartsPanel({
                     </button>
                   )
                 })}
+              </div>
+            </div>
+          </details>
+
+          <details className="test-analysis-filter-menu">
+            <summary>
+              <span>Metrics</span>
+              <strong>{visibleMetricCount}/4</strong>
+            </summary>
+            <div className="test-analysis-filter-popover">
+              <div className="test-analysis-color-list">
+                <button
+                  type="button"
+                  className={`test-analysis-color-chip${metricVisibility.rfc ? ' is-active' : ''}`}
+                  style={
+                    metricVisibility.rfc
+                      ? { borderColor: '#ef4444', background: '#ef44441f' }
+                      : undefined
+                  }
+                  onClick={() => toggleMetric('rfc')}
+                >
+                  <i style={{ background: '#ef4444' }} />
+                  RFC (Struggle)
+                </button>
+                <button
+                  type="button"
+                  className={`test-analysis-color-chip${metricVisibility.percentC ? ' is-active' : ''}`}
+                  style={
+                    metricVisibility.percentC
+                      ? { borderColor: '#22c55e', background: '#22c55e1f' }
+                      : undefined
+                  }
+                  onClick={() => toggleMetric('percentC')}
+                >
+                  <i style={{ background: '#22c55e' }} />
+                  %c (Success)
+                </button>
+                <button
+                  type="button"
+                  className={`test-analysis-color-chip${metricVisibility.chunks ? ' is-active' : ''}`}
+                  style={
+                    metricVisibility.chunks
+                      ? { borderColor: '#38bdf8', background: '#38bdf81f' }
+                      : undefined
+                  }
+                  onClick={() => toggleMetric('chunks')}
+                >
+                  <i style={{ background: '#38bdf8' }} />
+                  Chunks (Count)
+                </button>
+                <button
+                  type="button"
+                  className={`test-analysis-color-chip${metricVisibility.probeDepth ? ' is-active' : ''}`}
+                  style={
+                    metricVisibility.probeDepth
+                      ? { borderColor: '#a855f7', background: '#a855f71f' }
+                      : undefined
+                  }
+                  onClick={() => toggleMetric('probeDepth')}
+                >
+                  <i style={{ background: '#a855f7' }} />
+                  Probe Depth
+                </button>
               </div>
             </div>
           </details>
@@ -890,232 +1007,391 @@ export function AnalysisChartsPanel({
                 actions={chartActions('sessionPercentC')}
                 collapsible={false}
               >
-                {/* Controls toolbar */}
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2.5 border-b border-slate-100 dark:border-white/10 text-xs">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-slate-500 font-medium">Nhóm:</span>
-                    <button
-                      type="button"
-                      className={`px-2 py-0.5 rounded-md font-semibold transition-all border cursor-pointer ${
-                        sessionGroupMode === 'dynamic' && dynamicChunkSize === 10
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                          : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-                      }`}
-                      onClick={() => {
-                        setSessionGroupMode('dynamic')
-                        setDynamicChunkSize(10)
-                      }}
-                    >
-                      Gộp 10 câu (Mặc định)
-                    </button>
-                    {[5, 15, 20].map((size) => (
-                      <button
-                        key={size}
-                        type="button"
-                        className={`px-2 py-0.5 rounded-md font-semibold transition-all border cursor-pointer ${
-                          sessionGroupMode === 'dynamic' && dynamicChunkSize === size
-                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                            : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-                        }`}
-                        onClick={() => {
+                {/* Minimal clean light controls toolbar */}
+                <div className="flex items-center justify-between gap-2 mb-2 pb-1 text-xs">
+                  <div className="flex items-center gap-1.5 text-slate-500">
+                    <span className="text-[11px] font-medium text-slate-400">Gộp:</span>
+                    <select
+                      value={sessionGroupMode === 'day' ? 'day' : String(dynamicChunkSize)}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        if (val === 'day') {
+                          setSessionGroupMode('day')
+                        } else {
                           setSessionGroupMode('dynamic')
-                          setDynamicChunkSize(size)
-                        }}
-                      >
-                        {size} câu
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      className={`px-2 py-0.5 rounded-md font-semibold transition-all border cursor-pointer ${
-                        sessionGroupMode === 'day'
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                          : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-                      }`}
-                      onClick={() => setSessionGroupMode('day')}
+                          setDynamicChunkSize(Number(val))
+                        }
+                      }}
+                      className="bg-transparent text-slate-700 font-semibold text-xs py-0.5 px-1 rounded hover:bg-slate-100 transition-colors cursor-pointer border-0 outline-none"
                     >
-                      Theo ngày học (D1..DN)
-                    </button>
+                      <option value="10">10 câu (Mặc định)</option>
+                      <option value="5">5 câu</option>
+                      <option value="15">15 câu</option>
+                      <option value="20">20 câu</option>
+                      <option value="day">Theo ngày (D1..DN)</option>
+                    </select>
                   </div>
 
-                  <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                  <div className="inline-flex items-center gap-0.5 p-0.5 rounded-lg bg-slate-100 text-slate-500">
                     <button
                       type="button"
-                      className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                      title="Biểu đồ cột (Bar)"
+                      className={`p-1 rounded-md transition-all cursor-pointer ${
                         sessionChartType === 'bar'
-                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                          : 'text-slate-500 hover:text-slate-800'
+                          ? 'bg-white text-slate-900 shadow-xs font-semibold'
+                          : 'hover:text-slate-800'
                       }`}
                       onClick={() => setSessionChartType('bar')}
                     >
-                      Bar
+                      <BarChart3 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       type="button"
-                      className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                      title="Biểu đồ đường (Line)"
+                      className={`p-1 rounded-md transition-all cursor-pointer ${
                         sessionChartType === 'line'
-                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                          : 'text-slate-500 hover:text-slate-800'
+                          ? 'bg-white text-slate-900 shadow-xs font-semibold'
+                          : 'hover:text-slate-800'
                       }`}
                       onClick={() => setSessionChartType('line')}
                     >
-                      Line
+                      <TrendingUp className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      title="Danh sách (List)"
+                      className={`p-1 rounded-md transition-all cursor-pointer ${
+                        sessionChartType === 'list'
+                          ? 'bg-white text-slate-900 shadow-xs font-semibold'
+                          : 'hover:text-slate-800'
+                      }`}
+                      onClick={() => setSessionChartType('list')}
+                    >
+                      <List className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
 
                 <div className={`standalone-chart-wrap${chartUi.sessionPercentC.expanded ? ' h-[26rem]' : ''}`}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart
-                      data={sessionPercentCBuckets}
-                      margin={{ top: 36, right: 24, bottom: 8, left: -12 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" opacity={0.6} />
-                      <XAxis
-                        dataKey="shortLabel"
-                        stroke="#64748b"
-                        fontSize={11}
-                        tickLine={false}
-                        interval={0}
-                      />
-                      <YAxis
-                        domain={[0, 100]}
-                        tickFormatter={(value) => `${value}%`}
-                        stroke="#64748b"
-                        fontSize={11}
-                        tickLine={false}
-                        label={{
-                          value: '%c (%)',
-                          angle: -90,
-                          position: 'insideLeft',
-                          fill: '#64748b',
-                        }}
-                      />
-                      <Tooltip
-                        cursor={{
-                          fill: 'rgba(255, 255, 255, 0.05)',
-                          stroke: '#6366f1',
-                          strokeDasharray: '3 3',
-                        }}
-                        content={({ active, payload }) => {
-                          if (!active || !payload?.length) return null
-                          const row = payload[0]?.payload
-                          if (!row) return null
-                          return (
-                            <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-3 text-xs text-slate-700 dark:text-slate-200 shadow-xl">
-                              <div className="mb-1 font-black text-slate-950 dark:text-white">
-                                {row.label}
-                              </div>
-                              <div className="flex items-center gap-1.5 my-1">
-                                <span>%c:</span>
-                                <strong
-                                  style={{
-                                    color: COLOR_HEX[row.bandColor as ResultColor],
-                                  }}
-                                >
-                                  {Number(row.percentC).toFixed(1)}%
-                                </strong>
-                                <span
-                                  className="px-1.5 py-0.5 rounded text-[10px] font-bold text-white uppercase"
-                                  style={{
-                                    backgroundColor:
-                                      COLOR_HEX[row.bandColor as ResultColor],
-                                  }}
-                                >
-                                  {COLOR_LABELS[row.bandColor as ResultColor]}
-                                </span>
-                              </div>
-                              <div>
-                                Questions: <strong>{row.questionCount}</strong>
-                              </div>
-                              <div>
-                                Struggle (RFC):{' '}
-                                <strong style={{ color: METRIC_HEX.rfc }}>
-                                  {Number(row.rfc).toFixed(1)}%
-                                </strong>
-                              </div>
-                            </div>
-                          )
-                        }}
-                      />
-                      <ReferenceLine
-                        y={50}
-                        stroke="#22c55e"
-                        strokeDasharray="3 3"
-                        label={{
-                          value: '50% Green',
-                          fill: '#22c55e',
-                          fontSize: 10,
-                          position: 'insideTopLeft',
-                        }}
-                      />
-                      <ReferenceLine
-                        y={75}
-                        stroke="#a855f7"
-                        strokeDasharray="3 3"
-                        label={{
-                          value: '75% Mastery',
-                          fill: '#a855f7',
-                          fontSize: 10,
-                          position: 'insideTopLeft',
-                        }}
-                      />
-                      {sessionChartType === 'bar' ? (
-                        <Bar
-                          dataKey="percentC"
-                          name="%c"
-                          radius={[4, 4, 0, 0]}
-                          isAnimationActive={false}
-                        >
+                  {sessionChartType === 'list' ? (
+                    <div className="overflow-x-auto max-h-full rounded-xl bg-white border border-slate-100">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-100 bg-slate-50/75 text-slate-500 font-semibold">
+                            <th className="py-2 px-3">STT / Phiên</th>
+                            {metricVisibility.percentC ? <th className="py-2 px-3">%c (Avg %x)</th> : null}
+                            {metricVisibility.rfc ? <th className="py-2 px-3">RFC</th> : null}
+                            {metricVisibility.chunks ? <th className="py-2 px-3">Chunks</th> : null}
+                            {metricVisibility.probeDepth ? <th className="py-2 px-3">Probe Depth</th> : null}
+                            <th className="py-2 px-3">Số câu hỏi</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-slate-700">
                           {sessionPercentCBuckets.map((b, idx) => (
-                            <Cell key={b.id ?? idx} fill={COLOR_HEX[b.bandColor]} />
+                            <tr key={b.id ?? idx} className="hover:bg-slate-50/80 transition-colors">
+                              <td className="py-2.5 px-3 font-medium text-slate-900">
+                                {b.label}
+                              </td>
+                              {metricVisibility.percentC ? (
+                                <td className="py-2.5 px-3">
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs"
+                                      style={{ backgroundColor: COLOR_HEX[b.bandColor] }}
+                                    />
+                                    <span
+                                      className="px-2 py-0.5 rounded-md font-mono font-bold text-xs"
+                                      style={{
+                                        backgroundColor: `${COLOR_HEX[b.bandColor]}20`,
+                                        color: COLOR_HEX[b.bandColor],
+                                      }}
+                                    >
+                                      {b.percentC.toFixed(1)}%
+                                    </span>
+                                  </div>
+                                </td>
+                              ) : null}
+                              {metricVisibility.rfc ? (
+                                <td className="py-2.5 px-3 font-mono font-semibold text-red-500">
+                                  {b.rfc.toFixed(1)}%
+                                </td>
+                              ) : null}
+                              {metricVisibility.chunks ? (
+                                <td className="py-2.5 px-3 font-mono font-semibold text-sky-600">
+                                  {b.chunks}
+                                </td>
+                              ) : null}
+                              {metricVisibility.probeDepth ? (
+                                <td className="py-2.5 px-3 font-mono font-semibold text-purple-600">
+                                  {b.probeDepth.toFixed(1)}
+                                </td>
+                              ) : null}
+                              <td className="py-2.5 px-3 font-mono text-slate-500">
+                                {b.questionCount} câu
+                              </td>
+                            </tr>
                           ))}
-                          {chartUi.sessionPercentC.showLabels ? (
-                            <LabelList
-                              dataKey="percentC"
-                              position="top"
-                              formatter={(v: unknown) => `${Number(v).toFixed(0)}%`}
-                              className="test-analysis-chart-label font-bold text-xs"
-                            />
-                          ) : null}
-                        </Bar>
-                      ) : (
-                        <Line
-                          type="monotone"
-                          dataKey="percentC"
-                          name="%c"
-                          stroke="#16a34a"
-                          strokeWidth={3}
-                          isAnimationActive={false}
-                          dot={(props: any) => {
-                            const { cx, cy, payload } = props
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart
+                        data={sessionPercentCBuckets}
+                        margin={{
+                          top: 36,
+                          right: metricVisibility.chunks || metricVisibility.probeDepth ? 36 : 24,
+                          bottom: 8,
+                          left: -12,
+                        }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" opacity={0.6} />
+                        <XAxis
+                          dataKey="shortLabel"
+                          stroke="#64748b"
+                          fontSize={11}
+                          tickLine={false}
+                          interval={0}
+                        />
+                        <YAxis
+                          domain={[0, 100]}
+                          tickFormatter={(value) => `${value}%`}
+                          stroke="#64748b"
+                          fontSize={11}
+                          tickLine={false}
+                          label={{
+                            value: '%c / RFC (%)',
+                            angle: -90,
+                            position: 'insideLeft',
+                            fill: '#64748b',
+                          }}
+                        />
+                        {metricVisibility.chunks || metricVisibility.probeDepth ? (
+                          <YAxis
+                            yAxisId="depth"
+                            orientation="right"
+                            stroke="#8b5cf6"
+                            fontSize={11}
+                            tickLine={false}
+                            domain={[0, 'auto']}
+                            label={{
+                              value: 'Chunks / Depth',
+                              angle: 90,
+                              position: 'insideRight',
+                              fill: '#8b5cf6',
+                            }}
+                          />
+                        ) : null}
+                        <Tooltip
+                          cursor={{
+                            fill: 'rgba(255, 255, 255, 0.05)',
+                            stroke: '#6366f1',
+                            strokeDasharray: '3 3',
+                          }}
+                          content={({ active, payload }) => {
+                            if (!active || !payload?.length) return null
+                            const row = payload[0]?.payload
+                            if (!row) return null
                             return (
-                              <circle
-                                key={props.key}
-                                cx={cx}
-                                cy={cy}
-                                r={5}
-                                fill={COLOR_HEX[payload.bandColor as ResultColor]}
-                                stroke="#ffffff"
-                                strokeWidth={2}
-                              />
+                              <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-3 text-xs text-slate-700 dark:text-slate-200 shadow-xl">
+                                <div className="mb-1 font-black text-slate-950 dark:text-white">
+                                  {row.label}
+                                </div>
+                                {metricVisibility.percentC ? (
+                                  <div className="flex items-center gap-1.5 my-1">
+                                    <span>%c:</span>
+                                    <strong
+                                      style={{
+                                        color: COLOR_HEX[row.bandColor as ResultColor],
+                                      }}
+                                    >
+                                      {Number(row.percentC).toFixed(1)}%
+                                    </strong>
+                                    <span
+                                      className="px-1.5 py-0.5 rounded text-[10px] font-bold text-white uppercase"
+                                      style={{
+                                        backgroundColor:
+                                          COLOR_HEX[row.bandColor as ResultColor],
+                                      }}
+                                    >
+                                      {COLOR_LABELS[row.bandColor as ResultColor]}
+                                    </span>
+                                  </div>
+                                ) : null}
+                                <div>
+                                  Questions: <strong>{row.questionCount}</strong>
+                                </div>
+                                {metricVisibility.rfc ? (
+                                  <div>
+                                    Struggle (RFC):{' '}
+                                    <strong style={{ color: METRIC_HEX.rfc }}>
+                                      {Number(row.rfc).toFixed(1)}%
+                                    </strong>
+                                  </div>
+                                ) : null}
+                                {metricVisibility.chunks ? (
+                                  <div>
+                                    Chunks: <strong>{row.chunks}</strong>
+                                  </div>
+                                ) : null}
+                                {metricVisibility.probeDepth ? (
+                                  <div>
+                                    Probe Depth: <strong>{Number(row.probeDepth).toFixed(1)}</strong>
+                                  </div>
+                                ) : null}
+                              </div>
                             )
                           }}
-                          activeDot={{ r: 7, stroke: '#0f172a', strokeWidth: 2 }}
-                        >
-                          {chartUi.sessionPercentC.showLabels ? (
-                            <LabelList
+                        />
+                        <ReferenceLine
+                          y={50}
+                          stroke="#22c55e"
+                          strokeDasharray="3 3"
+                          label={{
+                            value: '50% Green',
+                            fill: '#22c55e',
+                            fontSize: 10,
+                            position: 'insideTopLeft',
+                          }}
+                        />
+                        <ReferenceLine
+                          y={75}
+                          stroke="#a855f7"
+                          strokeDasharray="3 3"
+                          label={{
+                            value: '75% Mastery',
+                            fill: '#a855f7',
+                            fontSize: 10,
+                            position: 'insideTopLeft',
+                          }}
+                        />
+                        {metricVisibility.chunks ? (
+                          <Bar
+                            yAxisId="depth"
+                            dataKey="chunks"
+                            name="Chunks"
+                            fill="#38bdf8"
+                            opacity={0.6}
+                            radius={[4, 4, 0, 0]}
+                            isAnimationActive={false}
+                          >
+                            {chartUi.sessionPercentC.showLabels ? (
+                              <LabelList
+                                dataKey="chunks"
+                                position="top"
+                                fill="#0284c7"
+                                className="test-analysis-chart-label font-bold text-xs"
+                              />
+                            ) : null}
+                          </Bar>
+                        ) : null}
+                        {metricVisibility.percentC ? (
+                          sessionChartType === 'bar' ? (
+                            <Bar
                               dataKey="percentC"
-                              position="top"
-                              offset={10}
-                              formatter={(v: unknown) => `${Number(v).toFixed(0)}%`}
-                              className="test-analysis-chart-label font-bold text-xs"
-                            />
-                          ) : null}
-                        </Line>
-                      )}
-                    </ComposedChart>
-                  </ResponsiveContainer>
+                              name="%c"
+                              radius={[4, 4, 0, 0]}
+                              isAnimationActive={false}
+                            >
+                              {sessionPercentCBuckets.map((b, idx) => (
+                                <Cell key={b.id ?? idx} fill={COLOR_HEX[b.bandColor]} />
+                              ))}
+                              {chartUi.sessionPercentC.showLabels ? (
+                                <LabelList
+                                  dataKey="percentC"
+                                  position="top"
+                                  formatter={(v: unknown) => `${Number(v).toFixed(0)}%`}
+                                  className="test-analysis-chart-label font-bold text-xs"
+                                />
+                              ) : null}
+                            </Bar>
+                          ) : (
+                            <Line
+                              type="monotone"
+                              dataKey="percentC"
+                              name="%c"
+                              stroke="#16a34a"
+                              strokeWidth={3}
+                              isAnimationActive={false}
+                              dot={(props: any) => {
+                                const { cx, cy, payload } = props
+                                return (
+                                  <circle
+                                    key={props.key}
+                                    cx={cx}
+                                    cy={cy}
+                                    r={5}
+                                    fill={COLOR_HEX[payload.bandColor as ResultColor]}
+                                    stroke="#ffffff"
+                                    strokeWidth={2}
+                                  />
+                                )
+                              }}
+                              activeDot={{ r: 7, stroke: '#0f172a', strokeWidth: 2 }}
+                            >
+                              {chartUi.sessionPercentC.showLabels ? (
+                                <LabelList
+                                  dataKey="percentC"
+                                  position="top"
+                                  offset={10}
+                                  formatter={(v: unknown) => `${Number(v).toFixed(0)}%`}
+                                  className="test-analysis-chart-label font-bold text-xs"
+                                />
+                              ) : null}
+                            </Line>
+                          )
+                        ) : null}
+                        {metricVisibility.rfc ? (
+                          <Line
+                            type="monotone"
+                            dataKey="rfc"
+                            name="RFC"
+                            stroke="#ef4444"
+                            strokeWidth={2.5}
+                            isAnimationActive={false}
+                            dot={{ r: 4, fill: '#ef4444', stroke: '#ffffff', strokeWidth: 2 }}
+                            activeDot={{ r: 6, fill: '#ef4444', stroke: '#0f172a', strokeWidth: 2 }}
+                          >
+                            {chartUi.sessionPercentC.showLabels ? (
+                              <LabelList
+                                dataKey="rfc"
+                                position="top"
+                                offset={10}
+                                formatter={(v: unknown) => `${Number(v).toFixed(0)}%`}
+                                fill="#ef4444"
+                                className="test-analysis-chart-label font-bold text-xs"
+                              />
+                            ) : null}
+                          </Line>
+                        ) : null}
+                        {metricVisibility.probeDepth ? (
+                          <Line
+                            yAxisId="depth"
+                            type="monotone"
+                            dataKey="probeDepth"
+                            name="Probe Depth"
+                            stroke="#a855f7"
+                            strokeWidth={2}
+                            strokeDasharray="4 4"
+                            isAnimationActive={false}
+                            dot={{ r: 4, fill: '#a855f7', stroke: '#ffffff', strokeWidth: 2 }}
+                            activeDot={{ r: 6, fill: '#a855f7', stroke: '#0f172a', strokeWidth: 2 }}
+                          >
+                            {chartUi.sessionPercentC.showLabels ? (
+                              <LabelList
+                                dataKey="probeDepth"
+                                position="top"
+                                offset={10}
+                                formatter={(v: unknown) => `${Number(v).toFixed(1)}`}
+                                fill="#a855f7"
+                                className="test-analysis-chart-label font-bold text-xs"
+                              />
+                            ) : null}
+                          </Line>
+                        ) : null}
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
               </Panel>
             </div>

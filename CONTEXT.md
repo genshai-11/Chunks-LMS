@@ -166,7 +166,19 @@ _Avoid_: Single-word lists, complete smooth sentences
 
 **Test Audio Lifecycle & GCP TTS**:
 Full audio management covering package start, part intros (1–3), section intros, package end, and every test item. Uses the Google Cloud Text-to-Speech API endpoint (`https://texttospeech.googleapis.com/v1/text:synthesize`) with Neural2 voices (`vi-VN-Neural2-A` for Vietnamese, `en-US-Neural2-F` for English). Supports real-time playback review, single/batch regeneration, and custom audio upload overrides.
-_Avoid_: Client-side synthesis only, unverified audio assets
+- **Audio Playback Chaining & Storage Mapping**:
+  In test execution and studio preview playback, question audio follows a deterministic 2-step prefix chaining sequence:
+  1. **Prefix Audio**: Plays the localized ordinal number clip `/audio/number_{order}.wav` (e.g. "Câu 1", "Câu 2"). If the clip is unavailable or non-standard (e.g. trial questions / Câu 0), playback gracefully proceeds directly to the item body.
+  2. **Question Body Audio**: When the prefix audio completes, the player resolves the item's `narration_variants` record. If an approved storage asset exists, a secure signed playback URL is fetched via `getNarrationPlaybackUrl(variantId)`. If no stored asset exists, it gracefully falls back to Google Cloud TTS preview with a user notification ("Đang phát preview TTS (chưa có audio trong gói)").
+  3. **Lifecycle & Intro Audio Resolution**: Non-item audio targets (`package_start`, `part_intro`, `section_intro`, `package_end`) map to approved `narration_variants` records for the selected language, streaming signed URLs from storage or falling back to GCP TTS preview.
+_Avoid_: Client-side synthesis only, unverified audio assets, unchained raw prompt playback without ordinal prefixes
+
+**Mini-Test Variant & Zero-Waste Audio Reuse**:
+Compact 21-question assessment variants (7 sessions × 3 sampled questions) derived directly from canonical 49-question Standard tests.
+- **Zero-Waste Audio Guarantee**: Clones `narration_variants` records for all sampled questions and intros by referencing existing `audio_asset_id` pointers in Supabase Storage. This completely eliminates redundant Google Cloud TTS API synthesis costs and avoids duplicate audio file storage.
+- **Sampling Strategies**: Supports deterministic uniform sampling (`first`, `middle`, `last`) or balanced pseudo-random sampling across each session.
+- **Catalog & Test Filtering**: Categorized as `PackageKind = 'standard' | 'mini'`, allowing instant filtering across Admin Package Studio, Teacher Tests 1-1, and Test Run Setup.
+_Avoid_: Re-synthesizing TTS audio for mini-test variants, duplicating audio storage binaries, mixed question count mismatches.
 
 
 ---

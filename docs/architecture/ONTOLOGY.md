@@ -1,6 +1,6 @@
 # Chunks-LMS System Ontology & Domain Specifications
 
-**Version:** 1.1.0  
+**Version:** 1.2.0
 **Status:** CANONICAL DOMAIN ONTOLOGY (Single Source of Truth)  
 **Companion Visual File:** `docs/architecture/ontology.html`  
 **Governing PRD:** `docs/plans/PRD-V1-TEACHER-SCOPED-SYNC.md`
@@ -132,6 +132,14 @@ Hệ thống tuân thủ nguyên tắc: **Cùng 1 Tổ chức nhưng dữ liệu
 - Nếu RPC bị thiếu, lỗi transport hoặc không trả payload khả dụng, client rơi về REST waterfall hiện có để tương thích migration. Fallback không được mô tả như atomic và không có OCC revision.
 - Migration hiện nhận trường `attendance` trong payload phía client nhưng `sync_workspace_atomic` chưa xử lý mảng này; persistence attendance vẫn nằm ngoài phần upsert của RPC.
 
+### 4.3. Bundle tải 1-on-1 Test Run
+
+- `get_standalone_test_run_bundle(p_run_id, p_assignment_id)` yêu cầu staff authentication và gom việc khôi phục trang 1-on-1 Test Run vào một lời gọi RPC.
+- Trong cùng lời gọi database, RPC lấy run hiện tại, assignment/package, tự tạo các section run còn thiếu cùng run items/attempt snapshots, rồi trả toàn bộ sibling runs, item + snapshot hiện tại, package/section narration variant IDs và RAC metric label.
+- `getStandaloneTestRunBundle()` ánh xạ payload RPC sang `StandaloneTestRunBundle`; `TeacherTestRunPage.load()` ưu tiên bundle để hydrate run details, all runs, items và audio variants trong một lượt.
+- Đường bundle thay thế waterfall khoảng 65 HTTP requests của quy trình khôi phục cũ bằng một database RPC. Khi RPC thiếu, lỗi hoặc trả payload không hợp lệ, trang vẫn chạy chuỗi query cũ làm compatibility fallback.
+- Migration triển khai: `20261001010000_standalone_test_run_bundle_rpc.sql`.
+
 ---
 
 ## 5. Quy tắc Ánh xạ Mã Nguồn (Codebase Mapping Reference)
@@ -146,4 +154,4 @@ Hệ thống tuân thủ nguyên tắc: **Cùng 1 Tổ chức nhưng dữ liệu
 | Probe Counters | `web/src/modules/assessment/probe-metrics.ts` | `web/src/pages/teacher/TeacherObservePage.tsx` | `enteredProbeFlow`, `probeCount` |
 | Atomic Sync, Scoped Snapshot & OCC | `web/src/lib/supabase-sync.ts` | `web/src/state/AppState.tsx` | `organization_workspace_versions`, `get_workspace_snapshot`, `sync_workspace_atomic` (`20261001000000_atomic_workspace_sync_and_scoping.sql`) |
 | Test Packages V2 | `web/src/lib/test-packages.ts` | `web/src/pages/admin/AdminPackageTestsPage.tsx` | `test_packages`, `test_sections`, `test_items` |
-| Standalone Test Run | `web/src/lib/standalone-tests.ts` | `web/src/pages/teacher/TeacherTestRunPage.tsx` | `standalone_test_runs`, `standalone_test_attempts` |
+| Standalone Test Run Bundle | `web/src/lib/standalone-tests.ts` | `web/src/pages/teacher/TeacherTestRunPage.tsx` | `standalone_test_runs`, `standalone_test_run_items`, `standalone_test_attempts`, `standalone_test_attempt_snapshots`, `narration_variants`, `get_standalone_test_run_bundle` (`20261001010000_standalone_test_run_bundle_rpc.sql`) |

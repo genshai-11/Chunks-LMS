@@ -1,7 +1,7 @@
 # SSSF Cleanup and Scoped Sync Handover
 
 **Status:** Complete  
-**Scope:** Dead-code removal, SSSF runtime-artifact hygiene, atomic workspace sync, and Teacher data scoping  
+**Scope:** Dead-code removal, SSSF runtime-artifact hygiene, atomic workspace sync, Teacher data scoping, and bundled 1-on-1 Test Run loading
 **Branch:** `refactor/cleanup-and-sssf-hygiene`
 
 ## 1. Summary
@@ -11,6 +11,8 @@ This handover covers two related change sets visible in the repository diff: rem
 The cleanup cutover is direct: the `/chunker` route and its import are gone, Observe no longer supports returning to Chunker, and the attendance-matrix implementation is removed together with its dedicated types, test assertions, and CSS. No replacement compatibility route, re-export, or deprecated alias was added.
 
 The synchronization change adds a migration-backed revision store, scoped snapshot reads, atomic workspace writes with optimistic concurrency control (OCC), client-side revision tracking, cloud-over-cache boot precedence, and a Teacher Overview filter that excludes learners outside the Teacher's operable classes.
+
+The 1-on-1 Test Run optimization adds a staff-authenticated bundle RPC and an RPC-first page load. It consolidates the previous approximately 65-request restoration waterfall into one database call while retaining the legacy sequence as a compatibility fallback.
 
 ## 2. Removed application surfaces
 
@@ -181,3 +183,36 @@ Together, these recorded results establish that the remaining TypeScript referen
 - A conflict is a reload signal, not permission to retry with an unversioned overwrite.
 - The atomic RPC currently does not persist the attendance array or implement prune/delete semantics; do not assume parity with every branch of the legacy save path.
 - Teacher visibility must remain constrained at both server snapshot scope and UI projection; Admin remains the only organization-wide role.
+
+## 9. 1-on-1 Test Run bundle optimization
+
+### 9.1 Database RPC
+
+`supabase/migrations/20261001010000_standalone_test_run_bundle_rpc.sql` adds the `security definer` RPC `get_standalone_test_run_bundle(p_run_id, p_assignment_id)`. The function requires a staff identity, resolves the primary run and its assignment/package context, and auto-prepares missing section runs in the database. For each missing section it creates the run, run items, attempts, and initial attempt snapshots.
+
+The returned JSON bundle contains:
+
+- the requested run and all sibling runs for the assignment;
+- package title/kind and RAC metric label;
+- approved package-start, three part-intro, package-end, and per-session section-intro narration variant IDs;
+- all assignment run items joined with test-item prompts and measurements;
+- the current attempt/snapshot state needed to restore scoring progress.
+
+This consolidates the previous approximately 65 HTTP requests made while restoring the 1-on-1 Test Run page into one RPC/database round trip.
+
+### 9.2 Client integration and fallback
+
+`web/src/lib/standalone-tests.ts` exports `StandaloneTestRunBundle`, its item payload type, and `getStandaloneTestRunBundle()`. The client wrapper calls `get_standalone_test_run_bundle`, maps database run rows through the existing run mapper, supplies documented defaults for optional package/audio fields, and caches the response under the standalone request cache.
+
+`web/src/pages/teacher/TeacherTestRunPage.tsx` now tries the bundle first in `load()`. On success it hydrates the current run, all runs, RAC label, package and session narration IDs, flattened items and their attempt state, restored audio readiness, current selection/summary state, and the run-page cache in one pass.
+
+If the RPC is unavailable, returns an error, yields an unusable payload, or throws, the existing sequential load path remains the compatibility fallback. The fallback preserves behavior during migration rollout but does not provide the request reduction of the bundle path.
+
+### 9.3 Recorded quality gates
+
+| Gate | Result |
+|---|---|
+| `npm run typecheck` | Passed with 0 errors |
+| `npm run test` | Passed: 47 of 47 test files, 231 tests |
+
+Apply `20261001010000_standalone_test_run_bundle_rpc.sql` before expecting the optimized page-load path; without it, `TeacherTestRunPage` intentionally uses the legacy request waterfall.

@@ -41,6 +41,7 @@ import {
   findLatestApprovedNarrationVariant,
   getStandaloneRun,
   getStandaloneRunRuntime,
+  getStandaloneTestRunBundle,
   listStandaloneAssignments,
   listStandaloneRunItems,
   listStandaloneRuns,
@@ -613,6 +614,105 @@ export function TeacherTestRunPage() {
       return
     }
     setIsRestoringRun(true)
+    try {
+      const bundleRes = await getStandaloneTestRunBundle(runId, assignmentIdParam || undefined)
+      if (bundleRes.ok && bundleRes.data) {
+        const bundle = bundleRes.data
+        const currentRun = bundle.runDetails
+        setRunDetails(currentRun)
+        setAllRuns(bundle.allRuns)
+        setRacMetricLabel(bundle.racMetricLabel)
+        setPackageStartVariantId(bundle.packageAudio.packageStartVariantId)
+        setPartIntroVariantIds({
+          1: bundle.packageAudio.partIntroVariantIds['1'] ?? null,
+          2: bundle.packageAudio.partIntroVariantIds['2'] ?? null,
+          3: bundle.packageAudio.partIntroVariantIds['3'] ?? null,
+        })
+        setPackageEndVariantId(bundle.packageAudio.packageEndVariantId)
+
+        const nextIntroBySession: Record<number, string | null> = {}
+        for (const [k, v] of Object.entries(bundle.sessionIntroVariantIds)) {
+          nextIntroBySession[Number(k)] = v
+        }
+        setSessionIntroVariantIds(nextIntroBySession)
+        setIntroVariantId(nextIntroBySession[currentRun.sessionNumber] ?? null)
+
+        const combinedItems: TestItem[] = bundle.items.map((item, index) => {
+          const itemAttempts = item.attempt_id
+            ? [
+                {
+                  id: item.attempt_id,
+                  status: item.attempt_status,
+                  snapshot: {
+                    status: item.attempt_status,
+                    effectiveColor: item.effective_color,
+                    enteredProbeFlow: item.entered_probe_flow,
+                    probeCount: item.probe_count,
+                    finalizedAt: item.finalized_at,
+                  },
+                },
+              ]
+            : []
+          return {
+            ...item,
+            global_item_order: index + 1,
+            cvr: item.cvr,
+            cci: item.cci,
+            cpd: item.cpd,
+            attempts: itemAttempts,
+          } as unknown as TestItem
+        })
+
+        setItems(combinedItems)
+
+        const completed = combinedItems.filter(isItemFinalized).length
+        const assignmentId = assignmentIdParam || currentRun.assignmentId
+        const restoredReady = readLiveAudioReady(runId, assignmentId)
+        if (completed > 0 || restoredReady) {
+          markAudioReady({ suppressAutoPlay: true, persist: completed > 0, assignmentId })
+          setAudioState((current) => (current === 'idle' ? 'ready' : current))
+          setAudioLabel((current) => (current === 'Current item' ? 'Live test restored' : current))
+          if (restoredReady && completed === 0) {
+            setMessage('Live test restored. Audio is ready; auto-play is paused until you press Play or score the next item.')
+          }
+        }
+
+        const firstUnfinalized = combinedItems.findIndex((item) => !isItemFinalized(item))
+        if (firstUnfinalized !== -1) {
+          setSelectedIndex(firstUnfinalized)
+          setIsSummaryShown(false)
+        } else if (combinedItems.length > 0) {
+          setSelectedIndex(combinedItems.length - 1)
+          setIsSummaryShown(true)
+          triggerConfetti()
+        }
+        enteringProbeRef.current = null
+
+        if (cacheKey) {
+          runPageCache.set(cacheKey, {
+            expiresAt: Date.now() + RUN_PAGE_CACHE_TTL_MS,
+            runDetails: currentRun,
+            allRuns: bundle.allRuns,
+            items: combinedItems,
+            racMetricLabel: bundle.racMetricLabel,
+            introVariantId: nextIntroBySession[currentRun.sessionNumber] ?? null,
+            sessionIntroVariantIds: nextIntroBySession,
+            packageStartVariantId: bundle.packageAudio.packageStartVariantId,
+            partIntroVariantIds: {
+              1: bundle.packageAudio.partIntroVariantIds['1'] ?? null,
+              2: bundle.packageAudio.partIntroVariantIds['2'] ?? null,
+              3: bundle.packageAudio.partIntroVariantIds['3'] ?? null,
+            },
+            packageEndVariantId: bundle.packageAudio.packageEndVariantId,
+          })
+        }
+        setIsRestoringRun(false)
+        return
+      }
+    } catch {
+      // Fall back to legacy sequential queries below
+    }
+
     const primaryRunResult = await getStandaloneRun(runId)
     if (!primaryRunResult.ok || !primaryRunResult.data) {
       setMessage(primaryRunResult.ok ? 'Run not found' : primaryRunResult.error)

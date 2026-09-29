@@ -471,3 +471,102 @@ export async function getStandaloneAssignmentProgress(
     data: batch.data[assignmentId] ?? { assignmentId, completedQuestions: 0, totalQuestions: 0 },
   }
 }
+
+export type StandaloneTestRunBundleItem = {
+  id: string
+  run_id: string
+  test_item_id: string
+  item_order: number
+  parent_run_id: string
+  session_number: number
+  prompt_language: 'vi' | 'en'
+  voice_id: string
+  test_section_id: string
+  prompt_vi: string | null
+  prompt_en: string | null
+  spoken_script_vi: string | null
+  spoken_script_en: string | null
+  tc: number | null
+  tl: number | null
+  lc: number | null
+  cvr: number
+  cci: number
+  cpd: number
+  attempt_id: string | null
+  attempt_status: string
+  effective_color: string | null
+  entered_probe_flow: boolean
+  probe_count: number
+  finalized_at: string | null
+}
+
+export type StandaloneTestRunBundle = {
+  runDetails: StandaloneTestRunRow
+  allRuns: StandaloneTestRunRow[]
+  packageTitle: string
+  packageKind: 'standard' | 'mini'
+  racMetricLabel: '%c' | '%r'
+  packageAudio: {
+    packageStartVariantId: string | null
+    partIntroVariantIds: Record<string, string | null>
+    packageEndVariantId: string | null
+  }
+  sessionIntroVariantIds: Record<string, string | null>
+  items: StandaloneTestRunBundleItem[]
+}
+
+export async function getStandaloneTestRunBundle(
+  runId: string,
+  assignmentId?: string,
+): Promise<Result<StandaloneTestRunBundle>> {
+  return cachedQuery(
+    cacheKey(['standalone', 'run-bundle', runId, assignmentId ?? '']),
+    async () => {
+      const sb = client()
+      if (!sb) return { ok: false, error: 'Supabase is not configured' }
+      const { data, error } = await sb.rpc('get_standalone_test_run_bundle', {
+        p_run_id: runId,
+        p_assignment_id: assignmentId ?? null,
+      })
+      if (error) return { ok: false, error: error.message }
+      type RpcBundleResponse = {
+        ok: boolean
+        error?: string
+        data?: {
+          runDetails: unknown
+          allRuns: unknown[]
+          packageTitle?: string
+          packageKind?: 'standard' | 'mini'
+          racMetricLabel?: '%c' | '%r'
+          packageAudio?: StandaloneTestRunBundle['packageAudio']
+          sessionIntroVariantIds?: Record<string, string | null>
+          items?: StandaloneTestRunBundleItem[]
+        }
+      }
+      const response = data as unknown as RpcBundleResponse | null
+      if (!response || !response.ok || !response.data) {
+        return { ok: false, error: response?.error ?? 'Failed to load test run bundle' }
+      }
+      const payload = response.data
+      const rawRuns = payload.allRuns ?? []
+      return {
+        ok: true,
+        data: {
+          runDetails: run(payload.runDetails),
+          allRuns: rawRuns.map(run),
+          packageTitle: payload.packageTitle ?? 'Standalone Test',
+          packageKind: payload.packageKind ?? 'standard',
+          racMetricLabel: (payload.racMetricLabel as '%c' | '%r') ?? '%c',
+          packageAudio: payload.packageAudio ?? {
+            packageStartVariantId: null,
+            partIntroVariantIds: {},
+            packageEndVariantId: null,
+          },
+          sessionIntroVariantIds: payload.sessionIntroVariantIds ?? {},
+          items: payload.items ?? [],
+        },
+      }
+    },
+    { ttlMs: 15_000, persist: true },
+  )
+}

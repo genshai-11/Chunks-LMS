@@ -25,7 +25,7 @@
         </div>
         <div>
           <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-            Chunks-LMS <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">v1.1.0</span>
+            Chunks-LMS <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">v1.2.0</span>
           </h1>
           <p class="text-xs text-slate-400">Canonical Architecture & Domain Ontology</p>
         </div>
@@ -274,6 +274,36 @@
           </div>
         </div>
       </div>
+
+      <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800">
+        <h2 class="text-lg font-bold text-white mb-2">Bundle tải 1-on-1 Test Run</h2>
+        <p class="text-sm text-slate-300 mb-6">
+          Migration <code>20261001010000_standalone_test_run_bundle_rpc.sql</code> bổ sung <code>get_standalone_test_run_bundle(p_run_id, p_assignment_id)</code>. Client ưu tiên bundle mới để thay waterfall khoảng 65 HTTP requests bằng một lời gọi RPC.
+        </p>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="bg-sky-950/20 border border-sky-500/30 rounded-xl p-5">
+            <div class="text-xs font-mono text-sky-400 font-bold uppercase mb-3">1. Chuẩn bị trong Database</div>
+            <div class="space-y-2 text-xs text-slate-300">
+              <p>RPC yêu cầu staff authentication, lấy run hiện tại cùng assignment, package và version.</p>
+              <p>Các section run còn thiếu được tạo cùng run items, attempts và attempt snapshots trong lời gọi database.</p>
+            </div>
+          </div>
+          <div class="bg-emerald-950/20 border border-emerald-500/30 rounded-xl p-5">
+            <div class="text-xs font-mono text-emerald-400 font-bold uppercase mb-3">2. Một Payload Hợp nhất</div>
+            <div class="space-y-2 text-xs text-slate-300">
+              <p>Response gom run details, toàn bộ sibling runs, items + snapshot hiện tại, package/section narration variant IDs và RAC metric label.</p>
+              <p><code>getStandaloneTestRunBundle()</code> ánh xạ payload sang <code>StandaloneTestRunBundle</code>.</p>
+            </div>
+          </div>
+          <div class="bg-amber-950/20 border border-amber-500/30 rounded-xl p-5">
+            <div class="text-xs font-mono text-amber-400 font-bold uppercase mb-3">3. Hydrate & Compatibility</div>
+            <div class="space-y-2 text-xs text-slate-300">
+              <p><code>TeacherTestRunPage.load()</code> hydrate run details, all runs, items và audio variants trong một lượt.</p>
+              <p>RPC thiếu, lỗi hoặc trả payload không hợp lệ sẽ rơi về chuỗi query cũ làm compatibility fallback.</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- TAB 4: CODEBASE MAPPING -->
@@ -342,6 +372,12 @@
                 <td class="p-3 text-emerald-400">lib/test-packages.ts</td>
                 <td class="p-3 text-slate-200">pages/admin/AdminPackageTestsPage.tsx</td>
                 <td class="p-3 text-indigo-400">test_packages, sections, items</td>
+              </tr>
+              <tr class="hover:bg-slate-900/50">
+                <td class="p-3 font-sans font-semibold text-white">Standalone Test Run Bundle</td>
+                <td class="p-3 text-emerald-400">lib/standalone-tests.ts</td>
+                <td class="p-3 text-slate-200">pages/teacher/TeacherTestRunPage.tsx</td>
+                <td class="p-3 text-indigo-400">standalone_test_runs, standalone_test_run_items, standalone_test_attempts, standalone_test_attempt_snapshots, narration_variants; get_standalone_test_run_bundle (20261001010000_standalone_test_run_bundle_rpc.sql)</td>
               </tr>
             </tbody>
           </table>

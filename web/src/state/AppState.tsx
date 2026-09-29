@@ -153,6 +153,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     loadActiveLearnerId(),
   )
   const [activeClassId, setActiveClassIdState] = useState<string | null>(() => loadActiveClassId())
+  const [workspaceRevision, setWorkspaceRevision] = useState<number | null>(null)
 
   const setActiveLearnerUserId = useCallback((id: string | null) => {
     saveActiveLearnerId(id)
@@ -259,6 +260,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const wLive = rosterWeight(live.roster, live.scheduling)
 
       skipNextSync.current = true
+      if (typeof loaded.revision === 'number') {
+        setWorkspaceRevision(loaded.revision)
+      }
 
       let authoritativeRoster = remote.roster
       const source = chooseBootstrapSource(wRemote, wLive)
@@ -280,7 +284,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           setRoster(remote.roster)
           setScheduling(remote.scheduling)
         }
-      } else if (source === 'cloud') {
+      } else if (source === 'cloud' || wRemote > 0) {
         // Cloud roster authoritative; merge scheduling so open remote sessions survive.
         setRoster(remote.roster)
         setScheduling(mergeScheduling(live.scheduling, remote.scheduling))
@@ -386,11 +390,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       allowEmptyWipeOnce.current = false
       const result = await saveWorkspaceToSupabase(normalized, {
         allowEmptyWipe: wipe,
+        expectedRevision: workspaceRevision ?? undefined,
       })
       if (result.ok) {
+        if (typeof result.newRevision === 'number') {
+          setWorkspaceRevision(result.newRevision)
+        }
         setBackendStatus('online')
         setBackendError(null)
         setLastSyncedAt(new Date().toISOString())
+      } else if (result.conflict) {
+        setBackendStatus('error')
+        setBackendError('Conflict: workspace updated by another session. Please reload to refresh.')
       } else {
         setBackendStatus('error')
         setBackendError(syncPhaseError('write', result.error))
@@ -406,6 +417,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     staffSession.authBypass,
     staffSession.signedIn,
     staffSession.staffRoles.length,
+    workspaceRevision,
   ])
 
   const resetAll = useCallback(() => {
@@ -510,7 +522,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const result = await saveWorkspaceToSupabase(normalized, {
         allowEmptyWipe: allowEmptyWipeOnce.current,
         pruneMissing: override?.pruneMissing,
+        expectedRevision: workspaceRevision ?? undefined,
       })
+      if (result.ok && typeof result.newRevision === 'number') {
+        setWorkspaceRevision(result.newRevision)
+      }
       allowEmptyWipeOnce.current = false
       if (result.ok) {
         const verified = await verifyWorkspacePersistence(normalized)
@@ -534,6 +550,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       staffSession.authBypass,
       staffSession.signedIn,
       staffSession.staffRoles.length,
+      workspaceRevision,
     ],
   )
 
@@ -573,6 +590,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setBackendStatus('online')
     setBackendError(null)
     setLastSyncedAt(new Date().toISOString())
+    if (typeof loaded.revision === 'number') {
+      setWorkspaceRevision(loaded.revision)
+    }
   }, [
     staffSession.displayName,
     staffSession.email,

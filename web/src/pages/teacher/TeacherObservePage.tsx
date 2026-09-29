@@ -24,7 +24,7 @@ import {
   Sparkles,
   X,
 } from 'lucide-react'
-import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import {
   advancePosition,
   createCaptureSession,
@@ -184,9 +184,7 @@ function currentAttemptForLearner(capture: CaptureSessionState, learnerUserId: s
  */
 export function TeacherObservePage() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const fromChunker = searchParams.get('from') === 'chunker'
-  const exitPath = fromChunker ? '/chunker' : '/teacher/session'
+  const exitPath = '/teacher/session'
   const {
     roster,
     ledger,
@@ -958,7 +956,6 @@ export function TeacherObservePage() {
     appendFinalizedFromCapture,
     syncNow,
     navigate,
-    exitPath,
     flash,
   ])
 

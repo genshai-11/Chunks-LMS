@@ -1,5 +1,4 @@
 import type { ResultColor } from '../result-lifecycle/types'
-import type { AttendanceStatus } from '../scheduling/types'
 
 export type OpsAuditEventType =
   | 'result_finalized'
@@ -41,27 +40,4 @@ export type SessionOpsRow = {
   resultCount: number
   openProbes: number
   unfinishedDrafts: number
-}
-
-export type AttendanceMatrixCell = {
-  learningSessionId: string
-  status: AttendanceStatus | 'missing'
-}
-
-export type AttendanceMatrixRow = {
-  learnerUserId: string
-  displayName: string
-  cells: AttendanceMatrixCell[]
-}
-
-export type AttendanceMatrix = {
-  classId: string
-  className: string
-  sessions: Array<{
-    id: string
-    sessionNumber: number | null
-    startedAt: string
-    status: 'open' | 'completed'
-  }>
-  rows: AttendanceMatrixRow[]
 }

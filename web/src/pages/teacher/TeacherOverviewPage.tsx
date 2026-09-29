@@ -24,6 +24,7 @@ import { UserAvatar } from '../../components/UserAvatar'
 import { EmptyState, Panel } from '../../components/ui'
 import { useFlash } from '../../hooks/useFlash'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
+import { useStaffSession } from '../../auth/useStaffSession'
 import {
   addLearnerProfile,
   createLearnerAndEnroll,
@@ -95,6 +96,7 @@ export function TeacherOverviewPage() {
     syncNow,
   } = useAppState()
   const { options, classRow, course, teacher, seats, hasMultiple, selectedClassIds, mode } = useTeacherClassContext()
+  const staffSession = useStaffSession()
   const navigate = useNavigate()
   const { message, error, ok, err } = useFlash()
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
@@ -177,9 +179,22 @@ export function TeacherOverviewPage() {
       }
     })
 
-    if (selectedClassIds.length === 0) return mapped
-    return mapped.filter((learner) => learner.assignedToSelectedClasses || learner.classIds.length === 0)
-  }, [classRow, ledger, roster, scheduling, selectedClassIds])
+    const teacherOperableClassIds = new Set(options.map((o) => o.classRow.id))
+    const isAdmin = staffSession.canAccess('admin')
+
+    return mapped.filter((learner) => {
+      if (isAdmin) {
+        if (selectedClassIds.length === 0) return true
+        return learner.assignedToSelectedClasses || learner.classIds.length === 0
+      }
+      // For Teacher: strictly scope to learners enrolled in teacher's operable classes
+      const inTeacherClass = learner.classIds.some((cid) => teacherOperableClassIds.has(cid))
+      if (selectedClassIds.length > 0) {
+        return learner.assignedToSelectedClasses
+      }
+      return inTeacherClass
+    })
+  }, [classRow, ledger, options, roster, scheduling, selectedClassIds, staffSession])
 
   const selectedLearner =
     learners.find((learner) => learner.id === activeLearnerUserId) ?? learners[0] ?? null

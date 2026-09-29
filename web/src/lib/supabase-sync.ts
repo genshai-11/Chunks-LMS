@@ -8,6 +8,7 @@ import { normalizeCourseSchedule } from '../modules/roster/schedule'
 import type { CourseSchedule, DomainUser, RosterState } from '../modules/roster/types'
 import { createEmptyRoster, isUuid, LOCAL_ORG_ID, newId } from '../modules/roster/seed'
 import type {
+  AttendanceStatus,
   LearningSession,
   PromptLanguage,
   SchedulingState,
@@ -43,12 +44,13 @@ export type WorkspaceSnapshot = {
   scheduling: SchedulingState
 }
 
-export type SyncResult = { ok: true; source: 'supabase' | 'empty' } | { ok: false; error: string }
+export type SyncResult =
+  | { ok: true; source: 'supabase' | 'empty'; newRevision?: number }
+  | { ok: false; error: string; conflict?: boolean; serverRevision?: number }
 
 export type VerifySyncResult = { ok: true } | { ok: false; error: string }
 
 type DeleteFail = { ok: false; error: string }
-
 function failDelete(scope: string, error: { message?: string } | null): DeleteFail | null {
   return error ? { ok: false, error: `${scope}: ${error.message ?? 'unknown error'}` } : null
 }
@@ -399,7 +401,10 @@ export function normalizeIdsForDb(snapshot: WorkspaceSnapshot): WorkspaceSnapsho
 
 export async function loadWorkspaceFromSupabase(options?: {
   organizationId?: string
-}): Promise<{ ok: true; data: WorkspaceSnapshot } | { ok: false; error: string }> {
+}): Promise<
+  | { ok: true; data: WorkspaceSnapshot; revision?: number }
+  | { ok: false; error: string }
+> {
   const sb = db()
   if (!sb) return { ok: false, error: 'Supabase not configured' }
 
@@ -440,6 +445,131 @@ export async function loadWorkspaceFromSupabase(options?: {
       }
     }
     const orgId = org.id as string
+
+    // 1. Try atomic scoped snapshot RPC first
+    try {
+      const rpcRes = await sb.rpc('get_workspace_snapshot', {
+        p_organization_id: orgId,
+      })
+      if (!rpcRes.error && rpcRes.data && rpcRes.data.ok && rpcRes.data.data) {
+        const snap = rpcRes.data.data
+        type JsonRow = Record<string, unknown>
+        const rawUsers = (snap.roster?.users ?? []) as unknown as JsonRow[]
+        const users: DomainUser[] = rawUsers.map((u) => ({
+          id: String(u.id ?? ''),
+          displayName: String(u.display_name ?? u.displayName ?? 'Learner'),
+          email: u.email ? String(u.email) : null,
+          roles: (Array.isArray(u.roles) ? u.roles : ['learner']) as DomainUser['roles'],
+          accountStatus: (u.account_status ?? u.accountStatus ?? 'active') as 'active' | 'inactive',
+          allowMultiClass: Boolean(u.allow_multi_class ?? u.allowMultiClass),
+          avatarUrl: u.avatar_url ? String(u.avatar_url) : (u.avatarUrl ? String(u.avatarUrl) : null),
+        }))
+        const courses = (snap.roster?.courses ?? []) as unknown as JsonRow[]
+        const classes = (snap.roster?.classes ?? []) as unknown as JsonRow[]
+        const enrollments = (snap.roster?.enrollments ?? []) as unknown as JsonRow[]
+        const scheduled = (snap.scheduling?.scheduledSessions ?? []) as unknown as JsonRow[]
+        const learning = (snap.scheduling?.learningSessions ?? []) as unknown as JsonRow[]
+        const attendance = (snap.scheduling?.attendanceRecords ?? []) as unknown as JsonRow[]
+
+        return {
+          ok: true,
+          data: {
+            roster: {
+              organization: { id: orgId, name: org.name ?? 'Default Org' },
+              users,
+              courses: courses.map((c) => ({
+                id: String(c.id ?? ''),
+                organizationId: String(c.organization_id ?? c.organizationId ?? orgId),
+                code: String(c.code ?? 'CRS'),
+                name: String(c.name ?? 'Course'),
+                status: (c.status as 'active' | 'archived') ?? 'active',
+                startsOn: (c.starts_on as string | null) ?? null,
+                endsOn: (c.ends_on as string | null) ?? null,
+              })),
+              classes: classes.map((cl) => ({
+                id: String(cl.id ?? ''),
+                courseId: String(cl.course_id ?? cl.courseId ?? ''),
+                name: String(cl.name ?? 'Class'),
+                capacity: Number(cl.capacity ?? 3),
+                teacherUserId: String(cl.teacher_user_id ?? cl.teacherUserId ?? ''),
+                status: (cl.status as 'active' | 'ended') ?? 'active',
+                startsOn: (cl.starts_on as string | null) ?? null,
+                endsOn: (cl.ends_on as string | null) ?? null,
+                schedule: asSchedule(cl.schedule),
+              })),
+              enrollments: enrollments.map((e) => ({
+                id: String(e.id ?? ''),
+                classId: String(e.class_id ?? e.classId ?? ''),
+                learnerUserId: String(e.learner_user_id ?? e.learnerUserId ?? ''),
+                status: (e.status as 'active' | 'ended') ?? 'active',
+                startedAt: String(e.started_at ?? e.startedAt ?? new Date().toISOString()),
+                endedAt: (e.ended_at as string | null) ?? null,
+              })),
+            },
+            scheduling: {
+              scheduledSessions: scheduled.map((s) => ({
+                id: String(s.id ?? ''),
+                classId: String(s.class_id ?? s.classId ?? ''),
+                plannedStart: String(s.starts_at ?? s.planned_start ?? s.plannedStart ?? new Date().toISOString()),
+                durationMinutes: Number(s.duration_minutes ?? s.durationMinutes ?? 60),
+                status: (s.status as 'scheduled' | 'completed' | 'cancelled' | 'rescheduled') ?? 'scheduled',
+                rescheduledFromId: (s.rescheduled_from_id as string | null) ?? null,
+                sessionNumber: typeof s.session_number === 'number' ? s.session_number : null,
+              })),
+              learningSessions: learning.map((ls) => ({
+                id: String(ls.id ?? ''),
+                classId: String(ls.class_id ?? ls.classId ?? ''),
+                scheduledSessionId: (ls.scheduled_session_id as string | null) ?? null,
+                status: (ls.status as 'open' | 'completed') ?? 'open',
+                plannedQuestionCount: (ls.planned_question_count as number | null) ?? null,
+                startedAt: String(ls.started_at ?? ls.startedAt ?? new Date().toISOString()),
+                completedAt: (ls.completed_at as string | null) ?? null,
+                maxProbeCount: Number(ls.max_probe_count ?? 2),
+                sessionNumber: typeof ls.session_number === 'number' ? ls.session_number : null,
+                ownerUserId: (ls.owner_user_id as string | null) ?? null,
+                lockExpiresAt: (ls.lock_expires_at as string | null) ?? null,
+                sessionKind: parseSessionKind(
+                  typeof ls.session_kind === 'string'
+                    ? ls.session_kind
+                    : typeof ls.sessionKind === 'string'
+                    ? ls.sessionKind
+                    : null,
+                ),
+                sessionFormat: parseSessionFormat(
+                  typeof ls.session_format === 'string'
+                    ? ls.session_format
+                    : typeof ls.sessionFormat === 'string'
+                    ? ls.sessionFormat
+                    : null,
+                ),
+                promptLanguage: parsePromptLanguage(
+                  typeof ls.prompt_language === 'string'
+                    ? ls.prompt_language
+                    : typeof ls.promptLanguage === 'string'
+                    ? ls.promptLanguage
+                    : null,
+                ),
+                liveTestResourceId: (ls.live_test_resource_id as string | null) ?? null,
+                liveTestBlockId: (ls.live_test_block_id as string | null) ?? null,
+                participantLearnerIds: Array.isArray(ls.participant_learner_ids)
+                  ? (ls.participant_learner_ids as string[])
+                  : null,
+              })),
+              attendance: attendance.map((a) => ({
+                id: String(a.id ?? ''),
+                learningSessionId: String(a.learning_session_id ?? a.learningSessionId ?? ''),
+                learnerUserId: String(a.learner_user_id ?? a.learnerUserId ?? ''),
+                status: ((a.status as AttendanceStatus) ?? 'present'),
+                recordedAt: String(a.recorded_at ?? a.recordedAt ?? new Date().toISOString()),
+              })),
+            },
+          },
+          revision: typeof rpcRes.data.revision === 'number' ? rpcRes.data.revision : 1,
+        }
+      }
+    } catch {
+      // Fall back to REST queries below
+    }
 
     const [
       membersRes,
@@ -642,6 +772,7 @@ export type SaveWorkspaceOptions = {
    * Default false — upsert only. allowEmptyWipe implies prune.
    */
   pruneMissing?: boolean
+  expectedRevision?: number
 }
 
 function workspaceIsEmpty(s: WorkspaceSnapshot): boolean {
@@ -667,6 +798,42 @@ export async function saveWorkspaceToSupabase(
   const prune = Boolean(options.allowEmptyWipe || options.pruneMissing)
 
   try {
+    // 0) Try Atomic Transaction RPC first
+    try {
+      const rpcRes = await sb.rpc('sync_workspace_atomic', {
+        p_organization_id: orgId,
+        p_expected_revision: options.expectedRevision ?? null,
+        p_payload: {
+          roster: {
+            users: roster.users,
+            courses: roster.courses,
+            classes: roster.classes,
+            enrollments: roster.enrollments,
+          },
+          scheduling: {
+            scheduledSessions: scheduling.scheduledSessions,
+            learningSessions: scheduling.learningSessions,
+            attendance: scheduling.attendance,
+          },
+        },
+      })
+      if (!rpcRes.error && rpcRes.data) {
+        if (rpcRes.data.ok) {
+          return { ok: true, source: 'supabase', newRevision: rpcRes.data.revision }
+        }
+        if (rpcRes.data.code === 'CONFLICT_REVISION_MISMATCH') {
+          return {
+            ok: false,
+            error: rpcRes.data.error ?? 'Conflict: workspace was updated by another session',
+            conflict: true,
+            serverRevision: rpcRes.data.serverRevision,
+          }
+        }
+      }
+    } catch {
+      // Fall through to 10-step REST fallback below
+    }
+
     // Guard: never let an empty boot/race wipe existing cloud data
     if (workspaceIsEmpty({ roster, scheduling }) && !options.allowEmptyWipe) {
       const { count: courseCount } = await sb

@@ -3,7 +3,6 @@ import { AuthProvider } from './auth/AuthProvider'
 import { StaffGate } from './auth/StaffGate'
 import { AppShell } from './components/AppShell'
 import { HomePage } from './pages/HomePage'
-import { ChunkerPage } from './pages/ChunkerPage'
 import { AdminLayout } from './pages/admin/AdminLayout'
 import { AdminOverviewPage } from './pages/admin/AdminOverviewPage'
 import { AdminCoursesPage } from './pages/admin/AdminCoursesPage'
@@ -40,7 +39,6 @@ export default function App() {
           <AppShell>
             <Routes>
               <Route path="/" element={<HomePage />} />
-              <Route path="/chunker" element={<ChunkerPage />} />
 
               <Route
                 path="/admin"

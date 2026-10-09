@@ -4,7 +4,23 @@
 
 Chunks-LMS measures learner Focus and Awareness through teacher-observed assessments. It is not a content-authoring or resource-library platform.
 
-Before changing the project, read `CONTEXT.md`, relevant files under `docs/adr/`, and `docs/architecture/chunks-lms-architecture-review.md`.
+Before changing the project, read `docs/architecture/ONTOLOGY.md`, `docs/architecture/ontology.html`, `docs/plans/PRD-V1-TEACHER-SCOPED-SYNC.md`, `CONTEXT.md`, and relevant files under `docs/adr/`.
+
+## Canonical Ontology & Dual-Sync Protocol (Single Source of Truth)
+
+`docs/architecture/ONTOLOGY.md` (Markdown specification) and `docs/architecture/ontology.html` (interactive visual dashboard) are the **CANONICAL SINGLE SOURCE OF TRUTH** for the entire codebase.
+
+### Quy tắc Bắt buộc (Dual-Sync Protocol):
+1. **Trước khi lập kế hoạch hoặc code:** Bắt buộc phải đối chiếu với `ONTOLOGY.md` để nắm rõ danh mục thực thể, chủ sở hữu (Owner), và ma trận phân quyền.
+2. **Trong SSSF Pipeline:**
+   * **`sssf-planner`:** Lập `plan.md` bắt buộc phải căn cứ theo `docs/architecture/ONTOLOGY.md` và `docs/plans/PRD-V1-TEACHER-SCOPED-SYNC.md`.
+   * **`sssf-builder`:** Tuyệt đối không tạo file/module mồ côi ngoài luồng; bám sát ranh giới cô lập dữ liệu giữa các giáo viên (Teacher data scoping).
+   * **`sssf-reviewer`:** Kiểm tra đối chiếu diff để đảm bảo không rò rỉ dữ liệu chéo giữa các giáo viên, không phá vỡ bất biến của hệ thống.
+   * **`sssf-documenter`:** Khi có bất kỳ thay đổi nào về cấu trúc thực thể, tính năng, hoặc luồng dữ liệu, **BẮT BUỘC phải cập nhật đồng thời cả 2 file: `docs/architecture/ONTOLOGY.md` VÀ `docs/architecture/ontology.html`** để tài liệu và giao diện trực quan luôn khớp nhau 100%.
+3. **Quy tắc Cô lập Dữ liệu V1:**
+   * **Single Organization:** Toàn hệ thống chỉ phục vụ một trường/tổ chức duy nhất (`LOCAL_ORG_ID`). Không phát triển tính năng multi-org hay tenant switcher.
+   * **Teacher Scope:** Giáo viên chỉ được xem và quản lý lớp học do mình phụ trách (`classes.teacher_user_id = user.id`) và học viên ghi danh vào các lớp của mình.
+   * **Admin Scope:** Quản trị viên toàn quyền xem và điều phối tất cả các lớp, tất cả giáo viên và tất cả học viên trong trường.
 
 ## Agent skills
 

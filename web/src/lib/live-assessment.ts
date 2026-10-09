@@ -65,6 +65,29 @@ function client() {
   return getSupabase() as any
 }
 
+export const LIVE_RPC_TIMEOUT_MS = 7000
+
+export function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number = LIVE_RPC_TIMEOUT_MS,
+  timeoutMsg: string = 'Operation timed out',
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(timeoutMsg))
+    }, ms)
+    promise
+      .then((res) => {
+        clearTimeout(timer)
+        resolve(res)
+      })
+      .catch((err: unknown) => {
+        clearTimeout(timer)
+        reject(err)
+      })
+  })
+}
+
 export const SUPABASE_IN_FILTER_BATCH_SIZE = 100
 
 export function chunkForSupabaseInFilter<T>(
@@ -342,6 +365,26 @@ export async function loadLiveCapture(input: {
   if (compatibleFallback && compatibleFallback.questions.length > questions.length) {
     return { ok: true, data: compatibleFallback }
   }
+  const preferredQuestionIndex =
+    compatibleFallback &&
+    compatibleFallback.position.questionIndex >= 0 &&
+    compatibleFallback.position.questionIndex < questions.length
+      ? compatibleFallback.position.questionIndex
+      : Math.max(0, questions.length - 1)
+  const preferredLearnerIndex =
+    compatibleFallback &&
+    compatibleFallback.position.learnerIndex >= 0 &&
+    compatibleFallback.position.learnerIndex < input.learnerIds.length
+      ? compatibleFallback.position.learnerIndex
+      : questions.length > 0
+        ? Math.max(
+            0,
+            input.learnerIds.indexOf(
+              questions[preferredQuestionIndex]?.assignedLearnerUserId ??
+                questions.at(-1)!.assignedLearnerUserId,
+            ),
+          )
+        : 0
 
   return {
     ok: true,
@@ -355,11 +398,8 @@ export async function loadLiveCapture(input: {
       maxProbeCount: input.maxProbeCount,
       position: {
         mode: input.mode ?? compatibleFallback?.position.mode ?? 'question_first',
-        questionIndex: Math.max(0, questions.length - 1),
-        learnerIndex:
-          questions.length > 0
-            ? Math.max(0, input.learnerIds.indexOf(questions.at(-1)!.assignedLearnerUserId))
-            : 0,
+        questionIndex: preferredQuestionIndex,
+        learnerIndex: preferredLearnerIndex,
       },
     },
   }
@@ -389,54 +429,67 @@ export async function createLiveQuestion(input: {
   }
 
   async function callCreateRpc(): Promise<Result<CaptureSessionState>> {
-    const result = await sb.rpc('create_session_question_attempt', {
-      p_learning_session_id: input.capture.learningSessionId,
-      p_teacher_user_id: input.capture.teacherUserId,
-      p_learner_user_id: learnerUserId,
-      p_external_ref: input.externalRef ?? null,
-    })
+    try {
+      const result = (await withTimeout(
+        sb.rpc('create_session_question_attempt', {
+          p_learning_session_id: input.capture.learningSessionId,
+          p_teacher_user_id: input.capture.teacherUserId,
+          p_learner_user_id: learnerUserId,
+          p_external_ref: input.externalRef ?? null,
+        }),
+        LIVE_RPC_TIMEOUT_MS,
+        'create_session_question_attempt RPC timed out',
+      )) as { data: unknown; error: { message: string } | null }
 
-    if (result.error) return { ok: false, error: result.error.message }
+      if (result.error) return { ok: false, error: result.error.message }
+      const row = result.data as DbCreateQuestionAttemptResponse
+      const question: SessionQuestion = {
+        id: row.question.id,
+        learningSessionId: row.question.learning_session_id,
+        sequenceNumber: row.question.sequence_number,
+        externalRef: row.question.external_ref,
+        assignedLearnerUserId: row.attempt.learner_user_id,
+      }
+      const attempt: AssessmentAttempt = {
+        id: row.attempt.id,
+        learningSessionId: row.attempt.learning_session_id,
+        sessionQuestionId: row.attempt.session_question_id,
+        learnerUserId: row.attempt.learner_user_id,
+        teacherUserId: row.attempt.teacher_user_id,
+        // The insert trigger creates the same draft snapshot server-side. Avoid a reload round-trip.
+        snapshot: createDraftSnapshot(input.capture.maxProbeCount),
+      }
 
-    const row = result.data as DbCreateQuestionAttemptResponse
-    const question: SessionQuestion = {
-      id: row.question.id,
-      learningSessionId: row.question.learning_session_id,
-      sequenceNumber: row.question.sequence_number,
-      externalRef: row.question.external_ref,
-      assignedLearnerUserId: row.attempt.learner_user_id,
-    }
-    const attempt: AssessmentAttempt = {
-      id: row.attempt.id,
-      learningSessionId: row.attempt.learning_session_id,
-      sessionQuestionId: row.attempt.session_question_id,
-      learnerUserId: row.attempt.learner_user_id,
-      teacherUserId: row.attempt.teacher_user_id,
-      // The insert trigger creates the same draft snapshot server-side. Avoid a reload round-trip.
-      snapshot: createDraftSnapshot(input.capture.maxProbeCount),
-    }
-
-    return {
-      ok: true,
-      data: {
-        ...input.capture,
-        questions: [...input.capture.questions, question],
-        attempts: [...input.capture.attempts, attempt],
-        position: {
-          ...input.capture.position,
-          questionIndex: input.capture.questions.length,
-          learnerIndex,
+      return {
+        ok: true,
+        data: {
+          ...input.capture,
+          questions: [...input.capture.questions, question],
+          attempts: [...input.capture.attempts, attempt],
+          position: {
+            ...input.capture.position,
+            questionIndex: input.capture.questions.length,
+            learnerIndex,
+          },
         },
-      },
+      }
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      }
     }
   }
-
   const created = await callCreateRpc()
   if (created.ok) return created
 
   // Retry once after ensuring the open learning session exists. This keeps the normal path to one RPC.
   if (input.openSession) {
-    const ensured = await ensureLearningSessionOnServer(input.openSession)
+    const ensured = await withTimeout(
+      ensureLearningSessionOnServer(input.openSession),
+      LIVE_RPC_TIMEOUT_MS,
+      'ensureLearningSessionOnServer timed out',
+    ).catch((err) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) }))
     if (ensured.ok) {
       const retried = await callCreateRpc()
       if (retried.ok) return retried
@@ -460,7 +513,17 @@ async function mutateSnapshot(
   const sb = client()
   if (!sb) return localMutateAttempt(attempt, localCommand)
 
-  const result = await sb.rpc(rpc, params)
+  let result: { data: unknown; error: { message: string } | null }
+  try {
+    result = await withTimeout(
+      sb.rpc(rpc, params),
+      LIVE_RPC_TIMEOUT_MS,
+      `${rpc} RPC timed out after ${LIVE_RPC_TIMEOUT_MS}ms`,
+    )
+  } catch (err) {
+    console.warn(`[live] ${rpc} call timed out or failed:`, err)
+    return localMutateAttempt(attempt, localCommand)
+  }
   if (result.error) {
     console.warn(`[live] ${rpc}:`, result.error.message)
     return localMutateAttempt(attempt, localCommand)

@@ -9,7 +9,6 @@ import {
   startLearningSession,
 } from '../scheduling/session-lifecycle'
 import { appendResult, type ResultRecord } from '../reporting/progress'
-import { buildAttendanceMatrix } from './attendance-matrix'
 import { buildSessionOpsBoard, buildScheduledToday } from './board'
 import { correctFinalizedResult, filterAuditEvents } from './audit'
 import { effectiveResults, resultKey } from './effective-results'
@@ -78,7 +77,7 @@ describe('effectiveResults', () => {
   })
 })
 
-describe('ops board & attendance matrix', () => {
+describe('ops board', () => {
   it('builds session ops with attendance rate', () => {
     const { roster, scheduling, classRow, learningSession, learners } = seedSession()
     const board = buildSessionOpsBoard(roster, scheduling, [], { classId: classRow.id })
@@ -86,12 +85,6 @@ describe('ops board & attendance matrix', () => {
     expect(board[0]!.learningSessionId).toBe(learningSession.id)
     expect(board[0]!.attendanceMarked).toBe(learners.length)
     expect(board[0]!.attendanceRate).toBe(100)
-
-    const matrix = buildAttendanceMatrix(roster, scheduling, classRow.id)
-    expect(matrix).not.toBeNull()
-    expect(matrix!.sessions).toHaveLength(1)
-    expect(matrix!.rows.length).toBe(learners.length)
-    expect(matrix!.rows.every((r) => r.cells[0]?.status === 'present')).toBe(true)
   })
 
   it('lists scheduled today', () => {

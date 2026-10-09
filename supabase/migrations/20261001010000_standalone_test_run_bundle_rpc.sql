@@ -131,7 +131,7 @@ begin
   select coalesce(jsonb_agg(to_jsonb(r) order by r.session_number asc), '[]'::jsonb)
   into v_all_runs
   from public.standalone_test_runs r
-  where r.assignment_id = v_assignment_id;
+  where ((v_assignment_id is not null and r.assignment_id = v_assignment_id) or (v_assignment_id is null and r.id = p_run_id));
 
   -- 5. Query narration audio variants (Package level)
   if v_version.id is not null then
@@ -242,7 +242,7 @@ begin
   join public.test_items ti on ti.id = ri.test_item_id
   left join public.standalone_test_attempts att on att.run_item_id = ri.id
   left join public.standalone_test_attempt_snapshots snp on snp.attempt_id = att.id
-  where r.assignment_id = v_assignment_id;
+  where ((v_assignment_id is not null and r.assignment_id = v_assignment_id) or (v_assignment_id is null and r.id = p_run_id));
 
   return jsonb_build_object(
     'ok', true,

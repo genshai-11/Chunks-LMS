@@ -222,6 +222,11 @@ export function TeacherObservePage() {
   const railWidthRef = useRef(railWidth)
   const captureRef = useRef(capture)
   const liveRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const liveSavingRef = useRef(liveSaving)
+  useEffect(() => {
+    liveSavingRef.current = liveSaving
+  }, [liveSaving])
+
   useEffect(() => {
     captureRef.current = capture
   }, [capture])
@@ -401,7 +406,17 @@ export function TeacherObservePage() {
         { event: '*', schema: 'public', table: 'assessment_attempt_snapshots' },
         () => {
           if (liveRefreshTimer.current) clearTimeout(liveRefreshTimer.current)
-          liveRefreshTimer.current = window.setTimeout(() => void refreshLiveCapture(), 150)
+          const scheduleRefresh = (delay = 150) => {
+            liveRefreshTimer.current = window.setTimeout(() => {
+              if (liveSavingRef.current) {
+                // Scoring in-flight: wait and retry after save completes to avoid clobbering state
+                scheduleRefresh(200)
+                return
+              }
+              void refreshLiveCapture()
+            }, delay)
+          }
+          scheduleRefresh(150)
         },
       )
       .subscribe()
@@ -622,16 +637,27 @@ export function TeacherObservePage() {
         flash('Live-test block complete')
         return state
       }
-      const created = await createLiveQuestion({
-        capture: state,
-        openSession: openSession ?? null,
-        externalRef,
-      })
-      if (!created.ok) {
-        flash(created.error)
+      try {
+        const created = await createLiveQuestion({
+          capture: state,
+          openSession: openSession ?? null,
+          externalRef,
+        })
+        if (!created.ok) {
+          flash(created.error)
+          if (state.position.questionIndex < state.questions.length - 1) {
+            return advancePosition(state)
+          }
+          return state
+        }
+        return created.data
+      } catch (err) {
+        flash(err instanceof Error ? err.message : 'Failed to create next question')
+        if (state.position.questionIndex < state.questions.length - 1) {
+          return advancePosition(state)
+        }
         return state
       }
-      return created.data
     },
     [flash, openSession, nextLiveTestExternalRef],
   )
@@ -737,21 +763,25 @@ export function TeacherObservePage() {
         flash('Live-test block complete')
         return state
       }
-      const created = await createLiveQuestion({
-        capture: state,
-        openSession: openSession ?? null,
-        learnerUserId,
-        externalRef,
-      })
-      if (!created.ok) {
-        flash(created.error)
+      try {
+        const created = await createLiveQuestion({
+          capture: state,
+          openSession: openSession ?? null,
+          learnerUserId,
+          externalRef,
+        })
+        if (!created.ok) {
+          flash(created.error)
+          return state
+        }
+        return created.data
+      } catch (err) {
+        flash(err instanceof Error ? err.message : 'Failed to advance learner')
         return state
       }
-      return created.data
     },
     [flash, openSession, nextLiveTestExternalRef],
   )
-
   const recordColorForLearner = useCallback(
     async (learnerUserId: string, color: ProvisionalColor) => {
       if (!capture || liveSaving) return

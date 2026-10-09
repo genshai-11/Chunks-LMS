@@ -638,6 +638,27 @@ export function TeacherTestRunPage() {
         setIntroVariantId(nextIntroBySession[currentRun.sessionNumber] ?? null)
 
         const combinedItems: TestItem[] = bundle.items.map((item, index) => {
+          const standaloneAttempts = item.attempt_id
+            ? [
+                {
+                  id: item.attempt_id,
+                  run_id: item.run_id ?? item.parent_run_id,
+                  run_item_id: item.id,
+                  status: item.attempt_status,
+                  standalone_test_attempt_snapshots: {
+                    attempt_id: item.attempt_id,
+                    status: item.attempt_status,
+                    effective_color: item.effective_color,
+                    effectiveColor: item.effective_color,
+                    entered_probe_flow: item.entered_probe_flow,
+                    enteredProbeFlow: item.entered_probe_flow,
+                    probe_count: item.probe_count,
+                    probeCount: item.probe_count,
+                    finalized_at: item.finalized_at,
+                  },
+                },
+              ]
+            : []
           const itemAttempts = item.attempt_id
             ? [
                 {
@@ -659,6 +680,7 @@ export function TeacherTestRunPage() {
             cvr: item.cvr,
             cci: item.cci,
             cpd: item.cpd,
+            standalone_test_attempts: standaloneAttempts,
             attempts: itemAttempts,
           } as unknown as TestItem
         })
@@ -1100,19 +1122,32 @@ export function TeacherTestRunPage() {
       playFirstItemAfterIntroRef.current = false
 
       const questionNumber = currentItem?.item_order ?? 1
-      const prefixUrl = `/audio/number_${questionNumber}.wav`
+      const hasPrefixAudio = questionNumber >= 1 && questionNumber <= 7
+      const prefixUrl = hasPrefixAudio ? `/audio/number_${questionNumber}.wav` : null
 
       if (shouldPlay) {
         resumeAudioAutoFlow()
-        pendingItemAudioRef.current = {
-          signedUrl: isSilent ? '' : signedUrl || null,
-          variantId,
-          isSilent
-        }
         if (currentItem?.id) {
           autoPlayedItemIdsRef.current.add(String(currentItem.id))
         }
-        activateAudioUrl(prefixUrl, `Number ${questionNumber}`, true, 'item_prefix')
+        if (hasPrefixAudio && prefixUrl) {
+          pendingItemAudioRef.current = {
+            signedUrl: isSilent ? '' : signedUrl || null,
+            variantId,
+            isSilent,
+          }
+          activateAudioUrl(prefixUrl, `Number ${questionNumber}`, true, 'item_prefix')
+        } else {
+          pendingItemAudioRef.current = null
+          if (isSilent) {
+            setAudioLabel(`Q${currentItemNumber} item (Teacher read direct)`)
+            setAudioState('played')
+          } else if (signedUrl) {
+            activateAudioUrl(signedUrl, `Q${currentItemNumber} item`, true, 'item')
+          } else {
+            await loadAudioVariant(variantId, `Q${currentItemNumber} item`, true, 'item')
+          }
+        }
       } else {
         pendingItemAudioRef.current = null
         if (isSilent) {
@@ -1456,14 +1491,17 @@ export function TeacherTestRunPage() {
           const nextItem = items.find((item) => String(item.id) === next.itemId)
           if (nextItem) {
             const questionNumber = nextItem.item_order ?? 1
-            const prefixUrl = `/audio/number_${questionNumber}.wav`
-            pendingItemAudioRef.current = {
-              signedUrl: next.isSilent ? '' : next.signedUrl,
-              variantId: next.variantId,
-              isSilent: next.isSilent
+            const hasPrefixAudio = questionNumber >= 1 && questionNumber <= 7
+            const prefixUrl = hasPrefixAudio ? `/audio/number_${questionNumber}.wav` : null
+            if (hasPrefixAudio && prefixUrl) {
+              pendingItemAudioRef.current = {
+                signedUrl: next.isSilent ? '' : next.signedUrl,
+                variantId: next.variantId,
+                isSilent: next.isSilent,
+              }
+              activateAudioUrl(prefixUrl, `Number ${questionNumber}`, true, 'item_prefix')
+              return
             }
-            activateAudioUrl(prefixUrl, `Number ${questionNumber}`, true, 'item_prefix')
-            return
           }
         }
         activateAudioUrl(next.signedUrl, next.label, true, 'item')
@@ -2046,7 +2084,20 @@ export function TeacherTestRunPage() {
                         setAudioState('playing')
                       }}
                       onEnded={handleAudioEnded}
-                      onError={() => setAudioState('error')}
+                      onError={() => {
+                        if (audioTargetRef.current === 'item_prefix') {
+                          // Prefix audio failed (e.g. 404 or network glitch). Fallback immediately to question audio!
+                          const pending = pendingItemAudioRef.current
+                          pendingItemAudioRef.current = null
+                          if (pending && !pending.isSilent && pending.signedUrl) {
+                            setAudioLabel(`Question ${currentItem?.item_order ?? 1}`)
+                            setAudioState('loading')
+                            activateAudioUrl(pending.signedUrl, `Question ${currentItem?.item_order ?? 1}`, true, 'item')
+                            return
+                          }
+                        }
+                        setAudioState('error')
+                      }}
                       className="live-test-audio-el"
                     />
                     <p className="live-test-audio-label">{audioLabel}</p>

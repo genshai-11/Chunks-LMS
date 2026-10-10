@@ -531,7 +531,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       allowEmptyWipeOnce.current = false
       if (result.ok) {
-        const verified = await verifyWorkspacePersistence(normalized)
+        const currentTeacherUser = roster.users.find(
+          (u) => Boolean(staffSession.email) && u.email?.toLowerCase() === staffSession.email?.toLowerCase(),
+        )
+        const verified = await verifyWorkspacePersistence(normalized, {
+          teacherUserId: staffSession.canAccess('admin') ? null : (currentTeacherUser?.id ?? null),
+        })
         if (!verified.ok) {
           setBackendStatus('error')
           setBackendError(syncPhaseError('verify', verified.error))

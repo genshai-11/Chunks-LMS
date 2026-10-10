@@ -1282,49 +1282,46 @@ export async function saveWorkspaceToSupabase(
 
 export async function verifyWorkspacePersistence(
   snapshot: WorkspaceSnapshot,
+  options?: { teacherUserId?: string | null },
 ): Promise<VerifySyncResult> {
   const expected = normalizeIdsForDb(snapshot)
   const loaded = await loadWorkspaceFromSupabase({
     organizationId: expected.roster.organization.id,
   })
   if (!loaded.ok) return { ok: false, error: `reload failed: ${loaded.error}` }
+  let expectedUsers = expected.roster.users
+  let expectedCourses = expected.roster.courses
+  let expectedClasses = expected.roster.classes
+  let expectedEnrollments = expected.roster.enrollments
+  let expectedScheduled = expected.scheduling.scheduledSessions
+  let expectedLearning = expected.scheduling.learningSessions
+  let expectedAttendance = expected.scheduling.attendance
+
+  if (options?.teacherUserId) {
+    const teacherId = options.teacherUserId
+    expectedClasses = expectedClasses.filter((c) => c.teacherUserId === teacherId)
+    const classIdSet = new Set(expectedClasses.map((c) => c.id))
+    expectedCourses = expectedCourses.filter((c) =>
+      expectedClasses.some((cl) => cl.courseId === c.id),
+    )
+    expectedEnrollments = expectedEnrollments.filter((e) => classIdSet.has(e.classId))
+    const learnerIdSet = new Set(expectedEnrollments.map((e) => e.learnerUserId))
+    expectedUsers = expectedUsers.filter((u) => u.id === teacherId || learnerIdSet.has(u.id))
+    expectedScheduled = expectedScheduled.filter((s) => classIdSet.has(s.classId))
+    expectedLearning = expectedLearning.filter((s) => classIdSet.has(s.classId))
+    const learningIdSet = new Set(expectedLearning.map((s) => s.id))
+    expectedAttendance = expectedAttendance.filter((a) => learningIdSet.has(a.learningSessionId))
+  }
+
 
   const missing = [
-    ...missingIds(
-      'users',
-      expected.roster.users.map((u) => u.id),
-      loaded.data.roster.users.map((u) => u.id),
-    ),
-    ...missingIds(
-      'courses',
-      expected.roster.courses.map((c) => c.id),
-      loaded.data.roster.courses.map((c) => c.id),
-    ),
-    ...missingIds(
-      'classes',
-      expected.roster.classes.map((c) => c.id),
-      loaded.data.roster.classes.map((c) => c.id),
-    ),
-    ...missingIds(
-      'enrollments',
-      expected.roster.enrollments.map((e) => e.id),
-      loaded.data.roster.enrollments.map((e) => e.id),
-    ),
-    ...missingIds(
-      'scheduled',
-      expected.scheduling.scheduledSessions.map((s) => s.id),
-      loaded.data.scheduling.scheduledSessions.map((s) => s.id),
-    ),
-    ...missingIds(
-      'learning',
-      expected.scheduling.learningSessions.map((s) => s.id),
-      loaded.data.scheduling.learningSessions.map((s) => s.id),
-    ),
-    ...missingIds(
-      'attendance',
-      expected.scheduling.attendance.map((a) => a.id),
-      loaded.data.scheduling.attendance.map((a) => a.id),
-    ),
+    ...missingIds('users', expectedUsers.map((u) => u.id), loaded.data.roster.users.map((u) => u.id)),
+    ...missingIds('courses', expectedCourses.map((c) => c.id), loaded.data.roster.courses.map((c) => c.id)),
+    ...missingIds('classes', expectedClasses.map((c) => c.id), loaded.data.roster.classes.map((c) => c.id)),
+    ...missingIds('enrollments', expectedEnrollments.map((e) => e.id), loaded.data.roster.enrollments.map((e) => e.id)),
+    ...missingIds('scheduled', expectedScheduled.map((s) => s.id), loaded.data.scheduling.scheduledSessions.map((s) => s.id)),
+    ...missingIds('learning', expectedLearning.map((s) => s.id), loaded.data.scheduling.learningSessions.map((s) => s.id)),
+    ...missingIds('attendance', expectedAttendance.map((a) => a.id), loaded.data.scheduling.attendance.map((a) => a.id)),
   ]
 
   if (missing.length > 0) {

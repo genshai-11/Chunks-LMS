@@ -418,6 +418,7 @@ export function TeacherTestRunPage() {
   const packageEndPlayedRef = useRef(false)
   const enteringProbeRef = useRef<string | null>(null)
   const pendingItemAudioRef = useRef<{ signedUrl: string | null; variantId: string; isSilent?: boolean } | null>(null)
+  const isScoringBusyRef = useRef(false)
 
   const markAudioReady = useCallback((options: { suppressAutoPlay?: boolean; persist?: boolean; assignmentId?: string | null } = {}) => {
     liveAudioStartedRef.current = true
@@ -1549,64 +1550,74 @@ export function TeacherTestRunPage() {
 
   const handleRecord = useCallback(
     async (color: PrimaryResultColor) => {
-      if (!currentItem || probeOpen) return
-      resumeAudioAutoFlow()
-      const isFinalOutstandingItem = !isItemFinalized(currentItem) && items.filter((item) => !isItemFinalized(item)).length === 1
-      playReaction(color)
-      if (color !== 'green') {
-        playScoreFeedbackThenNext(color)
-      } else {
-        enteringProbeRef.current = String(currentItem.id)
-        activateAudioUrl(resultAudioUrl('green'), 'green result', true, 'result_reaction')
+      if (!currentItem || probeOpen || isScoringBusyRef.current) return
+      isScoringBusyRef.current = true
+      try {
+        resumeAudioAutoFlow()
+        const isFinalOutstandingItem = !isItemFinalized(currentItem) && items.filter((item) => !isItemFinalized(item)).length === 1
+        playReaction(color)
+        if (color !== 'green') {
+          playScoreFeedbackThenNext(color)
+        } else {
+          enteringProbeRef.current = String(currentItem.id)
+          activateAudioUrl(resultAudioUrl('green'), 'green result', true, 'result_reaction')
+        }
+        const result = await recordStandaloneResult(currentItem.id, color)
+        if (!result.ok) {
+          setMessage(result.error)
+          return
+        }
+        setItems((prev) =>
+          prev.map((item) =>
+            item.id === currentItem.id
+              ? withStandaloneSnapshot(item, result.data, color === 'green')
+              : item,
+          ),
+        )
+        if (isFinalOutstandingItem) await playEndAfterFinalScore()
+      } finally {
+        isScoringBusyRef.current = false
       }
-      const result = await recordStandaloneResult(currentItem.id, color)
-      if (!result.ok) {
-        setMessage(result.error)
-        return
-      }
-      setItems((prev) =>
-        prev.map((item) =>
-          item.id === currentItem.id
-            ? withStandaloneSnapshot(item, result.data, color === 'green')
-            : item,
-        ),
-      )
-      if (isFinalOutstandingItem) await playEndAfterFinalScore()
     },
     [activateAudioUrl, currentItem, items, playEndAfterFinalScore, playReaction, playScoreFeedbackThenNext, probeOpen, resumeAudioAutoFlow],
   )
 
   const handleProbe = useCallback(
     async (outcome: 'fail' | 'continue' | 'done') => {
-      if (!currentAttempt?.id || !probeOpen) return
-      resumeAudioAutoFlow()
-      const isFinalOutstandingItem = outcome !== 'continue' && currentItem && !isItemFinalized(currentItem) && items.filter((item) => !isItemFinalized(item)).length === 1
-      if (outcome !== 'continue') {
-        playScoreFeedbackThenNext(outcome === 'fail' ? 'yellow' : 'indigo')
-      } else {
-        activateAudioUrl(resultAudioUrl('blue'), 'blue continue result', true, 'result_reaction')
+      if (!currentAttempt?.id || !probeOpen || isScoringBusyRef.current) return
+      isScoringBusyRef.current = true
+      try {
+        resumeAudioAutoFlow()
+        const isFinalOutstandingItem = outcome !== 'continue' && currentItem && !isItemFinalized(currentItem) && items.filter((item) => !isItemFinalized(item)).length === 1
+        if (outcome !== 'continue') {
+          playScoreFeedbackThenNext(outcome === 'fail' ? 'yellow' : 'indigo')
+        } else {
+          activateAudioUrl(resultAudioUrl('blue'), 'blue continue result', true, 'result_reaction')
+        }
+        const result = await resolveStandaloneProbe(String(currentAttempt.id), outcome)
+        if (!result.ok) {
+          setMessage(result.error)
+          return
+        }
+        const data = { ...result.data }
+        if (outcome === 'fail' && typeof probeCount === 'number') {
+          data.probeCount = probeCount
+        }
+        if (outcome === 'continue') {
+          setMessage(`Chunks Number=${probeChunksNumber({ enteredProbeFlow: true, probeCount: data.probeCount }) ?? 1}`)
+        } else {
+          playReaction(outcome === 'fail' ? 'yellow' : 'indigo')
+          setMessage('')
+        }
+        setItems((prev) =>
+          prev.map((item) =>
+            item.id === currentItem.id ? withStandaloneSnapshot(item, data, true) : item,
+          ),
+        )
+        if (isFinalOutstandingItem) await playEndAfterFinalScore()
+      } finally {
+        isScoringBusyRef.current = false
       }
-      const result = await resolveStandaloneProbe(String(currentAttempt.id), outcome)
-      if (!result.ok) {
-        setMessage(result.error)
-        return
-      }
-      const data = { ...result.data }
-      if (outcome === 'fail' && typeof probeCount === 'number') {
-        data.probeCount = probeCount
-      }
-      if (outcome === 'continue') {
-        setMessage(`Chunks Number=${probeChunksNumber({ enteredProbeFlow: true, probeCount: data.probeCount }) ?? 1}`)
-      } else {
-        playReaction(outcome === 'fail' ? 'yellow' : 'indigo')
-        setMessage('')
-      }
-      setItems((prev) =>
-        prev.map((item) =>
-          item.id === currentItem.id ? withStandaloneSnapshot(item, data, true) : item,
-        ),
-      )
-      if (isFinalOutstandingItem) await playEndAfterFinalScore()
     },
     [activateAudioUrl, currentAttempt?.id, currentItem, items, playEndAfterFinalScore, playReaction, playScoreFeedbackThenNext, probeOpen, resumeAudioAutoFlow],
   )

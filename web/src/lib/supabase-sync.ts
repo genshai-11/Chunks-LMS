@@ -455,15 +455,29 @@ export async function loadWorkspaceFromSupabase(options?: {
         const snap = rpcRes.data.data
         type JsonRow = Record<string, unknown>
         const rawUsers = (snap.roster?.users ?? []) as unknown as JsonRow[]
-        const users: DomainUser[] = rawUsers.map((u) => ({
-          id: String(u.id ?? ''),
-          displayName: String(u.display_name ?? u.displayName ?? 'Learner'),
-          email: u.email ? String(u.email) : null,
-          roles: (Array.isArray(u.roles) ? u.roles : ['learner']) as DomainUser['roles'],
-          accountStatus: (u.account_status ?? u.accountStatus ?? 'active') as 'active' | 'inactive',
-          allowMultiClass: Boolean(u.allow_multi_class ?? u.allowMultiClass),
-          avatarUrl: u.avatar_url ? String(u.avatar_url) : (u.avatarUrl ? String(u.avatarUrl) : null),
-        }))
+        const rawClasses = (snap.roster?.classes ?? []) as unknown as JsonRow[]
+        const teacherIdsFromClasses = new Set(
+          rawClasses.map((c) => String(c.teacher_user_id ?? c.teacherUserId ?? '')),
+        )
+        const users: DomainUser[] = rawUsers.map((u) => {
+          const id = String(u.id ?? '')
+          const rawRoles =
+            Array.isArray(u.roles) && u.roles.length > 0
+              ? (u.roles as string[])
+              : teacherIdsFromClasses.has(id)
+                ? ['teacher']
+                : ['learner']
+          return {
+            id,
+            displayName: String(u.display_name ?? u.displayName ?? 'Learner'),
+            email: u.email ? String(u.email) : null,
+            username: u.username ? String(u.username) : null,
+            roles: rawRoles as DomainUser['roles'],
+            accountStatus: (u.account_status ?? u.accountStatus ?? 'active') as 'active' | 'inactive',
+            allowMultiClass: Boolean(u.allow_multi_class ?? u.allowMultiClass),
+            avatarUrl: u.avatar_url ? String(u.avatar_url) : (u.avatarUrl ? String(u.avatarUrl) : null),
+          }
+        })
         const courses = (snap.roster?.courses ?? []) as unknown as JsonRow[]
         const classes = (snap.roster?.classes ?? []) as unknown as JsonRow[]
         const enrollments = (snap.roster?.enrollments ?? []) as unknown as JsonRow[]

@@ -267,10 +267,12 @@ export function AdminPeoplePage() {
           <button
             type="button"
             className="underline font-semibold"
-            onClick={() => {
+            onClick={async () => {
               const r = mergeDuplicateAccountsByEmail(roster)
               if (!r.ok) return err(r.error)
               setRoster(r.state)
+              await syncNow({ roster: r.state, pruneMissing: true })
+              await reloadFromSupabase()
               ok(
                 r.value.removed === 0
                   ? 'No duplicates to merge'

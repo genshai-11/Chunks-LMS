@@ -139,6 +139,11 @@ Hệ thống tuân thủ nguyên tắc: **Cùng 1 Tổ chức nhưng dữ liệu
 - `getStandaloneTestRunBundle()` ánh xạ payload RPC sang `StandaloneTestRunBundle`; `TeacherTestRunPage.load()` ưu tiên bundle để hydrate run details, all runs, items và audio variants trong một lượt.
 - Đường bundle thay thế waterfall khoảng 65 HTTP requests của quy trình khôi phục cũ bằng một database RPC. Khi RPC thiếu, lỗi hoặc trả payload không hợp lệ, trang vẫn chạy chuỗi query cũ làm compatibility fallback.
 - Migration triển khai: `20261001010000_standalone_test_run_bundle_rpc.sql`.
+### 4.4. Cô lập Dữ liệu Tests 1-1 và Phân tích Standalone theo Quyền sở hữu Lớp
+
+- **Ranh giới vai trò:** Giáo viên (Teacher) chỉ được phép xem các bài tập (`standalone_test_assignments`), phiên chạy (`standalone_test_runs`), và phân tích chi tiết (`TeacherTestAnalysisPage`, `TeacherLearnerTestResultsPage`) của học viên đang ghi danh vào các lớp mà chính giáo viên đó phụ trách (`classes.teacher_user_id = auth.uid()`). Admin có quyền xem phân tích trên toàn trường.
+- **Rào chắn Giao diện UI:** `TeacherTestAnalysisPage` và `TeacherTestsPage` đối chiếu `learnerId` của bài test với `operableClassIds` từ `useTeacherClassContext()`. Nếu giáo viên cố gắng truy cập bài test của học viên thuộc lớp giáo viên khác qua URL trực tiếp, giao diện lập tức kích hoạt màn hình chặn truy cập (`EmptyState - ShieldAlert: Không có quyền truy cập`).
+- **Rào chắn Cơ sở dữ liệu RLS:** Migration `20261010020000_harden_standalone_test_scoping.sql` thắt chặt hàm `private.staff_can_manage_standalone_test(organization_id, learner_user_id)`. Non-admin teacher chỉ truy vấn được bảng standalone tests nếu học viên đang có enrollment `active` trong một lớp học `active` do teacher đó sở hữu.
 
 ---
 
@@ -155,3 +160,4 @@ Hệ thống tuân thủ nguyên tắc: **Cùng 1 Tổ chức nhưng dữ liệu
 | Atomic Sync, Scoped Snapshot & OCC | `web/src/lib/supabase-sync.ts` | `web/src/state/AppState.tsx` | `organization_workspace_versions`, `get_workspace_snapshot`, `sync_workspace_atomic` (`20261001000000_atomic_workspace_sync_and_scoping.sql`) |
 | Test Packages V2 | `web/src/lib/test-packages.ts` | `web/src/pages/admin/AdminPackageTestsPage.tsx` | `test_packages`, `test_sections`, `test_items` |
 | Standalone Test Run Bundle | `web/src/lib/standalone-tests.ts` | `web/src/pages/teacher/TeacherTestRunPage.tsx` | `standalone_test_runs`, `standalone_test_run_items`, `standalone_test_attempts`, `standalone_test_attempt_snapshots`, `narration_variants`, `get_standalone_test_run_bundle` (`20261001010000_standalone_test_run_bundle_rpc.sql`) |
+| Standalone Tests Scoping & Analysis | `web/src/lib/standalone-tests.ts` | `web/src/pages/teacher/TeacherTestAnalysisPage.tsx`, `TeacherTestsPage.tsx` | `private.staff_can_manage_standalone_test` (`20261010020000_harden_standalone_test_scoping.sql`) |

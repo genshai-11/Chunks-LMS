@@ -22,6 +22,7 @@ import {
   summarizeLearnerSessions,
 } from '../../modules/teacher/learner-insights'
 import { useAppState } from '../../state/useAppState'
+import { useStaffSession } from '../../auth/useStaffSession'
 
 const DEFAULT_COLUMNS = {
   date: true,
@@ -59,7 +60,8 @@ export function TeacherLearnerProfilePage() {
   const { learnerId } = useParams()
   const navigate = useNavigate()
   const { roster, scheduling, ledger, setRoster, syncNow, setActiveLearnerUserId } = useAppState()
-  const { course } = useTeacherClassContext()
+  const { course, options } = useTeacherClassContext()
+  const staffSession = useStaffSession()
   const { message, error, ok, err } = useFlash()
   const learner = roster.users.find((u) => u.id === learnerId)
   const [name, setName] = useState(learner?.displayName ?? '')
@@ -165,13 +167,24 @@ export function TeacherLearnerProfilePage() {
     [learnerId, ledger, scheduling],
   )
   const stats = learnerRfcStats(rows)
+  const isDenied = useMemo(() => {
+    if (!learnerId) return true
+    if (staffSession.canAccess('admin')) return false
+    const operableClassIds = new Set(options.map((o) => o.classRow.id))
+    if (operableClassIds.size === 0) return true
+    const activeEnrolls = roster.enrollments.filter(
+      (e) => e.learnerUserId === learnerId && e.status === 'active',
+    )
+    return !activeEnrolls.some((e) => operableClassIds.has(e.classId))
+  }, [learnerId, staffSession, options, roster.enrollments])
 
-  if (!learner || !learnerId) {
+
+  if (isDenied || !learner || !learnerId) {
     return (
       <EmptyState
         icon={UserRound}
         title="Learner not found"
-        description="Go back to the Teacher learner list and choose a learner."
+        description="This learner does not exist or is not enrolled in any class you manage."
         action={
           <Link to="/teacher" className="btn ghost">
             Back to learners

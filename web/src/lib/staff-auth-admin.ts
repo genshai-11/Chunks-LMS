@@ -30,6 +30,7 @@ export function createTeacherAuthAccount(input: {
   username: string
   password: string
   avatarUrl?: string | null
+  organizationId?: string | null
 }) {
   return invokeStaffAccount<TeacherPayload>({ action: 'createTeacher', ...input })
 }
@@ -40,6 +41,7 @@ export function updateTeacherAuthAccount(input: {
   email: string
   username: string
   avatarUrl?: string | null
+  organizationId?: string | null
 }) {
   return invokeStaffAccount<TeacherPayload>({ action: 'updateTeacher', ...input })
 }

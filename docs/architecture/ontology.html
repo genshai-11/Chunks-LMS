@@ -304,6 +304,28 @@
           </div>
         </div>
       </div>
+      <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800">
+        <h2 class="text-lg font-bold text-white mb-2">Cô lập Dữ liệu 1-on-1 Test Analysis Theo Lớp</h2>
+        <p class="text-sm text-slate-300 mb-6">
+          Migration <code>20261010020000_harden_standalone_test_scoping.sql</code> và UI boundary: Giáo viên chỉ được xem các bài test 1-1 của học viên thuộc lớp do chính giáo viên đó phụ trách.
+        </p>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-red-950/20 border border-red-500/30 rounded-xl p-5">
+            <div class="text-xs font-mono text-red-400 font-bold uppercase mb-3">1. Rào chắn UI (UI Guard)</div>
+            <div class="space-y-2 text-xs text-slate-300">
+              <p><code>TeacherTestAnalysisPage</code> đối chiếu <code>learnerId</code> của bài test với <code>operableClassIds</code> từ <code>useTeacherClassContext()</code>.</p>
+              <p>Truy cập trực tiếp bài test của lớp khác sẽ bị chặn ngay lập tức với giao diện <code>EmptyState - ShieldAlert</code>.</p>
+            </div>
+          </div>
+          <div class="bg-indigo-950/20 border border-indigo-500/30 rounded-xl p-5">
+            <div class="text-xs font-mono text-indigo-400 font-bold uppercase mb-3">2. Rào chắn Database RLS</div>
+            <div class="space-y-2 text-xs text-slate-300">
+              <p><code>private.staff_can_manage_standalone_test</code> kiểm tra quan hệ sở hữu lớp: Non-admin teacher chỉ đọc được test nếu học viên có active enrollment trong lớp active do teacher sở hữu.</p>
+              <p>Triệt tiêu hoàn toàn rủi ro rò rỉ phân tích giữa các lớp học.</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- TAB 4: CODEBASE MAPPING -->
@@ -378,6 +400,12 @@
                 <td class="p-3 text-emerald-400">lib/standalone-tests.ts</td>
                 <td class="p-3 text-slate-200">pages/teacher/TeacherTestRunPage.tsx</td>
                 <td class="p-3 text-indigo-400">standalone_test_runs, standalone_test_run_items, standalone_test_attempts, standalone_test_attempt_snapshots, narration_variants; get_standalone_test_run_bundle (20261001010000_standalone_test_run_bundle_rpc.sql)</td>
+              </tr>
+              <tr class="hover:bg-slate-900/50">
+                <td class="p-3 font-sans font-semibold text-white">Standalone Tests Scoping & Analysis</td>
+                <td class="p-3 text-emerald-400">lib/standalone-tests.ts</td>
+                <td class="p-3 text-slate-200">pages/teacher/TeacherTestAnalysisPage.tsx</td>
+                <td class="p-3 text-indigo-400">private.staff_can_manage_standalone_test (20261010020000_harden_standalone_test_scoping.sql)</td>
               </tr>
             </tbody>
           </table>

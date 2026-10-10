@@ -19,6 +19,8 @@ import { EmptyState, Panel } from '../../components/ui'
 import { UserAvatar } from '../../components/UserAvatar'
 import { listActiveLearners } from '../../modules/roster/service'
 import { useAppState } from '../../state/useAppState'
+import { useStaffSession } from '../../auth/useStaffSession'
+import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import {
   listSelectablePackageVersions,
   listTestSections,
@@ -37,8 +39,25 @@ import {
 
 export function TeacherTestsPage() {
   const { roster } = useAppState()
+  const staffSession = useStaffSession()
+  const { options } = useTeacherClassContext()
   const navigate = useNavigate()
-  const learners = listActiveLearners(roster)
+
+  const enrolledLearnerIds = useMemo(() => {
+    if (staffSession.canAccess('admin')) return null
+    const operableClassIds = new Set(options.map((o) => o.classRow.id))
+    return new Set(
+      roster.enrollments
+        .filter((e) => e.status === 'active' && operableClassIds.has(e.classId))
+        .map((e) => e.learnerUserId),
+    )
+  }, [roster.enrollments, staffSession, options])
+
+  const learners = useMemo(() => {
+    const all = listActiveLearners(roster)
+    if (!enrolledLearnerIds) return all
+    return all.filter((l) => enrolledLearnerIds.has(l.id))
+  }, [roster, enrolledLearnerIds])
   const [learnerId, setLearnerId] = useState('')
   const [isLearnerMenuOpen, setIsLearnerMenuOpen] = useState(false)
   const [learnerSearch, setLearnerSearch] = useState('')
@@ -133,6 +152,7 @@ export function TeacherTestsPage() {
 
   const filteredAssignments = useMemo(() => {
     return assignments.filter((assignment) => {
+      if (enrolledLearnerIds && !enrolledLearnerIds.has(assignment.learnerUserId)) return false
       if (assignmentStatusFilter !== 'all' && assignment.status !== assignmentStatusFilter) return false
       if (assignmentPackageFilter === 'standard') {
         const v = versions.find((ver) => ver.id === assignment.packageVersionId)

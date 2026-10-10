@@ -1,6 +1,6 @@
 import { Lock, ShieldAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { PageHeader } from '../components/PageHeader'
 import type { StaffRole } from './staff-roles'
 import { StaffSignInForm } from './AuthProvider'
@@ -58,6 +58,12 @@ export function StaffGate({ role, children }: Props) {
   }
 
   if (!session.canAccess(role)) {
+    if (role === 'admin' && session.canAccess('teacher')) {
+      return <Navigate to="/teacher" replace />
+    }
+    if (role === 'teacher' && session.canAccess('admin')) {
+      return <Navigate to="/admin" replace />
+    }
     return (
       <div className="access-page">
         <PageHeader

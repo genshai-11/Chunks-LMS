@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, BarChart3, Brain, CircleDot, Eye, EyeOff, Gauge, GripVertical, LineChart as LineChartIcon, Maximize2, Minimize2, PieChart as PieChartIcon, RotateCcw, Target, X, Zap } from 'lucide-react'
+import { Activity, BarChart3, Brain, CircleDot, Eye, EyeOff, Gauge, GripVertical, LineChart as LineChartIcon, Maximize2, Minimize2, PieChart as PieChartIcon, RotateCcw, ShieldAlert, Target, X, Zap } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import {
   Bar,
@@ -23,6 +23,8 @@ import { listActiveLearners } from '../../modules/roster/service'
 import { getStandaloneAssignmentAnalysis, type StandaloneTestRunRow } from '../../lib/standalone-tests'
 import { getTestPackageVersion, listTestPackages } from '../../lib/test-packages'
 import { useAppState } from '../../state/useAppState'
+import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
+import { useStaffSession } from '../../auth/useStaffSession'
 import { probeChunksNumber } from '../../modules/assessment/probe-metrics'
 import { calculateDynamicAcn, useDynamicAcnConfig } from '../../modules/assessment/dynamic-acn'
 import { calculateSpectrumStepBreakdown, spectrumRecordsForAttempt, COLOR_PERCENT_X_VALUES, colorForAvgPercentX } from '../../modules/metrics/calculate'
@@ -217,6 +219,8 @@ function StandaloneMetricIcon({ metric }: { metric: StandaloneTestMetricSetting 
 export function TeacherTestAnalysisPage() {
   const { assignmentId } = useParams()
   const { roster, metricSettings } = useAppState()
+  const staffSession = useStaffSession()
+  const { options } = useTeacherClassContext()
   const [runs, setRuns] = useState<StandaloneTestRunRow[]>([])
   const [items, setItems] = useState<AnalysisItem[]>([])
   const [learnerId, setLearnerId] = useState('')
@@ -282,6 +286,32 @@ export function TeacherTestAnalysisPage() {
   }, [])
 
   const learner = listActiveLearners(roster).find((l) => l.id === learnerId)
+  const isAccessDenied = useMemo(() => {
+    if (loading || !learnerId) return false
+    if (staffSession.canAccess('admin')) return false
+
+    const operableClassIds = new Set(options.map((o) => o.classRow.id))
+    if (operableClassIds.size === 0) return true
+
+    const learnerEnrollments = roster.enrollments.filter(
+      (e) => e.learnerUserId === learnerId && e.status === 'active',
+    )
+    const learnerClassIds = learnerEnrollments.map((e) => e.classId)
+    return !learnerClassIds.some((cid) => operableClassIds.has(cid))
+  }, [loading, learnerId, staffSession, options, roster.enrollments])
+
+  const learnerEnrollment = useMemo(
+    () => roster.enrollments.find((e) => e.learnerUserId === learnerId && e.status === 'active') ?? null,
+    [roster.enrollments, learnerId],
+  )
+  const learnerClass = useMemo(
+    () => (learnerEnrollment ? roster.classes.find((c) => c.id === learnerEnrollment.classId) ?? null : null),
+    [roster.classes, learnerEnrollment],
+  )
+  const learnerCourse = useMemo(
+    () => (learnerClass ? roster.courses.find((crs) => crs.id === learnerClass.courseId) ?? null : null),
+    [roster.courses, learnerClass],
+  )
 
   const rows = useMemo(
     () =>
@@ -697,13 +727,44 @@ export function TeacherTestAnalysisPage() {
   if (loading) return <EmptyState icon={BarChart3} title="Loading standalone analysis..." />
   if (error) return <EmptyState icon={BarChart3} title="Could not load analysis" description={error} />
 
+  if (isAccessDenied) {
+    return (
+      <div className="test-analysis-page">
+        <PageHeader
+          icon={ShieldAlert}
+          kicker="Teacher - Phân quyền Tests 1-1"
+          title="Không có quyền xem phân tích bài test này"
+          subtitle="Học viên này thuộc lớp học do giáo viên khác phụ trách."
+          actions={
+            <Link className="btn ghost" to="/teacher/tests">
+              Quay lại Tests
+            </Link>
+          }
+        />
+        <EmptyState
+          icon={ShieldAlert}
+          title="Bài kiểm tra thuộc lớp khác"
+          description="Bạn chỉ có thể xem phân tích Tests 1-1 của các học viên thuộc lớp do bạn giảng dạy. Bài kiểm tra này thuộc lớp của giáo viên khác."
+          action={
+            <Link className="btn primary" to="/teacher/tests">
+              Danh sách Tests của bạn
+            </Link>
+          }
+        />
+      </div>
+    )
+  }
   return (
     <div className="test-analysis-page">
       <PageHeader
         icon={BarChart3}
         kicker="Teacher - Standalone Test Analysis"
         title={learner?.displayName ? `${learner.displayName} - Test Analysis` : 'Standalone Test Analysis'}
-        subtitle="Dedicated analysis for Tests 1-1, separate from class/session analysis."
+        subtitle={
+          learnerClass
+            ? `Lớp: ${learnerClass.name} (${learnerCourse?.name ?? 'Course'}) · Phân tích chi tiết Tests 1-1`
+            : 'Dedicated analysis for Tests 1-1, separate from class/session analysis.'
+        }
         actions={
           <Link className="btn ghost" to="/teacher/tests">
             Back to Tests

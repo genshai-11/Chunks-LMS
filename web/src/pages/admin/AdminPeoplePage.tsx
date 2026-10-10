@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react'
 import {
+  BookOpen,
+  Building2,
   Check,
   GraduationCap,
   ImagePlus,
   Pencil,
   Power,
+  Search,
   Trash2,
   UserPlus,
   Users,
@@ -27,6 +30,7 @@ import {
   addLearnerProfile,
   countDuplicateEmailGroups,
   deleteUserProfile,
+  enrollLearner,
   listActiveLearners,
   listActiveTeachers,
   listTeachersRaw,
@@ -35,6 +39,7 @@ import {
   setAccountStatus,
   updateUserProfile,
 } from '../../modules/roster/service'
+import { LOCAL_ORG_ID } from '../../modules/roster/seed'
 import { useAppState } from '../../state/useAppState'
 
 type Tab = 'teachers' | 'learners'
@@ -45,6 +50,8 @@ type Draft = {
   password?: string
   avatarUrl?: string
   allowMultiClass?: boolean
+  organizationId?: string
+  classId?: string
 }
 
 const emptyDraft = (): Draft => ({
@@ -54,6 +61,8 @@ const emptyDraft = (): Draft => ({
   password: '',
   avatarUrl: '',
   allowMultiClass: false,
+  organizationId: '',
+  classId: '',
 })
 
 export function AdminPeoplePage() {
@@ -65,15 +74,88 @@ export function AdminPeoplePage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState<Draft>(emptyDraft)
 
+  // Filters
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
+  const [selectedTeacherFilter, setSelectedTeacherFilter] = useState('all')
+  const [selectedCourseFilter, setSelectedCourseFilter] = useState('all')
+
   const teachers = useMemo(() => listActiveTeachers(roster), [roster])
   const learners = useMemo(() => listActiveLearners(roster), [roster])
   const rawTeacherCount = useMemo(() => listTeachersRaw(roster).length, [roster])
   const rawLearnerCount = useMemo(() => listLearnersRaw(roster).length, [roster])
   const dupGroups = useMemo(() => countDuplicateEmailGroups(roster), [roster])
 
-  const rows = tab === 'teachers' ? teachers : learners
+  const activeClasses = useMemo(() => roster.classes.filter((c) => c.status === 'active'), [roster.classes])
+
+  // Filtered teachers list
+  const filteredTeachers = useMemo(() => {
+    let list = selectedStatusFilter === 'all'
+      ? listTeachersRaw(roster)
+      : selectedStatusFilter === 'active'
+        ? listActiveTeachers(roster)
+        : listTeachersRaw(roster).filter((u) => u.accountStatus === 'inactive')
+
+    const q = searchQuery.trim().toLowerCase()
+    if (q) {
+      list = list.filter(
+        (u) =>
+          u.displayName.toLowerCase().includes(q) ||
+          Boolean(u.email && u.email.toLowerCase().includes(q)) ||
+          Boolean(u.username && u.username.toLowerCase().includes(q)),
+      )
+    }
+
+    return list
+  }, [roster, selectedStatusFilter, searchQuery])
+
+  // Filtered learners list with Teacher and Course filtering
+  const filteredLearners = useMemo(() => {
+    let list = selectedStatusFilter === 'all'
+      ? listLearnersRaw(roster)
+      : selectedStatusFilter === 'active'
+        ? listActiveLearners(roster)
+        : listLearnersRaw(roster).filter((u) => u.accountStatus === 'inactive')
+
+    const q = searchQuery.trim().toLowerCase()
+    if (q) {
+      list = list.filter(
+        (u) =>
+          u.displayName.toLowerCase().includes(q) ||
+          Boolean(u.email && u.email.toLowerCase().includes(q)),
+      )
+    }
+
+    if (selectedCourseFilter !== 'all') {
+      const courseClassIds = new Set(
+        roster.classes.filter((c) => c.courseId === selectedCourseFilter).map((c) => c.id),
+      )
+      const enrolledInCourseIds = new Set(
+        roster.enrollments
+          .filter((e) => e.status === 'active' && courseClassIds.has(e.classId))
+          .map((e) => e.learnerUserId),
+      )
+      list = list.filter((u) => enrolledInCourseIds.has(u.id))
+    }
+
+    if (selectedTeacherFilter !== 'all') {
+      const teacherClassIds = new Set(
+        roster.classes.filter((c) => c.teacherUserId === selectedTeacherFilter).map((c) => c.id),
+      )
+      const enrolledWithTeacherIds = new Set(
+        roster.enrollments
+          .filter((e) => e.status === 'active' && teacherClassIds.has(e.classId))
+          .map((e) => e.learnerUserId),
+      )
+      list = list.filter((u) => enrolledWithTeacherIds.has(u.id))
+    }
+
+    return list
+  }, [roster, selectedStatusFilter, searchQuery, selectedCourseFilter, selectedTeacherFilter])
+
+  const rows = tab === 'teachers' ? filteredTeachers : filteredLearners
   const rawCount = tab === 'teachers' ? rawTeacherCount : rawLearnerCount
-  const hiddenDupes = Math.max(0, rawCount - rows.length)
+  const hiddenDupes = Math.max(0, rawCount - (tab === 'teachers' ? teachers.length : learners.length))
 
   async function createAccount() {
     if (tab === 'teachers') {
@@ -81,16 +163,19 @@ export function AdminPeoplePage() {
       const usernameError = validateStaffUsername(draft.username)
       if (usernameError) return err(usernameError)
       if (password.length < 6) return err('Teacher password must be at least 6 characters')
+
+      const targetOrgId = draft.organizationId || roster.organization.id || LOCAL_ORG_ID
       const r = await createTeacherAuthAccount({
         displayName: draft.displayName,
         email: draft.email,
         username: normalizeStaffUsername(draft.username),
         password,
         avatarUrl: draft.avatarUrl || null,
+        organizationId: targetOrgId,
       })
       if (!r.ok) return err(r.error)
       await reloadFromSupabase()
-      ok(`Teacher ${r.data.displayName} created with Supabase Auth login`)
+      ok(`Teacher ${r.data.displayName} created in workplace ${roster.organization.name || 'Default'}`)
     } else {
       const r = addLearnerProfile(roster, {
         displayName: draft.displayName,
@@ -99,9 +184,21 @@ export function AdminPeoplePage() {
         allowMultiClass: draft.allowMultiClass,
       })
       if (!r.ok) return err(r.error)
-      setRoster(r.state)
-      await syncNow({ roster: r.state })
-      ok(`Learner ${r.value.displayName} added`)
+
+      let nextRoster = r.state
+      let enrolledMsg = ''
+      if (draft.classId) {
+        const enrollRes = enrollLearner(nextRoster, draft.classId, r.value.id)
+        if (enrollRes.ok) {
+          nextRoster = enrollRes.state
+          const className = roster.classes.find((c) => c.id === draft.classId)?.name ?? 'Class'
+          enrolledMsg = ` and enrolled into ${className}`
+        }
+      }
+
+      setRoster(nextRoster)
+      await syncNow({ roster: nextRoster })
+      ok(`Learner ${r.value.displayName} added${enrolledMsg}`)
     }
     setDraft(emptyDraft())
     setShowAdd(false)
@@ -118,6 +215,7 @@ export function AdminPeoplePage() {
         email: editDraft.email,
         username: normalizeStaffUsername(editDraft.username),
         avatarUrl: editDraft.avatarUrl || null,
+        organizationId: editDraft.organizationId || roster.organization.id || LOCAL_ORG_ID,
       })
       if (!r.ok) return err(r.error)
       await reloadFromSupabase()
@@ -145,7 +243,7 @@ export function AdminPeoplePage() {
         icon={Users}
         kicker="Admin"
         title="Accounts"
-        subtitle="Teacher: email + username (Supabase Auth) · learner: profile account"
+        subtitle="Manage staff accounts (Supabase Auth) and learner profiles across courses and classes."
         actions={
           <button
             type="button"
@@ -193,6 +291,7 @@ export function AdminPeoplePage() {
             setTab('teachers')
             setShowAdd(false)
             setEditingId(null)
+            setSearchQuery('')
           }}
         >
           <Users className="h-3.5 w-3.5" aria-hidden />
@@ -206,6 +305,7 @@ export function AdminPeoplePage() {
             setTab('learners')
             setShowAdd(false)
             setEditingId(null)
+            setSearchQuery('')
           }}
         >
           <GraduationCap className="h-3.5 w-3.5" aria-hidden />
@@ -220,8 +320,8 @@ export function AdminPeoplePage() {
           title={tab === 'teachers' ? 'New teacher' : 'New learner'}
           description={
             tab === 'teachers'
-              ? 'Creates a real Supabase Auth staff account plus database teacher role.'
-              : 'Creates a learner profile. Email remains unique across all accounts.'
+              ? 'Creates a real Supabase Auth staff account assigned to your active workplace with a teacher role.'
+              : 'Creates a learner profile and seats them into a class.'
           }
         >
           <form
@@ -231,6 +331,19 @@ export function AdminPeoplePage() {
               createAccount()
             }}
           >
+            {tab === 'teachers' && (
+              <label>
+                Assigned Workplace
+                <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold text-slate-700">
+                  <Building2 className="h-4 w-4 text-emerald-600" aria-hidden />
+                  <span>{roster.organization.name || 'My organization'}</span>
+                  <span className="ml-auto text-xs font-mono text-slate-400">
+                    {roster.organization.id.slice(0, 8)}…
+                  </span>
+                </div>
+              </label>
+            )}
+
             <label>
               Name
               <input
@@ -280,18 +393,41 @@ export function AdminPeoplePage() {
                 />
               </label>
             )}
+
             {tab === 'learners' && (
-              <label className="flex items-center gap-2 mt-2 select-none cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={draft.allowMultiClass ?? false}
-                  onChange={(e) => setDraft((d) => ({ ...d, allowMultiClass: e.target.checked }))}
-                />
-                <span className="text-xs text-slate-600 font-medium">
-                  Allow multi-class (Cho phép học nhiều lớp)
-                </span>
-              </label>
+              <>
+                <label>
+                  Initial Class Enrollment (Optional)
+                  <select
+                    value={draft.classId ?? ''}
+                    onChange={(e) => setDraft((d) => ({ ...d, classId: e.target.value }))}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800"
+                  >
+                    <option value="">Do not enroll yet (assign later)</option>
+                    {activeClasses.map((cl) => {
+                      const course = roster.courses.find((c) => c.id === cl.courseId)
+                      const teacherUser = roster.users.find((u) => u.id === cl.teacherUserId)
+                      return (
+                        <option key={cl.id} value={cl.id}>
+                          {cl.name} ({course?.name ?? 'Course'}) · Teacher: {teacherUser?.displayName ?? 'Unassigned'}
+                        </option>
+                      )
+                    })}
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 mt-2 select-none cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={draft.allowMultiClass ?? false}
+                    onChange={(e) => setDraft((d) => ({ ...d, allowMultiClass: e.target.checked }))}
+                  />
+                  <span className="text-xs text-slate-600 font-medium">
+                    Allow multi-class (Cho phép học nhiều lớp)
+                  </span>
+                </label>
+              </>
             )}
+
             <div className="avatar-field">
               <UserAvatar
                 name={draft.displayName || 'User'}
@@ -344,15 +480,78 @@ export function AdminPeoplePage() {
         title={tab === 'teachers' ? 'Teachers' : 'Learners'}
         description={
           rows.length === 0
-            ? 'No accounts yet'
-            : `${rows.length} unique email${rows.length === 1 ? '' : 's'}`
+            ? 'No matching accounts found'
+            : `Showing ${rows.length} of ${tab === 'teachers' ? rawTeacherCount : rawLearnerCount} total account${rawCount === 1 ? '' : 's'}`
         }
       >
+        {/* Filter bar */}
+        <div className="mb-4 flex flex-wrap items-center gap-3 border-b border-slate-100 pb-4">
+          <div className="relative min-w-[14rem] flex-1">
+            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" aria-hidden />
+            <input
+              type="search"
+              placeholder={tab === 'teachers' ? 'Search by name, email, or username…' : 'Search by name or email…'}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-9 pr-3 text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-slate-400 focus:bg-white focus:outline-none"
+            />
+          </div>
+
+          {tab === 'learners' && (
+            <>
+              <div className="flex items-center gap-1.5">
+                <Users className="h-4 w-4 text-slate-400" aria-hidden />
+                <select
+                  value={selectedTeacherFilter}
+                  onChange={(e) => setSelectedTeacherFilter(e.target.value)}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none"
+                  aria-label="Filter by teacher"
+                >
+                  <option value="all">All teachers</option>
+                  {teachers.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.displayName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <BookOpen className="h-4 w-4 text-slate-400" aria-hidden />
+                <select
+                  value={selectedCourseFilter}
+                  onChange={(e) => setSelectedCourseFilter(e.target.value)}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none"
+                  aria-label="Filter by course"
+                >
+                  <option value="all">All courses</option>
+                  {roster.courses.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
+
+          <select
+            value={selectedStatusFilter}
+            onChange={(e) => setSelectedStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none"
+            aria-label="Filter by status"
+          >
+            <option value="all">All status</option>
+            <option value="active">Active only</option>
+            <option value="inactive">Inactive only</option>
+          </select>
+        </div>
+
         {rows.length === 0 ? (
           <EmptyState
             icon={tab === 'teachers' ? Users : GraduationCap}
-            title={tab === 'teachers' ? 'No teachers' : 'No learners'}
-            description="Add an account with a unique email."
+            title={tab === 'teachers' ? 'No teachers found' : 'No learners found'}
+            description={searchQuery || selectedCourseFilter !== 'all' || selectedTeacherFilter !== 'all' ? 'Try adjusting your filters.' : 'Add an account to get started.'}
             action={
               <button type="button" className="primary" onClick={() => setShowAdd(true)}>
                 <UserPlus className="h-4 w-4" aria-hidden />
@@ -366,6 +565,8 @@ export function AdminPeoplePage() {
               <thead>
                 <tr>
                   <th scope="col">Person</th>
+                  {tab === 'teachers' && <th scope="col">Workplace & Classes</th>}
+                  {tab === 'learners' && <th scope="col">Enrolled Courses & Classes</th>}
                   <th scope="col">Status</th>
                   <th scope="col">
                     <span className="sr-only">Actions</span>
@@ -373,10 +574,20 @@ export function AdminPeoplePage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((u) =>
-                  editingId === u.id ? (
+                {rows.map((u) => {
+                  const isTeacher = u.roles.includes('teacher')
+                  const teacherClasses = roster.classes.filter((c) => c.teacherUserId === u.id && c.status === 'active')
+
+                  const learnerEnrollments = roster.enrollments.filter(
+                    (e) => e.learnerUserId === u.id && e.status === 'active',
+                  )
+                  const learnerClasses = roster.classes.filter((c) =>
+                    learnerEnrollments.some((e) => e.classId === c.id),
+                  )
+
+                  return editingId === u.id ? (
                     <tr key={u.id} className="accounts-row-edit">
-                      <td colSpan={3}>
+                      <td colSpan={4}>
                         <div className="accounts-edit-row">
                           <input
                             className="row-input"
@@ -452,16 +663,6 @@ export function AdminPeoplePage() {
                                 }}
                               />
                             </label>
-                            {editDraft.avatarUrl ? (
-                              <button
-                                type="button"
-                                className="ghost danger btn-sm p-1"
-                                onClick={() => setEditDraft((d) => ({ ...d, avatarUrl: '' }))}
-                                title="Remove photo"
-                              >
-                                <X className="h-3 w-3" aria-hidden />
-                              </button>
-                            ) : null}
                           </div>
                           <div className="row-actions">
                             <button
@@ -506,14 +707,67 @@ export function AdminPeoplePage() {
                               )}
                             </strong>
                             <span className="accounts-email">{u.email ?? '—'}</span>
-                            {u.roles.includes('teacher') ? (
-                              <span className="accounts-email">
+                            {isTeacher && (
+                              <span className="accounts-email text-emerald-600 font-mono">
                                 {u.username ? `@${u.username}` : 'Username not set'}
                               </span>
-                            ) : null}
+                            )}
                           </span>
                         </span>
                       </td>
+
+                      {/* Teachers Column: Workplace & Classes */}
+                      {tab === 'teachers' && (
+                        <td>
+                          <div className="flex flex-col gap-1 text-xs">
+                            <div className="flex items-center gap-1.5 font-semibold text-slate-700">
+                              <Building2 className="h-3.5 w-3.5 text-slate-400" />
+                              <span>{roster.organization.name || 'My organization'}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {teacherClasses.length > 0 ? (
+                                teacherClasses.map((c) => (
+                                  <span
+                                    key={c.id}
+                                    className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600"
+                                  >
+                                    {c.name}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-[11px] text-slate-400 italic">No assigned classes</span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      )}
+
+                      {/* Learners Column: Enrolled Courses & Classes */}
+                      {tab === 'learners' && (
+                        <td>
+                          <div className="flex flex-col gap-1 text-xs">
+                            {learnerClasses.length > 0 ? (
+                              learnerClasses.map((c) => {
+                                const course = roster.courses.find((crs) => crs.id === c.courseId)
+                                const teacherObj = roster.users.find((t) => t.id === c.teacherUserId)
+                                return (
+                                  <div key={c.id} className="flex items-center gap-1.5 text-slate-700">
+                                    <span className="rounded bg-blue-50 px-1.5 py-0.5 font-bold text-blue-700 text-[10px]">
+                                      {c.name} ({course?.code ?? 'CRS'})
+                                    </span>
+                                    <span className="text-slate-400 text-[11px]">
+                                      · Teacher: {teacherObj?.displayName ?? 'Unassigned'}
+                                    </span>
+                                  </div>
+                                )
+                              })
+                            ) : (
+                              <span className="text-slate-400 text-[11px] italic">Not enrolled in any class</span>
+                            )}
+                          </div>
+                        </td>
+                      )}
+
                       <td>
                         <span
                           className={`badge${(u.accountStatus ?? 'active') === 'active' ? ' success' : ''}`}
@@ -532,7 +786,7 @@ export function AdminPeoplePage() {
                             onClick={() => {
                               const next =
                                 (u.accountStatus ?? 'active') === 'active' ? 'inactive' : 'active'
-                              if (u.roles.includes('teacher')) {
+                              if (isTeacher) {
                                 void (async () => {
                                   const r = await setTeacherAuthAccountStatus({
                                     userId: u.id,
@@ -565,6 +819,7 @@ export function AdminPeoplePage() {
                                 username: u.username ?? '',
                                 avatarUrl: u.avatarUrl ?? '',
                                 allowMultiClass: u.allowMultiClass ?? false,
+                                organizationId: roster.organization.id,
                               })
                             }}
                           >
@@ -576,7 +831,7 @@ export function AdminPeoplePage() {
                             title="Delete"
                             onClick={() => {
                               if (!window.confirm(`Delete ${u.displayName}?`)) return
-                              if (u.roles.includes('teacher')) {
+                              if (isTeacher) {
                                 void (async () => {
                                   const r = await deleteTeacherAuthAccount(u.id)
                                   if (!r.ok) return err(r.error)
@@ -597,8 +852,8 @@ export function AdminPeoplePage() {
                         </div>
                       </td>
                     </tr>
-                  ),
-                )}
+                  )
+                })}
               </tbody>
             </table>
           </div>

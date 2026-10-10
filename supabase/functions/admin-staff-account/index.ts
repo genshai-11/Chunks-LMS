@@ -15,6 +15,7 @@ type StaffAction =
       displayName: string;
       password: string;
       avatarUrl?: string | null;
+      organizationId?: string | null;
     }
   | {
       action: "updateTeacher";
@@ -23,11 +24,13 @@ type StaffAction =
       username: string;
       displayName: string;
       avatarUrl?: string | null;
+      organizationId?: string | null;
     }
   | { action: "setTeacherStatus"; userId: string; accountStatus: "active" | "inactive" }
   | { action: "deleteTeacher"; userId: string };
 
 type Json = Record<string, unknown>;
+const LOCAL_ORG_ID = "a0000000-0000-4000-8000-000000000001";
 // Edge functions intentionally use dynamic tables without generated database types.
 // deno-lint-ignore no-explicit-any
 type SupabaseClientLike = any;
@@ -111,17 +114,18 @@ async function requireAdmin(admin: SupabaseClientLike, token: string) {
   if (roleError) throw new Error(`Admin role lookup failed: ${roleError.message}`);
   if (!role) throw new Error("Admin role required");
 
-  const { data: membership, error: membershipError } = await admin
+  const { data: memberships, error: membershipError } = await admin
     .from("organization_memberships")
     .select("organization_id")
     .eq("user_id", caller.id)
-    .eq("role", "admin")
-    .limit(1)
-    .maybeSingle();
+    .eq("role", "admin");
   if (membershipError) throw new Error(`Admin organization lookup failed: ${membershipError.message}`);
-  if (!membership?.organization_id) throw new Error("Admin organization membership required");
+  if (!memberships || memberships.length === 0) throw new Error("Admin organization membership required");
 
-  return { authUserId: authData.user.id, userId: caller.id as string, organizationId: membership.organization_id as string };
+  const orgIds = memberships.map((m: { organization_id: string }) => m.organization_id);
+  const chosenOrgId = orgIds.includes(LOCAL_ORG_ID) ? LOCAL_ORG_ID : orgIds[0];
+
+  return { authUserId: authData.user.id, userId: caller.id as string, organizationId: chosenOrgId as string };
 }
 
 async function assertTeacher(admin: SupabaseClientLike, userId: string) {
@@ -276,7 +280,10 @@ async function createTeacher(admin: SupabaseClientLike, actor: Awaited<ReturnTyp
       username,
       displayName,
       avatarUrl: body.avatarUrl ?? null,
-      organizationId: actor.organizationId,
+      organizationId:
+        (typeof body.organizationId === "string" && body.organizationId.trim())
+          ? body.organizationId.trim()
+          : actor.organizationId,
     });
     return {
       userId: domain.userId,
@@ -353,6 +360,13 @@ async function updateTeacher(admin: SupabaseClientLike, body: StaffAction) {
       });
     }
     throw new Error(`Teacher update failed: ${usernameWriteError(error)}`);
+  }
+  if (typeof body.organizationId === "string" && body.organizationId.trim()) {
+    const orgId = body.organizationId.trim();
+    await admin.from("organization_memberships").upsert(
+      { organization_id: orgId, user_id: body.userId, role: "teacher" },
+      { onConflict: "organization_id,user_id,role" },
+    );
   }
 
   return {

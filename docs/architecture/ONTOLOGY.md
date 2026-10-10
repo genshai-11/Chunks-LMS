@@ -154,7 +154,7 @@ Hệ thống tuân thủ nguyên tắc: **Cùng 1 Tổ chức nhưng dữ liệu
 | Roster & Teacher Scope | `web/src/modules/roster/teacher-workspace.ts` | `web/src/pages/teacher/TeacherOverviewPage.tsx` | `users`, `classes`, `enrollments` |
 | Multi-Class Context | `web/src/modules/roster/class-context.ts` | `web/src/hooks/useTeacherClassContext.ts` | `classes` |
 | Session Scheduling | `web/src/modules/scheduling/session-lifecycle.ts`| `web/src/pages/teacher/TeacherSessionPage.tsx` | `learning_sessions`, `scheduled_sessions` |
-| Live Observation | `web/src/modules/assessment/session-capture.ts` | `web/src/pages/teacher/TeacherObservePage.tsx` | `assessment_attempts`, `assessment_events` |
+| Live Observation | `web/src/modules/assessment/session-capture.ts`, `web/src/lib/live-assessment.ts` | `web/src/pages/teacher/TeacherObservePage.tsx` | `assessment_attempts`, `assessment_events`, `create_session_question_attempt`, `record_provisional_result`, `resolve_probe` (`20261010070000_fix_live_scoring_and_events_rls.sql`) |
 | 7-Color Spectrum | `web/src/modules/result-lifecycle/types.ts` | `web/src/pages/teacher/TeacherObservePage.tsx` | `result_color` enum, `assessment_attempt_snapshots` |
 | Probe Counters | `web/src/modules/assessment/probe-metrics.ts` | `web/src/pages/teacher/TeacherObservePage.tsx` | `enteredProbeFlow`, `probeCount` |
 | Atomic Sync, Scoped Snapshot & OCC | `web/src/lib/supabase-sync.ts` | `web/src/state/AppState.tsx` | `organization_workspace_versions`, `get_workspace_snapshot`, `sync_workspace_atomic` (`20261010030000_fix_workspace_snapshot_user_roles.sql`) |

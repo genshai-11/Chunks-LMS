@@ -787,6 +787,7 @@ export type SaveWorkspaceOptions = {
    */
   pruneMissing?: boolean
   expectedRevision?: number
+  canProvision?: boolean
 }
 
 function workspaceIsEmpty(s: WorkspaceSnapshot): boolean {
@@ -866,8 +867,8 @@ export async function saveWorkspaceToSupabase(
       }
     }
 
-    // 1) Org
-    {
+    // 1) Org: only attempt to upsert organization if caller is admin (options.canProvision === true)
+    if (options.canProvision) {
       const { error } = await sb.from('organizations').upsert(
         {
           id: orgId,

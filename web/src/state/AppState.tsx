@@ -391,6 +391,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const result = await saveWorkspaceToSupabase(normalized, {
         allowEmptyWipe: wipe,
         expectedRevision: workspaceRevision ?? undefined,
+        canProvision: staffSession.canAccess('admin'),
       })
       if (result.ok) {
         if (typeof result.newRevision === 'number') {
@@ -523,6 +524,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         allowEmptyWipe: allowEmptyWipeOnce.current,
         pruneMissing: override?.pruneMissing,
         expectedRevision: workspaceRevision ?? undefined,
+        canProvision: staffSession.canAccess('admin'),
       })
       if (result.ok && typeof result.newRevision === 'number') {
         setWorkspaceRevision(result.newRevision)

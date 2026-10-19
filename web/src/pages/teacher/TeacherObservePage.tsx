@@ -1542,7 +1542,7 @@ export function TeacherObservePage() {
     >
       <header className={`observe-bar observe-bar-slim${showHeader ? '' : ' is-hidden'}`}>
         <Link to={exitPath} className="observe-nav-exit" aria-label="Exit observe">
-          <X aria-hidden strokeWidth={2.5} />
+          <X aria-hidden strokeWidth={2} />
         </Link>
         <div className="observe-bar-center">
           <span className="observe-day-badge" title={dayLabel}>
@@ -1571,7 +1571,7 @@ export function TeacherObservePage() {
               title="Map (H)"
             >
               {/* Grid = question map (clearer than panel icons on phone) */}
-              <LayoutGrid aria-hidden strokeWidth={2.25} />
+              <LayoutGrid aria-hidden strokeWidth={1.75} />
             </button>
           ) : null}
           <button
@@ -1582,7 +1582,7 @@ export function TeacherObservePage() {
             aria-label="Keyboard shortcuts"
             title="Keys (?)"
           >
-            <Keyboard aria-hidden strokeWidth={2.25} />
+            <Keyboard aria-hidden strokeWidth={1.75} />
           </button>
         </div>
       </header>

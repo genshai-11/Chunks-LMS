@@ -1835,7 +1835,7 @@ export function TeacherTestRunPage() {
         onMouseLeave={() => setShowHeader(false)}
       >
         <button type="button" className="observe-nav-exit" onClick={() => navigate('/teacher/tests')} aria-label="Exit live test">
-          <ChevronLeft aria-hidden strokeWidth={2.5} />
+          <ChevronLeft aria-hidden strokeWidth={2} />
         </button>
         <div className="observe-bar-center">
           <span className="observe-day-badge">Session {currentSessionNumber}/{totalSessions}</span>
@@ -1848,10 +1848,10 @@ export function TeacherTestRunPage() {
         </div>
         <div className="observe-nav-group" role="toolbar" aria-label="Live test tools">
           <button type="button" className={`observe-nav-btn${mapOpen ? ' is-active' : ''}`} onClick={() => setMapOpen((v) => !v)} title="Map (H)">
-            {mapOpen ? <PanelLeftClose aria-hidden strokeWidth={2.25} /> : <PanelLeftOpen aria-hidden strokeWidth={2.25} />}
+            {mapOpen ? <PanelLeftClose aria-hidden strokeWidth={1.75} /> : <PanelLeftOpen aria-hidden strokeWidth={1.75} />}
           </button>
           <button type="button" className={`observe-nav-btn observe-hide-phone${showKeys ? ' is-active' : ''}`} onClick={() => setShowKeys((v) => !v)} title="Keys (?)">
-            <Keyboard aria-hidden strokeWidth={2.25} />
+            <Keyboard aria-hidden strokeWidth={1.75} />
           </button>
           <button
             type="button"
@@ -1859,7 +1859,7 @@ export function TeacherTestRunPage() {
             onClick={() => (isAllFinalized ? void completeAll() : setIsSummaryShown(true))}
             title={isAllFinalized ? 'Finish Test / Complete Run' : 'Open summary before finishing'}
           >
-            <CheckCircle2 aria-hidden strokeWidth={2.25} />
+            <CheckCircle2 aria-hidden strokeWidth={1.75} />
             <span className="observe-nav-finish-label">Finish Test</span>
           </button>
         </div>
@@ -2288,21 +2288,31 @@ export function TeacherTestRunPage() {
 
             <div className="live-test-focus-card">
               <div className="live-test-focus-actions">
-                <button type="button" className="ghost" disabled={selectedIndex === 0} onClick={() => setSelectedIndex((prev) => Math.max(0, prev - 1))}>
-                  <ChevronLeft className="h-4 w-4" /> Prev
+                <button
+                  type="button"
+                  className="ghost text-xs font-medium py-1.5 px-3 rounded-xl inline-flex items-center gap-1"
+                  disabled={selectedIndex === 0}
+                  onClick={() => setSelectedIndex((prev) => Math.max(0, prev - 1))}
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" /> Prev
                 </button>
                 <button
                   type="button"
-                  className="live-test-wave-play"
+                  className="live-test-wave-play py-1.5 px-3 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shadow-xs"
                   onClick={() => void playCurrentItemAudio(true)}
                   aria-label={audioState === 'error' ? 'Retry current item audio' : 'Play current item audio'}
                 >
-                  {audioState === 'error' ? <RotateCcw className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                  {audioState === 'error' ? <RotateCcw className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
                   <span className="live-test-wave" aria-hidden><i /><i /><i /><i /></span>
                   <span>{audioState === 'error' ? 'Retry' : audioState === 'playing' ? 'Playing' : 'Play'}</span>
                 </button>
-                <button type="button" className="ghost" disabled={selectedIndex === items.length - 1} onClick={() => setSelectedIndex((prev) => Math.min(items.length - 1, prev + 1))}>
-                  Next <ChevronRight className="h-4 w-4" />
+                <button
+                  type="button"
+                  className="ghost text-xs font-medium py-1.5 px-3 rounded-xl inline-flex items-center gap-1"
+                  disabled={selectedIndex === items.length - 1}
+                  onClick={() => setSelectedIndex((prev) => Math.min(items.length - 1, prev + 1))}
+                >
+                  Next <ChevronRight className="h-3.5 w-3.5" />
                 </button>
               </div>
 

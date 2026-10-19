@@ -125,14 +125,24 @@ begin
         coalesce(nullif(trim(coalesce(v_item->>'displayName', v_item->>'display_name', '')), ''), 'Learner'),
         nullif(lower(btrim(coalesce(v_item->>'email', ''))), ''),
         coalesce(v_item->>'avatarUrl', v_item->>'avatar_url'),
-        case when v_is_admin then coalesce(v_item->>'accountStatus', v_item->>'account_status', 'active')::text else 'active' end,
+        case
+          when v_is_admin then coalesce(v_item->>'accountStatus', v_item->>'account_status', 'active')::text
+          when not exists (select 1 from public.staff_roles sr where sr.user_id = v_user_id and sr.active = true)
+            then coalesce(v_item->>'accountStatus', v_item->>'account_status', 'active')::text
+          else 'active'
+        end,
         coalesce((v_item->>'allowMultiClass')::boolean, (v_item->>'allow_multi_class')::boolean, false)
       )
       on conflict (id) do update set
         display_name = coalesce(excluded.display_name, users.display_name),
         email = coalesce(excluded.email, users.email),
         avatar_url = coalesce(excluded.avatar_url, users.avatar_url),
-        account_status = case when v_is_admin then coalesce(excluded.account_status, users.account_status) else users.account_status end,
+        account_status = case
+          when v_is_admin then coalesce(excluded.account_status, users.account_status)
+          when not exists (select 1 from public.staff_roles sr where sr.user_id = users.id and sr.active = true)
+            then coalesce(excluded.account_status, users.account_status)
+          else users.account_status
+        end,
         allow_multi_class = coalesce(excluded.allow_multi_class, users.allow_multi_class),
         updated_at = now();
 

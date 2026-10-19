@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  Check,
   Eye,
   Gauge,
   Info,
   Layers,
+  LayoutGrid,
+  List,
   Play,
   Plus,
   Radio,
@@ -86,9 +89,8 @@ export function TeacherSessionPage() {
   }, [openSession, activeLearnerIds])
 
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
-
   const [selectedIds, setSelectedIds] = useState<string[]>([])
-
+  const [viewMode, setViewMode] = useState<'card' | 'list'>('card')
   useEffect(() => {
     if (!classRow) return
     const cleanup = closeOrphanOpenSessions(roster, scheduling)
@@ -97,19 +99,15 @@ export function TeacherSessionPage() {
     void syncNow({ scheduling: cleanup.state })
   }, [classRow, roster, scheduling, setScheduling, syncNow])
 
-  // Default multi-select: preselect query learner, else all enrolled
+  // Default selection: preselect query learner, else default unselected (only 1-2 learners per session)
   useEffect(() => {
     if (openSession) return
-    if (activeLearnerIds.length === 0) {
-      setSelectedIds([])
-      return
-    }
     if (preselect && activeLearnerIds.includes(preselect)) {
       setSelectedIds([preselect])
     } else {
-      setSelectedIds(enrolledIds)
+      setSelectedIds([])
     }
-  }, [activeLearnerIds, enrolledIds, preselect, openSession])
+  }, [activeLearnerIds, preselect, openSession])
 
   const totalDays =
     classRow?.schedule?.sessionCount ??
@@ -326,18 +324,38 @@ export function TeacherSessionPage() {
           title="Learners in this session"
           description="Each question maps to exactly one learner (round-robin). 100 Q / 2 HV ≈ 50 each. Multi-column observe uses this list."
           actions={
-            <div className="btn-row">
+            <div className="flex items-center gap-2">
+              <div className="inline-flex items-center rounded-xl bg-slate-100 p-0.5 border border-slate-200">
+                <button
+                  type="button"
+                  className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                    viewMode === 'card'
+                      ? 'bg-white text-indigo-700 shadow-2xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  onClick={() => setViewMode('card')}
+                  title="Card View"
+                >
+                  <LayoutGrid className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Cards</span>
+                </button>
+                <button
+                  type="button"
+                  className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                    viewMode === 'list'
+                      ? 'bg-white text-indigo-700 shadow-2xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  onClick={() => setViewMode('list')}
+                  title="List View"
+                >
+                  <List className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">List</span>
+                </button>
+              </div>
               <button
                 type="button"
-                className="ghost"
-                onClick={() => setSelectedIds(activeLearnerIds)}
-                disabled={activeLearnerIds.length === 0}
-              >
-                Select all
-              </button>
-              <button
-                type="button"
-                className="ghost"
+                className="ghost text-xs py-1.5 px-3"
                 onClick={() => setSelectedIds([])}
                 disabled={selectedIds.length === 0}
               >
@@ -357,6 +375,52 @@ export function TeacherSessionPage() {
                 </Link>
               }
             />
+          ) : viewMode === 'card' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {enrolledIds.map((id) => {
+                const user = roster.users.find((u) => u.id === id)
+                const checked = selectedIds.includes(id)
+                const disabled = !checked && selectedIds.length >= 2
+                return (
+                  <div
+                    key={id}
+                    onClick={() => !disabled && toggleLearner(id)}
+                    className={`relative p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                      checked
+                        ? 'border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-500/20 shadow-xs'
+                        : disabled
+                        ? 'border-slate-100 bg-slate-50/50 opacity-50 cursor-not-allowed'
+                        : 'border-slate-200/80 bg-white hover:border-slate-300 hover:shadow-xs'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <UserAvatar
+                        name={user?.displayName ?? id}
+                        avatarUrl={user?.avatarUrl}
+                        size="md"
+                      />
+                      <div className="min-w-0">
+                        <p className="font-bold text-sm text-slate-900 truncate">
+                          {user?.displayName ?? id}
+                        </p>
+                        <p className="text-xs text-slate-500 truncate">
+                          {user?.email ?? 'No email'}
+                         </p>
+                       </div>
+                     </div>
+                    <div
+                      className={`h-5 w-5 rounded-full border flex items-center justify-center shrink-0 transition-all ${
+                        checked
+                          ? 'border-indigo-600 bg-indigo-600 text-white'
+                          : 'border-slate-300 bg-white'
+                      }`}
+                    >
+                      {checked && <Check className="h-3 w-3 stroke-[3]" />}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           ) : (
             <ul className="person-list">
               {enrolledIds.map((id) => {

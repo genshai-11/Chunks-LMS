@@ -15,6 +15,7 @@ import {
   User,
   UserPlus,
   Users,
+  Trash2,
   X,
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -28,8 +29,10 @@ import { useStaffSession } from '../../auth/useStaffSession'
 import {
   addLearnerProfile,
   createLearnerAndEnroll,
+  endEnrollment,
   enrollLearner,
   listActiveLearners,
+  setAccountStatus,
 } from '../../modules/roster/service'
 
 export const PRESET_AVATARS = [
@@ -269,6 +272,32 @@ export function TeacherOverviewPage() {
     setRoster(result.state)
     await syncNow({ roster: result.state })
     ok('Class label assigned')
+  }
+
+  async function handleArchiveLearner(learnerId: string, learnerName: string) {
+    if (
+      !window.confirm(
+        `Are you sure you want to remove ${learnerName}? The learner will be archived and removed from active class lists. All past session and assessment history is safely preserved.`,
+      )
+    ) {
+      return
+    }
+    let nextRoster = roster
+    const activeEnrollments = nextRoster.enrollments.filter(
+      (e) => e.learnerUserId === learnerId && e.status === 'active',
+    )
+    for (const enr of activeEnrollments) {
+      const endRes = endEnrollment(nextRoster, enr.id)
+      if (endRes.ok) nextRoster = endRes.state
+    }
+    const statusRes = setAccountStatus(nextRoster, learnerId, 'inactive')
+    if (!statusRes.ok) {
+      return err(statusRes.error)
+    }
+    nextRoster = statusRes.state
+    setRoster(nextRoster)
+    await syncNow({ roster: nextRoster })
+    ok(`Learner ${learnerName} has been archived.`)
   }
 
   async function startFastSession(learnerId: string, preferredClassId: string | null) {
@@ -744,6 +773,7 @@ export function TeacherOverviewPage() {
                   if (learner.preferredClassId) setActiveClassId(learner.preferredClassId)
                 }}
                 onStart={() => void startFastSession(learner.id, learner.preferredClassId)}
+                onArchive={() => void handleArchiveLearner(learner.id, learner.name)}
               />
             ))}
           </div>
@@ -836,6 +866,15 @@ export function TeacherOverviewPage() {
                             {startingLearnerId === learner.id ? 'Starting…' : 'Start now'}
                           </button>
                         )}
+                        <button
+                          type="button"
+                          className="btn ghost text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-1"
+                          onClick={() => void handleArchiveLearner(learner.id, learner.name)}
+                          title={`Archive ${learner.name}`}
+                          aria-label={`Archive ${learner.name}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -869,6 +908,7 @@ function LearnerCard({
   onAssignActiveClass,
   onSelect,
   onStart,
+  onArchive,
 }: {
   learner: {
     id: string
@@ -892,58 +932,105 @@ function LearnerCard({
   onAssignActiveClass: () => void
   onSelect: () => void
   onStart: () => void
+  onArchive: () => void
 }) {
   return (
-    <article className={`teacher-learner-card${selected ? ' is-selected' : ''}`}>
-      <button type="button" className="teacher-learner-card-main" onClick={onSelect}>
-        <UserAvatar name={learner.name} avatarUrl={learner.avatarUrl} size="lg" />
-        <span>
-          <strong>{learner.name}</strong>
-          <small>{learner.email ?? 'No email'}</small>
-        </span>
-      </button>
-      <div className="teacher-learner-mini-stats">
-        <span title="Minimum RFC across sessions">
-          <strong>{formatPercent(learner.rfcMin)}</strong>
-          <small>Min</small>
-        </span>
-        <span title="Maximum RFC across sessions">
-          <strong>{formatPercent(learner.rfcMax)}</strong>
-          <small>Max</small>
-        </span>
-        <span title="Average RFC across sessions">
-          <strong>{formatPercent(learner.rfcAvg)}</strong>
-          <small>Avg</small>
-        </span>
+    <article
+      className={`group relative flex flex-col justify-between gap-4 rounded-2xl border p-4 bg-white shadow-2xs transition-all hover:shadow-md hover:border-slate-300 ${
+        selected ? 'ring-2 ring-indigo-600/30 border-indigo-600' : 'border-slate-200/80'
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <button
+          type="button"
+          className="flex items-center gap-3 text-left min-w-0 flex-1 bg-transparent border-0 p-0 cursor-pointer"
+          onClick={onSelect}
+        >
+          <div className="relative shrink-0">
+            <UserAvatar name={learner.name} avatarUrl={learner.avatarUrl} size="md" />
+            {openSession && (
+              <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
+              </span>
+            )}
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-bold text-sm text-slate-900 truncate leading-snug group-hover:text-indigo-600 transition-colors">
+              {learner.name}
+            </h3>
+            <p className="text-xs text-slate-400 truncate mt-0.5">
+              {learner.email ?? 'No email'}
+            </p>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onArchive()
+          }}
+          className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors opacity-70 hover:opacity-100"
+          title={`Remove/archive ${learner.name}`}
+          aria-label={`Remove ${learner.name}`}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
       </div>
-      <p className="meta my-0">
-        {learner.sessions} session(s) · {learner.finalized} finalized observations ·{' '}
-        {learner.classIds.length ? `${learner.classIds.length} class label(s)` : 'No class label'}
-      </p>
-      <div className="btn-row teacher-learner-card-actions">
+
+      {/* Minimal Stats Row */}
+      <div className="grid grid-cols-3 gap-1.5 p-2 rounded-xl bg-slate-50/80 border border-slate-100 text-center">
+        <div>
+          <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Min RFC</span>
+          <span className="font-mono text-xs font-bold text-slate-700">{formatPercent(learner.rfcMin)}</span>
+        </div>
+        <div>
+          <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Avg RFC</span>
+          <span className="font-mono text-xs font-bold text-indigo-600">{formatPercent(learner.rfcAvg)}</span>
+        </div>
+        <div>
+          <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Sessions</span>
+          <span className="font-mono text-xs font-bold text-slate-700">{learner.sessions}</span>
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
         {canAssignActiveClass && activeClassName ? (
-          <button type="button" className="ghost" onClick={onAssignActiveClass}>
+          <button
+            type="button"
+            className="text-xs py-1.5 px-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium truncate"
+            onClick={onAssignActiveClass}
+          >
             Assign {activeClassName}
           </button>
         ) : null}
-        <Link to={`/teacher/learner/${encodeURIComponent(learner.id)}`} className="btn ghost">
-          <Eye className="h-4 w-4" aria-hidden />
-          Profile
+        <Link
+          to={`/teacher/learner/${encodeURIComponent(learner.id)}`}
+          className="flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-3 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold transition-colors"
+        >
+          <Eye className="h-3.5 w-3.5 text-slate-500" aria-hidden />
+          <span>Profile</span>
         </Link>
         {openSession ? (
-          <Link to="/teacher/observe" className="btn primary" onClick={onSelect}>
-            <Play className="h-4 w-4" aria-hidden />
-            Open live
+          <Link
+            to="/teacher/observe"
+            className="flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-2xs transition-colors"
+            onClick={onSelect}
+          >
+            <Play className="h-3.5 w-3.5" aria-hidden />
+            <span>Open live</span>
           </Link>
         ) : (
           <button
             type="button"
-            className="primary"
+            className="flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-2xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={onStart}
             disabled={starting || !learner.preferredClassId}
           >
-            <Play className="h-4 w-4" aria-hidden />
-            {starting ? 'Starting…' : 'Start now'}
+            <Play className="h-3.5 w-3.5" aria-hidden />
+            <span>{starting ? 'Starting…' : 'Start now'}</span>
           </button>
         )}
       </div>

@@ -1417,9 +1417,9 @@
     @apply border-0 bg-transparent! shadow-none min-h-0 inline-flex h-11 w-11 items-center justify-center rounded-xl text-slate-400! transition-all duration-200 active:scale-95 hover:bg-white/10 hover:text-white! focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white;
   }
 
-  /* Size + weight controlled here so Lucide always renders large enough */
+  /* Size + weight controlled here so Lucide always renders clean and balanced */
   .observe-nav-btn svg {
-    @apply h-6 w-6 shrink-0 stroke-current text-slate-400 transition-colors duration-200;
+    @apply h-4 w-4 shrink-0 stroke-current text-slate-400 transition-colors duration-200;
   }
 
   .observe-nav-btn:hover svg {
@@ -1427,7 +1427,7 @@
   }
 
   .observe-nav-btn.is-active {
-    @apply bg-gradient-to-r from-indigo-600 to-violet-600 text-white! shadow-lg shadow-indigo-500/20 ring-1 ring-white/10;
+    @apply bg-gradient-to-r from-indigo-600 to-violet-600 text-white! shadow-md shadow-indigo-500/20 ring-1 ring-white/10;
   }
 
   .observe-nav-btn.is-active svg {
@@ -1435,11 +1435,11 @@
   }
 
   .observe-nav-exit {
-    @apply min-h-0 border-0 shadow-none inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5! text-slate-400! shadow-sm transition-all duration-200 hover:bg-white/10! hover:text-white!;
+    @apply min-h-0 border-0 shadow-none inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5! text-slate-400! transition-all duration-200 hover:bg-white/10! hover:text-white!;
   }
 
   .observe-nav-exit svg {
-    @apply h-6 w-6 text-slate-400 transition-colors duration-200;
+    @apply h-4 w-4 text-slate-400 transition-colors duration-200;
   }
 
   .observe-nav-exit:hover svg {
@@ -1448,15 +1448,15 @@
 
   /* Finish & save — primary action in observe toolbar */
   .observe-nav-finish {
-    @apply min-h-0 border-0 inline-flex h-11 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600! px-3 py-2 text-white! font-semibold shadow-lg shadow-green-500/10 hover:from-green-500 hover:to-emerald-500 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none;
+    @apply min-h-0 border-0 inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600! px-3.5 py-1.5 text-white! font-medium text-xs shadow-sm shadow-emerald-500/10 hover:from-emerald-500 hover:to-teal-500 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none;
   }
 
   .observe-nav-finish svg {
-    @apply h-6 w-6 text-white;
+    @apply h-4 w-4 text-white;
   }
 
   .observe-nav-finish-label {
-    @apply hidden font-display text-xs font-bold uppercase tracking-wide sm:inline;
+    @apply hidden font-sans text-xs font-semibold tracking-normal sm:inline;
   }
 
   .observe-nav-finish:disabled {

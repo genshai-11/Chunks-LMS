@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, BarChart3, Eye, EyeOff, ImagePlus, Play, Save, UserRound, Pencil, X, Mail, School } from 'lucide-react'
+import { ArrowLeft, BarChart3, Eye, EyeOff, ImagePlus, Play, Save, UserRound, Pencil, X, Mail, School, Trash2 } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Flash } from '../../components/Flash'
 import { PageHeader } from '../../components/PageHeader'
@@ -15,7 +15,7 @@ import {
 } from '../../lib/standalone-tests'
 import { listSelectablePackageVersions } from '../../lib/test-packages'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
-import { updateUserProfile, endEnrollment, enrollLearner } from '../../modules/roster/service'
+import { updateUserProfile, endEnrollment, enrollLearner, setAccountStatus } from '../../modules/roster/service'
 import {
   formatPercent,
   learnerRfcStats,
@@ -247,6 +247,34 @@ export function TeacherLearnerProfilePage() {
     }
   }
 
+  async function handleRemoveLearner() {
+    if (!learner) return
+    if (
+      !window.confirm(
+        `Are you sure you want to remove ${learner.displayName}? The learner will be archived and removed from active class lists. All past session and assessment history is safely preserved.`,
+      )
+    ) {
+      return
+    }
+    let nextRoster = roster
+    const activeEnrollments = nextRoster.enrollments.filter(
+      (e) => e.learnerUserId === learner.id && e.status === 'active',
+    )
+    for (const enr of activeEnrollments) {
+      const endRes = endEnrollment(nextRoster, enr.id)
+      if (endRes.ok) nextRoster = endRes.state
+    }
+    const statusRes = setAccountStatus(nextRoster, learner.id, 'inactive')
+    if (!statusRes.ok) {
+      return err(statusRes.error)
+    }
+    nextRoster = statusRes.state
+    setRoster(nextRoster)
+    await syncNow({ roster: nextRoster })
+    ok(`Learner ${learner.displayName} has been archived.`)
+    navigate('/teacher')
+  }
+
   return (
     <>
       <PageHeader
@@ -278,6 +306,15 @@ export function TeacherLearnerProfilePage() {
                 <span>Tests 1-1 analysis</span>
               </Link>
             ) : null}
+            <button
+              type="button"
+              className="btn ghost text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
+              onClick={handleRemoveLearner}
+              title="Remove/archive this learner"
+            >
+              <Trash2 className="h-4 w-4 text-rose-600" aria-hidden />
+              <span>Remove</span>
+            </button>
           </div>
         }
       />
@@ -521,6 +558,7 @@ export function TeacherLearnerProfilePage() {
                     ) : null}
                     {columns.scoreAvg ? <th scope="col">Score avg</th> : null}
                     {columns.probeTotal ? <th scope="col">Chunks Number</th> : null}
+                    <th scope="col" className="text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -556,6 +594,16 @@ export function TeacherLearnerProfilePage() {
                       {columns.probeTotal ? (
                         <td className="font-mono text-xs tabular-nums">{row.probeTotal}</td>
                       ) : null}
+                      <td className="text-right">
+                        <Link
+                          to={`/teacher/analysis?session=${encodeURIComponent(row.learningSessionId)}&learner=${encodeURIComponent(learner.id)}`}
+                          className="btn ghost inline-flex items-center gap-1 text-xs py-1 px-2.5 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                          title="Open detailed analysis for this session"
+                        >
+                          <BarChart3 className="h-3.5 w-3.5" />
+                          <span>Analysis</span>
+                        </Link>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

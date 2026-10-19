@@ -281,11 +281,12 @@ $$\text{TestPackage} \xrightarrow{1..N} \text{TestPackageVersion} \xrightarrow{1
    - RPC khóa hàng `organization_workspace_versions` bằng `SELECT ... FOR UPDATE`.
    - Nếu `p_expected_revision < current_revision`: Bắn lỗi `CONFLICT_REVISION_MISMATCH`, hủy ghi, yêu cầu người dùng reload để tránh đè dữ liệu.
    - Nếu hợp lệ: Cập nhật toàn bộ thực thể trong 1 transaction PostgreSQL duy nhất và tăng revision $+1$.
-3. **Cơ Chế Lưu Trữ Phía Client (`AppState.tsx`):**
-   - **Debounced Auto-Save:** Timer 700ms tự động kích hoạt khi có thay đổi ở `roster` hoặc `scheduling`.
-   - **Manual `syncNow`:** Đồng bộ cưỡng bức tức thời kèm xác minh tính bền vững (`verifyWorkspacePersistence`).
+3. **Cơ Chế Lưu Trữ & Chống Vòng Lặp Phía Client (`AppState.tsx`):**
+   - **Debounced Auto-Save & State Fingerprinting:** Timer 700ms chỉ kích hoạt khi nội dung chuẩn hóa của `roster` hoặc `scheduling` thực sự thay đổi (kiểm tra qua `lastSavedFingerprintRef`).
+   - **Tách Biệt Revision Khỏi Trigger Lưu (`workspaceRevisionRef`):** Biến `workspaceRevision` chỉ được đọc qua ref, tuyệt đối không đưa vào dependency array của auto-save để triệt tiêu hiện tượng server tăng revision làm kích hoạt lưu vòng lặp vô tận ("sync liên tục").
+   - **Manual `syncNow`:** Đồng bộ cưỡng bức tức thời kèm hủy timer debounced đang chờ và ghi nhận ngay `fingerprint` mới.
    - **Local Storage Cache:** Lưu trữ snapshot cục bộ tức thì giúp ứng dụng không bị mất dữ liệu khi mất mạng đột ngột.
-
+   - **Quy Tắc Xác Định Số Buổi Quan Sát (Observe Day Resolution):** Số buổi học (`resolveSessionDayNumber`) được tính toán xác định: Ưu tiên `openSession.sessionNumber`; nếu chưa có, đếm số ca học `completed` của lớp đó trước thời điểm bắt đầu $+ 1$ (loại trừ các ca học bị hủy `cancelled`).
 ---
 
 ## 4. Hệ Thống Các Bất Biến Bắt Buộc (Canonical System Invariants)

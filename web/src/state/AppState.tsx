@@ -170,10 +170,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const skipNextSync = useRef(false)
   /** After intentional Clear data, allow empty cloud wipe once */
   const allowEmptyWipeOnce = useRef(false)
-  /** Latest in-memory workspace for boot merge (avoid clobbering mid-edit) */
   const liveRef = useRef({ roster, scheduling })
   liveRef.current = { roster, scheduling }
 
+  const workspaceRevisionRef = useRef<number | null>(workspaceRevision)
+  useEffect(() => {
+    workspaceRevisionRef.current = workspaceRevision
+  }, [workspaceRevision])
+
+  const lastSavedFingerprintRef = useRef<string>('')
   // Boot: staff (signed-in) cloud is authoritative for writes.
   useEffect(() => {
     let cancelled = false
@@ -311,6 +316,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // Learners load cloud read-only; do not surface a sticky "error" banner.
       setBackendError(null)
       setLastSyncedAt(new Date().toISOString())
+      lastSavedFingerprintRef.current = JSON.stringify(
+        normalizeIdsForDb({ roster: authoritativeRoster, scheduling: remote.scheduling }),
+      )
       bootDone.current = true
     })()
     return () => {
@@ -371,12 +379,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
     if (syncTimer.current) clearTimeout(syncTimer.current)
     syncTimer.current = setTimeout(async () => {
-      setBackendStatus('syncing')
       const stable = {
         roster: ensureStableOrg(roster),
         scheduling,
       }
       const normalized = normalizeIdsForDb(stable)
+      const fingerprint = JSON.stringify(normalized)
+      if (lastSavedFingerprintRef.current === fingerprint) {
+        return
+      }
+
+      setBackendStatus('syncing')
       if (
         normalized.roster.organization.id !== roster.organization.id ||
         normalized.roster.users.some((u, i) => u.id !== roster.users[i]?.id) ||
@@ -390,11 +403,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       allowEmptyWipeOnce.current = false
       const result = await saveWorkspaceToSupabase(normalized, {
         allowEmptyWipe: wipe,
-        expectedRevision: workspaceRevision ?? undefined,
+        expectedRevision: workspaceRevisionRef.current ?? undefined,
         canProvision: staffSession.canAccess('admin'),
       })
       if (result.ok) {
+        lastSavedFingerprintRef.current = fingerprint
         if (typeof result.newRevision === 'number') {
+          workspaceRevisionRef.current = result.newRevision
           setWorkspaceRevision(result.newRevision)
         }
         setBackendStatus('online')
@@ -418,7 +433,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     staffSession.authBypass,
     staffSession.signedIn,
     staffSession.staffRoles.length,
-    workspaceRevision,
   ])
 
   const resetAll = useCallback(() => {
@@ -535,6 +549,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       allowEmptyWipeOnce.current = false
       if (result.ok) {
+        lastSavedFingerprintRef.current = JSON.stringify(normalized)
+        if (typeof result.newRevision === 'number') {
+          workspaceRevisionRef.current = result.newRevision
+          setWorkspaceRevision(result.newRevision)
+        }
         const currentTeacherUser = roster.users.find(
           (u) =>
             (staffSession.domainUserId && u.id === staffSession.domainUserId) ||

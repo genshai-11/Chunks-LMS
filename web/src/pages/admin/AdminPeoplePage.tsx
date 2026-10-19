@@ -375,7 +375,7 @@ export function AdminPeoplePage() {
                   required
                   minLength={3}
                   maxLength={32}
-                  pattern="[A-Za-z0-9][A-Za-z0-9._-]{2,31}"
+                  pattern="[A-Za-z0-9][-A-Za-z0-9._]{2,31}"
                   placeholder="teacher.name"
                   autoComplete="username"
                 />
@@ -619,7 +619,7 @@ export function AdminPeoplePage() {
                               placeholder="Username"
                               minLength={3}
                               maxLength={32}
-                              pattern="[A-Za-z0-9][A-Za-z0-9._-]{2,31}"
+                              pattern="[A-Za-z0-9][-A-Za-z0-9._]{2,31}"
                               required
                             />
                           )}

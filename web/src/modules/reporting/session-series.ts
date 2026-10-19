@@ -108,7 +108,7 @@ export function resolveSessionDayNumber(
     if (sched?.sessionNumber != null && sched.sessionNumber > 0) return sched.sessionNumber
   }
   const ordered = ctx.learningSessions
-    .filter((s) => s.classId === openSession.classId)
+    .filter((s) => s.classId === openSession.classId && ('status' in s ? s.status !== 'cancelled' : true))
     .slice()
     .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
   const idx = ordered.findIndex((s) => s.id === openSession.id)

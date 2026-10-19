@@ -844,9 +844,28 @@ export async function saveWorkspaceToSupabase(
             serverRevision: rpcRes.data.serverRevision,
           }
         }
+        return {
+          ok: false,
+          error: rpcRes.data.error ?? 'Sync failed on server',
+        }
       }
-    } catch {
-      // Fall through to 10-step REST fallback below
+      if (rpcRes.error) {
+        console.warn('sync_workspace_atomic error:', rpcRes.error)
+        if (!options.canProvision) {
+          return {
+            ok: false,
+            error: `Server sync rejected: ${rpcRes.error.message}`,
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('sync_workspace_atomic exception:', err)
+      if (!options.canProvision) {
+        return {
+          ok: false,
+          error: err instanceof Error ? err.message : 'Sync request failed',
+        }
+      }
     }
 
     // Guard: never let an empty boot/race wipe existing cloud data

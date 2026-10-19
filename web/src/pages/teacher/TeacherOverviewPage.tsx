@@ -936,8 +936,10 @@ function LearnerCard({
 }) {
   return (
     <article
-      className={`group relative flex flex-col justify-between gap-4 rounded-2xl border p-4 bg-white shadow-2xs transition-all hover:shadow-md hover:border-slate-300 ${
-        selected ? 'ring-2 ring-indigo-600/30 border-indigo-600' : 'border-slate-200/80'
+      className={`group relative flex flex-col justify-between gap-4 rounded-2xl border p-4 bg-white shadow-xs transition-all hover:shadow-md ${
+        selected
+          ? 'ring-2 ring-slate-900 border-slate-900'
+          : 'border-slate-900/20 hover:border-slate-900/50'
       }`}
     >
       <div className="flex items-start justify-between gap-3">

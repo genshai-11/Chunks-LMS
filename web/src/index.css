@@ -2658,14 +2658,14 @@
   }
 
   .observe-dock-label {
-    @apply block font-black uppercase tracking-wide opacity-90;
-    font-size: clamp(0.5rem, 1dvh, 0.65rem);
-    margin-top: clamp(0.125rem, 0.3dvh, 0.25rem);
+    @apply block font-semibold uppercase tracking-wider opacity-80;
+    font-size: clamp(0.5rem, 0.9dvh, 0.6rem);
+    margin-top: clamp(0.1rem, 0.25dvh, 0.2rem);
   }
 
   .observe-dock-num {
-    @apply font-display font-black leading-none tracking-tight opacity-95;
-    font-size: clamp(0.7rem, 1.5dvh, 0.95rem);
+    @apply font-display font-bold leading-tight tracking-tight opacity-95;
+    font-size: clamp(0.65rem, 1.25dvh, 0.85rem);
   }
 
   .observe-dock-probe {
@@ -2692,7 +2692,10 @@
     @apply border-yellow-300/60 bg-yellow-950/80 text-yellow-100 hover:bg-yellow-900;
   }
   .observe-dock-probe-btn.pass {
-    @apply border-blue-300/60 bg-blue-950/80 text-blue-100 hover:bg-blue-900;
+    @apply border-blue-400/60 bg-blue-950/80 text-sky-300 hover:bg-blue-900;
+  }
+  .observe-dock-probe-btn.pass span {
+    @apply text-sky-300 font-bold;
   }
   .observe-dock-probe-btn.done {
     @apply border-indigo-300/60 bg-indigo-950/80 text-indigo-100 hover:bg-indigo-900;
@@ -2745,8 +2748,8 @@
   }
 
   .observe-dock-lg .observe-dock-num {
-    font-size: clamp(1.6rem, 3.65dvh, 2.35rem);
-    @apply font-black tracking-wide;
+    font-size: clamp(1.15rem, 2.5dvh, 1.55rem);
+    @apply font-bold font-display tracking-normal;
   }
 
   .observe-dock-lg .observe-dock-label {
@@ -5140,7 +5143,10 @@
     @apply border-yellow-300/60 bg-yellow-950/80 text-yellow-100 hover:bg-yellow-900;
   }
   .live-test-probe-dock .observe-dock-probe-btn.pass {
-    @apply border-blue-300/60 bg-blue-950/80 text-blue-100 hover:bg-blue-900;
+    @apply border-blue-400/60 bg-blue-950/80 text-sky-300 hover:bg-blue-900;
+  }
+  .live-test-probe-dock .observe-dock-probe-btn.pass span {
+    @apply text-sky-300 font-bold;
   }
   .live-test-probe-dock .observe-dock-probe-btn.done {
     @apply border-indigo-300/60 bg-indigo-950/80 text-indigo-100 hover:bg-indigo-900;
@@ -5881,8 +5887,10 @@
     @apply border-yellow-300/60 bg-yellow-950/80 text-yellow-100 hover:bg-yellow-900;
   }
   .live-test-probe-dock .observe-dock-probe-btn.pass {
-    @apply border-blue-300/60 bg-blue-950/80 text-blue-100 hover:bg-blue-900;
+    @apply border-blue-400/60 bg-blue-950/80 text-sky-300 hover:bg-blue-900;
   }
+  .live-test-probe-dock .observe-dock-probe-btn.pass span {
+    @apply text-sky-300 font-bold;
   .live-test-probe-dock .observe-dock-probe-btn.done {
     @apply border-indigo-300/60 bg-indigo-950/80 text-indigo-100 hover:bg-indigo-900;
   }

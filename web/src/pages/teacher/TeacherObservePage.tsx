@@ -121,15 +121,15 @@ function reactionFor(color: ResultColor): ReactionKind {
 }
 
 const RAIL_W_KEY = 'chunks-lms:observe-rail-w'
-const RAIL_MIN = 152
-const RAIL_MAX = 440
-const RAIL_DEFAULT = 224
+const RAIL_MIN = 168
+const RAIL_MAX = 520
+const RAIL_DEFAULT = 345
 const RAIL_COLLAPSED = 48
 
 function readSavedRailWidth(): number {
   try {
     const n = Number(window.localStorage.getItem(RAIL_W_KEY))
-    if (Number.isFinite(n)) return Math.min(RAIL_MAX, Math.max(RAIL_MIN, n))
+    if (Number.isFinite(n) && n >= 330) return Math.min(RAIL_MAX, Math.max(RAIL_MIN, n))
   } catch {
     /* ignore */
   }
@@ -1754,21 +1754,27 @@ export function TeacherObservePage() {
         ) : (
           <>
             {(!mapOpen || isPhone) ? stageHeroNode : null}
+            <div className="relative mx-auto w-fit flex flex-col items-center">
+              {reaction ? (
+                <div key={reaction.id} className={`observe-react observe-react-${reaction.kind}`} aria-hidden>
+                  <span className="observe-react-symbol">
+                    <Check aria-hidden />
+                  </span>
+                  <span className="observe-react-label">
+                    {reaction.kind === 'celebrate'
+                      ? 'Xuất sắc!'
+                      : reaction.kind === 'happy'
+                        ? 'Tập trung tốt!'
+                        : 'Cố gắng lên!'}
+                  </span>
+                  <Sparkles className="observe-react-sparkles" aria-hidden />
+                  <span className="observe-react-burst" />
+                </div>
+              ) : null}
 
-            {reaction && reaction.kind === 'happy' ? (
-              <div key={reaction.id} className="observe-react observe-react-happy" aria-hidden>
-                <span className="observe-react-symbol">
-                  <Check aria-hidden />
-                </span>
-                <span className="observe-react-label">Tập trung tốt!</span>
-                <Sparkles className="observe-react-sparkles" aria-hidden />
-                <span className="observe-react-burst" />
-              </div>
-            ) : null}
-
-            <div
-              className={`observe-dock observe-dock-lg${reaction ? ` is-glowing is-${reaction.color}` : ''}`}
-            >
+              <div
+                className={`observe-dock observe-dock-lg${reaction ? ` is-glowing is-${reaction.color}` : ''}`}
+              >
               {probeOpen ? (
                 <div className="observe-dock-probe" role="group" aria-label="Resolve probe">
                   <p className="live-test-probe-depth observe-depth-inline">
@@ -1836,8 +1842,9 @@ export function TeacherObservePage() {
                 </button>
               </div>
             </div>
-          </>
-        )}
+          </div>
+        </>
+      )}
       </main>
 
       {/* Phone: question map as bottom sheet (not a side rail) */}

@@ -2230,18 +2230,19 @@ export function TeacherTestRunPage() {
               </p>
             ) : null}
 
-            {reaction ? (
-              <div key={reaction.id} className={`observe-react observe-react-${reaction.kind}`} aria-hidden>
-                <span className="observe-react-symbol"><Check aria-hidden /></span>
-                <span className="observe-react-label">{reaction.kind === 'celebrate' ? 'Xuất sắc!' : reaction.kind === 'happy' ? 'Tập trung tốt!' : 'Cần hỗ trợ'}</span>
-                <Sparkles className="observe-react-sparkles" aria-hidden />
-                <span className="observe-react-burst" />
-              </div>
-            ) : null}
+            <div className="relative mx-auto w-fit flex flex-col items-center">
+              {reaction ? (
+                <div key={reaction.id} className={`observe-react observe-react-${reaction.kind}`} aria-hidden>
+                  <span className="observe-react-symbol"><Check aria-hidden /></span>
+                  <span className="observe-react-label">{reaction.kind === 'celebrate' ? 'Xuất sắc!' : reaction.kind === 'happy' ? 'Tập trung tốt!' : 'Cần hỗ trợ'}</span>
+                  <Sparkles className="observe-react-sparkles" aria-hidden />
+                  <span className="observe-react-burst" />
+                </div>
+              ) : null}
 
-            <div className={`observe-dock observe-dock-lg live-test-dock-compact${reaction ? ` is-glowing is-${reaction.color}` : ''}`}>
-              {showStartCard ? (
-                <div className="live-test-start-card w-full max-w-md border-0 bg-transparent p-0 shadow-none">
+              <div className={`observe-dock observe-dock-lg live-test-dock-compact${reaction ? ` is-glowing is-${reaction.color}` : ''}`}>
+                {showStartCard ? (
+                  <div className="live-test-start-card w-full max-w-md border-0 bg-transparent p-0 shadow-none">
                   <button
                     type="button"
                     className="btn primary flex items-center gap-2 rounded-full px-6 py-3 font-bold text-sm mx-auto shadow-lg"
@@ -2285,7 +2286,7 @@ export function TeacherTestRunPage() {
                 <p className="observe-day-line live-test-day-line">Session {currentSessionNumber} · Q{currentItemNumber}/{items.length} · {completedCount}/{items.length} finalized</p>
               </div>
             </div>
-
+          </div>
             <div className="live-test-focus-card">
               <div className="live-test-focus-actions">
                 <button

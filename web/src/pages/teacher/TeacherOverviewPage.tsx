@@ -778,109 +778,116 @@ export function TeacherOverviewPage() {
             ))}
           </div>
         ) : (
-          <div className="table-wrap learner-list-table">
-            <table aria-label="Learner list">
-              <thead>
-                <tr>
-                  <th scope="col">Learner</th>
-                  <th scope="col" title="Minimum RFC across sessions">
-                    RFC min
-                  </th>
-                  <th scope="col" title="Maximum RFC across sessions">
-                    RFC max
-                  </th>
-                  <th scope="col" title="Average RFC across sessions">
-                    RFC avg
-                  </th>
-                  <th scope="col">Sessions</th>
-                  <th scope="col">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {learners.map((learner) => (
-                  <tr
-                    key={learner.id}
-                    className={selectedLearner?.id === learner.id ? 'bg-slate-100/80' : ''}
-                  >
-                    <td>
-                      <button
-                        type="button"
-                        className="learner-inline-button"
-                        onClick={() => setActiveLearnerUserId(learner.id)}
-                      >
-                        <UserAvatar name={learner.name} avatarUrl={learner.avatarUrl} size="sm" />
-                        <span>
-                          <strong>{learner.name}</strong>
-                          <small>{learner.email ?? 'No email'}</small>
+          <div className="flex flex-col gap-2.5">
+            {learners.map((learner) => (
+              <div
+                key={learner.id}
+                className={`group flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 p-3.5 rounded-2xl border bg-white transition-all hover:shadow-xs hover:border-red-200 ${
+                  selectedLearner?.id === learner.id
+                    ? 'border-red-700 ring-1 ring-red-700/20 bg-red-50/10'
+                    : 'border-slate-200/80'
+                }`}
+              >
+                {/* Left: Avatar + Name + Email */}
+                <button
+                  type="button"
+                  className="flex items-center gap-3 text-left min-w-0 bg-transparent border-0 p-0 cursor-pointer flex-1"
+                  onClick={() => {
+                    setActiveLearnerUserId(learner.id)
+                    if (learner.preferredClassId) setActiveClassId(learner.preferredClassId)
+                  }}
+                >
+                  <div className="relative shrink-0">
+                    <UserAvatar name={learner.name} avatarUrl={learner.avatarUrl} size="md" />
+                    {learner.hasMatchingOpenSession && (
+                      <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-600" />
+                      </span>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm text-slate-900 group-hover:text-red-700 transition-colors truncate">
+                        {learner.name}
+                      </span>
+                      {learner.hasMatchingOpenSession && (
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-red-100 text-red-700">
+                          Live
                         </span>
-                      </button>
-                    </td>
-                    <td className="font-mono text-xs tabular-nums">
-                      {formatPercent(learner.rfcMin)}
-                    </td>
-                    <td className="font-mono text-xs tabular-nums">
-                      {formatPercent(learner.rfcMax)}
-                    </td>
-                    <td className="font-mono text-xs tabular-nums">
-                      {formatPercent(learner.rfcAvg)}
-                    </td>
-                    <td className="font-mono text-xs tabular-nums">{learner.sessions}</td>
-                    <td>
-                      <div className="btn-row my-0">
-                        <Link
-                          to={`/teacher/learner/${encodeURIComponent(learner.id)}`}
-                          className="btn ghost"
-                        >
-                          <Eye className="h-4 w-4" aria-hidden />
-                          Profile
-                        </Link>
-                        {classRow && !learner.assignedToActiveClass ? (
-                          <button
-                            type="button"
-                            className="ghost"
-                            onClick={() => assignActiveClass(learner.id)}
-                          >
-                            Assign {classRow.name}
-                          </button>
-                        ) : null}
-                        {learner.hasMatchingOpenSession ? (
-                          <Link
-                            to="/teacher/observe"
-                            className="btn primary"
-                            onClick={() => {
-                              setActiveLearnerUserId(learner.id)
-                              if (learner.preferredClassId) setActiveClassId(learner.preferredClassId)
-                            }}
-                          >
-                            <Play className="h-4 w-4" aria-hidden />
-                            Open live
-                          </Link>
-                        ) : (
-                          <button
-                            type="button"
-                            className="primary"
-                            onClick={() => void startFastSession(learner.id, learner.preferredClassId)}
-                            disabled={startingLearnerId === learner.id || !learner.preferredClassId}
-                          >
-                            <Play className="h-4 w-4" aria-hidden />
-                            {startingLearnerId === learner.id ? 'Starting…' : 'Start now'}
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          className="btn ghost text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-1"
-                          onClick={() => void handleArchiveLearner(learner.id, learner.name)}
-                          title={`Archive ${learner.name}`}
-                          aria-label={`Archive ${learner.name}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      )}
+                    </div>
+                    <span className="text-xs text-slate-400 truncate block mt-0.5">
+                      {learner.email ?? 'No email'} · {learner.sessions} session(s)
+                    </span>
+                  </div>
+                </button>
+
+                {/* Center: Minimal Stats Badge Row */}
+                <div className="flex items-center gap-3 self-start sm:self-center shrink-0">
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-100 text-xs font-mono">
+                    <span className="text-slate-400 text-[10px] font-sans uppercase font-bold">RFC</span>
+                    <span className="text-slate-600 font-semibold" title="Min RFC">{formatPercent(learner.rfcMin)}</span>
+                    <span className="text-slate-300">/</span>
+                    <span className="text-red-700 font-bold" title="Avg RFC">{formatPercent(learner.rfcAvg)}</span>
+                    <span className="text-slate-300">/</span>
+                    <span className="text-slate-600 font-semibold" title="Max RFC">{formatPercent(learner.rfcMax)}</span>
+                  </div>
+                </div>
+
+                {/* Right: Actions */}
+                <div className="flex items-center gap-2 shrink-0">
+                  {classRow && !learner.assignedToActiveClass ? (
+                    <button
+                      type="button"
+                      className="text-xs py-1.5 px-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium"
+                      onClick={() => assignActiveClass(learner.id)}
+                    >
+                      Assign {classRow.name}
+                    </button>
+                  ) : null}
+                  <Link
+                    to={`/teacher/learner/${encodeURIComponent(learner.id)}`}
+                    className="inline-flex items-center gap-1 py-1.5 px-3 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-red-700 text-xs font-semibold transition-colors"
+                  >
+                    <Eye className="h-3.5 w-3.5 text-slate-500" aria-hidden />
+                    <span>Profile</span>
+                  </Link>
+                  {learner.hasMatchingOpenSession ? (
+                    <Link
+                      to="/teacher/observe"
+                      className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-red-700 hover:bg-red-800 text-white text-xs font-bold shadow-xs transition-colors"
+                      onClick={() => {
+                        setActiveLearnerUserId(learner.id)
+                        if (learner.preferredClassId) setActiveClassId(learner.preferredClassId)
+                      }}
+                    >
+                      <Play className="h-3.5 w-3.5 fill-current" aria-hidden />
+                      <span>Open live</span>
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-red-700 hover:bg-red-800 text-white text-xs font-bold shadow-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => void startFastSession(learner.id, learner.preferredClassId)}
+                      disabled={startingLearnerId === learner.id || !learner.preferredClassId}
+                    >
+                      <Play className="h-3.5 w-3.5 fill-current" aria-hidden />
+                      <span>{startingLearnerId === learner.id ? 'Starting…' : 'Start now'}</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                    onClick={() => void handleArchiveLearner(learner.id, learner.name)}
+                    title={`Archive ${learner.name}`}
+                    aria-label={`Archive ${learner.name}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </Panel>
@@ -936,10 +943,10 @@ function LearnerCard({
 }) {
   return (
     <article
-      className={`group relative flex flex-col justify-between gap-4 rounded-2xl border p-4 bg-white shadow-xs transition-all hover:shadow-md ${
+      className={`group relative flex flex-col justify-between gap-4 rounded-2xl border p-4 bg-white shadow-2xs transition-all hover:shadow-md hover:border-red-200 ${
         selected
-          ? 'ring-2 ring-slate-900 border-slate-900'
-          : 'border-slate-900/20 hover:border-slate-900/50'
+          ? 'ring-2 ring-red-700 border-red-700'
+          : 'border-slate-200/90'
       }`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -952,13 +959,13 @@ function LearnerCard({
             <UserAvatar name={learner.name} avatarUrl={learner.avatarUrl} size="md" />
             {openSession && (
               <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600" />
               </span>
             )}
           </div>
           <div className="min-w-0">
-            <h3 className="font-bold text-sm text-slate-900 truncate leading-snug group-hover:text-indigo-600 transition-colors">
+            <h3 className="font-bold text-sm text-slate-900 truncate leading-snug group-hover:text-red-700 transition-colors">
               {learner.name}
             </h3>
             <p className="text-xs text-slate-400 truncate mt-0.5">
@@ -989,7 +996,7 @@ function LearnerCard({
         </div>
         <div>
           <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Avg RFC</span>
-          <span className="font-mono text-xs font-bold text-indigo-600">{formatPercent(learner.rfcAvg)}</span>
+          <span className="font-mono text-xs font-bold text-red-700">{formatPercent(learner.rfcAvg)}</span>
         </div>
         <div>
           <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Sessions</span>
@@ -1010,7 +1017,7 @@ function LearnerCard({
         ) : null}
         <Link
           to={`/teacher/learner/${encodeURIComponent(learner.id)}`}
-          className="flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-3 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold transition-colors"
+          className="flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-3 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-red-700 text-xs font-semibold transition-colors"
         >
           <Eye className="h-3.5 w-3.5 text-slate-500" aria-hidden />
           <span>Profile</span>
@@ -1018,20 +1025,20 @@ function LearnerCard({
         {openSession ? (
           <Link
             to="/teacher/observe"
-            className="flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-2xs transition-colors"
+            className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-red-700 hover:bg-red-800 text-white text-xs font-bold shadow-xs transition-colors"
             onClick={onSelect}
           >
-            <Play className="h-3.5 w-3.5" aria-hidden />
+            <Play className="h-3.5 w-3.5 fill-current" aria-hidden />
             <span>Open live</span>
           </Link>
         ) : (
           <button
             type="button"
-            className="flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-2xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-red-700 hover:bg-red-800 text-white text-xs font-bold shadow-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={onStart}
             disabled={starting || !learner.preferredClassId}
           >
-            <Play className="h-3.5 w-3.5" aria-hidden />
+            <Play className="h-3.5 w-3.5 fill-current" aria-hidden />
             <span>{starting ? 'Starting…' : 'Start now'}</span>
           </button>
         )}

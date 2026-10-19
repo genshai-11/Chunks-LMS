@@ -79,6 +79,7 @@ type Props = {
   ledger: ResultRecord[]
   users: DomainUser[]
   learnerUserId?: string
+  initialSessionId?: string
   learningSessions?: SessionOpt[]
   emptyHint?: string
   /**
@@ -232,7 +233,7 @@ function ProbePathwayView({ record }: { record: ResultRecord }) {
   )
 }
 
-function getSessionStatusBadge(metrics: Partial<Record<MetricKey, number | null>>) {
+export function getSessionStatusBadge(metrics: Partial<Record<MetricKey, number | null>>) {
   const rfc = metrics.rfc
   const rac = metrics.rac
   if (rac == null || rfc == null) {
@@ -269,7 +270,7 @@ function getSessionStatusBadge(metrics: Partial<Record<MetricKey, number | null>
   }
 }
 
-function getLearnerStatus(
+export function getLearnerStatus(
   rac: number | null | undefined,
   rfc: number | null | undefined,
   count: number,
@@ -370,6 +371,7 @@ export function ProgressAnalysisView({
   ledger,
   users,
   learnerUserId,
+  initialSessionId,
   learningSessions = [],
   emptyHint,
   metricSettings,
@@ -381,7 +383,7 @@ export function ProgressAnalysisView({
   const [customEnd, setCustomEnd] = useState(
     (courseEnd ?? '2026-12-31').toString().slice(0, 10),
   )
-  const [sessionId, setSessionId] = useState(learningSessions[0]?.id ?? '')
+  const [sessionId, setSessionId] = useState(initialSessionId || (learningSessions[0]?.id ?? ''))
   const learners = useMemo(
     () => users.filter((u) => u.roles.includes('learner')),
     [users],
@@ -406,6 +408,13 @@ export function ProgressAnalysisView({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [learnerUserId, learners])
+
+  useEffect(() => {
+    if (initialSessionId) {
+      setSessionId(initialSessionId)
+      setKind('session')
+    }
+  }, [initialSessionId])
 
   const [tab, setTab] = useState<
     'overview' | 'charts' | 'sessions' | 'learners' | 'history'
@@ -1408,9 +1417,7 @@ export function ProgressAnalysisView({
                         {renderSortIcon('day')}
                       </div>
                     </th>
-                    <th scope="col" title="Session progress status based on %c and RFC">
-                      Status
-                    </th>
+                    {/* Temporarily hidden per user request: Status column in analysis detail */}
                     <th
                       scope="col"
                       className="cursor-pointer hover:text-slate-900 select-none transition-colors"
@@ -1467,7 +1474,7 @@ export function ProgressAnalysisView({
                     const dRac = deltas?.dRac ?? null
                     const rfcT = trendTone('rfc', dRfc)
                     const racT = trendTone('rac', dRac)
-                    const statusBadge = getSessionStatusBadge(p.metrics)
+                    // const _statusBadge = getSessionStatusBadge(p.metrics)
                     const sessionData = sessionColorMap.get(p.learningSessionId) ?? {
                       counts: colorCounts([]),
                       total: p.attemptCount,
@@ -1485,13 +1492,7 @@ export function ProgressAnalysisView({
                             </small>
                           </span>
                         </th>
-                        <td>
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${statusBadge.className}`}
-                          >
-                            {statusBadge.label}
-                          </span>
-                        </td>
+                        {/* Temporarily hidden per user request: Status cell in analysis detail */}
                         <td className="font-mono text-xs tabular-nums">{p.attemptCount}</td>
                         <td>
                           <div className="flex items-center gap-2">
@@ -1585,9 +1586,7 @@ export function ProgressAnalysisView({
               <thead>
                 <tr>
                   <th scope="col">Learner</th>
-                  <th scope="col" title="Learner trajectory status based on %c and RFC">
-                    Status
-                  </th>
+                  {/* Temporarily hidden per user request: Status column in analysis detail */}
                   <th scope="col" title="Finalized sample size (not chunks number)">
                     sample
                   </th>
@@ -1613,7 +1612,7 @@ export function ProgressAnalysisView({
                     counts: colorCounts([]),
                     total: row.attemptCount,
                   }
-                  const statusBadge = getLearnerStatus(rRac?.value, rRfc?.value, row.attemptCount)
+                  // const _statusBadge = getLearnerStatus(rRac?.value, rRfc?.value, row.attemptCount)
                   return (
                     <tr key={row.learnerUserId}>
                       <td>
@@ -1626,13 +1625,7 @@ export function ProgressAnalysisView({
                           <span>{user?.displayName ?? row.learnerUserId}</span>
                         </span>
                       </td>
-                      <td>
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${statusBadge.className}`}
-                        >
-                          {statusBadge.label}
-                        </span>
-                      </td>
+                      {/* Temporarily hidden per user request: Status cell in analysis detail */}
                       <td className="font-mono text-xs tabular-nums">{row.attemptCount}</td>
                       <td>
                         <div className="flex items-center gap-2">

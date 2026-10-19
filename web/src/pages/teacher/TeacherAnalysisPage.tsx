@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { PageHeader } from '../../components/PageHeader'
 import { ProgressAnalysisView } from '../../components/ProgressAnalysisView'
 import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
@@ -15,8 +15,12 @@ export function TeacherAnalysisPage() {
     setLedger,
     syncNow,
     metricSettings,
+    activeLearnerUserId,
   } = useAppState()
   const { classRow, course } = useTeacherClassContext()
+  const [searchParams] = useSearchParams()
+  const targetLearnerId = searchParams.get('learner') || activeLearnerUserId || undefined
+  const targetSessionId = searchParams.get('session') || undefined
 
   const deleteSession = async (sessionId: string) => {
     const hasFinalized = ledger.some((r) => r.learningSessionId === sessionId)
@@ -125,7 +129,8 @@ export function TeacherAnalysisPage() {
           }))}
         emptyHint="Start a live session and finalize Focus / Awareness colors to populate this report."
         metricSettings={metricSettings}
-        learnerUserId={undefined}
+        learnerUserId={targetLearnerId}
+        initialSessionId={targetSessionId}
         onDeleteSession={deleteSession}
         onEditSessionNumber={editSessionNumber}
       />

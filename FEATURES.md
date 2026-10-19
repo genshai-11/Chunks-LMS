@@ -267,7 +267,9 @@ $$\text{TestPackage} \xrightarrow{1..N} \text{TestPackageVersion} \xrightarrow{1
      $$ACN = \frac{N_{\text{total}} - (N_{\text{green}} + N_{\text{blue}} + N_{\text{indigo}})}{n_{\text{total\_items}}}$$
    - **Preset `v1_legacy`:**
      $$ACN = \frac{\sum n\_depth}{N_{\text{probed}}}$$
-
+6. **Điều Hướng & Hiển Thị Phân Tích (Analysis Routing & Preselection):**
+   - Khi kết thúc ca quan sát trực tiếp, hệ thống điều hướng với tham số `?learner=<id>&session=<id>`, đảm bảo màn hình Analysis hiển thị chính xác học viên và ca học vừa hoàn thành (thay vì mặc định học viên đầu danh sách).
+   - Cột trạng thái (`Status`) trong các bảng so sánh Session và tiến độ Learner tạm thời được ẩn để tinh gọn giao diện theo yêu cầu người dùng.
 ---
 
 ### 3.9. Đồng Bộ Dữ Liệu Nguyên Tử & Điều Khiển Đồng Thời Lạc Quan (Atomic Sync & OCC)

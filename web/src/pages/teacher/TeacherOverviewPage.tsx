@@ -782,16 +782,17 @@ export function TeacherOverviewPage() {
             {learners.map((learner) => (
               <div
                 key={learner.id}
-                className={`group flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 p-3.5 rounded-2xl border bg-white transition-all hover:shadow-xs hover:border-red-200 ${
+                className={`group flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 p-3.5 rounded-2xl border bg-white transition-all hover:shadow-xs hover:border-slate-300 ${
                   selectedLearner?.id === learner.id
-                    ? 'border-red-700 ring-1 ring-red-700/20 bg-red-50/10'
+                    ? 'border-slate-300 ring-1 ring-slate-400/30 bg-slate-50/50'
                     : 'border-slate-200/80'
                 }`}
               >
                 {/* Left: Avatar + Name + Email */}
-                <button
-                  type="button"
-                  className="flex items-center gap-3 text-left min-w-0 bg-transparent border-0 p-0 cursor-pointer flex-1"
+                <div
+                  role="button"
+                  tabIndex={0}
+                  className="flex items-center justify-start text-left gap-3 min-w-0 flex-1 bg-transparent border-0 p-0 cursor-pointer"
                   onClick={() => {
                     setActiveLearnerUserId(learner.id)
                     if (learner.preferredClassId) setActiveClassId(learner.preferredClassId)
@@ -806,8 +807,8 @@ export function TeacherOverviewPage() {
                       </span>
                     )}
                   </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
+                  <div className="min-w-0 text-left">
+                    <div className="flex items-center justify-start gap-2">
                       <span className="font-bold text-sm text-slate-900 group-hover:text-red-700 transition-colors truncate">
                         {learner.name}
                       </span>
@@ -817,11 +818,11 @@ export function TeacherOverviewPage() {
                         </span>
                       )}
                     </div>
-                    <span className="text-xs text-slate-400 truncate block mt-0.5">
+                    <span className="text-xs text-slate-400 truncate block mt-0.5 text-left">
                       {learner.email ?? 'No email'} · {learner.sessions} session(s)
                     </span>
                   </div>
-                </button>
+                </div>
 
                 {/* Center: Minimal Stats Badge Row */}
                 <div className="flex items-center gap-3 self-start sm:self-center shrink-0">
@@ -943,16 +944,17 @@ function LearnerCard({
 }) {
   return (
     <article
-      className={`group relative flex flex-col justify-between gap-4 rounded-2xl border p-4 bg-white shadow-2xs transition-all hover:shadow-md hover:border-red-200 ${
+      className={`group relative flex flex-col justify-between gap-4 rounded-2xl border p-4 bg-white shadow-2xs transition-all hover:shadow-xs hover:border-slate-300 ${
         selected
-          ? 'ring-2 ring-red-700 border-red-700'
-          : 'border-slate-200/90'
+          ? 'border-slate-300 ring-1 ring-slate-400/30'
+          : 'border-slate-200/80'
       }`}
     >
       <div className="flex items-start justify-between gap-3">
-        <button
-          type="button"
-          className="flex items-center gap-3 text-left min-w-0 flex-1 bg-transparent border-0 p-0 cursor-pointer"
+        <div
+          role="button"
+          tabIndex={0}
+          className="flex items-center justify-start text-left gap-3 min-w-0 flex-1 bg-transparent border-0 p-0 cursor-pointer"
           onClick={onSelect}
         >
           <div className="relative shrink-0">
@@ -972,7 +974,7 @@ function LearnerCard({
               {learner.email ?? 'No email'}
             </p>
           </div>
-        </button>
+        </div>
 
         <button
           type="button"

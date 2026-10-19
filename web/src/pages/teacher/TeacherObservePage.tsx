@@ -991,8 +991,17 @@ export function TeacherObservePage() {
       setSaveStatus('success')
       await new Promise((resolve) => window.setTimeout(resolve, 1500))
       setFinishSummary(null)
-      navigate('/teacher/analysis')
-    } catch {
+      const testedLearnerId =
+        activeSplitLearnerId ??
+        activeLearnerUserId ??
+        capture.learnerIds[0] ??
+        ''
+      const targetUrl = testedLearnerId
+        ? `/teacher/analysis?learner=${encodeURIComponent(testedLearnerId)}${
+            openSession?.id ? `&session=${encodeURIComponent(openSession.id)}` : ''
+          }`
+        : '/teacher/analysis'
+      navigate(targetUrl)
       setSaveStatus('idle')
     } finally {
       setFinishing(false)
@@ -1007,6 +1016,8 @@ export function TeacherObservePage() {
     appendFinalizedFromCapture,
     syncNow,
     navigate,
+    activeSplitLearnerId,
+    activeLearnerUserId,
     flash,
   ])
 

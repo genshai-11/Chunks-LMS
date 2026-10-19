@@ -25,7 +25,7 @@ export function listLearners(state: RosterState): DomainUser[] {
 
 /** Raw teachers without email dedupe (admin cleanup / diagnostics). */
 export function listTeachersRaw(state: RosterState): DomainUser[] {
-  return state.users.filter((u) => u.roles.includes('teacher'))
+  return state.users.filter((u) => u.roles.includes('teacher') || u.roles.includes('admin'))
 }
 
 /** Raw learners without email dedupe. */

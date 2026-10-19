@@ -6,9 +6,10 @@ import { TeacherOverviewPage } from './TeacherOverviewPage'
 import { createSeedRoster } from '../../modules/roster/seed'
 import { emptySchedulingState } from '../../modules/scheduling/session-lifecycle'
 import { createDefaultMetricSettings } from '../../modules/metrics/settings'
+import type { AppStateContextValue } from '../../state/app-state-context'
 import { AppStateContext } from '../../state/app-state-context'
-import { BypassStaffSessionProvider } from '../../auth/StaffSessionContext'
-
+import type { StaffSession } from '../../auth/StaffSessionContext'
+import { BypassStaffSessionProvider, StaffSessionContext } from '../../auth/StaffSessionContext'
 function renderWithContext(initialRoster = createSeedRoster()) {
   const syncNowMock = vi.fn().mockResolvedValue({ ok: true })
   let currentRoster = {
@@ -136,5 +137,69 @@ describe('TeacherOverviewPage - Add Learner', () => {
       expect(setRosterMock).toHaveBeenCalled()
       expect(syncNowMock).toHaveBeenCalled()
     })
+  }, 15000)
+
+  it('disables save when no class is selected for teacher-only session', async () => {
+    const user = userEvent.setup()
+    const initialRoster = createSeedRoster()
+    const seededTeacher = initialRoster.users.find((u) => u.roles.includes('teacher'))!
+    const teacherSession = {
+      ready: true,
+      signedIn: true,
+      authBypass: false,
+      authEnabled: true,
+      userId: 'teacher-auth-1',
+      domainUserId: seededTeacher.id,
+      email: seededTeacher.email,
+      displayName: seededTeacher.displayName,
+      staffRoles: ['teacher' as const],
+      canAccess: (role: string) => role === 'teacher',
+      isStaff: true,
+      signInWithEmail: vi.fn(),
+      signInWithPassword: vi.fn(),
+      signUpWithPassword: vi.fn(),
+      signOut: vi.fn(),
+    } as unknown as StaffSession
+    const mockContextValue = {
+      roster: initialRoster,
+      setRoster: vi.fn(),
+      scheduling: emptySchedulingState(),
+      setScheduling: vi.fn(),
+      capture: null,
+      setCapture: vi.fn(),
+      ledger: [],
+      setLedger: vi.fn(),
+      opsAuditEvents: [],
+      metricSettings: createDefaultMetricSettings(),
+      setMetricSettings: vi.fn(),
+      activeLearnerUserId: null,
+      setActiveLearnerUserId: vi.fn(),
+      activeClassId: null,
+      setActiveClassId: vi.fn(),
+      syncNow: vi.fn(),
+      backendStatus: 'ready' as const,
+      syncError: null,
+      dismissSyncError: vi.fn(),
+    } as unknown as AppStateContextValue
+
+    render(
+      <StaffSessionContext.Provider value={teacherSession}>
+        <AppStateContext.Provider value={mockContextValue}>
+          <MemoryRouter>
+            <TeacherOverviewPage />
+          </MemoryRouter>
+        </AppStateContext.Provider>
+      </StaffSessionContext.Provider>,
+    )
+
+    await user.click(screen.getByRole('button', { name: /Add learner/i }))
+    const nameInput = screen.getByLabelText(/Display Name/i)
+    await user.type(nameInput, 'Taylor Swift')
+
+    const classSelect = screen.getByLabelText(/Class enrollment/i)
+    await user.selectOptions(classSelect, '')
+
+    const saveBtn = screen.getByRole('button', { name: /Save Learner/i })
+    expect(saveBtn).toBeDisabled()
   }, 15000)
 })

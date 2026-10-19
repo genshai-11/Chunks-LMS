@@ -28,15 +28,19 @@ export function useTeacherClassContext(): TeacherClassContext {
   const signedInTeacher = roster.users.find(
     (user) =>
       user.roles.includes('teacher') &&
-      Boolean(staffSession.email) &&
-      user.email?.toLowerCase() === staffSession.email?.toLowerCase(),
+      ((staffSession.domainUserId && user.id === staffSession.domainUserId) ||
+        (Boolean(staffSession.email) && user.email?.toLowerCase() === staffSession.email?.toLowerCase())),
   )
 
   const classes = useMemo(() => {
     const all = listTeacherOperableClasses(roster)
-    return staffSession.canAccess('admin') || !signedInTeacher
-      ? all
-      : all.filter((row) => row.teacherUserId === signedInTeacher.id)
+    if (staffSession.canAccess('admin')) {
+      return all
+    }
+    if (!signedInTeacher) {
+      return []
+    }
+    return all.filter((row) => row.teacherUserId === signedInTeacher.id)
   }, [roster, staffSession, signedInTeacher])
   const options = useMemo(() => classes.map((row) => toClassOption(roster, row)), [classes, roster])
   const preferredSessionClassId = useMemo(() => {

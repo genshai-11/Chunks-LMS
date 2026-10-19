@@ -349,6 +349,26 @@ describe('admin roster workflows', () => {
     const okRes = enrollLearner(state, 'class-2', learner.id)
     expect(okRes.ok).toBe(true)
   })
+
+  it('includes admin accounts in listTeachersRaw for full staff management', () => {
+    let state = createSeedRoster()
+    state = {
+      ...state,
+      users: [
+        ...state.users,
+        {
+          id: 'admin-1',
+          displayName: 'Administrator',
+          email: 'admin@example.com',
+          avatarUrl: null,
+          roles: ['admin' as const],
+          accountStatus: 'active' as const,
+        },
+      ],
+    }
+    const staff = listTeachersRaw(state)
+    expect(staff.some((u) => u.id === 'admin-1')).toBe(true)
+  })
 })
 
 function normalizeEmail(email: string | null | undefined): string | null {

@@ -215,6 +215,9 @@ export function TeacherOverviewPage() {
     if (!name) return err('Display Name is required')
     const email = addLearnerDraft.email.trim() || undefined
     const classId = addLearnerDraft.classId
+    if (!classId && !staffSession.canAccess('admin')) {
+      return err('Please select a class to enroll this learner.')
+    }
     const avatarUrl = addLearnerDraft.avatarUrl.trim() || undefined
 
     setSavingLearner(true)
@@ -659,7 +662,11 @@ export function TeacherOverviewPage() {
                       onChange={(e) => setAddLearnerDraft((d) => ({ ...d, classId: e.target.value }))}
                       className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl border border-slate-300 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all shadow-2xs"
                     >
-                      <option value="">Do not enroll in a class yet (Unassigned Learner)</option>
+                      {staffSession.canAccess('admin') ? (
+                        <option value="">Do not enroll in a class yet (Unassigned Learner)</option>
+                      ) : (
+                        <option value="">Select a class...</option>
+                      )}
                       {options.map((opt) => (
                         <option key={opt.classRow.id} value={opt.classRow.id}>
                           {opt.classRow.name} {opt.course ? `· ${opt.course.code} (${opt.course.name})` : ''}
@@ -689,7 +696,7 @@ export function TeacherOverviewPage() {
               </button>
               <button
                 type="submit"
-                disabled={savingLearner || !addLearnerDraft.displayName.trim()}
+                disabled={savingLearner || !addLearnerDraft.displayName.trim() || (!addLearnerDraft.classId && !staffSession.canAccess('admin'))}
                 className="px-6 py-2.5 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm shadow-indigo-200 transition-all inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {savingLearner ? (

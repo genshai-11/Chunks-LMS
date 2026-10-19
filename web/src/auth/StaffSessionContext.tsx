@@ -31,6 +31,7 @@ export type StaffSession = {
   authBypass: boolean
   authEnabled: boolean
   userId: string | null
+  domainUserId: string | null
   email: string | null
   displayName: string | null
   staffRoles: StaffRole[]
@@ -48,8 +49,7 @@ export type StaffSession = {
   signOut: () => Promise<void>
 }
 
-const StaffSessionContext = createContext<StaffSession | null>(null)
-
+export const StaffSessionContext = createContext<StaffSession | null>(null)
 function buildSession(
   partial: Omit<
     StaffSession,
@@ -81,9 +81,11 @@ function normalizeStaffEmail(raw: string): string {
   return raw.normalize('NFKC').trim().toLowerCase()
 }
 
-async function loadStaffRolesByAuthUserId(authUserId: string | null): Promise<StaffRole[]> {
+async function loadStaffRolesByAuthUserId(
+  authUserId: string | null,
+): Promise<{ roles: StaffRole[]; domainUserId: string | null }> {
   const sb = getSupabase()
-  if (!authUserId || !sb) return []
+  if (!authUserId || !sb) return { roles: [], domainUserId: null }
 
   const userResult = await sb
     .from('users')
@@ -92,7 +94,9 @@ async function loadStaffRolesByAuthUserId(authUserId: string | null): Promise<St
     .maybeSingle()
 
   const userRow = userResult.data as { id: string; account_status?: string | null } | null
-  if (userResult.error || !userRow || userRow.account_status === 'inactive') return []
+  if (userResult.error || !userRow || userRow.account_status === 'inactive') {
+    return { roles: [], domainUserId: null }
+  }
 
   const rolesResult = await sb
     .from('staff_roles')
@@ -105,8 +109,8 @@ async function loadStaffRolesByAuthUserId(authUserId: string | null): Promise<St
     .map((row) => ({ role: normalizeStaffRole(row.role), active: Boolean(row.active) }))
     .filter((grant): grant is { role: StaffRole; active: boolean } => Boolean(grant.role))
 
-  if (rolesResult.error) return []
-  return resolveActiveStaffRoles(grants)
+  if (rolesResult.error) return { roles: [], domainUserId: userRow.id }
+  return { roles: resolveActiveStaffRoles(grants), domainUserId: userRow.id }
 }
 
 const noopSignIn: StaffSession['signInWithEmail'] = async () => ({
@@ -129,6 +133,7 @@ const BYPASS_SESSION = buildSession({
   authBypass: true,
   authEnabled: false,
   userId: 'bypass-staff',
+  domainUserId: 'bypass-staff',
   email: null,
   displayName: 'Local staff',
   staffRoles: ['admin', 'teacher'],
@@ -159,6 +164,7 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
   const [ready, setReady] = useState(false)
   const [user, setUser] = useState<User | null>(null)
   const [staffRoles, setStaffRoles] = useState<StaffRole[]>([])
+  const [domainUserId, setDomainUserId] = useState<string | null>(null)
   const [rolesLoading, setRolesLoading] = useState(false)
   const activeAuthUserId = useRef<string | null>(null)
 
@@ -284,13 +290,17 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
     const userId = user?.id ?? null
     if (!userId) {
       setStaffRoles([])
+      setDomainUserId(null)
       setRolesLoading(false)
       return
     }
     setRolesLoading(true)
     void loadStaffRolesByAuthUserId(userId)
-      .then((roles) => {
-        if (!cancelled) setStaffRoles(roles)
+      .then((res) => {
+        if (!cancelled) {
+          setStaffRoles(res.roles)
+          setDomainUserId(res.domainUserId)
+        }
       })
       .finally(() => {
         if (!cancelled) setRolesLoading(false)
@@ -308,6 +318,7 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
         authBypass: false,
         authEnabled: Boolean(sb),
         userId: user?.id ?? null,
+        domainUserId: domainUserId ?? null,
         email: user?.email ?? null,
         displayName: displayNameFor(user),
         staffRoles,
@@ -322,7 +333,7 @@ export function SupabaseStaffSessionProvider({ children }: { children: ReactNode
       user,
       sb,
       staffRoles,
-      signInWithEmail,
+      domainUserId,
       signInWithPassword,
       signUpWithPassword,
       signOut,

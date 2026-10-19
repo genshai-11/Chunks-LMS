@@ -66,6 +66,7 @@ import {
   recordLiveColor,
   replaceLiveAttempt,
   resolveLiveProbe,
+  syncCaptureSessionToServer,
 } from '../../lib/live-assessment'
 import { getSupabase } from '../../lib/supabase'
 import { triggerConfetti } from '../../lib/confetti'
@@ -404,7 +405,15 @@ export function TeacherObservePage() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'assessment_attempt_snapshots' },
-        () => {
+        (payload: { new?: { attempt_id?: string }; old?: { attempt_id?: string } }) => {
+          const changedAttemptId = payload.new?.attempt_id ?? payload.old?.attempt_id
+          if (
+            changedAttemptId &&
+            captureRef.current &&
+            !captureRef.current.attempts.some((a) => a.id === changedAttemptId)
+          ) {
+            return
+          }
           if (liveRefreshTimer.current) clearTimeout(liveRefreshTimer.current)
           const scheduleRefresh = (delay = 150) => {
             liveRefreshTimer.current = window.setTimeout(() => {
@@ -664,7 +673,8 @@ export function TeacherObservePage() {
 
   const recordColor = useCallback(
     async (color: ProvisionalColor) => {
-      if (!capture || !attempt || liveSaving) return
+      if (!capture || !attempt || liveSaving || liveSavingRef.current) return
+      liveSavingRef.current = true
       const wasFinal = isFinalized
       setLiveSaving(true)
       try {
@@ -690,6 +700,7 @@ export function TeacherObservePage() {
           playReaction('green')
         }
       } finally {
+        liveSavingRef.current = false
         setLiveSaving(false)
       }
     },
@@ -708,7 +719,8 @@ export function TeacherObservePage() {
 
   const resolveProbe = useCallback(
     async (outcome: 'fail' | 'continue' | 'done') => {
-      if (!capture || !attempt || liveSaving) return
+      if (!capture || !attempt || liveSaving || liveSavingRef.current) return
+      liveSavingRef.current = true
       setLiveSaving(true)
       try {
         const result = await resolveLiveProbe(attempt, outcome)
@@ -741,6 +753,7 @@ export function TeacherObservePage() {
           flash(`Chunks Number=${probeChunksNumber(result.data.snapshot) ?? 1}`)
         }
       } finally {
+        liveSavingRef.current = false
         setLiveSaving(false)
       }
     },
@@ -784,9 +797,10 @@ export function TeacherObservePage() {
   )
   const recordColorForLearner = useCallback(
     async (learnerUserId: string, color: ProvisionalColor) => {
-      if (!capture || liveSaving) return
+      if (!capture || liveSaving || liveSavingRef.current) return
       const learnerAttempt = currentAttemptForLearner(capture, learnerUserId)
       if (!learnerAttempt) return
+      liveSavingRef.current = true
       const wasFinal =
         learnerAttempt.snapshot.status === 'finalized' ||
         learnerAttempt.snapshot.status === 'corrected'
@@ -814,6 +828,7 @@ export function TeacherObservePage() {
           playReaction('green')
         }
       } finally {
+        liveSavingRef.current = false
         setLiveSaving(false)
       }
     },
@@ -830,9 +845,10 @@ export function TeacherObservePage() {
 
   const resolveProbeForLearner = useCallback(
     async (learnerUserId: string, outcome: 'fail' | 'continue' | 'done') => {
-      if (!capture || liveSaving) return
+      if (!capture || liveSaving || liveSavingRef.current) return
       const learnerAttempt = currentAttemptForLearner(capture, learnerUserId)
       if (!learnerAttempt) return
+      liveSavingRef.current = true
       setLiveSaving(true)
       try {
         const result = await resolveLiveProbe(learnerAttempt, outcome)
@@ -865,6 +881,7 @@ export function TeacherObservePage() {
           flash(`Chunks Number=${probeChunksNumber(result.data.snapshot) ?? 1}`)
         }
       } finally {
+        liveSavingRef.current = false
         setLiveSaving(false)
       }
     },
@@ -880,7 +897,8 @@ export function TeacherObservePage() {
   )
 
   const startFirst = useCallback(async () => {
-    if (!capture || liveSaving) return
+    if (!capture || liveSaving || liveSavingRef.current) return
+    liveSavingRef.current = true
     setLiveSaving(true)
     try {
       if (openSession) {
@@ -913,6 +931,7 @@ export function TeacherObservePage() {
       setCapture(next)
       flash(capture.learnerIds.length === 2 ? '2 learners ready' : 'Q1 ready')
     } finally {
+      liveSavingRef.current = false
       setLiveSaving(false)
     }
   }, [capture, liveSaving, setCapture, flash, openSession, nextLiveTestExternalRef])
@@ -961,11 +980,13 @@ export function TeacherObservePage() {
       setCapture(completedCapture)
       appendFinalizedFromCapture(completedCapture)
       try {
-        const { syncCaptureSessionToServer } = await import('../../lib/live-assessment')
-        await syncCaptureSessionToServer(completedCapture)
+        const syncRes = await syncCaptureSessionToServer(completedCapture)
+        if (!syncRes.ok) {
+          console.warn('[observe] live session sync warning:', syncRes.error)
+        }
         await syncNow({ scheduling: done.state })
-      } catch {
-        /* local persist still holds; backend may be offline */
+      } catch (err) {
+        console.warn('[observe] local persist held, sync warning:', err)
       }
       setSaveStatus('success')
       await new Promise((resolve) => window.setTimeout(resolve, 1500))

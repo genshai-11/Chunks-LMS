@@ -505,6 +505,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setBackendError('No staff role — cannot sync')
         return false
       }
+      if (syncTimer.current) {
+        window.clearTimeout(syncTimer.current)
+        syncTimer.current = null
+      }
       setBackendStatus('syncing')
       // Prefer explicit snapshot (caller just mutated scheduling/roster) over stale React state.
       const snapshot = {
@@ -532,7 +536,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       allowEmptyWipeOnce.current = false
       if (result.ok) {
         const currentTeacherUser = roster.users.find(
-          (u) => Boolean(staffSession.email) && u.email?.toLowerCase() === staffSession.email?.toLowerCase(),
+          (u) =>
+            (staffSession.domainUserId && u.id === staffSession.domainUserId) ||
+            (Boolean(staffSession.email) && u.email?.toLowerCase() === staffSession.email?.toLowerCase()),
         )
         const verified = await verifyWorkspacePersistence(normalized, {
           teacherUserId: staffSession.canAccess('admin') ? null : (currentTeacherUser?.id ?? null),
@@ -554,13 +560,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [
       roster,
       scheduling,
+      staffSession,
       staffSession.authBypass,
       staffSession.signedIn,
-      staffSession.staffRoles.length,
+      staffSession.staffRoles,
+      staffSession.domainUserId,
+      staffSession.email,
       workspaceRevision,
     ],
   )
-
   const reloadFromSupabase = useCallback(async () => {
     if (!isSupabaseConfigured() || !staffSession.userId) return
     setBackendStatus('syncing')

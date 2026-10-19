@@ -1,12 +1,13 @@
 # Chunks-LMS System Ontology & Domain Specifications
 
-**Version:** 1.2.0
+**Version:** 1.3.0
 **Status:** CANONICAL DOMAIN ONTOLOGY (Single Source of Truth)  
+**Companion Feature Ontology:** `FEATURES.md`  
 **Companion Visual File:** `docs/architecture/ontology.html`  
 **Governing PRD:** `docs/plans/PRD-V1-TEACHER-SCOPED-SYNC.md`
 
-> **BẮT BUỘC ĐỐI VỚI TẤT CẢ AGENT & DEVELOPER:**
-> Trước khi viết, sửa code hoặc thực hiện review (dù bằng tay hay qua SSSF pipeline), BẮT BUỘC phải đọc file này. Mọi thay đổi về cấu trúc dữ liệu, ranh giới quyền truy cập hoặc logic đồng bộ đều phải được đối chiếu và cập nhật đồng thời tại file này và file `ontology.html`.
+> **BẮT BUỘC ĐỐI VỚI TẤT CẢ AGENT & DEVELOPER (Triple-Sync Protocol):**
+> Trước khi viết, sửa code hoặc thực hiện review (dù bằng tay hay qua Osmani / SSSF pipeline), BẮT BUỘC phải đọc file này và `FEATURES.md`. Mọi thay đổi về cấu trúc dữ liệu, ranh giới quyền truy cập hoặc logic đồng bộ đều phải được đối chiếu và cập nhật đồng thời tại 3 nơi: `FEATURES.md`, `ONTOLOGY.md` và `ontology.html`.
 
 ---
 
@@ -81,7 +82,7 @@ Hệ thống tuân thủ nguyên tắc: **Cùng 1 Tổ chức nhưng dữ liệu
    * Mọi can thiệp bằng probe (`enteredProbeFlow = true`, tăng `probeCount`) và mọi màu chấm (`SPECTRUM_COLORS`) một khi đã finalize đều không được phép ghi đè vật lý (DELETE/UPDATE). Mọi sửa đổi sau khi finalize bắt buộc phải ghi thành bản ghi hiệu chỉnh (`result_corrections` / `OpsAuditEvent`).
 2. **Bất biến Sĩ số Lớp học (Capacity Constraint):**
    * Số lượng bản ghi `enrollments` có trạng thái `active` của một lớp học không bao giờ được vượt quá `classes.capacity`.
-   * Trigger kiểm tra sĩ số phải hỗ trợ giao dịch hoán đổi (atomic swap) mà không bắn lỗi giữa chừng.
+   * Trigger kiểm tra sĩ số `trg_enforce_class_capacity` được triển khai dạng `CONSTRAINT TRIGGER ... AFTER INSERT OR UPDATE ON enrollments DEFERRABLE INITIALLY DEFERRED` với truy vấn có scope theo `NEW.class_id`, đảm bảo cho phép giao dịch hoán đổi (atomic swap) mà không bắn lỗi giữa chừng và không gây N+1 scan bảng.
 3. **Bất biến Phiên bản Lạc quan (Optimistic Concurrency Control):**
    * Khi snapshot RPC trả revision, client lưu nó trong `workspaceRevision` và gửi lại dưới dạng `p_expected_revision`. `sync_workspace_atomic` từ chối một revision cũ hơn revision hiện tại bằng `CONFLICT_REVISION_MISMATCH`; client hiển thị trạng thái lỗi và yêu cầu reload thay vì tự ghi đè.
    * RPC là đường ghi ưu tiên. REST waterfall cũ vẫn là đường tương thích khi RPC không khả dụng; đường fallback không trả revision mới và không có bảo đảm OCC/transaction của RPC.
@@ -154,10 +155,10 @@ Hệ thống tuân thủ nguyên tắc: **Cùng 1 Tổ chức nhưng dữ liệu
 | Roster & Teacher Scope | `web/src/modules/roster/teacher-workspace.ts` | `web/src/pages/teacher/TeacherOverviewPage.tsx` | `users`, `classes`, `enrollments` |
 | Multi-Class Context | `web/src/modules/roster/class-context.ts` | `web/src/hooks/useTeacherClassContext.ts` | `classes` |
 | Session Scheduling | `web/src/modules/scheduling/session-lifecycle.ts`| `web/src/pages/teacher/TeacherSessionPage.tsx` | `learning_sessions`, `scheduled_sessions` |
-| Live Observation | `web/src/modules/assessment/session-capture.ts`, `web/src/lib/live-assessment.ts` | `web/src/pages/teacher/TeacherObservePage.tsx` | `assessment_attempts`, `assessment_events`, `create_session_question_attempt`, `record_provisional_result`, `resolve_probe` (`20261010070000_fix_live_scoring_and_events_rls.sql`) |
+| Live Observation | `web/src/modules/assessment/session-capture.ts`, `web/src/lib/live-assessment.ts` | `web/src/pages/teacher/TeacherObservePage.tsx` | `assessment_attempts`, `assessment_events`, `create_session_question_attempt`, `record_provisional_result`, `resolve_probe`, `correct_final_result` (`20261020000000_fix_scoping_sync_and_scoring.sql`) |
 | 7-Color Spectrum | `web/src/modules/result-lifecycle/types.ts` | `web/src/pages/teacher/TeacherObservePage.tsx` | `result_color` enum, `assessment_attempt_snapshots` |
 | Probe Counters | `web/src/modules/assessment/probe-metrics.ts` | `web/src/pages/teacher/TeacherObservePage.tsx` | `enteredProbeFlow`, `probeCount` |
-| Atomic Sync, Scoped Snapshot & OCC | `web/src/lib/supabase-sync.ts` | `web/src/state/AppState.tsx` | `organization_workspace_versions`, `get_workspace_snapshot`, `sync_workspace_atomic` (`20261010030000_fix_workspace_snapshot_user_roles.sql`) |
+| Atomic Sync, Scoped Snapshot & OCC | `web/src/lib/supabase-sync.ts` | `web/src/state/AppState.tsx` | `organization_workspace_versions`, `get_workspace_snapshot`, `sync_workspace_atomic` (`20261020000000_fix_scoping_sync_and_scoring.sql`) |
 | Test Packages V2 | `web/src/lib/test-packages.ts` | `web/src/pages/admin/AdminPackageTestsPage.tsx` | `test_packages`, `test_sections`, `test_items` |
 | Standalone Test Run Bundle | `web/src/lib/standalone-tests.ts` | `web/src/pages/teacher/TeacherTestRunPage.tsx` | `standalone_test_runs`, `standalone_test_run_items`, `standalone_test_attempts`, `standalone_test_attempt_snapshots`, `narration_variants`, `get_standalone_test_run_bundle` (`20261001010000_standalone_test_run_bundle_rpc.sql`) |
 | Standalone Tests Scoping, Serialization & Analysis | `web/src/lib/standalone-tests.ts` | `web/src/pages/teacher/TeacherTestAnalysisPage.tsx`, `TeacherTestsPage.tsx`, `TeacherTestRunPage.tsx` | `private.staff_can_manage_standalone_test`, `record_standalone_provisional_result`, `resolve_standalone_probe` (`20261010080000_serialize_standalone_test_events.sql`) |

@@ -19,9 +19,16 @@ export function TeacherAnalysisPage() {
   const { classRow, course } = useTeacherClassContext()
 
   const deleteSession = async (sessionId: string) => {
+    const hasFinalized = ledger.some((r) => r.learningSessionId === sessionId)
+    if (hasFinalized) {
+      window.alert(
+        'Cannot delete a session with recorded assessment results. This would violate assessment immutability. Please keep the session for audit history.',
+      )
+      return
+    }
     if (
       !window.confirm(
-        'Are you sure you want to delete this live session? All question captures and attendance for this session will be permanently deleted.',
+        'Are you sure you want to delete this un-assessed session? Attendance for this session will be removed.',
       )
     ) {
       return

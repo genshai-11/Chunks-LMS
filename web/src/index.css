@@ -5891,6 +5891,7 @@
   }
   .live-test-probe-dock .observe-dock-probe-btn.pass span {
     @apply text-sky-300 font-bold;
+  }
   .live-test-probe-dock .observe-dock-probe-btn.done {
     @apply border-indigo-300/60 bg-indigo-950/80 text-indigo-100 hover:bg-indigo-900;
   }

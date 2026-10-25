@@ -9,6 +9,10 @@ import type { SchedulingState } from '../modules/scheduling/types'
 
 export type BackendStatus = 'booting' | 'online' | 'offline' | 'syncing' | 'error'
 
+export type SessionNumberSaveResult =
+  | { ok: true; persistence: 'cloud' | 'local' }
+  | { ok: false; error: string }
+
 export type AppStateValue = {
   roster: RosterState
   setRoster: (next: RosterState) => void

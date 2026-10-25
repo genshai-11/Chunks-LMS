@@ -66,6 +66,10 @@ export type Props = {
   courseId: string
   classId?: string
   learnerUserId?: string
+  selectedLearnerIds?: string[]
+  selectedSessionId?: string
+  selectedSessionNumber?: number | null
+  learnerName?: string
   totalDays?: number | null
   /** Compact: hide advanced multi-metric toggles */
   compact?: boolean
@@ -148,15 +152,32 @@ export function AnalysisChartsPanel({
   courseId,
   classId,
   learnerUserId,
+  selectedLearnerIds,
+  selectedSessionId,
+  selectedSessionNumber,
+  learnerName,
   totalDays,
   compact = false,
 }: Props) {
-  const [selectedSessions, setSelectedSessions] = useState<number[]>([])
+  const [selectedSessions, setSelectedSessions] = useState<number[]>(() => {
+    if (selectedSessionNumber != null && selectedSessionNumber > 0) {
+      return [selectedSessionNumber]
+    }
+    return []
+  })
+
+  useEffect(() => {
+    if (selectedSessionNumber != null && selectedSessionNumber > 0) {
+      setSelectedSessions([selectedSessionNumber])
+    } else if (selectedSessionId === undefined) {
+      setSelectedSessions([])
+    }
+  }, [selectedSessionId, selectedSessionNumber])
   const [selectedColors, setSelectedColors] = useState<ResultColor[]>([...SPECTRUM_COLORS])
   const [chartUi, setChartUi] = useState<ChartUiState>(DEFAULT_CHART_UI)
   const [chartOrder, setChartOrder] = useState<ChartKey[]>(DEFAULT_CHART_ORDER)
   const [draggingChart, setDraggingChart] = useState<ChartKey | null>(null)
-  const [sessionGroupMode, setSessionGroupMode] = useState<'dynamic' | 'day'>('dynamic')
+  const [sessionGroupMode, setSessionGroupMode] = useState<'dynamic' | 'day'>('day')
   const [dynamicChunkSize, setDynamicChunkSize] = useState<number>(10)
   const [sessionChartType, setSessionChartType] = useState<SessionChartType>('bar')
   const [metricVisibility, setMetricVisibility] = useState({
@@ -198,7 +219,11 @@ export function AnalysisChartsPanel({
     const scoped = ledger.filter((r) => {
       if (r.courseId !== courseId) return false
       if (classId && r.classId !== classId) return false
-      if (learnerUserId && r.learnerUserId !== learnerUserId) return false
+      if (selectedLearnerIds && selectedLearnerIds.length > 0) {
+        if (!selectedLearnerIds.includes(r.learnerUserId)) return false
+      } else if (learnerUserId && r.learnerUserId !== learnerUserId) {
+        return false
+      }
       return true
     })
 
@@ -211,18 +236,24 @@ export function AnalysisChartsPanel({
       return new Date(a.finalizedAt).getTime() - new Date(b.finalizedAt).getTime()
     })
 
-    return sorted.map((r, index) => {
+    // Number questions per session starting from 1
+    const sessionCounters = new Map<string, number>()
+    return sorted.map((r) => {
       const session = sessionMap.get(r.learningSessionId)
       const sessionNumber = session?.sessionNumber ?? 1
+      const countInSession = (sessionCounters.get(r.learningSessionId) ?? 0) + 1
+      sessionCounters.set(r.learningSessionId, countInSession)
+
       const color = r.effectiveColor
       const enteredProbeFlow = Boolean(r.enteredProbeFlow)
       const probeEventCount = Math.max(0, r.probeEventCount ?? 0)
 
       return {
         id: r.id,
-        index: index + 1,
-        label: `Attempt ${index + 1}`,
-        shortLabel: `A${index + 1}`,
+        sessionQuestionIndex: countInSession,
+        index: countInSession,
+        label: `Day ${sessionNumber} · Q${countInSession}`,
+        shortLabel: `Q${countInSession}`,
         session: sessionNumber,
         sessionId: r.learningSessionId,
         sessionLabel: sessionLabel(sessionNumber, session?.startedAt, totalDays),
@@ -234,7 +265,7 @@ export function AnalysisChartsPanel({
         finalizedAt: r.finalizedAt,
       }
     })
-  }, [ledger, learningSessions, courseId, classId, learnerUserId, totalDays])
+  }, [ledger, learningSessions, courseId, classId, learnerUserId, selectedLearnerIds, totalDays])
 
   const availableSessions = useMemo(() => {
     const list = Array.from(new Set(attempts.map((a) => a.session))).sort((a, b) => a - b)
@@ -249,12 +280,19 @@ export function AnalysisChartsPanel({
   const chartAttempts = useMemo(() => {
     const sessionSet = selectedSessions.length ? new Set(selectedSessions) : null
     const colorSet = new Set<ResultColor>(selectedColors)
-    return attempts.filter((row) => {
-      if (sessionSet && !sessionSet.has(row.session)) return false
-      if (!colorSet.has(row.color)) return false
-      return true
-    })
-  }, [attempts, selectedColors, selectedSessions])
+    const isSingleDay = selectedSessions.length === 1 || (selectedSessions.length === 0 && availableSessions.length === 1)
+
+    return attempts
+      .filter((row) => {
+        if (sessionSet && !sessionSet.has(row.session)) return false
+        if (!colorSet.has(row.color)) return false
+        return true
+      })
+      .map((row) => ({
+        ...row,
+        shortLabel: isSingleDay ? `Q${row.sessionQuestionIndex}` : `D${row.session}-Q${row.sessionQuestionIndex}`,
+      }))
+  }, [attempts, selectedColors, selectedSessions, availableSessions])
 
   // Summary KPIs for live scope (RFC, %c, sample size, N_total)
   const summary = useMemo(() => {
@@ -365,7 +403,10 @@ export function AnalysisChartsPanel({
     if (chartAttempts.length === 0) return []
 
     if (sessionGroupMode === 'dynamic') {
-      const sorted = [...chartAttempts].sort((a, b) => a.index - b.index)
+      const sorted = [...chartAttempts].sort((a, b) => {
+        if (a.session !== b.session) return a.session - b.session
+        return a.sessionQuestionIndex - b.sessionQuestionIndex
+      })
       const buckets: {
         id: string
         label: string
@@ -383,9 +424,13 @@ export function AnalysisChartsPanel({
       const numBuckets = Math.ceil(totalAttempts / size)
 
       for (let i = 0; i < numBuckets; i++) {
-        const startQ = i * size + 1
-        const endQ = Math.min((i + 1) * size, totalAttempts)
-        const bucketAttempts = sorted.slice(i * size, endQ)
+        const startIdx = i * size
+        const endIdx = Math.min((i + 1) * size, totalAttempts)
+        const bucketAttempts = sorted.slice(startIdx, endIdx)
+        if (bucketAttempts.length === 0) continue
+
+        const first = bucketAttempts[0]!
+        const last = bucketAttempts[bucketAttempts.length - 1]!
 
         const probed = bucketAttempts.filter((a) => a.enteredProbeFlow)
         const chunksNumbers = probed.map((a) => Math.max(1, a.probeEventCount + 1))
@@ -407,10 +452,16 @@ export function AnalysisChartsPanel({
         const bandColor = colorForAvgPercentX(percentC)
         const rfc = spectrum.rfc == null ? 0 : Number((spectrum.rfc * 100).toFixed(1))
 
+        const rangeLabel = first.session === last.session
+          ? `D${first.session} (Q${first.sessionQuestionIndex}-Q${last.sessionQuestionIndex})`
+          : `D${first.session}-Q${first.sessionQuestionIndex} → D${last.session}-Q${last.sessionQuestionIndex}`
+
         buckets.push({
           id: `dynamic-${i}`,
-          label: `Session ${i + 1} (Q${startQ}-Q${endQ})`,
-          shortLabel: `S${i + 1} (Q${startQ}-${endQ})`,
+          label: `Chunk ${i + 1} · ${rangeLabel}`,
+          shortLabel: first.session === last.session
+            ? `Q${first.sessionQuestionIndex}-${last.sessionQuestionIndex}`
+            : `C${i + 1}`,
           percentC,
           bandColor,
           questionCount: bucketAttempts.length,
@@ -419,7 +470,6 @@ export function AnalysisChartsPanel({
           probeDepth,
         })
       }
-
       return buckets
     } else {
       // sessionGroupMode === 'day'
@@ -666,6 +716,12 @@ export function AnalysisChartsPanel({
               </span>
             </div>
           </div>
+          {learnerName ? (
+            <div className="px-3 py-1.5 bg-indigo-50 border-b border-indigo-100 text-indigo-700 text-xs font-semibold flex items-center gap-1.5 truncate">
+              <span className="text-indigo-500 uppercase text-[10px] tracking-wider">Learner:</span>
+              <span className="truncate">{learnerName}</span>
+            </div>
+          ) : null}
 
           <details className="test-analysis-filter-menu">
             <summary>

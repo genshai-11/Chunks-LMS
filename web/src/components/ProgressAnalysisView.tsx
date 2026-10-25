@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import {
   Activity,
   ArrowDown,
@@ -49,6 +49,7 @@ import {
 import { AnalysisChartsPanel } from './AnalysisChartsPanel'
 import { UserAvatar } from './UserAvatar'
 import { probeChunksNumber } from '../modules/assessment/probe-metrics'
+import type { SessionNumberSaveResult } from '../state/app-state-context'
 
 const DAY_TABLE_DEFAULT: MetricKey[] = [
   'rfc',
@@ -88,7 +89,7 @@ type Props = {
    */
   metricSettings?: MetricSettingsState
   onDeleteSession?: (sessionId: string) => void
-  onEditSessionNumber?: (sessionId: string, sessionNumber: number) => void
+  onEditSessionNumber?: (sessionId: string, sessionNumber: number) => Promise<SessionNumberSaveResult>
 }
 
 /** Time scope: keep simple — course total, one day, or custom range */
@@ -378,7 +379,7 @@ export function ProgressAnalysisView({
   onDeleteSession,
   onEditSessionNumber,
 }: Props) {
-  const [kind, setKind] = useState<ReportWindowKind>('course')
+  const [kind, setKind] = useState<ReportWindowKind>(initialSessionId ? 'session' : 'course')
   const [customStart, setCustomStart] = useState(courseStart.slice(0, 10) || '2026-07-01')
   const [customEnd, setCustomEnd] = useState(
     (courseEnd ?? '2026-12-31').toString().slice(0, 10),
@@ -394,20 +395,30 @@ export function ProgressAnalysisView({
     const firstLearner = users.find((u) => u.roles.includes('learner'))
     return firstLearner ? [firstLearner.id] : []
   })
+  const learnerSelectionInitialized = useRef(Boolean(learnerUserId) || learners.length > 0)
+  const firstLearnerId = learners[0]?.id
   const [whoOpen, setWhoOpen] = useState(false)
   const [columnsPanelOpen, setColumnsPanelOpen] = useState(false)
   const [deleteSessionIdConfirm, setDeleteSessionIdConfirm] = useState<string | null>(null)
   const [editSessionId, setEditSessionId] = useState<string | null>(null)
   const [editSessionNumberInput, setEditSessionNumberInput] = useState<string>('')
+  const [editSessionSaving, setEditSessionSaving] = useState(false)
+  const [editSessionError, setEditSessionError] = useState<string | null>(null)
+  const [editSessionNotice, setEditSessionNotice] = useState<string | null>(null)
   
   useEffect(() => {
     if (learnerUserId) {
       setSelectedLearnerIds([learnerUserId])
-    } else if (learners.length > 0 && selectedLearnerIds.length === 0) {
-      setSelectedLearnerIds([learners[0].id])
+      learnerSelectionInitialized.current = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [learnerUserId, learners])
+  }, [learnerUserId])
+
+  useEffect(() => {
+    if (!learnerSelectionInitialized.current && firstLearnerId) {
+      setSelectedLearnerIds([firstLearnerId])
+      learnerSelectionInitialized.current = true
+    }
+  }, [firstLearnerId])
 
   useEffect(() => {
     if (initialSessionId) {
@@ -428,6 +439,9 @@ export function ProgressAnalysisView({
       return a.startedAt.localeCompare(b.startedAt)
     })
   }, [learningSessions])
+  const selectedSession = sessionId
+    ? orderedSessions.find((session) => session.id === sessionId)
+    : orderedSessions[0]
 
   const window = useMemo(() => {
     try {
@@ -439,14 +453,8 @@ export function ProgressAnalysisView({
         })
       }
       if (kind === 'session') {
-        const s = orderedSessions.find((x) => x.id === sessionId) ?? orderedSessions[0]
-        if (!s) {
-          return resolveReportWindow({
-            kind: 'course',
-            courseStart,
-            courseEnd: courseEnd ?? '2026-12-31',
-          })
-        }
+        const s = selectedSession
+        if (!s) return null
         return resolveReportWindow({
           kind: 'session',
           learningSessionId: s.id,
@@ -463,7 +471,7 @@ export function ProgressAnalysisView({
     } catch {
       return null
     }
-  }, [kind, customStart, customEnd, sessionId, courseStart, courseEnd, orderedSessions])
+  }, [kind, customStart, customEnd, courseStart, courseEnd, selectedSession])
 
   const scopedLedger = useMemo(() => {
     if (!classId) return ledger.filter((r) => r.courseId === courseId)
@@ -478,7 +486,10 @@ export function ProgressAnalysisView({
   const courseReport = useMemo(() => {
     if (!window || mode === 'learner' || focusLearnerId) return null
     const learnerIds = selectedLearnerIds.length > 0 ? selectedLearnerIds : learners.map((u) => u.id)
-    return buildCourseProgressReport(scopedLedger, courseId, window, { learnerIds })
+    const population = selectedLearnerIds.length > 0
+      ? scopedLedger.filter((record) => selectedLearnerIds.includes(record.learnerUserId))
+      : scopedLedger
+    return buildCourseProgressReport(population, courseId, window, { learnerIds })
   }, [window, mode, focusLearnerId, scopedLedger, courseId, learners, selectedLearnerIds])
 
   const learnerReport = useMemo(() => {
@@ -503,6 +514,7 @@ export function ProgressAnalysisView({
     }
     return records
   }, [window, scopedLedger, courseId, classId, focusLearnerId, selectedLearnerIds])
+  const finalizedCount = windowRecords.length
 
   const counts = colorCounts(windowRecords)
   const total = useMemo(
@@ -648,7 +660,7 @@ export function ProgressAnalysisView({
 
   const learnerColorMap = useMemo(() => {
     const map = new Map<string, { counts: Record<ResultColor, number>; total: number }>()
-    for (const r of scopedLedger) {
+    for (const r of windowRecords) {
       let entry = map.get(r.learnerUserId)
       if (!entry) {
         entry = {
@@ -668,7 +680,7 @@ export function ProgressAnalysisView({
       }
     }
     return map
-  }, [scopedLedger])
+  }, [windowRecords])
 
   type SessionSortField = 'day' | 'sample' | 'rfc' | 'rac'
   type SortDirection = 'asc' | 'desc'
@@ -771,19 +783,37 @@ export function ProgressAnalysisView({
   const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages)
   const startIdx = (safeCurrentPage - 1) * pageSize
   const endIdx = Math.min(startIdx + pageSize, totalHistory)
+  const sessionQuestionNumberMap = useMemo(() => {
+    const bySession = new Map<string, ResultRecord[]>()
+    for (const r of scopedLedger) {
+      if (!bySession.has(r.learningSessionId)) bySession.set(r.learningSessionId, [])
+      bySession.get(r.learningSessionId)!.push(r)
+    }
+    const map = new Map<string, number>()
+    for (const [, records] of bySession) {
+      const sorted = [...records].sort(
+        (a, b) => new Date(a.finalizedAt).getTime() - new Date(b.finalizedAt).getTime(),
+      )
+      sorted.forEach((r, idx) => {
+        map.set(r.id, idx + 1)
+      })
+    }
+    return map
+  }, [scopedLedger])
+
   const paginatedHistory = useMemo(() => {
     return filteredHistory.slice(startIdx, endIdx)
   }, [filteredHistory, startIdx, endIdx])
 
 
   const selectedSessionLabel = useMemo(() => {
-    const s = orderedSessions.find((x) => x.id === sessionId) ?? orderedSessions[0]
-    if (!s) return '—'
+    const s = selectedSession
+    if (!s) return 'Selected session unavailable'
     const num =
       s.sessionNumber ??
       orderedSessions.findIndex((x) => x.id === s.id) + 1
     return sessionLabel(num, s.startedAt, totalDays)
-  }, [orderedSessions, sessionId, totalDays])
+  }, [orderedSessions, selectedSession, totalDays])
 
   if (scopedLedger.length === 0) {
     return (
@@ -914,25 +944,28 @@ export function ProgressAnalysisView({
           ) : null}
         </div>
 
-        {kind === 'session' && orderedSessions.length > 0 ? (
+        {kind === 'session' ? (
           <div className="analysis-filter-row">
             <label className="analysis-select-wrap analysis-filter-grow">
               <span className="analysis-filter-label">Day / session</span>
               <select
                 className="analysis-select"
-                value={sessionId || orderedSessions[0]?.id}
+                value={selectedSession?.id ?? sessionId}
                 onChange={(e) => setSessionId(e.target.value)}
               >
+                {!selectedSession && <option value={sessionId}>Selected session unavailable</option>}
                 {orderedSessions.map((s, i) => {
                   const num = s.sessionNumber ?? i + 1
                   const label = sessionLabel(num, s.startedAt, totalDays)
-                  const date = new Date(s.startedAt).toLocaleDateString([], {
+                  const date = new Date(s.startedAt).toLocaleString([], {
                     month: 'short',
                     day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
                   })
                   return (
                     <option key={s.id} value={s.id}>
-                      {label} · {date}
+                      {label} · {date} · {s.id.slice(0, 8)}
                       {s.completedAt ? '' : ' · open'}
                     </option>
                   )
@@ -977,9 +1010,13 @@ export function ProgressAnalysisView({
               : ''}
           {kind === 'session' ? ` · ${selectedSessionLabel}` : window ? ` · ${window.label}` : ''}
           {' · '}
-          <strong>{total} finalized</strong>
-          <span className="text-slate-400"> (sample size, not chunks number)</span>
+          <strong>{finalizedCount} finalized</strong>
+          <span className="text-slate-400"> (sample size) · N_total={total} measurement steps</span>
         </p>
+        {kind === 'session' && !selectedSession && (
+          <p role="status" className="meta">This session is unavailable in the current class. Select another day; no other session is included automatically.</p>
+        )}
+        {editSessionNotice && <p role="status" className="meta">{editSessionNotice}</p>}
       </section>
 
       {/* Focused learner strip */}
@@ -1037,7 +1074,7 @@ export function ProgressAnalysisView({
           <div className="analysis-person-copy">
             <p className="analysis-person-name">{focusLearner.displayName}</p>
             <p className="meta">
-              {mode === 'teacher' ? 'Learner detail' : 'Your progress'} · {total} results in scope
+              {mode === 'teacher' ? 'Learner detail' : 'Your progress'} · {finalizedCount} results in scope
             </p>
           </div>
           {mode === 'teacher' ? (
@@ -1076,7 +1113,7 @@ export function ProgressAnalysisView({
                 <span className="group relative inline-block cursor-help text-slate-400 hover:text-slate-600">
                   <Info className="h-3.5 w-3.5" />
                   <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-900 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 border border-slate-800 text-left normal-case">
-                    <strong>Struggle (RFC)</strong> = (Red + Orange) ÷ finalized sample. Lower RFC is better. Source: assessment ledger only (no mock).
+                    <strong>Struggle (RFC)</strong> = (Red + Orange + Yellow) ÷ N_total measurement steps from finalized attempts. Lower RFC is better. Source: assessment ledger only (no mock).
                   </span>
                 </span>
               </p>
@@ -1122,9 +1159,9 @@ export function ProgressAnalysisView({
                   </span>
                 </span>
               </p>
-              <p className="stat-value">{total}</p>
+              <p className="stat-value">{finalizedCount}</p>
               <p className="meta">
-                G/P {counts.green + counts.purple} · R/Y {counts.red + counts.yellow}
+                N_total={total} measurement steps (primary + probe)
               </p>
             </div>
           </div>
@@ -1139,11 +1176,11 @@ export function ProgressAnalysisView({
                 <div className="flex items-center justify-between mb-2">
                   <p className="panel-title m-0">Color mix</p>
                   <span className="text-xs text-slate-500 font-medium">
-                    sample={total}
+                    sample={finalizedCount} · N_total={total} steps
                   </span>
                 </div>
                 <p className="meta mb-3" style={{ marginTop: 0 }}>
-                  7-color spectrum distribution across finalized results
+                  7-color measurement steps from finalized attempts, including probe steps; not a question count
                 </p>
 
                 {total === 0 ? (
@@ -1346,9 +1383,13 @@ export function ProgressAnalysisView({
             learningSessions={orderedSessions}
             courseId={courseId}
             classId={classId}
-            learnerUserId={focusLearnerId}
             totalDays={totalDays}
             metricSettings={metricSettings}
+            learnerUserId={focusLearnerId}
+            selectedLearnerIds={selectedLearnerIds}
+            selectedSessionId={kind === 'session' ? sessionId : undefined}
+            selectedSessionNumber={kind === 'session' ? (selectedSession?.sessionNumber ?? null) : null}
+            learnerName={focusLearner?.displayName ?? (selectedLearnerIds.length > 1 ? `${selectedLearnerIds.length} learners` : undefined)}
           />
         </div>
       )}
@@ -1366,7 +1407,7 @@ export function ProgressAnalysisView({
                   <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-slate-900 p-2.5 text-[10px] font-normal leading-normal text-slate-200 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 border border-slate-800 text-left normal-case">
                     Each row is one live day from the <strong>finalized ledger</strong> (no mock).
                     <br />
-                    <strong>RFC</strong> = (Red+Orange) / sample. <strong>Δ RFC</strong> = change vs previous day (negative pp = improvement).
+                    <strong>RFC</strong> = (Red + Orange + Yellow) / N_total measurement steps. <strong>Δ RFC</strong> = change vs previous day (negative pp = improvement).
                   </span>
                 </span>
               </span>
@@ -1485,10 +1526,12 @@ export function ProgressAnalysisView({
                           <span className="analysis-day-cell">
                             {sessionLabel(p.sessionNumber, p.startedAt, totalDays)}
                             <small>
-                              {new Date(p.startedAt).toLocaleDateString([], {
+                              {new Date(p.startedAt).toLocaleString([], {
                                 month: 'short',
                                 day: 'numeric',
-                              })}
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })} · {p.learningSessionId.slice(0, 8)}
                             </small>
                           </span>
                         </th>
@@ -1549,6 +1592,8 @@ export function ProgressAnalysisView({
                                 onClick={() => {
                                   setEditSessionId(p.learningSessionId)
                                   setEditSessionNumberInput(String(p.sessionNumber ?? ''))
+                                  setEditSessionError(null)
+                                  setEditSessionNotice(null)
                                 }}
                               >
                                 Edit Day
@@ -1790,10 +1835,12 @@ export function ProgressAnalysisView({
                         <td>
                           {sessionNum != null ? (
                             <span
-                              className="inline-flex items-center font-mono text-xs px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-700"
+                              className="inline-flex items-center gap-1 font-mono text-xs px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-700"
                               title={session?.startedAt ? new Date(session.startedAt).toLocaleDateString() : undefined}
                             >
-                              D{sessionNum}
+                              <span>D{sessionNum}</span>
+                              <span className="text-slate-400">·</span>
+                              <span className="font-semibold text-slate-900">Q{sessionQuestionNumberMap.get(r.id) ?? '—'}</span>
                             </span>
                           ) : (
                             <span className="text-slate-400 font-mono text-xs">—</span>
@@ -1937,9 +1984,9 @@ export function ProgressAnalysisView({
       {/* Custom Edit Session Number Modal */}
       {editSessionId && (
         <div className="observe-modal-container">
-          <div className="observe-modal-backdrop" onClick={() => setEditSessionId(null)} />
-          <div className="observe-modal-card text-left max-w-sm p-6 bg-white border border-slate-200 rounded-2xl shadow-xl relative z-50">
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Edit Session Day</h3>
+          <div className="observe-modal-backdrop" onClick={() => { if (!editSessionSaving) setEditSessionId(null) }} />
+          <div className="observe-modal-card text-left max-w-sm p-6 bg-white border border-slate-200 rounded-2xl shadow-xl relative z-50" role="dialog" aria-modal="true" aria-labelledby="edit-session-title" aria-busy={editSessionSaving}>
+            <h3 id="edit-session-title" className="text-lg font-bold text-slate-900 mb-2">Edit Session Day</h3>
             <p className="text-xs text-slate-500 mb-4">
               Enter the correct day number sequence for this session record.
             </p>
@@ -1947,6 +1994,9 @@ export function ProgressAnalysisView({
               <input
                 type="number"
                 min="1"
+                step="1"
+                aria-label="Day number"
+                disabled={editSessionSaving}
                 required
                 className="w-full text-center bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-2xl font-black text-slate-900 focus:outline-none focus:border-indigo-500 font-mono tracking-wider"
                 value={editSessionNumberInput}
@@ -1954,10 +2004,12 @@ export function ProgressAnalysisView({
                 placeholder="Day Number"
               />
             </div>
+            {editSessionError && <p role="alert" className="text-sm text-red-700 mb-4">{editSessionError}</p>}
             <div className="flex justify-end gap-3">
               <button
                 type="button"
                 className="btn secondary px-4 py-2 text-xs font-semibold rounded-lg"
+                disabled={editSessionSaving}
                 onClick={() => setEditSessionId(null)}
               >
                 Cancel
@@ -1965,17 +2017,36 @@ export function ProgressAnalysisView({
               <button
                 type="button"
                 className="btn primary bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 text-xs font-semibold rounded-lg shadow-md"
-                onClick={() => {
-                  const newNum = parseInt(editSessionNumberInput, 10)
-                  if (!isNaN(newNum) && newNum > 0) {
-                    if (onEditSessionNumber) onEditSessionNumber(editSessionId, newNum)
+                disabled={editSessionSaving}
+                onClick={async () => {
+                  if (editSessionSaving || !onEditSessionNumber) return
+                  const newNum = Number(editSessionNumberInput)
+                  if (!Number.isSafeInteger(newNum) || newNum <= 0) {
+                    setEditSessionError('Invalid session number. Must be a positive integer.')
+                    return
+                  }
+                  setEditSessionError(null)
+                  setEditSessionSaving(true)
+                  try {
+                    const result = (await onEditSessionNumber(editSessionId, newNum)) as SessionNumberSaveResult | void
+                    if (result && !result.ok) {
+                      setEditSessionError(result.error)
+                      return
+                    }
+                    if (result) {
+                      setEditSessionNotice(result.persistence === 'cloud'
+                        ? 'Session day saved to cloud.'
+                        : 'Session day saved only in this browser; not synced to cloud.')
+                    }
                     setEditSessionId(null)
-                  } else {
-                    alert('Invalid session number. Must be a positive integer.')
+                  } catch (error) {
+                    setEditSessionError(error instanceof Error ? error.message : 'Unable to save session day.')
+                  } finally {
+                    setEditSessionSaving(false)
                   }
                 }}
               >
-                Save Changes
+                {editSessionSaving ? 'Saving…' : 'Save Changes'}
               </button>
             </div>
           </div>

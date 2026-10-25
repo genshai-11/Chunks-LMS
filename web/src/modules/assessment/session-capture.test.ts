@@ -158,4 +158,52 @@ describe('one-result-per-sentence assignment', () => {
     expect(summary.recordedByColor.indigo).toBe(1)
     expect(summary.totalRecords).toBe(4)
   })
+
+  it('keeps five drafts and an open probe separate from finalized questions and measurement steps', () => {
+    let state = createCaptureSession({
+      learningSessionId: 'summary-session',
+      teacherUserId: 'teacher-1',
+      learnerIds: ['learner-1'],
+    })
+    const directQuestion = addSessionQuestion(state)
+    if (!directQuestion.ok) throw new Error(directQuestion.error)
+    const direct = recordColorForCurrent(directQuestion.state, 'orange', '2026-07-10T10:00:00.000Z')
+    if (!direct.ok) throw new Error(direct.error)
+
+    const probedQuestion = addSessionQuestion(direct.state)
+    if (!probedQuestion.ok) throw new Error(probedQuestion.error)
+    const green = recordColorForCurrent(probedQuestion.state, 'green', '2026-07-10T10:01:00.000Z')
+    if (!green.ok) throw new Error(green.error)
+    const blue = resolveProbeForCurrent(green.state, 'continue', '2026-07-10T10:02:00.000Z')
+    if (!blue.ok) throw new Error(blue.error)
+    const done = resolveProbeForCurrent(blue.state, 'done', '2026-07-10T10:03:00.000Z')
+    if (!done.ok) throw new Error(done.error)
+
+    const openQuestion = addSessionQuestion(done.state)
+    if (!openQuestion.ok) throw new Error(openQuestion.error)
+    const open = recordColorForCurrent(openQuestion.state, 'green', '2026-07-10T10:04:00.000Z')
+    if (!open.ok) throw new Error(open.error)
+    const continued = resolveProbeForCurrent(open.state, 'continue', '2026-07-10T10:05:00.000Z')
+    if (!continued.ok) throw new Error(continued.error)
+    state = continued.state
+    for (let i = 0; i < 5; i++) {
+      const draft = addSessionQuestion(state)
+      if (!draft.ok) throw new Error(draft.error)
+      state = draft.state
+    }
+
+    expect(sessionColorSummary(state)).toMatchObject({
+      total: 8,
+      done: 2,
+      byColor: { draft: 5, open: 1, orange: 1, indigo: 1 },
+      primaryRecords: 3,
+      probeRecords: 3,
+      totalRecords: 6,
+      recordedByColor: {
+        red: 0, orange: 1, yellow: 0, green: 2, blue: 2, indigo: 1, purple: 0,
+      },
+    })
+    expect(attemptCountsByLearner(state)).toEqual({ 'learner-1': 8 })
+    expect(state.attempts.filter((a) => a.snapshot.status === 'finalized')).toHaveLength(2)
+  })
 })

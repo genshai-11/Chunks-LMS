@@ -44,7 +44,8 @@ export function dedupeById<T extends { id: string }>(rows: T[]): T[] {
 /**
  * Merge remote scheduling into local so another browser's open session is not lost.
  * Remote open sessions win for the same class if local lacks them.
- * Local sessions are kept when IDs match; completed is terminal and cannot be reopened by stale remote data.
+ * Local lifecycle state is kept when IDs match; cloud day metadata is authoritative.
+ * Completed is terminal and cannot be reopened by stale remote data.
  */
 export function mergeScheduling(local: SchedulingState, remote: SchedulingState): SchedulingState {
   const schedById = new Map(local.scheduledSessions.map((s) => [s.id, s]))
@@ -59,6 +60,8 @@ export function mergeScheduling(local: SchedulingState, remote: SchedulingState)
       lsById.set(s.id, s)
       continue
     }
+    // Reload must not preserve an unacknowledged day edit from this browser's cache.
+    lsById.set(s.id, { ...existing, sessionNumber: s.sessionNumber })
     // Completion is terminal. A stale remote open snapshot must never make Finish resumable again.
     if (s.status === 'open' && existing.status === 'open') {
       // Prefer fresher lock / owner from remote if local has no owner

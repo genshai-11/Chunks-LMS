@@ -5,6 +5,7 @@ import { useTeacherClassContext } from '../../hooks/useTeacherClassContext'
 import { activeEnrollmentsForClass } from '../../modules/roster/service'
 import { useAppState } from '../../state/useAppState'
 import { getSupabase } from '../../lib/supabase'
+import type { SessionNumberSaveResult } from '../../state/app-state-context'
 
 export function TeacherAnalysisPage() {
   const {
@@ -16,6 +17,7 @@ export function TeacherAnalysisPage() {
     syncNow,
     metricSettings,
     activeLearnerUserId,
+    supabaseEnabled,
   } = useAppState()
   const { classRow, course } = useTeacherClassContext()
   const [searchParams] = useSearchParams()
@@ -53,26 +55,41 @@ export function TeacherAnalysisPage() {
     }
   }
 
-  const editSessionNumber = async (sessionId: string, sessionNumber: number) => {
+  const editSessionNumber = async (
+    sessionId: string,
+    sessionNumber: number,
+  ): Promise<SessionNumberSaveResult> => {
+    if (!Number.isInteger(sessionNumber) || sessionNumber < 1 || sessionNumber > 2_147_483_647) {
+      return { ok: false, error: 'Day must be a positive whole number within the supported range.' }
+    }
+    const session = scheduling.learningSessions.find((row) => row.id === sessionId)
+    if (!classRow || !session || session.classId !== classRow.id) {
+      return { ok: false, error: 'This session is not in your active class. Reload and try again.' }
+    }
     const nextScheduling = {
       ...scheduling,
-      learningSessions: scheduling.learningSessions.map((s) =>
-        s.id === sessionId ? { ...s, sessionNumber } : s
+      learningSessions: scheduling.learningSessions.map((row) =>
+        row.id === sessionId ? { ...row, sessionNumber } : row,
       ),
     }
 
     setScheduling(nextScheduling)
-
+    if (!supabaseEnabled) {
+      return { ok: true, persistence: 'local' }
+    }
     try {
-      const sb = getSupabase()
-      if (sb) {
-        await (sb.from('learning_sessions') as any)
-          .update({ session_number: sessionNumber })
-          .eq('id', sessionId)
+      const saved = await syncNow({ scheduling: nextScheduling })
+      return saved
+        ? { ok: true, persistence: 'cloud' }
+        : {
+            ok: false,
+            error: 'Cloud save was not confirmed. This change is local only; check the sync error and reload before retrying.',
+          }
+    } catch (error) {
+      return {
+        ok: false,
+        error: `Cloud save was not confirmed; the change is local only. ${error instanceof Error ? error.message : 'Reload before retrying.'}`,
       }
-      await syncNow({ scheduling: nextScheduling })
-    } catch (e) {
-      console.warn('Session update sync failed:', e)
     }
   }
 

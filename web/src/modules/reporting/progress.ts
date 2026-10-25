@@ -74,6 +74,9 @@ export function filterResults(
     if (window.learningSessionId && r.learningSessionId !== window.learningSessionId) {
       return false
     }
+    // A session is identified by its ID, not by when a teacher finalized/corrected
+    // an attempt. Late results still belong to the selected session.
+    if (window.kind === 'session' && window.learningSessionId) return true
     return isInWindow(r.finalizedAt, window)
   })
 }

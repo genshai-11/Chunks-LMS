@@ -144,23 +144,23 @@ function formatFinishSummary(
   const summary = sessionColorSummary(capture)
   const unresolved = summary.byColor.open + summary.byColor.draft
   return [
-    'Session finished',
+    'Session summary',
     '',
     `${dayLabel}${className ? ` · ${className}` : ''}`,
     `Learners: ${capture.learnerIds.length}`,
-    `Questions: ${capture.questions.length}`,
-    `Finalized: ${summary.done}/${summary.total}`,
-    `0 Red: ${summary.byColor.red}`,
-    `1 Orange: ${summary.byColor.orange}`,
-    `F Yellow: ${summary.byColor.yellow}`,
-    `2 Green: ${summary.byColor.green}`,
-    `C Blue: ${summary.byColor.blue}`,
-    `D Indigo: ${summary.byColor.indigo}`,
-    `3 Purple: ${summary.byColor.purple}`,
-    `N_total: ${summary.totalRecords} (${summary.primaryRecords} primary + ${summary.probeRecords} probe)`,
+    `Questions created: ${capture.questions.length}`,
+    `Finalized attempts: ${summary.done}/${summary.total}`,
+    `Red steps: ${summary.recordedByColor.red}`,
+    `Orange steps: ${summary.recordedByColor.orange}`,
+    `Yellow steps: ${summary.recordedByColor.yellow}`,
+    `Green steps: ${summary.recordedByColor.green}`,
+    `Blue steps: ${summary.recordedByColor.blue}`,
+    `Indigo steps: ${summary.recordedByColor.indigo}`,
+    `Purple steps: ${summary.recordedByColor.purple}`,
+    `N_total measurement steps: ${summary.totalRecords} (${summary.primaryRecords} recorded primary + ${summary.probeRecords} probe)`,
     `Max chunks number: ${summary.maxProbeDepth}`,
     unresolved > 0
-      ? `Left unfinalized when session closed: ${unresolved}`
+      ? `Unfinalized: ${unresolved} (${summary.byColor.draft} unscored drafts, ${summary.byColor.open} unresolved probes). These attempts are excluded from Analysis.`
       : 'All captured attempts finalized.',
   ].join('\n')
 }
@@ -487,6 +487,10 @@ export function TeacherObservePage() {
       purple: summary.byColor.purple,
       recordedByColor: summary.recordedByColor,
       totalRecords: summary.totalRecords,
+      primaryRecords: summary.primaryRecords,
+      probeRecords: summary.probeRecords,
+      draftCount: summary.byColor.draft,
+      openProbeCount: summary.byColor.open,
       maxProbeDepth: summary.maxProbeDepth,
       unresolved,
     }
@@ -641,6 +645,17 @@ export function TeacherObservePage() {
       if (state.position.questionIndex < state.questions.length - 1) {
         return advancePosition(state)
       }
+
+      // Guard: Never create a new question if the current/latest question is not finalized
+      const lastAttempt = state.attempts[state.attempts.length - 1]
+      if (
+        lastAttempt &&
+        lastAttempt.snapshot.status !== 'finalized' &&
+        lastAttempt.snapshot.status !== 'corrected'
+      ) {
+        return state
+      }
+
       const externalRef = nextLiveTestExternalRef(state)
       if (externalRef === null) {
         flash('Live-test block complete')
@@ -771,6 +786,15 @@ export function TeacherObservePage() {
 
   const advanceLearnerPane = useCallback(
     async (state: CaptureSessionState, learnerUserId: string): Promise<CaptureSessionState> => {
+      const learnerAttempts = state.attempts.filter((a) => a.learnerUserId === learnerUserId)
+      const lastLearnerAttempt = learnerAttempts[learnerAttempts.length - 1]
+      if (
+        lastLearnerAttempt &&
+        lastLearnerAttempt.snapshot.status !== 'finalized' &&
+        lastLearnerAttempt.snapshot.status !== 'corrected'
+      ) {
+        return state
+      }
       const externalRef = nextLiveTestExternalRef(state)
       if (externalRef === null) {
         flash('Live-test block complete')
@@ -1510,9 +1534,10 @@ export function TeacherObservePage() {
         {done > 0 && summary ? (
           <span
             className="observe-heat-metric muted tabular observe-hide-phone"
-            aria-label={`N_total: ${summary.totalRecords}`}
+            aria-label={`N_total: ${summary.totalRecords} recorded measurement steps; ${summary.done} of ${summary.total} attempts finalized`}
+            title={`${summary.primaryRecords} recorded primary + ${summary.probeRecords} probe steps. Open probes are included here; only finalized attempts feed Analysis.`}
           >
-            N_total {summary.totalRecords}/{Math.max(summary.total + summary.probeRecords, 1)}
+            N_total {summary.totalRecords} steps · finalized {summary.done}/{summary.total}
             {summary.maxProbeDepth > 0 ? ` · max chunks=${summary.maxProbeDepth}` : ''}
           </span>
         ) : null}
@@ -2060,18 +2085,21 @@ export function TeacherObservePage() {
                     <p className="text-lg font-bold text-white mt-0.5">{finishMetrics.learnerCount}</p>
                   </div>
                   <div className="bg-slate-950/40 p-2.5 rounded-lg border border-white/5">
-                    <p className="text-[10px] text-slate-400 uppercase font-medium">Questions</p>
+                    <p className="text-[10px] text-slate-400 uppercase font-medium">Questions created</p>
                     <p className="text-lg font-bold text-white mt-0.5">{finishMetrics.questionCount}</p>
                   </div>
                   <div className="bg-slate-950/40 p-2.5 rounded-lg border border-white/5">
-                    <p className="text-[10px] text-slate-400 uppercase font-medium">Finalized</p>
+                    <p className="text-[10px] text-slate-400 uppercase font-medium">Finalized attempts</p>
                     <p className="text-lg font-bold text-emerald-400 mt-0.5">{finishMetrics.done}/{finishMetrics.total}</p>
                   </div>
                 </div>
+                <p className="text-[11px] text-slate-400">
+                  Questions include unscored drafts. Auto-advance can prepare a next draft before it is scored.
+                </p>
 
                 {/* Color distribution bar */}
                 <div>
-                  <p className="text-[10px] text-slate-400 uppercase font-medium mb-1.5">Recorded 7-color distribution</p>
+                  <p className="text-[10px] text-slate-400 uppercase font-medium mb-1.5">Recorded 7-color measurement steps</p>
                   <div className="h-3 w-full rounded-full bg-slate-950 overflow-hidden flex">
                     {SPECTRUM_COLORS.map((color) =>
                       finishMetrics.recordedByColor[color] > 0 ? (
@@ -2094,9 +2122,13 @@ export function TeacherObservePage() {
 
                 {/* Additional metrics */}
                 <div className="flex justify-between items-center text-xs pt-1 border-t border-white/5">
-                  <span className="text-slate-400">N_total:</span>
+                  <span className="text-slate-400">N_total (measurement steps):</span>
                   <span className="font-mono font-bold text-white">{finishMetrics.totalRecords}</span>
                 </div>
+                <p className="text-[11px] text-slate-400">
+                  {finishMetrics.primaryRecords} recorded primary + {finishMetrics.probeRecords} probe steps.
+                  {' '}Includes steps from unresolved probes; unscored drafts add no steps. Analysis uses finalized attempts only.
+                </p>
                 <div className="flex justify-between items-center text-xs pt-1 border-t border-white/5">
                   <span className="text-slate-400">Max chunks number:</span>
                   <span className="font-mono font-bold text-white">{finishMetrics.maxProbeDepth}</span>
@@ -2106,7 +2138,9 @@ export function TeacherObservePage() {
                 <div className="mt-1">
                   {finishMetrics.unresolved > 0 ? (
                     <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-lg p-2 text-[11px] font-medium">
-                      ⚠️ Left unfinalized when session closed: {finishMetrics.unresolved}
+                      <p>Unfinalized attempts: {finishMetrics.unresolved}</p>
+                      <p>Unscored drafts: {finishMetrics.draftCount} · Unresolved probes: {finishMetrics.openProbeCount}</p>
+                      <p>Save &amp; Finish leaves these attempts unfinalized and excluded from Analysis. Review More to inspect them.</p>
                     </div>
                   ) : (
                     <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg p-2 text-[11px] font-medium text-center">

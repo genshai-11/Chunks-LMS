@@ -153,7 +153,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     loadActiveLearnerId(),
   )
   const [activeClassId, setActiveClassIdState] = useState<string | null>(() => loadActiveClassId())
-  const [workspaceRevision, setWorkspaceRevision] = useState<number | null>(null)
 
   const setActiveLearnerUserId = useCallback((id: string | null) => {
     saveActiveLearnerId(id)
@@ -173,10 +172,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const liveRef = useRef({ roster, scheduling })
   liveRef.current = { roster, scheduling }
 
-  const workspaceRevisionRef = useRef<number | null>(workspaceRevision)
-  useEffect(() => {
-    workspaceRevisionRef.current = workspaceRevision
-  }, [workspaceRevision])
+  const workspaceRevisionRef = useRef<number | null>(null)
+  const workspaceSyncQueue = useRef<Promise<boolean>>(Promise.resolve(true))
+  const enqueueWorkspaceSync = useCallback((save: () => Promise<boolean>) => {
+    const pending = workspaceSyncQueue.current.then(save).catch((error: unknown) => {
+      setBackendStatus('error')
+      setBackendError(syncPhaseError('write', error instanceof Error ? error.message : 'Sync request failed'))
+      return false
+    })
+    workspaceSyncQueue.current = pending
+    return pending
+  }, [])
 
   const lastSavedFingerprintRef = useRef<string>('')
   // Boot: staff (signed-in) cloud is authoritative for writes.
@@ -265,9 +271,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       const wLive = rosterWeight(live.roster, live.scheduling)
 
       skipNextSync.current = true
-      if (typeof loaded.revision === 'number') {
-        setWorkspaceRevision(loaded.revision)
-      }
+      workspaceRevisionRef.current = loaded.revision ?? null
 
       let authoritativeRoster = remote.roster
       const source = chooseBootstrapSource(wRemote, wLive)
@@ -378,50 +382,52 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
 
     if (syncTimer.current) clearTimeout(syncTimer.current)
-    syncTimer.current = setTimeout(async () => {
-      const stable = {
-        roster: ensureStableOrg(roster),
-        scheduling,
-      }
-      const normalized = normalizeIdsForDb(stable)
-      const fingerprint = JSON.stringify(normalized)
-      if (lastSavedFingerprintRef.current === fingerprint) {
-        return
-      }
+    syncTimer.current = setTimeout(() => {
+      syncTimer.current = null
+      void enqueueWorkspaceSync(async () => {
+        // Read after any in-flight save, never replay an older debounced snapshot.
+        const live = liveRef.current
+        const normalized = normalizeIdsForDb({
+          roster: ensureStableOrg(live.roster),
+          scheduling: live.scheduling,
+        })
+        const fingerprint = JSON.stringify(normalized)
+        if (lastSavedFingerprintRef.current === fingerprint) return true
 
-      setBackendStatus('syncing')
-      if (
-        normalized.roster.organization.id !== roster.organization.id ||
-        normalized.roster.users.some((u, i) => u.id !== roster.users[i]?.id) ||
-        normalized.roster.courses.some((c, i) => c.id !== roster.courses[i]?.id)
-      ) {
-        skipNextSync.current = true
-        setRoster(normalized.roster)
-        setScheduling(normalized.scheduling)
-      }
-      const wipe = allowEmptyWipeOnce.current
-      allowEmptyWipeOnce.current = false
-      const result = await saveWorkspaceToSupabase(normalized, {
-        allowEmptyWipe: wipe,
-        expectedRevision: workspaceRevisionRef.current ?? undefined,
-        canProvision: staffSession.canAccess('admin'),
-      })
-      if (result.ok) {
-        lastSavedFingerprintRef.current = fingerprint
-        if (typeof result.newRevision === 'number') {
-          workspaceRevisionRef.current = result.newRevision
-          setWorkspaceRevision(result.newRevision)
+        setBackendStatus('syncing')
+        if (
+          normalized.roster.organization.id !== live.roster.organization.id ||
+          normalized.roster.users.some((u, i) => u.id !== live.roster.users[i]?.id) ||
+          normalized.roster.courses.some((c, i) => c.id !== live.roster.courses[i]?.id)
+        ) {
+          skipNextSync.current = true
+          setRoster(normalized.roster)
+          setScheduling(normalized.scheduling)
         }
-        setBackendStatus('online')
-        setBackendError(null)
-        setLastSyncedAt(new Date().toISOString())
-      } else if (result.conflict) {
-        setBackendStatus('error')
-        setBackendError('Conflict: workspace updated by another session. Please reload to refresh.')
-      } else {
-        setBackendStatus('error')
-        setBackendError(syncPhaseError('write', result.error))
-      }
+        const wipe = allowEmptyWipeOnce.current
+        allowEmptyWipeOnce.current = false
+        const result = await saveWorkspaceToSupabase(normalized, {
+          allowEmptyWipe: wipe,
+          expectedRevision: workspaceRevisionRef.current ?? undefined,
+          canProvision: staffSession.canAccess('admin'),
+        })
+        if (result.ok) {
+          lastSavedFingerprintRef.current = fingerprint
+          if (typeof result.newRevision === 'number') {
+            workspaceRevisionRef.current = result.newRevision
+          }
+          setBackendStatus('online')
+          setBackendError(null)
+          setLastSyncedAt(new Date().toISOString())
+        } else if (result.conflict) {
+          setBackendStatus('error')
+          setBackendError('Conflict: workspace updated by another session. Please reload to refresh.')
+        } else {
+          setBackendStatus('error')
+          setBackendError(syncPhaseError('write', result.error))
+        }
+        return result.ok
+      })
     }, 700)
 
     return () => {
@@ -433,6 +439,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     staffSession.authBypass,
     staffSession.signedIn,
     staffSession.staffRoles.length,
+    enqueueWorkspaceSync,
   ])
 
   const resetAll = useCallback(() => {
@@ -523,73 +530,74 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         window.clearTimeout(syncTimer.current)
         syncTimer.current = null
       }
-      setBackendStatus('syncing')
-      // Prefer explicit snapshot (caller just mutated scheduling/roster) over stale React state.
-      const snapshot = {
-        roster: ensureStableOrg(override?.roster ?? roster),
-        scheduling: override?.scheduling ?? scheduling,
-      }
-      const normalized = normalizeIdsForDb(snapshot)
-      if (
-        normalized.roster.organization.id !== snapshot.roster.organization.id ||
-        normalized.roster.users.some((u, i) => u.id !== snapshot.roster.users[i]?.id)
-      ) {
-        skipNextSync.current = true
-        setRoster(normalized.roster)
-        setScheduling(normalized.scheduling)
-      }
-      const result = await saveWorkspaceToSupabase(normalized, {
-        allowEmptyWipe: allowEmptyWipeOnce.current,
-        pruneMissing: override?.pruneMissing,
-        expectedRevision: workspaceRevision ?? undefined,
-        canProvision: staffSession.canAccess('admin'),
-      })
-      if (result.ok && typeof result.newRevision === 'number') {
-        setWorkspaceRevision(result.newRevision)
-      }
-      allowEmptyWipeOnce.current = false
-      if (result.ok) {
-        lastSavedFingerprintRef.current = JSON.stringify(normalized)
-        if (typeof result.newRevision === 'number') {
-          workspaceRevisionRef.current = result.newRevision
-          setWorkspaceRevision(result.newRevision)
+      return enqueueWorkspaceSync(async () => {
+        setBackendStatus('syncing')
+        // Explicit overrides include mutations not yet committed by React.
+        const snapshot = {
+          roster: ensureStableOrg(override?.roster ?? liveRef.current.roster),
+          scheduling: override?.scheduling ?? liveRef.current.scheduling,
         }
-        const currentTeacherUser = roster.users.find(
-          (u) =>
-            (staffSession.domainUserId && u.id === staffSession.domainUserId) ||
-            (Boolean(staffSession.email) && u.email?.toLowerCase() === staffSession.email?.toLowerCase()),
-        )
-        const verified = await verifyWorkspacePersistence(normalized, {
-          teacherUserId: staffSession.canAccess('admin') ? null : (currentTeacherUser?.id ?? null),
+        const normalized = normalizeIdsForDb(snapshot)
+        if (
+          normalized.roster.organization.id !== snapshot.roster.organization.id ||
+          normalized.roster.users.some((u, i) => u.id !== snapshot.roster.users[i]?.id)
+        ) {
+          skipNextSync.current = true
+          setRoster(normalized.roster)
+          setScheduling(normalized.scheduling)
+        }
+        const result = await saveWorkspaceToSupabase(normalized, {
+          allowEmptyWipe: allowEmptyWipeOnce.current,
+          pruneMissing: override?.pruneMissing,
+          expectedRevision: workspaceRevisionRef.current ?? undefined,
+          canProvision: staffSession.canAccess('admin'),
         })
-        if (!verified.ok) {
-          setBackendStatus('error')
-          setBackendError(syncPhaseError('verify', verified.error))
-          return false
+        allowEmptyWipeOnce.current = false
+        if (result.ok) {
+          if (typeof result.newRevision === 'number') {
+            workspaceRevisionRef.current = result.newRevision
+          }
+          const currentTeacherUser = normalized.roster.users.find(
+            (u) =>
+              (staffSession.domainUserId && u.id === staffSession.domainUserId) ||
+              (Boolean(staffSession.email) && u.email?.toLowerCase() === staffSession.email?.toLowerCase()),
+          )
+          const verified = await verifyWorkspacePersistence(normalized, {
+            teacherUserId: staffSession.canAccess('admin') ? null : (currentTeacherUser?.id ?? null),
+          })
+          if (!verified.ok) {
+            setBackendStatus('error')
+            setBackendError(syncPhaseError('verify', verified.error))
+            return false
+          }
+          lastSavedFingerprintRef.current = JSON.stringify(normalized)
+          setBackendStatus('online')
+          setBackendError(null)
+          setLastSyncedAt(new Date().toISOString())
+          return true
         }
-        setBackendStatus('online')
-        setBackendError(null)
-        setLastSyncedAt(new Date().toISOString())
-        return true
-      }
-      setBackendStatus('error')
-      setBackendError(syncPhaseError('write', result.error))
-      return false
+        setBackendStatus('error')
+        setBackendError(syncPhaseError('write', result.error))
+        return false
+      })
     },
     [
-      roster,
-      scheduling,
       staffSession,
       staffSession.authBypass,
       staffSession.signedIn,
       staffSession.staffRoles,
       staffSession.domainUserId,
       staffSession.email,
-      workspaceRevision,
+      enqueueWorkspaceSync,
     ],
   )
   const reloadFromSupabase = useCallback(async () => {
     if (!isSupabaseConfigured() || !staffSession.userId) return
+    if (syncTimer.current) {
+      clearTimeout(syncTimer.current)
+      syncTimer.current = null
+    }
+    await workspaceSyncQueue.current
     setBackendStatus('syncing')
     const provisioned = await ensureSupabaseStaffWorkspace({
       authUserId: staffSession.userId,
@@ -624,9 +632,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setBackendStatus('online')
     setBackendError(null)
     setLastSyncedAt(new Date().toISOString())
-    if (typeof loaded.revision === 'number') {
-      setWorkspaceRevision(loaded.revision)
-    }
+    workspaceRevisionRef.current = loaded.revision ?? null
+    lastSavedFingerprintRef.current = JSON.stringify(
+      normalizeIdsForDb({ roster: remoteRoster, scheduling: loaded.data.scheduling }),
+    )
   }, [
     staffSession.displayName,
     staffSession.email,

@@ -89,6 +89,8 @@ Hệ thống tuân thủ nguyên tắc: **Cùng 1 Tổ chức nhưng dữ liệu
 4. **Bất biến Định danh Giáo viên (Class Teacher Integrity):**
    * Một lớp học bắt buộc phải gắn liền với một giáo viên phụ trách (`teacher_user_id IS NOT NULL`).
 
+5. **Bất biến Định danh Báo cáo Theo Phiên (Session Report Identity):**
+   * `learningSessionId`, không phải nhãn Day hay khoảng thời gian hoàn tất, là khóa của báo cáo một buổi. Dữ liệu cũ có thể chứa nhiều `Learning Session` cùng `sessionNumber`; chọn một dòng `By day` không được gộp các phiên khác. `sample` đếm attempt đã finalized/corrected; `N_total` đếm các bước màu primary + probe. Attempt `draft`/`probe_open` không phải kết quả finalized.
 ---
 
 ## 4. Chu trình Đồng bộ Dữ liệu Nguyên tử và Snapshot Theo Vai trò

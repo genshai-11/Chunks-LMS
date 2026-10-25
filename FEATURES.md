@@ -270,6 +270,8 @@ $$\text{TestPackage} \xrightarrow{1..N} \text{TestPackageVersion} \xrightarrow{1
 6. **Điều Hướng & Hiển Thị Phân Tích (Analysis Routing & Preselection):**
    - Khi kết thúc ca quan sát trực tiếp, hệ thống điều hướng với tham số `?learner=<id>&session=<id>`, đảm bảo màn hình Analysis hiển thị chính xác học viên và ca học vừa hoàn thành (thay vì mặc định học viên đầu danh sách).
    - Cột trạng thái (`Status`) trong các bảng so sánh Session và tiến độ Learner tạm thời được ẩn để tinh gọn giao diện theo yêu cầu người dùng.
+   - `By day` định danh mỗi dòng bằng `learningSessionId` (không chỉ bằng số Day, vì dữ liệu cũ có thể trùng `sessionNumber`). `Open` khóa báo cáo, biểu đồ và lịch sử kết quả vào đúng ID phiên; không tự rơi về phiên khác nếu ID không còn tồn tại. Kết quả hiệu chỉnh/finalize muộn vẫn thuộc phiên gốc, không bị cắt bởi `startedAt`/`completedAt`.
+   - **`sample`/`finalized` = số attempt đã chốt** trong scope phiên và học viên; **`N_total` = số bước màu đã ghi** (mỗi attempt có thể tạo nhiều bước Green/Blue/Indigo/Yellow khi probe). Không dùng `N_total` làm số câu đã chốt hay số dòng Results; `draft` và `probe_open` không vào số mẫu finalized. Các bộ lọc học viên áp dụng thống nhất cho tổng hợp, biểu đồ, bảng theo ngày và lịch sử.
 ---
 
 ### 3.9. Đồng Bộ Dữ Liệu Nguyên Tử & Điều Khiển Đồng Thời Lạc Quan (Atomic Sync & OCC)

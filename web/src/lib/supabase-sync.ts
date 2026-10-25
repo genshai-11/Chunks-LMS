@@ -1346,6 +1346,19 @@ export async function verifyWorkspacePersistence(
   if (missing.length > 0) {
     return { ok: false, error: `missing after reload: ${missing.slice(0, 8).join(', ')}` }
   }
+  const learningById = new Map(
+    loaded.data.scheduling.learningSessions.map((session) => [session.id, session]),
+  )
+  const mismatchedDays = expectedLearning.filter(
+    (session) =>
+      (session.sessionNumber ?? null) !== (learningById.get(session.id)?.sessionNumber ?? null),
+  )
+  if (mismatchedDays.length > 0) {
+    return {
+      ok: false,
+      error: `session day differs after reload: ${mismatchedDays.slice(0, 8).map((session) => session.id).join(', ')}`,
+    }
+  }
   return { ok: true }
 }
 

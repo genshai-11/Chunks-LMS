@@ -139,6 +139,43 @@ describe('mergeScheduling', () => {
     expect(merged.scheduledSessions.map((s) => s.id)).toContain('s1')
     expect(merged.learningSessions.find((s) => s.id === 'l1')?.status).toBe('completed')
   })
+
+  it.each([3, null])('replaces cached day 6 with cloud day %s without reopening completed history', (cloudDay) => {
+    const local: SchedulingState = {
+      scheduledSessions: [],
+      attendance: [],
+      learningSessions: [
+        ls({
+          id: 'same-session',
+          classId: 'c1',
+          sessionNumber: 6,
+          status: 'completed',
+          completedAt: '2026-07-11T11:00:00.000Z',
+        }),
+        ls({ id: 'unsynced-session', classId: 'c2', sessionNumber: 8 }),
+      ],
+    }
+    const remote: SchedulingState = {
+      scheduledSessions: [],
+      attendance: [],
+      learningSessions: [
+        ls({ id: 'same-session', classId: 'c1', sessionNumber: cloudDay, status: 'open' }),
+      ],
+    }
+
+    const merged = mergeScheduling(local, remote)
+    expect(merged.learningSessions.find((s) => s.id === 'same-session')).toMatchObject({
+      sessionNumber: cloudDay,
+      status: 'completed',
+      completedAt: '2026-07-11T11:00:00.000Z',
+    })
+    expect(merged.learningSessions.find((s) => s.id === 'unsynced-session')).toMatchObject({
+      sessionNumber: 8,
+      status: 'open',
+    })
+    expect(local.learningSessions[0]?.sessionNumber).toBe(6)
+    expect(remote.learningSessions[0]?.status).toBe('open')
+  })
 })
 
 describe('session locks', () => {

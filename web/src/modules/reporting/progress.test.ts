@@ -91,4 +91,67 @@ describe('course progress projections', () => {
     expect(report.comparison.previous).toBeNull()
     expect(formatDelta('rac', report.comparison.deltas.rac)).toBe('no trend')
   })
+
+  it('reports the selected session by identity including late corrections, not by shared timestamps', () => {
+    const ledger = [
+      rec({
+        id: 'selected-at-end',
+        learnerUserId: 'l1',
+        learningSessionId: 'selected',
+        effectiveColor: 'purple',
+        finalizedAt: '2026-07-10T11:00:00.000Z',
+      }),
+      rec({
+        id: 'selected-late-correction',
+        learnerUserId: 'l1',
+        learningSessionId: 'selected',
+        effectiveColor: 'orange',
+        finalizedAt: '2026-07-12T10:00:00.000Z',
+      }),
+      rec({
+        id: 'other-session-same-time',
+        learnerUserId: 'l1',
+        learningSessionId: 'other',
+        effectiveColor: 'red',
+        finalizedAt: '2026-07-10T11:00:00.000Z',
+      }),
+      rec({
+        id: 'other-learner',
+        learnerUserId: 'l2',
+        learningSessionId: 'selected',
+        effectiveColor: 'red',
+        finalizedAt: '2026-07-10T10:00:00.000Z',
+      }),
+      rec({
+        id: 'other-class',
+        classId: 'class-2',
+        learnerUserId: 'l1',
+        learningSessionId: 'selected',
+        effectiveColor: 'red',
+        finalizedAt: '2026-07-10T10:00:00.000Z',
+      }),
+    ]
+    const window = resolveReportWindow({
+      kind: 'session',
+      learningSessionId: 'selected',
+      sessionStartedAt: '2026-07-10T09:00:00.000Z',
+      sessionEndedAt: '2026-07-10T11:00:00.000Z',
+    })
+    const report = buildLearnerProgressReport(ledger, 'l1', window, {
+      courseId: 'course-1',
+      classId: 'class-1',
+    })
+    expect(report.attemptCount).toBe(2)
+    expect(report.comparison.current.find((m) => m.key === 'rfc')?.value).toBe(0.5)
+
+    const dateWindow = resolveReportWindow({
+      kind: 'custom',
+      start: '2026-07-10T09:00:00.000Z',
+      end: '2026-07-10T11:00:00.000Z',
+    })
+    expect(buildLearnerProgressReport(ledger, 'l1', dateWindow, {
+      courseId: 'course-1',
+      classId: 'class-1',
+    }).attemptCount).toBe(0)
+  })
 })

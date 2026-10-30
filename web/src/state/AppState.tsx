@@ -138,7 +138,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       ? emptySchedulingState()
       : (persistedRef.current?.scheduling ?? emptySchedulingState()),
   )
-  const [capture, setCapture] = useState<CaptureSessionState | null>(null)
+  const [capture, setCapture] = useState<CaptureSessionState | null>(
+    () => persistedRef.current?.capture ?? null,
+  )
   const [ledger, setLedger] = useState<ResultRecord[]>(() => persistedRef.current?.ledger ?? [])
   const [auditLog, setAuditLog] = useState<OpsAuditEvent[]>(
     () => persistedRef.current?.auditLog ?? [],
@@ -344,12 +346,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     savePersistedAppState({
       roster,
       scheduling,
-      capture: null,
+      capture,
       ledger,
       metricSettings,
       auditLog,
     })
-  }, [roster, scheduling, metricSettings, ledger, auditLog])
+  }, [roster, scheduling, capture, metricSettings, ledger, auditLog])
 
   // Persist metric settings to Supabase org_settings when available (staff only)
   useEffect(() => {

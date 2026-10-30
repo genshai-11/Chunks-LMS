@@ -487,7 +487,7 @@ export async function createLiveQuestion(input: {
   if (input.openSession) {
     const ensured = await withTimeout(
       ensureLearningSessionOnServer(input.openSession),
-      LIVE_RPC_TIMEOUT_MS,
+      Math.min(LIVE_RPC_TIMEOUT_MS, 1500),
       'ensureLearningSessionOnServer timed out',
     ).catch((err) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) }))
     if (ensured.ok) {

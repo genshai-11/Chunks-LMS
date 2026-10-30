@@ -199,7 +199,7 @@ export function TeacherObservePage() {
   } = useAppState()
   const [toast, setToast] = useState<string | null>(null)
   const [showHeader, setShowHeader] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 768 : true)
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success'>('idle')
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
   const [showKeys, setShowKeys] = useState(false)
   const [finishing, setFinishing] = useState(false)
   const [liveLoading, setLiveLoading] = useState(true)
@@ -1042,7 +1042,7 @@ export function TeacherObservePage() {
       if (!syncRes.ok) {
         console.warn('[observe] live session sync warning:', syncRes.error)
         flash(`Cảnh báo: Không thể lưu kết quả lên server (${syncRes.error}). Vui lòng thử lại.`)
-        setSaveStatus('idle')
+        setSaveStatus('error')
         setFinishing(false)
         return
       }
@@ -1075,7 +1075,7 @@ export function TeacherObservePage() {
       setSaveStatus('idle')
     } catch (err) {
       flash(err instanceof Error ? err.message : 'Error finishing session')
-      setSaveStatus('idle')
+      setSaveStatus('error')
     } finally {
       setFinishing(false)
     }
@@ -1688,17 +1688,19 @@ export function TeacherObservePage() {
         )}
       </button>
 
-      <button
-        type="button"
-        className="observe-finish-fab"
-        onClick={() => void finishSessionAndSave()}
-        disabled={finishing}
-        aria-label="Finish session and save"
-        title="Finish & save (F)"
-      >
-        <CheckCircle2 aria-hidden strokeWidth={2.25} />
-        <span>{finishButtonLabel}</span>
-      </button>
+      {!finishSummary && (
+        <button
+          type="button"
+          className="observe-finish-fab"
+          onClick={() => void finishSessionAndSave()}
+          disabled={finishing}
+          aria-label="Finish session and save"
+          title="Finish & save (F)"
+        >
+          <CheckCircle2 aria-hidden strokeWidth={2.25} />
+          <span>{finishButtonLabel}</span>
+        </button>
+      )}
 
       {/* Desktop left rail (resizable). Phone uses bottom map sheet instead. */}
       {capture.questions.length > 0 && !isPhone && !splitMode ? (
@@ -2103,54 +2105,46 @@ export function TeacherObservePage() {
       )}
 
       {finishSummary && (
-        <div className="observe-modal-container">
-          <div className="observe-modal-backdrop" aria-hidden="true" />
+        <div className="observe-modal-container z-[100]">
+          <div className="observe-modal-backdrop" aria-hidden="true" onClick={() => !finishing && setFinishSummary(null)} />
           <div
-            className="observe-modal-card"
+            className="observe-modal-card max-h-[85vh] overflow-y-auto max-w-md w-full"
             role="dialog"
             aria-modal="true"
             aria-labelledby="modal-finish-summary-title"
           >
             <div className="observe-modal-icon">
-              <CheckCircle2 className="h-8 w-8 text-green-400" />
+              <CheckCircle2 className="h-7 w-7 text-green-400" />
             </div>
-            <h2 id="modal-finish-summary-title" className="observe-modal-title">
+            <h2 id="modal-finish-summary-title" className="observe-modal-title text-lg">
               Session Summary
             </h2>
-            <p className="observe-modal-desc">
-              Review this session summary. Save & Finish will close this day permanently, then the
-              next visit starts a new day.
-            </p>
             {finishMetrics && (
-              <div className="w-full flex flex-col gap-4 text-left my-4 bg-slate-900/50 p-4 rounded-xl border border-white/5">
+              <div className="w-full flex flex-col gap-3 text-left my-2 bg-slate-900/50 p-3.5 rounded-xl border border-white/5">
                 <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                  <span className="text-sm font-semibold text-slate-200">{finishMetrics.dayLabel}</span>
-                  <span className="text-[11px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded font-mono font-bold uppercase">{finishMetrics.className}</span>
+                  <span className="text-xs font-semibold text-slate-200">{finishMetrics.dayLabel}</span>
+                  <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded font-mono font-bold uppercase">{finishMetrics.className}</span>
                 </div>
                 
                 {/* 3 KPIs */}
                 <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="bg-slate-950/40 p-2.5 rounded-lg border border-white/5">
-                    <p className="text-[10px] text-slate-400 uppercase font-medium">Learners</p>
-                    <p className="text-lg font-bold text-white mt-0.5">{finishMetrics.learnerCount}</p>
+                  <div className="bg-slate-950/40 p-2 rounded-lg border border-white/5">
+                    <p className="text-[9px] text-slate-400 uppercase font-medium">Learners</p>
+                    <p className="text-base font-bold text-white mt-0.5">{finishMetrics.learnerCount}</p>
                   </div>
-                  <div className="bg-slate-950/40 p-2.5 rounded-lg border border-white/5">
-                    <p className="text-[10px] text-slate-400 uppercase font-medium">Questions created</p>
-                    <p className="text-lg font-bold text-white mt-0.5">{finishMetrics.questionCount}</p>
+                  <div className="bg-slate-950/40 p-2 rounded-lg border border-white/5">
+                    <p className="text-[9px] text-slate-400 uppercase font-medium">Questions</p>
+                    <p className="text-base font-bold text-white mt-0.5">{finishMetrics.questionCount}</p>
                   </div>
-                  <div className="bg-slate-950/40 p-2.5 rounded-lg border border-white/5">
-                    <p className="text-[10px] text-slate-400 uppercase font-medium">Finalized attempts</p>
-                    <p className="text-lg font-bold text-emerald-400 mt-0.5">{finishMetrics.done}/{finishMetrics.total}</p>
+                  <div className="bg-slate-950/40 p-2 rounded-lg border border-white/5">
+                    <p className="text-[9px] text-slate-400 uppercase font-medium">Finalized</p>
+                    <p className="text-base font-bold text-emerald-400 mt-0.5">{finishMetrics.done}/{finishMetrics.total}</p>
                   </div>
                 </div>
-                <p className="text-[11px] text-slate-400">
-                  Questions include unscored drafts. Auto-advance can prepare a next draft before it is scored.
-                </p>
 
                 {/* Color distribution bar */}
                 <div>
-                  <p className="text-[10px] text-slate-400 uppercase font-medium mb-1.5">Recorded 7-color measurement steps</p>
-                  <div className="h-3 w-full rounded-full bg-slate-950 overflow-hidden flex">
+                  <div className="h-2.5 w-full rounded-full bg-slate-950 overflow-hidden flex">
                     {SPECTRUM_COLORS.map((color) =>
                       finishMetrics.recordedByColor[color] > 0 ? (
                         <div
@@ -2161,9 +2155,9 @@ export function TeacherObservePage() {
                       ) : null,
                     )}
                   </div>
-                  <div className="grid grid-cols-4 gap-1.5 mt-2.5 text-center text-[10px]">
+                  <div className="grid grid-cols-4 gap-1 mt-2 text-center text-[9px]">
                     {SPECTRUM_COLORS.map((color) => (
-                      <div key={color} className={`${SPECTRUM_PILL[color]} border py-1 rounded font-bold`}>
+                      <div key={color} className={`${SPECTRUM_PILL[color]} border py-0.5 rounded font-bold`}>
                         {SPECTRUM_LABEL[color]}: {finishMetrics.recordedByColor[color]}
                       </div>
                     ))}
@@ -2171,39 +2165,34 @@ export function TeacherObservePage() {
                 </div>
 
                 {/* Additional metrics */}
-                <div className="flex justify-between items-center text-xs pt-1 border-t border-white/5">
+                <div className="flex justify-between items-center text-[11px] pt-1 border-t border-white/5">
                   <span className="text-slate-400">N_total (measurement steps):</span>
                   <span className="font-mono font-bold text-white">{finishMetrics.totalRecords}</span>
                 </div>
-                <p className="text-[11px] text-slate-400">
-                  {finishMetrics.primaryRecords} recorded primary + {finishMetrics.probeRecords} probe steps.
-                  {' '}Includes steps from unresolved probes; unscored drafts add no steps. Analysis uses finalized attempts only.
-                </p>
-                <div className="flex justify-between items-center text-xs pt-1 border-t border-white/5">
+                <div className="flex justify-between items-center text-[11px] pt-0.5">
                   <span className="text-slate-400">Max chunks number:</span>
                   <span className="font-mono font-bold text-white">{finishMetrics.maxProbeDepth}</span>
                 </div>
 
-                {/* Unresolved / status info */}
-                <div className="mt-1">
-                  {finishMetrics.unresolved > 0 ? (
-                    <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-lg p-2 text-[11px] font-medium">
-                      <p>Unfinalized attempts: {finishMetrics.unresolved}</p>
-                      <p>Unscored drafts: {finishMetrics.draftCount} · Unresolved probes: {finishMetrics.openProbeCount}</p>
-                      <p>Save &amp; Finish leaves these attempts unfinalized and excluded from Analysis. Review More to inspect them.</p>
-                    </div>
-                  ) : (
-                    <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg p-2 text-[11px] font-medium text-center">
-                      ✓ All captured attempts finalized.
-                    </div>
-                  )}
-                </div>
+                {/* Error status info (only shown on failure) */}
+                {saveStatus === 'error' && (
+                  <div className="bg-rose-500/15 border border-rose-500/30 text-rose-300 rounded-lg p-2 text-[11px] font-medium text-center">
+                    Lỗi lưu dữ liệu lên server. Vui lòng bấm thử lại bên dưới.
+                  </div>
+                )}
+
+                {/* Subtle note if there are unfinalized attempts */}
+                {finishMetrics.unresolved > 0 && saveStatus !== 'error' && (
+                  <p className="text-[10px] text-slate-500 text-center">
+                    *{finishMetrics.unresolved} câu chưa finalize sẽ được bỏ qua khi hoàn thành
+                  </p>
+                )}
               </div>
             )}
-            <div className="observe-modal-actions">
+            <div className="observe-modal-actions w-full flex items-center justify-end gap-2 pt-2">
               <button
                 type="button"
-                className="observe-modal-btn observe-modal-cancel"
+                className="observe-modal-btn observe-modal-cancel text-xs py-2 px-3"
                 onClick={() => setFinishSummary(null)}
                 disabled={finishing}
               >
@@ -2211,7 +2200,7 @@ export function TeacherObservePage() {
               </button>
               <button
                 type="button"
-                className="observe-modal-btn observe-modal-confirm"
+                className="observe-modal-btn observe-modal-confirm text-xs py-2 px-4 font-bold"
                 onClick={() => void handleConfirmFinish()}
                 disabled={finishing}
               >

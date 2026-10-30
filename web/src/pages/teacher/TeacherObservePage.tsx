@@ -643,7 +643,7 @@ export function TeacherObservePage() {
 
   const flash = useCallback((msg: string) => {
     setToast(msg)
-    window.setTimeout(() => setToast(null), 900)
+    window.setTimeout(() => setToast(null), 1800)
   }, [])
 
   const nextLiveTestExternalRef = useCallback(
@@ -693,7 +693,7 @@ export function TeacherObservePage() {
 
       const externalRef = nextLiveTestExternalRef(state)
       if (externalRef === null) {
-        flash('Live-test block complete')
+        flash('Đã hoàn thành toàn bộ câu hỏi kiểm tra! Bấm FINISH để kết thúc.')
         return state
       }
       try {
@@ -723,9 +723,37 @@ export function TeacherObservePage() {
 
   const recordColor = useCallback(
     async (color: ProvisionalColor) => {
-      if (!capture || !attempt || liveSaving || liveSavingRef.current) return
+      const currentCapture = captureRef.current ?? capture
+      if (!currentCapture || !attempt || liveSaving || liveSavingRef.current) return
+
+      // Idempotency: If this attempt is already finalized with the exact same color,
+      // do not spam the database with duplicate corrections. Instead, advance to next question.
+      if (
+        (attempt.snapshot.status === 'finalized' || attempt.snapshot.status === 'corrected') &&
+        attempt.snapshot.effectiveColor === color
+      ) {
+        if (currentCapture.position.questionIndex < currentCapture.questions.length - 1) {
+          setCapture(advancePosition(currentCapture))
+          return
+        }
+        if (nextLiveTestExternalRef(currentCapture) === null) {
+          flash('Đã hoàn thành toàn bộ câu hỏi kiểm tra! Bấm FINISH để kết thúc.')
+          return
+        }
+        liveSavingRef.current = true
+        setLiveSaving(true)
+        try {
+          const next = await advanceAfterFinal(currentCapture)
+          setCapture(next)
+          appendFinalizedFromCapture(next)
+        } finally {
+          liveSavingRef.current = false
+          setLiveSaving(false)
+        }
+        return
+      }
+
       liveSavingRef.current = true
-      const wasFinal = isFinalized
       setLiveSaving(true)
       try {
         const result = await recordLiveColor(attempt, color)
@@ -733,7 +761,7 @@ export function TeacherObservePage() {
           flash(result.error)
           return
         }
-        let next = replaceLiveAttempt(capture, result.data)
+        let next = replaceLiveAttempt(currentCapture, result.data)
         setCapture(next)
         appendFinalizedFromCapture(next)
         if (
@@ -741,11 +769,9 @@ export function TeacherObservePage() {
           result.data.snapshot.status === 'corrected'
         ) {
           playReaction(color)
-          if (!wasFinal) {
-            next = await advanceAfterFinal(next)
-            setCapture(next)
-            appendFinalizedFromCapture(next)
-          }
+          next = await advanceAfterFinal(next)
+          setCapture(next)
+          appendFinalizedFromCapture(next)
         } else if (color === 'green') {
           playReaction('green')
         }
@@ -758,11 +784,11 @@ export function TeacherObservePage() {
       capture,
       attempt,
       liveSaving,
-      isFinalized,
       setCapture,
       appendFinalizedFromCapture,
       playReaction,
       advanceAfterFinal,
+      nextLiveTestExternalRef,
       flash,
     ],
   )
@@ -856,13 +882,32 @@ export function TeacherObservePage() {
   )
   const recordColorForLearner = useCallback(
     async (learnerUserId: string, color: ProvisionalColor) => {
-      if (!capture || liveSaving || liveSavingRef.current) return
-      const learnerAttempt = currentAttemptForLearner(capture, learnerUserId)
+      const currentCapture = captureRef.current ?? capture
+      if (!currentCapture || liveSaving || liveSavingRef.current) return
+      const learnerAttempt = currentAttemptForLearner(currentCapture, learnerUserId)
       if (!learnerAttempt) return
+
+      // Idempotency: If this learner's attempt is already finalized with the exact same color,
+      // do not spam the database with duplicate corrections. Instead, advance the learner pane.
+      if (
+        (learnerAttempt.snapshot.status === 'finalized' ||
+          learnerAttempt.snapshot.status === 'corrected') &&
+        learnerAttempt.snapshot.effectiveColor === color
+      ) {
+        liveSavingRef.current = true
+        setLiveSaving(true)
+        try {
+          const next = await advanceLearnerPane(currentCapture, learnerUserId)
+          setCapture(next)
+          appendFinalizedFromCapture(next)
+        } finally {
+          liveSavingRef.current = false
+          setLiveSaving(false)
+        }
+        return
+      }
+
       liveSavingRef.current = true
-      const wasFinal =
-        learnerAttempt.snapshot.status === 'finalized' ||
-        learnerAttempt.snapshot.status === 'corrected'
       setLiveSaving(true)
       try {
         const result = await recordLiveColor(learnerAttempt, color)
@@ -870,7 +915,7 @@ export function TeacherObservePage() {
           flash(result.error)
           return
         }
-        let next = replaceLiveAttempt(capture, result.data)
+        let next = replaceLiveAttempt(currentCapture, result.data)
         setCapture(next)
         appendFinalizedFromCapture(next)
         if (
@@ -878,11 +923,9 @@ export function TeacherObservePage() {
           result.data.snapshot.status === 'corrected'
         ) {
           playReaction(color)
-          if (!wasFinal) {
-            next = await advanceLearnerPane(next, learnerUserId)
-            setCapture(next)
-            appendFinalizedFromCapture(next)
-          }
+          next = await advanceLearnerPane(next, learnerUserId)
+          setCapture(next)
+          appendFinalizedFromCapture(next)
         } else if (color === 'green') {
           playReaction('green')
         }

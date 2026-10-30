@@ -442,4 +442,107 @@ describe('TeacherObservePage - Finish and Failure Handling', () => {
       },
     })
   })
+
+  it('does not spam recordLiveColor when re-clicking an already finalized color', async () => {
+    const roster = createSeedRoster()
+    const classItem = roster.classes[0]!
+    const teacherId = classItem.teacherUserId
+    const learnerId = roster.enrollments.find((e) => e.classId === classItem.id)!.learnerUserId
+    const captureState: CaptureSessionState = {
+      learningSessionId: 'sess-final',
+      teacherUserId: teacherId,
+      learnerIds: [learnerId],
+      sessionStatus: 'open',
+      questions: [
+        { id: 'q-1', learningSessionId: 'sess-final', sequenceNumber: 1, externalRef: null, assignedLearnerUserId: learnerId },
+        { id: 'q-2', learningSessionId: 'sess-final', sequenceNumber: 2, externalRef: null, assignedLearnerUserId: learnerId },
+      ],
+      attempts: [
+        {
+          id: 'att-1',
+          learningSessionId: 'sess-final',
+          sessionQuestionId: 'q-1',
+          learnerUserId: learnerId,
+          teacherUserId: teacherId,
+          snapshot: {
+            status: 'finalized',
+            provisionalColor: 'purple',
+            effectiveColor: 'purple',
+            effectiveScore: 1,
+            probeCount: 0,
+            maxProbeCount: 2,
+            enteredProbeFlow: false,
+            finalizedAt: '2026-10-30',
+          },
+        },
+      ],
+      position: { mode: 'question_first', questionIndex: 0, learnerIndex: 0 },
+      maxProbeCount: 2,
+    }
+
+    const mockSetCapture = vi.fn()
+    const mockContextValue = {
+      roster,
+      scheduling: {
+        scheduledSessions: [],
+        attendance: [],
+        learningSessions: [{
+          id: 'sess-final',
+          classId: classItem.id,
+          ownerUserId: teacherId,
+          status: 'open' as const,
+          sessionNumber: 1,
+          startedAt: '2026-10-30T00:00:00.000Z',
+          completedAt: null,
+          plannedQuestionCount: 56,
+          maxProbeCount: 2,
+          sessionKind: 'regular' as const,
+          sessionFormat: 'lesson' as const,
+          participantLearnerIds: [learnerId],
+        }],
+      },
+      setScheduling: vi.fn(),
+      capture: captureState,
+      setCapture: mockSetCapture,
+      ledger: [],
+      setLedger: vi.fn(),
+      opsAuditEvents: [],
+      metricSettings: createDefaultMetricSettings(),
+      setMetricSettings: vi.fn(),
+      activeLearnerUserId: learnerId,
+      setActiveLearnerUserId: vi.fn(),
+      activeClassId: classItem.id,
+      setActiveClassId: vi.fn(),
+      syncNow: vi.fn().mockResolvedValue(true),
+      appendFinalizedFromCapture: vi.fn(),
+      backendStatus: 'ready' as const,
+      syncError: null,
+      dismissSyncError: vi.fn(),
+    } as unknown as AppStateContextValue
+
+    render(
+      <BypassStaffSessionProvider>
+        <AppStateContext.Provider value={mockContextValue}>
+          <MemoryRouter>
+            <TeacherObservePage />
+          </MemoryRouter>
+        </AppStateContext.Provider>
+      </BypassStaffSessionProvider>,
+    )
+
+    mockRecordLiveColor.mockClear()
+
+    // Attempt is already finalized as purple
+    const purpleBtn = screen.getByRole('button', { name: /^Purple$/i })
+    fireEvent.click(purpleBtn)
+
+    // Should NOT invoke recordLiveColor because it is already finalized with purple
+    expect(mockRecordLiveColor).not.toHaveBeenCalled()
+    // It should advance position to Q2
+    expect(mockSetCapture).toHaveBeenCalledWith(
+      expect.objectContaining({
+        position: expect.objectContaining({ questionIndex: 1 }),
+      }),
+    )
+  })
 })

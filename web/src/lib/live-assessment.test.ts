@@ -4,6 +4,7 @@ import {
   loadLiveCapture,
   loadLiveLedger,
   recordLiveColor,
+  syncCaptureSessionToServer,
   SUPABASE_IN_FILTER_BATCH_SIZE,
   withTimeout,
 } from './live-assessment'
@@ -251,5 +252,192 @@ describe('recordLiveColor fallback on hanging RPC', () => {
     if (!result.ok) return
     expect(result.data.snapshot.status).toBe('finalized')
     expect(result.data.snapshot.effectiveColor).toBe('orange')
+  })
+})
+
+describe('syncCaptureSessionToServer', () => {
+  it('returns ok true when all table upserts succeed', async () => {
+    mocked.supabase = {
+      from() {
+        return {
+          upsert() {
+            return Promise.resolve({ data: null, error: null })
+          },
+        }
+      },
+    }
+    const capture: CaptureSessionState = {
+      learningSessionId: 'sess-1',
+      teacherUserId: 't-1',
+      learnerIds: ['l-1'],
+      sessionStatus: 'completed',
+      questions: [
+        {
+          id: 'q-1',
+          learningSessionId: 'sess-1',
+          sequenceNumber: 1,
+          externalRef: null,
+          assignedLearnerUserId: 'l-1',
+        },
+      ],
+      attempts: [
+        {
+          id: 'att-1',
+          learningSessionId: 'sess-1',
+          sessionQuestionId: 'q-1',
+          learnerUserId: 'l-1',
+          teacherUserId: 't-1',
+          snapshot: {
+            status: 'finalized',
+            provisionalColor: 'green',
+            effectiveColor: 'green',
+            effectiveScore: 2,
+            probeCount: 0,
+            maxProbeCount: 2,
+            enteredProbeFlow: false,
+            finalizedAt: '2026-10-20',
+          },
+        },
+      ],
+      position: { mode: 'question_first', questionIndex: 0, learnerIndex: 0 },
+      maxProbeCount: 2,
+    }
+    const res = await syncCaptureSessionToServer(capture)
+    expect(res.ok).toBe(true)
+  })
+
+  it('returns ok false with error when an upsert fails', async () => {
+    mocked.supabase = {
+      from(table: string) {
+        return {
+          upsert() {
+            if (table === 'assessment_attempt_snapshots') {
+              return Promise.resolve({ data: null, error: { message: 'RLS policy violated' } })
+            }
+            return Promise.resolve({ data: null, error: null })
+          },
+        }
+      },
+    }
+    const capture: CaptureSessionState = {
+      learningSessionId: 'sess-1',
+      teacherUserId: 't-1',
+      learnerIds: ['l-1'],
+      sessionStatus: 'completed',
+      questions: [
+        {
+          id: 'q-1',
+          learningSessionId: 'sess-1',
+          sequenceNumber: 1,
+          externalRef: null,
+          assignedLearnerUserId: 'l-1',
+        },
+      ],
+      attempts: [
+        {
+          id: 'att-1',
+          learningSessionId: 'sess-1',
+          sessionQuestionId: 'q-1',
+          learnerUserId: 'l-1',
+          teacherUserId: 't-1',
+          snapshot: {
+            status: 'finalized',
+            provisionalColor: 'green',
+            effectiveColor: 'green',
+            effectiveScore: 2,
+            probeCount: 0,
+            maxProbeCount: 2,
+            enteredProbeFlow: false,
+            finalizedAt: '2026-10-20',
+          },
+        },
+      ],
+      position: { mode: 'question_first', questionIndex: 0, learnerIndex: 0 },
+      maxProbeCount: 2,
+    }
+    const res = await syncCaptureSessionToServer(capture)
+    expect(res.ok).toBe(false)
+    if (res.ok) return
+    expect(res.error).toContain('assessment_attempt_snapshots sync: RLS policy violated')
+  })
+
+  it('returns ok true immediately when capture has no questions without querying database', async () => {
+    const fromSpy = vi.fn()
+    mocked.supabase = {
+      from: fromSpy,
+    }
+    const emptyCapture: CaptureSessionState = {
+      learningSessionId: 'sess-1',
+      teacherUserId: 't-1',
+      learnerIds: ['l-1'],
+      sessionStatus: 'completed',
+      questions: [],
+      attempts: [],
+      position: { mode: 'question_first', questionIndex: 0, learnerIndex: 0 },
+      maxProbeCount: 2,
+    }
+    const res = await syncCaptureSessionToServer(emptyCapture)
+    expect(res.ok).toBe(true)
+    expect(fromSpy).not.toHaveBeenCalled()
+  })
+
+  it('returns ok false with timeout message when database upsert hangs', async () => {
+    vi.useFakeTimers()
+    try {
+      const neverResolves = Promise.withResolvers<{ data: null; error: null }>().promise
+      mocked.supabase = {
+        from() {
+          return {
+            upsert() {
+              return neverResolves
+            },
+          }
+        },
+      }
+      const capture: CaptureSessionState = {
+        learningSessionId: 'sess-1',
+        teacherUserId: 't-1',
+        learnerIds: ['l-1'],
+        sessionStatus: 'completed',
+        questions: [
+          {
+            id: 'q-1',
+            learningSessionId: 'sess-1',
+            sequenceNumber: 1,
+            externalRef: null,
+            assignedLearnerUserId: 'l-1',
+          },
+        ],
+        attempts: [
+          {
+            id: 'att-1',
+            learningSessionId: 'sess-1',
+            sessionQuestionId: 'q-1',
+            learnerUserId: 'l-1',
+            teacherUserId: 't-1',
+            snapshot: {
+              status: 'finalized',
+              provisionalColor: 'green',
+              effectiveColor: 'green',
+              effectiveScore: 2,
+              probeCount: 0,
+              maxProbeCount: 2,
+              enteredProbeFlow: false,
+              finalizedAt: '2026-10-20',
+            },
+          },
+        ],
+        position: { mode: 'question_first', questionIndex: 0, learnerIndex: 0 },
+        maxProbeCount: 2,
+      }
+      const syncPromise = syncCaptureSessionToServer(capture)
+      await vi.advanceTimersByTimeAsync(16000)
+      const res = await syncPromise
+      expect(res.ok).toBe(false)
+      if (res.ok) return
+      expect(res.error).toContain('timed out')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

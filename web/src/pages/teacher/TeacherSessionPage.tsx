@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Check,
+  CheckCircle2,
   Eye,
   Gauge,
   Info,
   Layers,
   LayoutGrid,
   List,
+  Loader2,
   Play,
   Plus,
   Radio,
   Trash2,
   Users,
+  X,
 } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Flash } from '../../components/Flash'
@@ -22,6 +25,7 @@ import { useFlash } from '../../hooks/useFlash'
 import {
   addSessionQuestion,
   createCaptureSession,
+  markSessionCompleted,
   sessionColorSummary,
 } from '../../modules/assessment/session-capture'
 import {
@@ -40,7 +44,7 @@ import {
 } from '../../modules/roster/service'
 import { subscribeToClassSnapshots } from '../../modules/realtime/snapshot-channel'
 import { closeOrphanOpenSessions } from '../../modules/scheduling/orphan-sessions'
-import { startLearningSession } from '../../modules/scheduling/session-lifecycle'
+import { completeLearningSession, startLearningSession } from '../../modules/scheduling/session-lifecycle'
 import {
   resolveSessionDayNumber,
   sessionDayBadge,
@@ -62,6 +66,7 @@ export function TeacherSessionPage() {
     ledger,
     metricSettings,
     syncNow,
+    appendFinalizedFromCapture,
     setActiveLearnerUserId,
   } = useAppState()
   const { message, error, ok, err } = useFlash()
@@ -87,8 +92,9 @@ export function TeacherSessionPage() {
     }
     return []
   }, [openSession, activeLearnerIds])
-
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+  const [showRolloverConfirm, setShowRolloverConfirm] = useState(false)
+  const [rolloverLoading, setRolloverLoading] = useState(false)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card')
   useEffect(() => {
@@ -212,6 +218,20 @@ export function TeacherSessionPage() {
 
   async function handleConfirmCancelActiveSession() {
     if (!openSession) return
+    const hasScores =
+      ledger.some((r) => r.learningSessionId === openSession.id) ||
+      (capture?.learningSessionId === openSession.id &&
+        capture.attempts.some(
+          (a) => a.snapshot.status === 'finalized' || a.snapshot.status === 'corrected',
+        ))
+
+    if (hasScores) {
+      setShowCancelConfirm(false)
+      return err(
+        'Cannot delete an active session with recorded assessment results. Please use Finish & Start Next Day instead.',
+      )
+    }
+
     try {
       const supabase = getSupabase()
       if (supabase) {
@@ -230,10 +250,45 @@ export function TeacherSessionPage() {
       setScheduling(nextState)
       setCapture(null)
       ok('Active session cancelled and deleted')
-    } catch (e: any) {
-      err(e.message || 'Failed to delete session')
+    } catch (e: unknown) {
+      err(e instanceof Error ? e.message : 'Failed to delete session')
     } finally {
       setShowCancelConfirm(false)
+    }
+  }
+
+  async function handleConfirmRolloverFromSession() {
+    if (!openSession || !teacher) return
+    setRolloverLoading(true)
+    try {
+      const participants = openSession.participantLearnerIds?.length
+        ? openSession.participantLearnerIds
+        : []
+      const done = completeLearningSession(scheduling, openSession.id, participants)
+      if (!done.ok) {
+        err(done.error)
+        return
+      }
+
+      if (capture && capture.learningSessionId === openSession.id) {
+        const completedCapture = markSessionCompleted(capture)
+        const { syncCaptureSessionToServer } = await import('../../lib/live-assessment')
+        const syncRes = await syncCaptureSessionToServer(completedCapture)
+        if (!syncRes.ok) {
+          err(`Không thể lưu kết quả ca học trước lên server: ${syncRes.error}`)
+          return
+        }
+        appendFinalizedFromCapture(completedCapture)
+      }
+      setScheduling(done.state)
+      setCapture(null)
+      await syncNow({ scheduling: done.state })
+      ok(`Đã đóng ${dayBadge}. Chọn học viên để bắt đầu ca học tiếp theo.`)
+      setShowRolloverConfirm(false)
+    } catch (e) {
+      err(e instanceof Error ? e.message : 'Lỗi khi hoàn tất phiên')
+    } finally {
+      setRolloverLoading(false)
     }
   }
 
@@ -526,6 +581,15 @@ export function TeacherSessionPage() {
             </Link>
             <button
               type="button"
+              className="btn ghost border border-slate-300 hover:border-slate-400 text-slate-700 px-3 py-1.5 rounded-xl flex items-center gap-1.5 font-semibold text-xs"
+              onClick={() => setShowRolloverConfirm(true)}
+              title="Finish this live session and select learners for the next day"
+            >
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              <span>Finish &amp; Start Next Day</span>
+            </button>
+            <button
+              type="button"
               className="btn ghost text-red-400 hover:text-red-300 hover:bg-red-500/10 px-3 py-1.5 rounded flex items-center gap-1.5"
               onClick={deleteActiveSession}
             >
@@ -738,6 +802,66 @@ export function TeacherSessionPage() {
                 onClick={() => void handleConfirmCancelActiveSession()}
               >
                 Cancel Session
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showRolloverConfirm && openSession && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2.5 text-slate-900">
+                <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+                <h3 className="font-bold text-base text-slate-900">Hoàn tất ca học &amp; Bắt đầu buổi tiếp theo</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRolloverConfirm(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 text-xs space-y-2">
+              <p className="text-slate-700">
+                Ca học <strong>{dayBadge}</strong> của lớp <strong>{classRow.name}</strong> sẽ được hoàn thành và lưu trữ vào phân tích.
+              </p>
+              <p className="text-slate-500 font-mono text-[11px]">
+                Học viên tham gia: {sessionLearnerIds.map((id) => roster.users.find((u) => u.id === id)?.displayName).join(', ') || 'Chưa ghi danh'} · Đã chấm: {finalizedCount} câu
+              </p>
+              <p className="text-indigo-600 font-medium">
+                Sau khi hoàn tất, bạn sẽ được đưa về màn hình chọn học viên để bắt đầu ca học mới ngay lập tức.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                disabled={rolloverLoading}
+                onClick={() => setShowRolloverConfirm(false)}
+                className="px-4 py-2 text-xs font-semibold rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={rolloverLoading}
+                onClick={() => void handleConfirmRolloverFromSession()}
+                className="px-4 py-2 text-xs font-bold rounded-xl bg-red-700 hover:bg-red-800 text-white shadow-xs inline-flex items-center gap-2 transition-colors disabled:opacity-50"
+              >
+                {rolloverLoading ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Đang hoàn thành…</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    <span>Hoàn thành &amp; Chọn học viên buổi mới</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

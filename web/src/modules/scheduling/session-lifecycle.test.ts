@@ -217,4 +217,40 @@ describe('session lifecycle and attendance', () => {
     if (!flexible.ok) return
     expect(flexible.value.sessionNumber).toBe(2)
   })
+
+  it('rolls over by completing open session and allowing start of new session', () => {
+    let state = emptySchedulingState()
+    const first = startLearningSession(state, {
+      classId,
+      participantLearnerIds: ['learner-1'],
+    })
+    expect(first.ok).toBe(true)
+    if (!first.ok) return
+    state = first.state
+
+    // Cannot start a second session while first is open
+    const blocked = startLearningSession(state, {
+      classId,
+      participantLearnerIds: ['learner-2'],
+    })
+    expect(blocked.ok).toBe(false)
+    expect(blocked.error).toContain('already has an open Learning Session')
+
+    // Complete the first session
+    const completed = completeLearningSession(state, first.value.id, ['learner-1'])
+    expect(completed.ok).toBe(true)
+    if (!completed.ok) return
+    state = completed.state
+
+    // Now start the second session
+    const second = startLearningSession(state, {
+      classId,
+      participantLearnerIds: ['learner-2'],
+    })
+    expect(second.ok).toBe(true)
+    if (!second.ok) return
+    expect(second.value.status).toBe('open')
+    expect(second.value.id).not.toBe(first.value.id)
+    expect(state.learningSessions.find((s) => s.id === first.value.id)?.status).toBe('completed')
+  })
 })

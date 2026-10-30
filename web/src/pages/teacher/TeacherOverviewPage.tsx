@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
 import {
+  AlertCircle,
   Camera,
   Check,
+  CheckCircle2,
   Eye,
   GraduationCap,
   Home,
@@ -73,12 +75,12 @@ import {
   nextLearnerSessionNumber,
   summarizeLearnerSessions,
 } from '../../modules/teacher/learner-insights'
-import { createCaptureSession } from '../../modules/assessment/session-capture'
+import { createCaptureSession, markSessionCompleted } from '../../modules/assessment/session-capture'
 import {
   closeOrphanOpenSessions,
   openSessionParticipantNames,
 } from '../../modules/scheduling/orphan-sessions'
-import { startLearningSession } from '../../modules/scheduling/session-lifecycle'
+import { completeLearningSession, startLearningSession } from '../../modules/scheduling/session-lifecycle'
 import { useAppState } from '../../state/useAppState'
 
 type ViewMode = 'grid' | 'list'
@@ -96,6 +98,7 @@ export function TeacherOverviewPage() {
     activeLearnerUserId,
     setActiveLearnerUserId,
     setActiveClassId,
+    appendFinalizedFromCapture,
     syncNow,
   } = useAppState()
   const { options, classRow, course, teacher, seats, hasMultiple, selectedClassIds, mode } = useTeacherClassContext()
@@ -106,6 +109,14 @@ export function TeacherOverviewPage() {
   const [startingLearnerId, setStartingLearnerId] = useState<string | null>(null)
   const [showAddLearner, setShowAddLearner] = useState(false)
   const [savingLearner, setSavingLearner] = useState(false)
+  const [rolloverPrompt, setRolloverPrompt] = useState<{
+    openSession: import('../../modules/scheduling/types').LearningSession
+    newLearnerId: string
+    preferredClassId: string
+    openParticipantNames: string
+    summary: { total: number; done: number } | null
+  } | null>(null)
+  const [rolloverLoading, setRolloverLoading] = useState(false)
   const [addLearnerDraft, setAddLearnerDraft] = useState({
     displayName: '',
     email: '',
@@ -323,11 +334,23 @@ export function TeacherOverviewPage() {
       if (!includesLearner) {
         const participantInfo = openSessionParticipantNames(roster, open)
         const names = participantInfo.names.join(', ')
-        return err(
-          `A live session is already open for ${names || 'another learner'}. Finish it before starting ${
-            roster.users.find((user) => user.id === learnerId)?.displayName ?? 'this learner'
-          }.`,
-        )
+        const isCurrentCapture = capture && capture.learningSessionId === open.id
+        const summaryData = isCurrentCapture
+          ? {
+              total: capture.questions.length,
+              done: capture.attempts.filter(
+                (a) => a.snapshot.status === 'finalized' || a.snapshot.status === 'corrected',
+              ).length,
+            }
+          : null
+        setRolloverPrompt({
+          openSession: open,
+          newLearnerId: learnerId,
+          preferredClassId,
+          openParticipantNames: names || 'another learner',
+          summary: summaryData,
+        })
+        return
       }
       setActiveLearnerUserId(learnerId)
       setActiveClassId(preferredClassId)
@@ -387,6 +410,78 @@ export function TeacherOverviewPage() {
       navigate('/teacher/observe')
     } finally {
       setStartingLearnerId(null)
+    }
+  }
+
+  async function confirmRolloverAndStart() {
+    if (!rolloverPrompt || !teacher) return
+    const { openSession, newLearnerId, preferredClassId } = rolloverPrompt
+    setRolloverLoading(true)
+    try {
+      const participants = openSession.participantLearnerIds?.length
+        ? openSession.participantLearnerIds
+        : []
+      const done = completeLearningSession(scheduling, openSession.id, participants)
+      if (!done.ok) {
+        err(done.error)
+        return
+      }
+
+      if (capture && capture.learningSessionId === openSession.id) {
+        const completedCapture = markSessionCompleted(capture)
+        const { syncCaptureSessionToServer } = await import('../../lib/live-assessment')
+        const syncRes = await syncCaptureSessionToServer(completedCapture)
+        if (!syncRes.ok) {
+          err(`Không thể lưu kết quả ca học trước lên server: ${syncRes.error}`)
+          return
+        }
+        appendFinalizedFromCapture(completedCapture)
+      }
+      const maxProbeCount = metricSettings.defaultMaxProbeCount
+      const nextSessionNum = nextLearnerSessionNumber({
+        ledger,
+        scheduling: done.state,
+        learnerUserId: newLearnerId,
+      })
+      const started = startLearningSession(done.state, {
+        classId: preferredClassId,
+        maxProbeCount,
+        ownerUserId: teacher.id,
+        sessionKind: 'regular',
+        participantLearnerIds: [newLearnerId],
+        sessionNumber: nextSessionNum,
+      })
+      if (!started.ok) {
+        err(started.error)
+        return
+      }
+
+      const nextCapture = createCaptureSession({
+        learningSessionId: started.value.id,
+        teacherUserId: teacher.id,
+        learnerIds: [newLearnerId],
+        maxProbeCount,
+      })
+
+      setActiveLearnerUserId(newLearnerId)
+      setActiveClassId(preferredClassId)
+      setScheduling(started.state)
+      setCapture(nextCapture)
+
+      const { ensureLearningSessionOnServer } = await import('../../lib/live-assessment')
+      await Promise.all([
+        ensureLearningSessionOnServer(started.value),
+        syncNow({ scheduling: started.state }),
+      ])
+
+      const newLearnerName = roster.users.find((u) => u.id === newLearnerId)?.displayName ?? 'học viên'
+      ok(`Completed previous session & started new session for ${newLearnerName}`)
+      setRolloverPrompt(null)
+      navigate('/teacher/observe')
+    } catch (e) {
+      err(e instanceof Error ? e.message : 'Failed to complete rollover')
+    } finally {
+      setRolloverLoading(false)
     }
   }
 
@@ -893,6 +988,68 @@ export function TeacherOverviewPage() {
         )}
       </Panel>
 
+      {rolloverPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2.5 text-amber-600">
+                <AlertCircle className="h-5 w-5 shrink-0" />
+                <h3 className="font-bold text-base text-slate-900">Ca học trước đang mở</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRolloverPrompt(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 text-xs space-y-2">
+              <p className="text-slate-700">
+                Lớp <strong className="text-slate-900">{classRow?.name ?? 'này'}</strong> hiện có ca học <strong>Day {rolloverPrompt.openSession.sessionNumber ?? '—'}</strong> của học viên <strong className="text-slate-900">{rolloverPrompt.openParticipantNames}</strong> đang hoạt động.
+              </p>
+              {rolloverPrompt.summary ? (
+                <p className="text-slate-500 font-mono text-[11px]">
+                  Số câu đã tạo: {rolloverPrompt.summary.total} · Đã chấm xong: {rolloverPrompt.summary.done}
+                </p>
+              ) : null}
+              <p className="text-red-700 font-medium">
+                Bạn có muốn hoàn tất ca học trước và bắt đầu ca học mới ngay cho <strong className="text-slate-950 font-bold">{roster.users.find((u) => u.id === rolloverPrompt.newLearnerId)?.displayName ?? 'học viên mới'}</strong> không?
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                disabled={rolloverLoading}
+                onClick={() => setRolloverPrompt(null)}
+                className="px-4 py-2 text-xs font-semibold rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={rolloverLoading}
+                onClick={() => void confirmRolloverAndStart()}
+                className="px-4 py-2 text-xs font-bold rounded-xl bg-red-700 hover:bg-red-800 text-white shadow-xs inline-flex items-center gap-2 transition-colors disabled:opacity-50"
+              >
+                {rolloverLoading ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Đang hoàn tất &amp; mở ca mới…</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    <span>Hoàn thành &amp; Bắt đầu mới</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {capture?.sessionStatus === 'open' ? (
         <p className="meta">
           Capture board is open —{' '}

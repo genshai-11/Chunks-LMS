@@ -91,7 +91,8 @@ Hệ thống tuân thủ nguyên tắc: **Cùng 1 Tổ chức nhưng dữ liệu
 
 5. **Bất biến Định danh Báo cáo Theo Phiên (Session Report Identity):**
    * `learningSessionId`, không phải nhãn Day hay khoảng thời gian hoàn tất, là khóa của báo cáo một buổi. Dữ liệu cũ có thể chứa nhiều `Learning Session` cùng `sessionNumber`; chọn một dòng `By day` không được gộp các phiên khác. `sample` đếm attempt đã finalized/corrected; `N_total` đếm các bước màu primary + probe. Attempt `draft`/`probe_open` không phải kết quả finalized.
----
+6. **Bất biến Chuyển Giao Ca Học Không Mất Dữ Liệu (Lossless Session Rollover):**
+   * Khi hoàn tất ca học cũ để mở ca mới (Session Rollover), ca cũ phải được chuyển sang `completed` và toàn bộ attempts/snapshots phải được lưu trữ bền vững trước khi ca mới được tạo. Tuyệt đối không xóa cứng ca cũ; ca mới mang `learningSessionId` độc lập hoàn toàn.
 
 ## 4. Chu trình Đồng bộ Dữ liệu Nguyên tử và Snapshot Theo Vai trò
 

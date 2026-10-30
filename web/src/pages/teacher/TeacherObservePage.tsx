@@ -374,8 +374,7 @@ export function TeacherObservePage() {
       fallback: localFallback,
     })
     if (!result.ok) return
-
-    // Don't overwrite a richer compatible local board with an empty/older cloud board.
+    if (liveSavingRef.current) return
     const latest = captureRef.current
     const latestCompatible =
       latest &&
@@ -390,6 +389,33 @@ export function TeacherObservePage() {
     ) {
       return
     }
+
+    // Preserve local finalized/corrected/provisional state if cloud snapshot is still older/draft
+    if (latestCompatible.attempts.length > 0) {
+      const localAttemptById = new Map(latestCompatible.attempts.map((a) => [a.id, a]))
+      result.data.attempts = result.data.attempts.map((cloudAttempt) => {
+        const local = localAttemptById.get(cloudAttempt.id)
+        if (!local) return cloudAttempt
+        if (
+          (local.snapshot.status === 'finalized' || local.snapshot.status === 'corrected') &&
+          cloudAttempt.snapshot.status !== 'finalized' &&
+          cloudAttempt.snapshot.status !== 'corrected'
+        ) {
+          return local
+        }
+        if (local.snapshot.probeCount > cloudAttempt.snapshot.probeCount) {
+          return local
+        }
+        if (local.snapshot.status === 'resolution_required' && cloudAttempt.snapshot.status !== 'finalized') {
+          return local
+        }
+        if (local.snapshot.enteredProbeFlow && !cloudAttempt.snapshot.enteredProbeFlow) {
+          return local
+        }
+        return cloudAttempt
+      })
+    }
+
     setCapture(result.data)
   }, [openSession, teacher, activeLearnerIds, setCapture])
 
@@ -405,12 +431,21 @@ export function TeacherObservePage() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'assessment_attempt_snapshots' },
-        (payload: { new?: { attempt_id?: string }; old?: { attempt_id?: string } }) => {
+        (payload: { new?: { attempt_id?: string; status?: string }; old?: { attempt_id?: string } }) => {
           const changedAttemptId = payload.new?.attempt_id ?? payload.old?.attempt_id
           if (
             changedAttemptId &&
             captureRef.current &&
             !captureRef.current.attempts.some((a) => a.id === changedAttemptId)
+          ) {
+            return
+          }
+          // Ignore self-echo if local snapshot already matches the incoming status
+          const localAtt = captureRef.current?.attempts.find((a) => a.id === changedAttemptId)
+          if (
+            localAtt &&
+            payload.new?.status &&
+            localAtt.snapshot.status === payload.new.status
           ) {
             return
           }
@@ -996,24 +1031,35 @@ export function TeacherObservePage() {
       if (!done.ok) {
         flash(done.error)
         setSaveStatus('idle')
+        setFinishing(false)
         return
       }
 
       const completedCapture = markSessionCompleted(capture)
+
+      // 1. Sync capture questions & snapshots to server first
+      const syncRes = await syncCaptureSessionToServer(completedCapture)
+      if (!syncRes.ok) {
+        console.warn('[observe] live session sync warning:', syncRes.error)
+        flash(`Cảnh báo: Không thể lưu kết quả lên server (${syncRes.error}). Vui lòng thử lại.`)
+        setSaveStatus('idle')
+        setFinishing(false)
+        return
+      }
+
+      // 2. Sync scheduling completed status to server
+      const syncNowOk = await syncNow({ scheduling: done.state })
+      if (!syncNowOk) {
+        console.warn('[observe] syncNow failed during finish')
+      }
+
+      // 3. Commit completed state only after successful sync
       setScheduling(done.state)
       setCapture(completedCapture)
       appendFinalizedFromCapture(completedCapture)
-      try {
-        const syncRes = await syncCaptureSessionToServer(completedCapture)
-        if (!syncRes.ok) {
-          console.warn('[observe] live session sync warning:', syncRes.error)
-        }
-        await syncNow({ scheduling: done.state })
-      } catch (err) {
-        console.warn('[observe] local persist held, sync warning:', err)
-      }
+
       setSaveStatus('success')
-      await new Promise((resolve) => window.setTimeout(resolve, 1500))
+      await new Promise((resolve) => window.setTimeout(resolve, 1200))
       setFinishSummary(null)
       const testedLearnerId =
         activeSplitLearnerId ??
@@ -1026,6 +1072,9 @@ export function TeacherObservePage() {
           }`
         : '/teacher/analysis'
       navigate(targetUrl)
+      setSaveStatus('idle')
+    } catch (err) {
+      flash(err instanceof Error ? err.message : 'Error finishing session')
       setSaveStatus('idle')
     } finally {
       setFinishing(false)
@@ -1058,6 +1107,7 @@ export function TeacherObservePage() {
       const k = e.key.toLowerCase()
       if (k === 'escape') {
         e.preventDefault()
+        if (finishing) return
         if (finishSummary) setFinishSummary(null)
         else navigate(exitPath)
         return
@@ -1199,7 +1249,7 @@ export function TeacherObservePage() {
     resolveProbeForLearner,
   ])
 
-  if (!openSession) {
+  if (!openSession && !finishing) {
     return <Navigate to={exitPath} replace />
   }
 
@@ -1227,7 +1277,7 @@ export function TeacherObservePage() {
     )
   }
 
-  if (liveLoading || !capture || capture.learningSessionId !== openSession.id) {
+  if ((!openSession && !finishing) || liveLoading || !capture || (!finishing && capture.learningSessionId !== openSession?.id)) {
     return (
       <div className="observe-root flex items-center justify-center" role="status">
         <p className="text-sm font-semibold text-slate-300">Loading live session…</p>
@@ -1235,7 +1285,7 @@ export function TeacherObservePage() {
     )
   }
 
-  if (capture.sessionStatus !== 'open') {
+  if (capture.sessionStatus !== 'open' && !finishing) {
     return <Navigate to={exitPath} replace />
   }
 

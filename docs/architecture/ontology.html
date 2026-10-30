@@ -271,7 +271,7 @@
               <p><code>AppState</code> giữ revision từ boot/reload, cập nhật bằng <code>newRevision</code> sau write, và chuyển sang error yêu cầu reload khi OCC conflict.</p>
               <p>Cloud roster không rỗng được ưu tiên hơn browser cache cũ; scheduling được merge để giữ session đang mở.</p>
               <p>RPC thiếu/lỗi sẽ rơi về REST waterfall. Fallback không atomic và không có OCC revision.</p>
-              <p>Client gửi <code>attendance</code>, nhưng migration RPC hiện chưa xử lý mảng này.</p>
+              <p class="text-emerald-400 font-semibold mt-1">✓ Session Rollover: Tự động tổng kết phiên cũ và bắt đầu phiên mới nguyên tử, bảo toàn lịch sử chấm điểm.</p>
             </div>
           </div>
         </div>

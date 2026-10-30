@@ -118,7 +118,9 @@ Chunks-LMS là nền tảng đo lường chỉ số **Tập trung (Focus)** và 
    - Mỗi ca học gắn với một `class_id` và giáo viên phụ trách (`owner_user_id`).
    - Hỗ trợ số thứ tự buổi học (`session_number`) và danh sách học viên tham gia cụ thể (`participant_learner_ids`).
    - Cơ chế khóa ca học (`lock_expires_at`) ngăn chặn nhiều giáo viên đồng thời can thiệp vào cùng một ca học.
-
+4. **Cơ Chế Chuyển Đổi Ca Học Tự Động Kèm Xác Nhận Tổng Kết (Session Rollover):**
+   - Khi bắt đầu ca học mới mà lớp đang có ca học `open`: Hệ thống hiển thị modal tóm tắt ca cũ (số câu, số kết quả finalized, học sinh tham gia).
+   - Xác nhận chuyển đổi: Hoàn tất và lưu trữ an toàn ca cũ trước, sau đó tự động khởi tạo ca mới và điều hướng trực tiếp vào Observe mà không cần mở lại ca cũ thủ công.
 #### Hợp Đồng Hàm & API Chính
 * `startLearningSession(scheduling, { sessionId, startedAt })`: Kích hoạt ca học sang trạng thái `active`.
 * `completeLearningSession(scheduling, { sessionId, completedAt })`: Hoàn thành ca học sang `completed`.
@@ -155,7 +157,10 @@ Chunks-LMS là nền tảng đo lường chỉ số **Tập trung (Focus)** và 
    - **`n depth` (`nDepth`):** Độ sâu probe của một câu hỏi cụ thể: $\max(1, \text{probeCount} + 1)$.
    - **`n depth max` (`nDepthMax`):** Độ sâu probe lớn nhất ghi nhận được trong ca học.
    - **`n depth avg` (`nDepthAvg`):** Độ sâu probe trung bình của các câu có vào luồng probe.
-
+5. **Cơ Chế Bảo Vệ Ghi Điểm Bền Vững & Chống Rung Giật (Persistence Gate & Anti-Stutter):**
+   - **Pre-Commit Persistence Gate:** Thao tác kết thúc ca học chỉ hoàn thành sau khi server đã xác nhận lưu trữ toàn bộ câu hỏi, attempts và snapshots. Nếu có lỗi, modal giữ nguyên để giáo viên thử lại, không báo thành công giả.
+   - **Anti-Stutter Snapshot Merge:** Dữ liệu Realtime và background refresh không bao giờ ghi đè lên các attempts đã chấm điểm cục bộ; tự động triệt tiêu các sự kiện Realtime tự phản hồi (self-echo).
+   - **Optimized Timeout (3.5s):** Giới hạn thời gian chờ RPC xuống 3.5s để giữ giao diện luôn phản hồi tức thì, không bị đứng máy.
 #### Hợp Đồng Hàm & API Chính
 * `createLiveQuestion(params)`: Tạo câu hỏi quan sát mới kèm draft attempt thông qua RPC `create_session_question_attempt`.
 * `recordLiveColor(params)`: Ghi nhận màu chấm tạm thời (provisional) qua RPC `record_provisional_result` hoặc hiệu chỉnh qua `correct_final_result`.

@@ -65,7 +65,7 @@ function client() {
   return getSupabase() as any
 }
 
-export const LIVE_RPC_TIMEOUT_MS = 7000
+export const LIVE_RPC_TIMEOUT_MS = 3500
 
 export function withTimeout<T>(
   promise: Promise<T>,
@@ -676,8 +676,10 @@ export async function syncCaptureSessionToServer(
   const sb = client()
   if (!sb) return { ok: false, error: 'Supabase is not configured' }
 
-  try {
-    if (capture.questions.length === 0) return { ok: true, data: true }
+  return withTimeout(
+    (async (): Promise<Result<true>> => {
+      try {
+        if (capture.questions.length === 0) return { ok: true, data: true }
 
     const dbQuestions: DbQuestion[] = capture.questions.map((q) => ({
       id: q.id,
@@ -718,9 +720,15 @@ export async function syncCaptureSessionToServer(
     // 3. Upsert snapshots
     const sRes = await sb.from('assessment_attempt_snapshots').upsert(dbSnapshots, { onConflict: 'attempt_id' })
     if (sRes.error) return { ok: false, error: `assessment_attempt_snapshots sync: ${sRes.error.message}` }
-
-    return { ok: true, data: true }
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : 'capture sync failed' }
-  }
+        return { ok: true, data: true }
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : 'capture sync failed' }
+      }
+    })(),
+    15000,
+    'Syncing capture session to server timed out',
+  ).catch((err: unknown): Result<true> => ({
+    ok: false,
+    error: err instanceof Error ? err.message : String(err),
+  }))
 }

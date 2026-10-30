@@ -202,4 +202,231 @@ describe('TeacherOverviewPage - Add Learner', () => {
     const saveBtn = screen.getByRole('button', { name: /Save Learner/i })
     expect(saveBtn).toBeDisabled()
   }, 15000)
+
+  it('opens rollover prompt when starting session for a learner while another learner has an open session', async () => {
+    const user = userEvent.setup()
+    const initialRoster = createSeedRoster()
+    const classId = initialRoster.classes[0]!.id
+    const learners = initialRoster.users.filter((u) => u.roles.includes('learner'))
+    const openSession = {
+      id: 'open-sess-1',
+      classId,
+      scheduledSessionId: null,
+      status: 'open' as const,
+      plannedQuestionCount: null,
+      startedAt: '2026-10-20T10:00:00.000Z',
+      completedAt: null,
+      maxProbeCount: 2,
+      sessionNumber: 1,
+      ownerUserId: 'teacher-1',
+      lockExpiresAt: null,
+      sessionKind: 'regular' as const,
+      sessionFormat: 'lesson' as const,
+      promptLanguage: null,
+      liveTestResourceId: null,
+      liveTestBlockId: null,
+      participantLearnerIds: [learners[0]!.id],
+    }
+    const mockContextValue = {
+      roster: initialRoster,
+      setRoster: vi.fn(),
+      scheduling: {
+        scheduledSessions: [],
+        learningSessions: [openSession],
+        attendance: [],
+      },
+      setScheduling: vi.fn(),
+      capture: null,
+      setCapture: vi.fn(),
+      ledger: [],
+      setLedger: vi.fn(),
+      opsAuditEvents: [],
+      metricSettings: createDefaultMetricSettings(),
+      setMetricSettings: vi.fn(),
+      activeLearnerUserId: null,
+      setActiveLearnerUserId: vi.fn(),
+      activeClassId: classId,
+      setActiveClassId: vi.fn(),
+      syncNow: vi.fn(),
+      appendFinalizedFromCapture: vi.fn(),
+      backendStatus: 'ready' as const,
+      syncError: null,
+      dismissSyncError: vi.fn(),
+    } as unknown as AppStateContextValue
+
+    render(
+      <BypassStaffSessionProvider>
+        <AppStateContext.Provider value={mockContextValue}>
+          <MemoryRouter>
+            <TeacherOverviewPage />
+          </MemoryRouter>
+        </AppStateContext.Provider>
+      </BypassStaffSessionProvider>,
+    )
+
+    const startButtons = screen.getAllByRole('button', { name: /Start now/i })
+    expect(startButtons.length).toBeGreaterThan(0)
+    await user.click(startButtons[0]!)
+
+    expect(screen.getByText(/Ca học trước đang mở/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Hoàn thành & Bắt đầu mới/i })).toBeInTheDocument()
+  }, 15000)
+
+  it('completes open session, creates new session, and syncs when rollover is confirmed', async () => {
+    const user = userEvent.setup()
+    const initialRoster = createSeedRoster()
+    const classId = initialRoster.classes[0]!.id
+    const teacherId = initialRoster.classes[0]!.teacherUserId
+    const learners = initialRoster.users.filter((u) => u.roles.includes('learner'))
+    const openSession = {
+      id: 'open-sess-1',
+      classId,
+      scheduledSessionId: null,
+      status: 'open' as const,
+      plannedQuestionCount: null,
+      startedAt: '2026-10-20T10:00:00.000Z',
+      completedAt: null,
+      maxProbeCount: 2,
+      sessionNumber: 1,
+      ownerUserId: teacherId,
+      lockExpiresAt: null,
+      sessionKind: 'regular' as const,
+      sessionFormat: 'lesson' as const,
+      promptLanguage: null,
+      liveTestResourceId: null,
+      liveTestBlockId: null,
+      participantLearnerIds: [learners[0]!.id],
+    }
+    const mockSetScheduling = vi.fn()
+    const mockSetCapture = vi.fn()
+    const mockSyncNow = vi.fn().mockResolvedValue(true)
+    const mockAppendFinalized = vi.fn()
+
+    const mockContextValue = {
+      roster: initialRoster,
+      setRoster: vi.fn(),
+      scheduling: {
+        scheduledSessions: [],
+        learningSessions: [openSession],
+        attendance: [],
+      },
+      setScheduling: mockSetScheduling,
+      capture: null,
+      setCapture: mockSetCapture,
+      ledger: [],
+      setLedger: vi.fn(),
+      opsAuditEvents: [],
+      metricSettings: createDefaultMetricSettings(),
+      setMetricSettings: vi.fn(),
+      activeLearnerUserId: null,
+      setActiveLearnerUserId: vi.fn(),
+      activeClassId: classId,
+      setActiveClassId: vi.fn(),
+      syncNow: mockSyncNow,
+      appendFinalizedFromCapture: mockAppendFinalized,
+      backendStatus: 'ready' as const,
+      syncError: null,
+      dismissSyncError: vi.fn(),
+    } as unknown as AppStateContextValue
+
+    render(
+      <BypassStaffSessionProvider>
+        <AppStateContext.Provider value={mockContextValue}>
+          <MemoryRouter>
+            <TeacherOverviewPage />
+          </MemoryRouter>
+        </AppStateContext.Provider>
+      </BypassStaffSessionProvider>,
+    )
+
+    const startButtons = screen.getAllByRole('button', { name: /Start now/i })
+    await user.click(startButtons[0]!)
+
+    expect(screen.getByText(/Ca học trước đang mở/i)).toBeInTheDocument()
+    const confirmBtn = screen.getByRole('button', { name: /Hoàn thành & Bắt đầu mới/i })
+    await user.click(confirmBtn)
+
+    await waitFor(() => {
+      expect(mockSetScheduling).toHaveBeenCalled()
+      expect(mockSetCapture).toHaveBeenCalled()
+      expect(mockSyncNow).toHaveBeenCalled()
+    })
+
+    expect(screen.queryByText(/Ca học trước đang mở/i)).not.toBeInTheDocument()
+  }, 15000)
+
+  it('closes rollover prompt without modifying sessions when Cancel is clicked', async () => {
+    const user = userEvent.setup()
+    const initialRoster = createSeedRoster()
+    const classId = initialRoster.classes[0]!.id
+    const teacherId = initialRoster.classes[0]!.teacherUserId
+    const learners = initialRoster.users.filter((u) => u.roles.includes('learner'))
+    const openSession = {
+      id: 'open-sess-1',
+      classId,
+      scheduledSessionId: null,
+      status: 'open' as const,
+      plannedQuestionCount: null,
+      startedAt: '2026-10-20T10:00:00.000Z',
+      completedAt: null,
+      maxProbeCount: 2,
+      sessionNumber: 1,
+      ownerUserId: teacherId,
+      lockExpiresAt: null,
+      sessionKind: 'regular' as const,
+      sessionFormat: 'lesson' as const,
+      promptLanguage: null,
+      liveTestResourceId: null,
+      liveTestBlockId: null,
+      participantLearnerIds: [learners[0]!.id],
+    }
+    const mockSetScheduling = vi.fn()
+
+    const mockContextValue = {
+      roster: initialRoster,
+      setRoster: vi.fn(),
+      scheduling: {
+        scheduledSessions: [],
+        learningSessions: [openSession],
+        attendance: [],
+      },
+      setScheduling: mockSetScheduling,
+      capture: null,
+      setCapture: vi.fn(),
+      ledger: [],
+      setLedger: vi.fn(),
+      opsAuditEvents: [],
+      metricSettings: createDefaultMetricSettings(),
+      setMetricSettings: vi.fn(),
+      activeLearnerUserId: null,
+      setActiveLearnerUserId: vi.fn(),
+      activeClassId: classId,
+      setActiveClassId: vi.fn(),
+      syncNow: vi.fn(),
+      appendFinalizedFromCapture: vi.fn(),
+      backendStatus: 'ready' as const,
+      syncError: null,
+      dismissSyncError: vi.fn(),
+    } as unknown as AppStateContextValue
+
+    render(
+      <BypassStaffSessionProvider>
+        <AppStateContext.Provider value={mockContextValue}>
+          <MemoryRouter>
+            <TeacherOverviewPage />
+          </MemoryRouter>
+        </AppStateContext.Provider>
+      </BypassStaffSessionProvider>,
+    )
+
+    const startButtons = screen.getAllByRole('button', { name: /Start now/i })
+    await user.click(startButtons[0]!)
+
+    expect(screen.getByText(/Ca học trước đang mở/i)).toBeInTheDocument()
+    const cancelBtn = screen.getByRole('button', { name: /Hủy/i })
+    await user.click(cancelBtn)
+
+    expect(screen.queryByText(/Ca học trước đang mở/i)).not.toBeInTheDocument()
+    expect(mockSetScheduling).not.toHaveBeenCalled()
+  }, 15000)
 })
